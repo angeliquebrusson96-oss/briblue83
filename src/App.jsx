@@ -355,23 +355,36 @@ const GlobalStyles = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: ${DS.bg}; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: ${DS.bg}; overflow-x: hidden; }
     input, select, textarea, button { font-family: inherit; }
     input:focus, select:focus, textarea:focus { outline: none; border-color: ${DS.blue} !important; box-shadow: 0 0 0 3px ${DS.blue}22 !important; }
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-    @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes fadeInFast { from { opacity:0; } to { opacity:1; } }
     @keyframes slideUp { from { opacity:0; transform:translateY(100%); } to { opacity:1; transform:translateY(0); } }
-    @keyframes scaleIn { from { opacity:0; transform:scale(0.95); } to { opacity:1; transform:scale(1); } }
+    @keyframes scaleIn { from { opacity:0; transform:scale(0.94); } to { opacity:1; transform:scale(1); } }
     @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.6; } }
-    .fade-in { animation: fadeIn .4s ease-out both; }
-    .slide-up { animation: slideUp .35s cubic-bezier(.22,1,.36,1) both; }
-    .scale-in { animation: scaleIn .3s ease-out both; }
-    .btn-hover { transition: all .2s ease; }
-    .btn-hover:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
-    .btn-hover:active { transform: translateY(0); }
-    .card-hover { transition: all .2s ease; }
-    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+    @keyframes shimmer { 0% { background-position:-200% 0; } 100% { background-position:200% 0; } }
+    @keyframes float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-4px); } }
+    .fade-in { animation: fadeIn .35s cubic-bezier(.22,1,.36,1) both; }
+    .slide-up { animation: slideUp .38s cubic-bezier(.22,1,.36,1) both; }
+    .scale-in { animation: scaleIn .28s cubic-bezier(.22,1,.36,1) both; }
+    .btn-hover { transition: all .18s cubic-bezier(.22,1,.36,1); }
+    .btn-hover:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,0.18); }
+    .btn-hover:active { transform: translateY(0) scale(0.98); box-shadow: none; }
+    .card-hover { transition: all .2s cubic-bezier(.22,1,.36,1); }
+    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(0,0,0,0.1); border-color: #c8d8e8 !important; }
+    .card-hover:active { transform: translateY(0); }
+    /* Desktop sidebar active link */
+    @media (min-width: 768px) {
+      .sidebar-nav-active { background: rgba(56,189,248,0.12) !important; }
+    }
+    /* Smooth page transitions */
+    .page-content { animation: fadeInFast .25s ease both; }
   `}</style>
 );
 
@@ -1234,7 +1247,7 @@ table td{padding:7px 12px;border:1px solid #e2e8f0;font-size:12px}
   <button onclick="window.close()" class="btn-close">Fermer</button>
 </div>
 
-<div class="subtitle" style="display:flex;justify-content:center;align-items:center;padding:0 0 14px"><img src="${BRAND_LOGO}" alt="BRIBLUE" style="max-width:340px;width:100%;height:auto;object-fit:contain;display:block"/></div>
+<div style="text-align:center;padding:0 0 10px"><span style=\"font-family:Inter,system-ui,sans-serif;font-size:36px;font-weight:900;color:#0c1222;letter-spacing:-1px\">Bri<span style=\"color:#0369a1\"><div style="text-align:center;padding:0 0 10px"><span style="font-family:Inter,system-ui,sans-serif;font-size:36px;font-weight:900;color:#0c1222;letter-spacing:-1px">Bri'<span style="color:#0369a1">blue</span></span></div>apos;</span>blue</span></div>
 <h1 style="margin-top:0">CONTRAT PISCINE</h1>
 <div class="subtitle" style="text-align:center;color:#0369a1;font-size:13px;font-weight:700;margin-bottom:20px;letter-spacing:0.5px">Création · Traitement de l'eau · Installation · Dépannage</div>
 
@@ -1600,13 +1613,28 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
 
   const client = clients.find(c=>c.id===f.clientId);
 
+  // Icônes SVG premium pour les étapes de la fiche entretien
+  const STEP_ICONS = [
+    // 1. Intervention — clé plate stylisée
+    (c="currentColor",s=16) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>,
+    // 2. Analyses eau — flacon avec bulles
+    (c="currentColor",s=16) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v5l3 9a3 3 0 01-3 3H9a3 3 0 01-3-3l3-9V3z"/><path d="M9 3h6"/><path d="M6.5 15h11"/><circle cx="10" cy="12" r="1" fill={c}/><circle cx="14" cy="13.5" r="0.8" fill={c}/></svg>,
+    // 3. État bassin — piscine avec vagues
+    (c="currentColor",s=16) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 14c2.5 2.5 5 2.5 7.5 0s5-2.5 7.5 0 5 2.5 7.5 0" clipPath="url(#p)"/><defs><clipPath id="p"><rect x="2" y="6" width="20" height="12"/></clipPath></defs><line x1="7" y1="6" x2="7" y2="3"/><line x1="17" y1="6" x2="17" y2="3"/></svg>,
+    // 4. Correctifs — éprouvette chimie
+    (c="currentColor",s=16) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 2l10 0"/><path d="M7 2v5l-4.5 9a2.5 2.5 0 002.3 3.5h10.4a2.5 2.5 0 002.3-3.5L13 7V2"/><path d="M5 15h14"/></svg>,
+    // 5. Clôture — checklist validée
+    (c="currentColor",s=16) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>,
+    // 6. Signatures — stylo plume
+    (c="currentColor",s=16) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.85 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/><path d="M15 5l4 4"/></svg>,
+  ];
   const STEP_INFO = [
-    {ic:"🔧",l:"Intervention",color:"#0369a1"},
-    {ic:"💧",l:"Analyses eau",color:"#0891b2"},
-    {ic:"🏊",l:"État bassin",color:"#059669"},
-    {ic:"⚗️",l:"Correctifs",color:"#7c3aed"},
-    {ic:"✅",l:"Clôture",color:"#ea580c"},
-    {ic:"✍️",l:"Signatures",color:"#be185d"},
+    {ic:STEP_ICONS[0],l:"Intervention",color:"#0369a1"},
+    {ic:STEP_ICONS[1],l:"Analyses eau",color:"#0891b2"},
+    {ic:STEP_ICONS[2],l:"État bassin",color:"#059669"},
+    {ic:STEP_ICONS[3],l:"Correctifs",color:"#7c3aed"},
+    {ic:STEP_ICONS[4],l:"Clôture",color:"#ea580c"},
+    {ic:STEP_ICONS[5],l:"Signatures",color:"#be185d"},
   ];
 
   const Stepper = () => (
@@ -1616,7 +1644,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
           const done=i+1<step, active=i+1===step;
           return (
             <button key={i} onClick={()=>setStep(i+1)} style={{flex:isMobile?"0 0 auto":(active?2:1),minWidth:isMobile?92:"auto",padding:isMobile?"10px 10px":"8px 6px",borderRadius:14,border:"none",cursor:"pointer",background:active?s.color:done?DS.green+"22":DS.light,display:"flex",alignItems:"center",justifyContent:"center",gap:6,transition:"all .3s",boxShadow:active?`0 2px 12px ${s.color}44`:"none",scrollSnapAlign:isMobile?"start":"none"}}>
-              {done ? Ico.check(12,DS.green) : <span style={{fontSize:active?14:12,filter:!active&&!done?"grayscale(0.6)":"none"}}>{s.ic}</span>}
+              {done ? Ico.check(12,DS.green) : (typeof s.ic==="function" ? s.ic(active?"#fff":DS.mid, active?16:14) : <span style={{fontSize:active?14:12,filter:!active&&!done?"grayscale(0.6)":"none"}}>{s.ic}</span>)}
               {(active || isMobile) && <span style={{fontSize:isMobile?11:10,fontWeight:800,color:active?"#fff":DS.dark,letterSpacing:-0.2}}>{s.l}</span>}
             </button>
           );
@@ -2122,7 +2150,16 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
                     <div style={{fontWeight:700,fontSize:13,color:DS.dark}}>{c.nom}</div>
                     <div style={{fontSize:11,color:DS.mid,marginTop:2}}>{al==="rouge"||al==="jaune"?`Expire dans ${j} jours`:"Passages en retard"}</div>
                   </div>
-                  <Tag color={col.tx}>{col.lbl}</Tag>
+                  <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
+                    <Tag color={col.tx}>{col.lbl}</Tag>
+                    {(al==="orange")&&(()=>{
+                      const mpm2=c.moisParMois||c.saisons||{};
+                      const retards=[];
+                      for(let m=1;m<=MOIS_NOW;m++){const mv2=getMoisVal(mpm2,m);const pm=passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===m&&new Date(p.date).getFullYear()===YEAR_NOW);const rE=Math.max(0,mv2.entretien-pm.filter(p=>isEntretienType(p.type)).length);const rC=Math.max(0,mv2.controle-pm.filter(p=>isControleType(p.type)).length);if(rE>0||rC>0)retards.push({m,rE,rC});}
+                      if(retards.length===0)return null;
+                      return <div style={{fontSize:10,color:DS.orange,fontWeight:700}}>{retards.map(r=>MOIS[r.m]).join(", ")}</div>;
+                    })()}
+                  </div>
                 </div>
               );
             })}
@@ -2526,10 +2563,10 @@ export default function App() {
   );
 
   const NAV = [
-    { id:"dashboard", l:"Accueil", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#0369a1":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M5 16c2 2 4 2 6 0s4-2 6 0" opacity={a?1:0.4}/><path d="M9 21V14h6v7"/></svg> },
-    { id:"clients",   l:"Clients", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#0369a1":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a4 4 0 014-4h8a4 4 0 014 4v2"/></svg> },
-    { id:"interventions", l:"Passages", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#0369a1":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 12c2 2.5 4 2.5 6 0s4-2.5 6 0 4 2.5 6 0"/><line x1="8" y1="4" x2="8" y2="2"/><line x1="16" y1="4" x2="16" y2="2"/></svg> },
-    { id:"rdv", l:"RDV", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#7c3aed":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="12" cy="15" r="2.5" fill={a?"#7c3aed":"none"}/></svg> },
+    { id:"dashboard", l:"Accueil", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#38bdf8":"rgba(255,255,255,0.35)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M5 16c2 2 4 2 6 0s4-2 6 0" opacity={a?1:0.4}/><path d="M9 21V14h6v7"/></svg> },
+    { id:"clients",   l:"Clients", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#38bdf8":"rgba(255,255,255,0.35)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a4 4 0 014-4h8a4 4 0 014 4v2"/></svg> },
+    { id:"interventions", l:"Passages", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#38bdf8":"rgba(255,255,255,0.35)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 12c2 2.5 4 2.5 6 0s4-2.5 6 0 4 2.5 6 0"/><line x1="8" y1="4" x2="8" y2="2"/><line x1="16" y1="4" x2="16" y2="2"/></svg> },
+    { id:"rdv", l:"RDV", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#a78bfa":"rgba(255,255,255,0.35)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="12" cy="15" r="2.5" fill={a?"#a78bfa":"none"}/></svg> },
   ];
 
   const PAGE_LABELS = { dashboard:`Bonjour Dorian 👋`, clients:"Clients", passages:"Passages", interventions:"Passages", rdv:"Rendez-vous" };
@@ -2537,64 +2574,117 @@ export default function App() {
   return (
     <>
     <GlobalStyles/>
-    <div style={{minHeight:"100vh",background:DS.bg,fontFamily:"'Inter', -apple-system, system-ui, sans-serif",maxWidth:isMobile?640:960,margin:"0 auto",position:"relative"}}>
-      {/* HEADER */}
-      <div style={{background:DS.white,padding:isMobile?"12px 16px":"14px 28px",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:50,boxShadow:"0 1px 0 "+DS.border,backdropFilter:"blur(12px)",backgroundColor:"rgba(255,255,255,0.92)"}}>
+    <div style={{minHeight:"100vh",background:DS.bg,fontFamily:"'Inter', -apple-system, system-ui, sans-serif",maxWidth:isMobile?640:1280,margin:"0 auto",position:"relative",display:"flex",flexDirection:"column"}}>
+      {/* HEADER MODERNISÉ */}
+      <div style={{background:"linear-gradient(135deg,#0c1222 0%,#0f2040 60%,#0369a1 100%)",padding:isMobile?"10px 16px":"12px 28px",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:50,boxShadow:"0 2px 20px rgba(3,105,161,0.35)",backdropFilter:"blur(16px)"}}>
         <button
           onClick={()=>setPage("dashboard")}
           className="btn-hover"
-          style={{background:"none",border:"none",padding:0,margin:0,cursor:"pointer",display:"flex",alignItems:"center",flexShrink:0}}
+          style={{background:"none",border:"none",padding:0,margin:0,cursor:"pointer",display:"flex",alignItems:"center",gap:10,flexShrink:0}}
         >
-          <img
-            src={BRAND_LOGO}
-            alt="BRIBLUE"
-            style={{height:isMobile?34:42,width:"auto",objectFit:"contain",display:"block"}}
-          />
+          <div style={{width:isMobile?32:38,height:isMobile?32:38,borderRadius:isMobile?10:12,background:"linear-gradient(135deg,#0ea5e9,#0369a1)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"0 4px 12px rgba(14,165,233,0.4)"}}>
+            {Ico.wave(isMobile?18:22,"white")}
+          </div>
+          <div style={{display:"flex",flexDirection:"column",lineHeight:1}}>
+            <span style={{fontWeight:900,fontSize:isMobile?14:18,color:"#fff",letterSpacing:2,fontFamily:"'Inter',sans-serif"}}>BRI<span style={{color:"#38bdf8"}}>'</span>BLUE</span>
+            {!isMobile && <span style={{fontSize:9,color:"rgba(255,255,255,0.55)",fontWeight:500,letterSpacing:0.5,marginTop:1}}>Traitement · Piscines</span>}
+          </div>
         </button>
         <div style={{flex:1}} />
         <div style={{display:"flex",gap:6,alignItems:"center"}}>
           {nbAlertes>0&&(
-            <button onClick={()=>setShowModalAlertes(true)} className="btn-hover" style={{position:"relative",width:38,height:38,borderRadius:12,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-              {Ico.alert(16,DS.red)}
-              <span style={{position:"absolute",top:-4,right:-4,width:18,height:18,borderRadius:9,background:DS.red,color:"#fff",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid #fff"}}>{nbAlertes}</span>
+            <button onClick={()=>setShowModalAlertes(true)} className="btn-hover" style={{position:"relative",width:38,height:38,borderRadius:12,background:"rgba(239,68,68,0.15)",border:"1px solid rgba(239,68,68,0.3)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              {Ico.alert(16,"#fca5a5")}
+              <span style={{position:"absolute",top:-4,right:-4,width:18,height:18,borderRadius:9,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid rgba(0,0,0,0.4)"}}>{nbAlertes}</span>
             </button>
           )}
-          <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} className="btn-hover" style={{width:38,height:38,borderRadius:12,background:DS.blueGrad,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 12px "+DS.blue+"44"}}>
-            {Ico.clipboard(17,"#fff")}
+          <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} className="btn-hover" style={{width:38,height:38,borderRadius:12,background:"rgba(14,165,233,0.2)",border:"1px solid rgba(14,165,233,0.35)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            {Ico.clipboard(17,"#7dd3fc")}
           </button>
-          <button onClick={openAddClient} className="btn-hover" style={{width:38,height:38,borderRadius:12,background:DS.purpleGrad,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 12px #7c3aed44"}}>
-            {Ico.userPlus(17,"#fff")}
+          <button onClick={openAddClient} className="btn-hover" style={{width:38,height:38,borderRadius:12,background:"rgba(124,58,237,0.2)",border:"1px solid rgba(124,58,237,0.35)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            {Ico.userPlus(17,"#c4b5fd")}
           </button>
-          <button onClick={handleLogout} className="btn-hover" style={{width:38,height:38,borderRadius:12,background:DS.light,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <button onClick={handleLogout} className="btn-hover" style={{width:38,height:38,borderRadius:12,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           </button>
         </div>
       </div>
 
-      {/* TITRE */}
-      <div style={{padding:isMobile?"16px 16px 4px":"20px 28px 8px"}}>
-        <h2 style={{margin:0,fontSize:isMobile?20:24,fontWeight:900,color:DS.dark,letterSpacing:-0.5}}>{PAGE_LABELS[page]}</h2>
-        {page==="dashboard"&&<p style={{margin:"2px 0 0",color:DS.mid,fontSize:12,fontWeight:500}}>Aujourd'hui tâchons de ne rien oublier ;)</p>}
-      </div>
+      {/* LAYOUT PRINCIPAL — sidebar desktop, plein mobile */}
+      {isMobile ? (
+        <>
+          {/* TITRE mobile */}
+          <div style={{padding:"16px 16px 4px"}}>
+            <h2 style={{margin:0,fontSize:20,fontWeight:900,color:DS.dark,letterSpacing:-0.5}}>{PAGE_LABELS[page]}</h2>
+            {page==="dashboard"&&<p style={{margin:"2px 0 0",color:DS.mid,fontSize:12,fontWeight:500}}>Aujourd'hui tâchons de ne rien oublier ;)</p>}
+          </div>
+          <div style={{padding:"6px 16px 110px"}}>
+            {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}}/>}
+            {page==="clients"&&<PageClients clients={clients} passages={passages} onClientClick={setFicheClient} onAdd={openAddClient}/>}
+            {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus}/>}
+            {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
+          </div>
+        </>
+      ) : (
+        /* LAYOUT DESKTOP : sidebar gauche + contenu principal */
+        <div style={{display:"flex",flex:1,minHeight:0}}>
+          {/* Sidebar navigation desktop */}
+          <div style={{width:220,flexShrink:0,background:"#0c1222",borderRight:"1px solid rgba(255,255,255,0.07)",display:"flex",flexDirection:"column",padding:"24px 12px",gap:4,position:"sticky",top:62,height:"calc(100vh - 62px)",overflowY:"auto"}}>
+            {/* Stats rapides */}
+            <div style={{padding:"12px 14px",borderRadius:12,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.06)",marginBottom:16}}>
+              <div style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Aperçu</div>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>Clients</span><span style={{fontSize:13,fontWeight:800,color:"#fff"}}>{clients.length}</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>Ce mois</span><span style={{fontSize:13,fontWeight:800,color:"#38bdf8"}}>{passages.filter(p=>new Date(p.date).getMonth()+1===MOIS_NOW&&new Date(p.date).getFullYear()===YEAR_NOW).length} pass.</span></div>
+                {nbAlertes>0&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>Alertes</span><span style={{fontSize:13,fontWeight:800,color:"#fca5a5"}}>{nbAlertes}</span></div>}
+              </div>
+            </div>
+            {/* Nav links */}
+            {NAV.map(n=>(
+              <button key={n.id} onClick={()=>setPage(n.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",borderRadius:12,border:"none",cursor:"pointer",background:page===n.id?"rgba(56,189,248,0.12)":"transparent",textAlign:"left",fontFamily:"inherit",transition:"all .2s",width:"100%"}}>
+                {n.icon(page===n.id)}
+                <span style={{fontSize:13,fontWeight:page===n.id?800:500,color:page===n.id?"#38bdf8":"rgba(255,255,255,0.5)"}}>{n.l}</span>
+                {page===n.id&&<div style={{marginLeft:"auto",width:4,height:16,borderRadius:2,background:"#38bdf8"}}/>}
+              </button>
+            ))}
+            {/* Actions rapides */}
+            <div style={{marginTop:"auto",display:"flex",flexDirection:"column",gap:8,paddingTop:16,borderTop:"1px solid rgba(255,255,255,0.07)"}}>
+              <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",borderRadius:10,border:"1px solid rgba(14,165,233,0.3)",background:"rgba(14,165,233,0.1)",cursor:"pointer",fontFamily:"inherit",width:"100%"}}>
+                {Ico.clipboard(14,"#7dd3fc")}<span style={{fontSize:12,fontWeight:700,color:"#7dd3fc"}}>Nouveau passage</span>
+              </button>
+              <button onClick={openAddClient} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",borderRadius:10,border:"1px solid rgba(124,58,237,0.3)",background:"rgba(124,58,237,0.1)",cursor:"pointer",fontFamily:"inherit",width:"100%"}}>
+                {Ico.userPlus(14,"#c4b5fd")}<span style={{fontSize:12,fontWeight:700,color:"#c4b5fd"}}>Nouveau client</span>
+              </button>
+            </div>
+          </div>
+          {/* Contenu principal desktop */}
+          <div style={{flex:1,overflowY:"auto",minWidth:0}}>
+            <div style={{padding:"20px 32px 80px",maxWidth:860,margin:"0 auto"}}>
+              <div style={{marginBottom:16}}>
+                <h2 style={{margin:0,fontSize:24,fontWeight:900,color:DS.dark,letterSpacing:-0.5}}>{PAGE_LABELS[page]}</h2>
+                {page==="dashboard"&&<p style={{margin:"2px 0 0",color:DS.mid,fontSize:13,fontWeight:500}}>Aujourd'hui tâchons de ne rien oublier ;)</p>}
+              </div>
+              {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}}/>}
+              {page==="clients"&&<PageClients clients={clients} passages={passages} onClientClick={setFicheClient} onAdd={openAddClient}/>}
+              {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus}/>}
+              {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
+            </div>
+          </div>
+        </div>
+      )}
 
-      {/* CONTENU */}
-      <div style={{padding:isMobile?"6px 16px 110px":"8px 28px 110px"}}>
-        {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}}/>}
-        {page==="clients"&&<PageClients clients={clients} passages={passages} onClientClick={setFicheClient} onAdd={openAddClient}/>}
-        {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus}/>}
-        {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
-      </div>
-
-      {/* NAV BAS — 4 items */}
-      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:isMobile?640:960,background:"rgba(255,255,255,0.95)",backdropFilter:"blur(12px)",borderTop:"1px solid "+DS.border,display:"flex",alignItems:"flex-end",boxShadow:"0 -2px 16px rgba(0,0,0,0.05)",zIndex:50,paddingBottom:"env(safe-area-inset-bottom,4px)"}}>
+      {/* NAV BAS MODERNISÉ — mobile seulement */}
+      {isMobile && <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:640,background:"rgba(12,18,34,0.96)",backdropFilter:"blur(20px)",borderTop:"1px solid rgba(255,255,255,0.08)",display:"flex",alignItems:"flex-end",boxShadow:"0 -4px 24px rgba(0,0,0,0.3)",zIndex:50,paddingBottom:"env(safe-area-inset-bottom,4px)"}}>
         {NAV.map(n=>(
-          <button key={n.id} onClick={()=>setPage(n.id)} style={{flex:1,padding:"10px 4px 12px",border:"none",cursor:"pointer",background:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:3,transition:"all .15s"}}>
-            {n.icon(page===n.id)}
-            <span style={{fontSize:10,fontWeight:page===n.id?800:500,color:page===n.id?(n.id==="rdv"?"#7c3aed":DS.blue):"#94a3b8"}}>{n.l}</span>
-            {page===n.id && <div style={{width:20,height:3,borderRadius:2,background:n.id==="rdv"?DS.purpleGrad:DS.blueGrad,marginTop:1}}/>}
+          <button key={n.id} onClick={()=>setPage(n.id)} style={{flex:1,padding:"10px 4px 12px",border:"none",cursor:"pointer",background:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:3,transition:"all .15s",position:"relative"}}>
+            {page===n.id && <div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",width:32,height:2,borderRadius:"0 0 2px 2px",background:n.id==="rdv"?"linear-gradient(90deg,#7c3aed,#a78bfa)":"linear-gradient(90deg,#0369a1,#0ea5e9)"}}/>}
+            <div style={{width:36,height:36,borderRadius:11,background:page===n.id?(n.id==="rdv"?"rgba(124,58,237,0.2)":"rgba(3,105,161,0.2)"):"transparent",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s"}}>
+              {n.icon(page===n.id)}
+            </div>
+            <span style={{fontSize:10,fontWeight:page===n.id?800:500,color:page===n.id?(n.id==="rdv"?"#a78bfa":"#38bdf8"):"rgba(255,255,255,0.35)"}}>{n.l}</span>
           </button>
         ))}
-      </div>
+      </div>}
 
       {/* MODALS */}
       {ficheClient&&(()=>{
@@ -2614,7 +2704,7 @@ export default function App() {
           <Modal title={`Alertes (${alertes.length})`} onClose={()=>setShowModalAlertes(false)}>
             {alertes.length===0
               ? <div style={{textAlign:"center",color:DS.mid,padding:32,fontSize:13}}>Aucune alerte en cours</div>
-              : <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              : <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 {alertes.map(c=>{
                   const al=alerteClient(c,passages); const col=AC[al]; const j=daysUntil(c.dateFin);
                   const mpm=c.moisParMois||c.saisons||{};
@@ -2623,22 +2713,51 @@ export default function App() {
                   const eC=passages.filter(p=>p.clientId===c.id&&isControleType(p.type)).length;
                   const eff=eE+eC;
                   const pct=tot>0?Math.round(eff/tot*100):0;
+                  // Calcul des mois en retard (mois passés où des passages restent)
+                  const moisEnRetard = [];
+                  for(let m=1; m<=MOIS_NOW; m++) {
+                    const mv = getMoisVal(mpm, m);
+                    const passM = passages.filter(p=>p.clientId===c.id && new Date(p.date).getMonth()+1===m && new Date(p.date).getFullYear()===YEAR_NOW);
+                    const doneE = passM.filter(p=>isEntretienType(p.type)).length;
+                    const doneC = passM.filter(p=>isControleType(p.type)).length;
+                    const restE = Math.max(0, mv.entretien - doneE);
+                    const restC = Math.max(0, mv.controle - doneC);
+                    if(restE > 0 || restC > 0) moisEnRetard.push({m, restE, restC});
+                  }
                   return (
-                    <div key={c.id} onClick={()=>{setShowModalAlertes(false);setFicheClient(c);}} className="card-hover" style={{display:"flex",alignItems:"center",gap:12,padding:"14px 16px",background:col.bg,borderRadius:DS.radiusSm,border:"1.5px solid "+col.bd,cursor:"pointer"}}>
-                      <Avatar nom={c.nom} size={42} photo={c.photoPiscine}/>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontWeight:800,fontSize:14,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
-                        <div style={{fontSize:12,color:col.tx,fontWeight:600,marginTop:3}}>
-                          {al==="rouge"?`Contrat expire dans ${j} jour${j>1?"s":""}`
-                           :al==="jaune"?`Contrat expire dans ${j} jours`
-                           :`Passages en retard — ${eff}/${tot} (${pct}%)`}
+                    <div key={c.id} onClick={()=>{setShowModalAlertes(false);setFicheClient(c);}} className="card-hover" style={{background:col.bg,borderRadius:DS.radius,border:"1.5px solid "+col.bd,cursor:"pointer",overflow:"hidden"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:12,padding:"14px 16px"}}>
+                        <Avatar nom={c.nom} size={42} photo={c.photoPiscine}/>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontWeight:800,fontSize:14,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
+                          <div style={{fontSize:12,color:col.tx,fontWeight:600,marginTop:3}}>
+                            {al==="rouge"?`⚠️ Contrat expire dans ${j} jour${j>1?"s":""}`
+                             :al==="jaune"?`🕐 Contrat expire dans ${j} jours`
+                             :`📋 Passages en retard — ${eff}/${tot} (${pct}%)`}
+                          </div>
+                          <div style={{display:"flex",gap:8,marginTop:5,flexWrap:"wrap"}}>
+                            {tE>0&&<span style={{fontSize:11,fontWeight:700,color:eE>=tE?DS.green:DS.blue,background:eE>=tE?DS.greenSoft:DS.blueSoft,padding:"2px 7px",borderRadius:6}}>🔧 Entretiens {eE}/{tE}</span>}
+                            {tC>0&&<span style={{fontSize:11,fontWeight:700,color:eC>=tC?DS.green:DS.teal,background:eC>=tC?DS.greenSoft:DS.tealSoft,padding:"2px 7px",borderRadius:6}}>💧 Contrôles {eC}/{tC}</span>}
+                          </div>
                         </div>
-                        <div style={{display:"flex",gap:6,marginTop:6}}>
-                          {tE>0&&<span style={{fontSize:11,fontWeight:700,color:eE>=tE?DS.green:DS.blue}}>🔧 {eE}/{tE}</span>}
-                          {tC>0&&<span style={{fontSize:11,fontWeight:700,color:eC>=tC?DS.green:DS.teal}}>💧 {eC}/{tC}</span>}
-                        </div>
+                        <Tag color={col.tx} bg={col.bg}>{col.lbl}</Tag>
                       </div>
-                      <Tag color={col.tx} bg={col.bg}>{col.lbl}</Tag>
+                      {moisEnRetard.length>0 && (
+                        <div style={{borderTop:"1px solid "+col.bd,padding:"10px 16px",background:"rgba(0,0,0,0.03)"}}>
+                          <div style={{fontSize:10,fontWeight:800,color:col.tx,textTransform:"uppercase",letterSpacing:.8,marginBottom:7}}>Mois en retard</div>
+                          <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                            {moisEnRetard.map(({m,restE,restC})=>(
+                              <div key={m} style={{background:DS.white,border:"1.5px solid "+col.bd,borderRadius:8,padding:"5px 9px",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                                <span style={{fontSize:11,fontWeight:800,color:DS.dark}}>{MOIS[m]}</span>
+                                <div style={{display:"flex",gap:5}}>
+                                  {restE>0&&<span style={{fontSize:10,fontWeight:700,color:DS.blue}}>🔧 {restE}</span>}
+                                  {restC>0&&<span style={{fontSize:10,fontWeight:700,color:DS.teal}}>💧 {restC}</span>}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
