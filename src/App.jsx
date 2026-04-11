@@ -338,10 +338,10 @@ function IcoBubble({ ico, color=DS.blue, bg, size=38 }) {
   );
 }
 
-function Tag({ children, color=DS.blue, bg }) {
+function Tag({ children, color=DS.blue, bg, style={} }) {
   const bgCol = bg || color+"14";
   return (
-    <span style={{background:bgCol,color,borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700,whiteSpace:"nowrap",display:"inline-flex",alignItems:"center",gap:4,letterSpacing:-0.2}}>{children}</span>
+    <span style={{background:bgCol,color,borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700,whiteSpace:"nowrap",display:"inline-flex",alignItems:"center",gap:4,letterSpacing:-0.2,...style}}>{children}</span>
   );
 }
 
@@ -379,9 +379,9 @@ function ProgressBar({ value, max, color=DS.blue, height=6 }) {
   );
 }
 
-function Card({ children, style={}, onClick, className="" }) {
+function Card({ children, style={}, onClick, className="", id }) {
   return (
-    <div onClick={onClick} className={onClick?"card-hover":className} style={{background:DS.white,borderRadius:DS.radius,padding:"16px 18px",boxShadow:DS.shadow,border:"1px solid "+DS.border,cursor:onClick?"pointer":"default",transition:"all .2s",...style}}>{children}</div>
+    <div id={id} onClick={onClick} className={onClick?"card-hover":className} style={{background:DS.white,borderRadius:DS.radius,padding:"16px 18px",boxShadow:DS.shadow,border:"1px solid "+DS.border,cursor:onClick?"pointer":"default",transition:"all .2s",...style}}>{children}</div>
   );
 }
 
@@ -682,6 +682,7 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
   const effC = passC.filter(p=>isControleType(p.type)).length;
   const eff = passC.length;
   const jours = daysUntil(client.dateFin);
+  const moisCourant = MOIS_NOW;
 
   return (
     <Modal title={client.nom} onClose={onClose} wide>
@@ -759,36 +760,37 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
         </div>
       )}
 
-      {tab==="saisons" && (
-        <div className="fade-in">
-          <div style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Calendrier {YEAR_NOW}</div>
-          <div style={{display:"flex",flexDirection:"column",gap:0,border:"1px solid "+DS.border,borderRadius:DS.radiusSm,overflow:"hidden"}}>
-            {[...Array(12)].map((_,i)=>{
-              const m=i+1;
-              const prevE=getEntretienMois(client.moisParMois||client.saisons,m);
-              const prevC=getControleMois(client.moisParMois||client.saisons,m);
-              const prevT=prevE+prevC;
-              const effME=passages.filter(p=>p.clientId===client.id&&new Date(p.date).getMonth()+1===m&&new Date(p.date).getFullYear()===YEAR_NOW&&isEntretienType(p.type)).length;
-              const effMC=passages.filter(p=>p.clientId===client.id&&new Date(p.date).getMonth()+1===m&&new Date(p.date).getFullYear()===YEAR_NOW&&isControleType(p.type)).length;
-              const rest=Math.max(0,prevT-(effME+effMC));
-              const sc=SAISONS_META[getSaison(m)];
-              const isCur=m===MOIS_NOW;
-              return (
-                <div key={m} style={{display:"flex",alignItems:"center",padding:"8px 12px",borderBottom:i<11?"1px solid "+DS.border:"none",background:isCur?sc.bg:i%2===0?DS.white:DS.light}}>
-                  <div style={{width:4,height:22,borderRadius:2,background:sc.color,marginRight:8,flexShrink:0}}/>
-                  <div style={{width:40,fontWeight:isCur?800:600,fontSize:12,color:isCur?sc.color:DS.mid}}>{MOIS_L[m].slice(0,4)}</div>
-                  <div style={{flex:1,display:"flex",gap:10,alignItems:"center"}}>
-                    {prevE>0&&<span style={{fontSize:12,fontWeight:700,color:effME>=prevE?DS.green:DS.blue}}>🔧 {effME}/{prevE}</span>}
-                    {prevC>0&&<span style={{fontSize:12,fontWeight:700,color:effMC>=prevC?DS.green:DS.teal}}>💧 {effMC}/{prevC}</span>}
-                    {prevT===0&&<span style={{fontSize:12,color:DS.border}}>—</span>}
-                  </div>
-                  {prevT>0&&<div style={{fontSize:11,fontWeight:700,color:rest>0?DS.orange:DS.green,background:rest>0?DS.orangeSoft:DS.greenSoft,padding:"2px 8px",borderRadius:6}}>{rest>0?`${rest} rest.`:"✓"}</div>}
-                </div>
-              );
-            })}
-          </div>
+      {tab==="saisons" && <div className="fade-in">
+        <div style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Calendrier — {MOIS_L[moisCourant]}</div>
+        <div style={{border:"1px solid "+DS.border,borderRadius:DS.radiusSm,overflow:"hidden"}}>
+          {[1,2,3,4,5,6,7,8,9,10,11,12].map((m,i)=>{
+            const mpm = client.moisParMois || client.saisons || {};
+            const prevE = getEntretienMois(mpm, m);
+            const prevC = getControleMois(mpm, m);
+            const prevT = prevE + prevC;
+            const passM = passC.filter(p=>{ const d=new Date(p.date); return d.getMonth()+1===m && d.getFullYear()===YEAR_NOW; });
+            const doneE = passM.filter(p=>isEntretienType(p.type)).length;
+            const doneC = passM.filter(p=>isControleType(p.type)).length;
+            const rest = Math.max(0, prevT - doneE - doneC);
+            const sc = SAISONS_META[getSaison(m)] || SAISONS_META.ete;
+            const cur = m === MOIS_NOW;
+            return <div key={m} style={{display:"flex",alignItems:"center",padding:"9px 12px",borderBottom:i<11?"1px solid "+DS.border:"none",background:cur?sc.bg:i%2===0?DS.white:"#f9fafb"}}>
+              <div style={{width:4,height:22,borderRadius:2,background:sc.color,marginRight:8,flexShrink:0}}/>
+              <div style={{width:42,fontWeight:cur?800:600,fontSize:12,color:cur?sc.color:DS.mid}}>{MOIS[m]}</div>
+              <div style={{flex:1,display:"flex",gap:8,alignItems:"center"}}>
+                {prevE>0 ? <span style={{fontSize:12,fontWeight:700,color:doneE>=prevE?DS.green:DS.blue}}>🔧 {doneE}/{prevE}</span> : null}
+                {prevC>0 ? <span style={{fontSize:12,fontWeight:700,color:doneC>=prevC?DS.green:DS.teal}}>💧 {doneC}/{prevC}</span> : null}
+                {prevT===0 ? <span style={{fontSize:12,color:"#d1d5db"}}>—</span> : null}
+              </div>
+              {prevT>0 ? <div style={{fontSize:10,fontWeight:700,color:rest>0?DS.orange:DS.green,background:rest>0?DS.orangeSoft:DS.greenSoft,padding:"2px 8px",borderRadius:6}}>{rest>0?rest+" rest.":"✓"}</div> : null}
+            </div>;
+          })}
         </div>
-      )}
+        <div style={{display:"flex",justifyContent:"space-between",marginTop:10,padding:"8px 12px",background:DS.dark,borderRadius:DS.radiusSm}}>
+          <span style={{color:"rgba(255,255,255,0.7)",fontSize:11,fontWeight:600}}>Total annuel</span>
+          <span style={{color:"#fff",fontSize:12,fontWeight:800}}>🔧 {totalE}  ·  💧 {totalC}  ·  {total} passages</span>
+        </div>
+      </div>}
 
       {tab==="passages" && (
         <div className="fade-in">
