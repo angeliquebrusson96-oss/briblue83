@@ -22,12 +22,12 @@ const BRAND_LOGO = `data:image/svg+xml;utf8,${encodeURIComponent(`
   </g>
   <text x="94" y="42" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="800" fill="#0c1222">BRIBLUE</text>
   <text x="94" y="66" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="600" fill="#0369a1">Entretien &amp; traitement de piscines</text>
-</svg>`)};
+</svg>`)}`;
 
 
-// ─── ICÔNES SVG PREMIUM ──────────────────────────────────────────────────────
+// ICNES SVG PREMIUM
 const Ico = {
-  // Pool-themed professional icons
+// Pool-themed professional icons
   home: (s=20,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg>,
   clients: (s=20,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/><path d="M16 3.13a4 4 0 010 7.75"/><path d="M21 21v-2a4 4 0 00-3-3.87"/></svg>,
   clipboard: (s=20,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>,
@@ -77,8 +77,8 @@ const Ico = {
 };
 
 
-// ─── DONNÉES PAR DÉFAUT ───────────────────────────────────────────────────────
-// Modèle mois par mois: {1:{entretien:0,controle:0}, 2:{...}, ... 12:{...}}
+// DONNES PAR DFAUT
+// Modle mois par mois: {1:{entretien:0,controle:0}, 2:{...}, ... 12:{...}}
 const MOIS_PAR_MOIS_DEF = Object.fromEntries([...Array(12)].map((_,i)=>[i+1,{entretien:0,controle:0}]));
 const SAISONS_META = {
   hiver:     { label: "Hiver",     icon: "snow",    mois: [12,1,2],  color: "#60a5fa", bg: "#eff6ff" },
@@ -89,16 +89,16 @@ const SAISONS_META = {
 const MOIS = ["","Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
 const MOIS_L = ["","Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
 
-// Migration: old saisons format OR moisParMois → normalized moisParMois (keys always integers)
+// Migration: old saisons format OR moisParMois  normalized moisParMois (keys always integers)
 function migrateMois(data) {
   if (!data) return {...MOIS_PAR_MOIS_DEF};
-  // Already mois-par-mois? (keys 1-12 as string or number)
+// Already mois-par-mois? (keys 1-12 as string or number)
   if (data["1"] || data[1]) {
     const r = {};
     for (let m=1;m<=12;m++) { const v=data[m]||data[String(m)]||{entretien:0,controle:0}; r[m]={entretien:v.entretien??0,controle:v.controle??0}; }
     return r;
   }
-  // Old saisons format → convert
+// Old saisons format  convert
   const SM = {hiver:[12,1,2],printemps:[3,4,5],ete:[6,7,8],automne:[9,10,11]};
   const r = {};
   for (let m=1;m<=12;m++) r[m]={entretien:0,controle:0};
@@ -133,7 +133,7 @@ const STATUT_LIV = {
   paye:      { label:"Payé",       color:"#059669", bg:"#d1fae5" },
 };
 
-// ─── RESPONSIVE HOOK ────────────────────────────────────────────────────────
+// RESPONSIVE HOOK
 function useIsMobile() {
   const [m, setM] = useState(window.innerWidth < 768);
   useEffect(()=>{
@@ -144,7 +144,7 @@ function useIsMobile() {
   return m;
 }
 
-// ─── STORAGE ──────────────────────────────────────────────────────────────────
+// STORAGE
 async function load(key, fallback) {
   try {
     const { data, error } = await supabase
@@ -187,7 +187,7 @@ async function save(key, val) {
 }
 
 
-// ─── UTILS ────────────────────────────────────────────────────────────────────
+// UTILS
 function getSaison(m) {
   for (const [k,s] of Object.entries(SAISONS_META)) if (s.mois.includes(m)) return k;
   return "ete";
@@ -231,7 +231,7 @@ const MOIS_NOW = new Date().getMonth() + 1;
 const YEAR_NOW = new Date().getFullYear();
 
 
-// ─── ICS EXPORT ─────────────────────────────────────────────────────────────
+// ICS EXPORT
 function exportRdvToICS(rdv, client) {
   const dt = rdv.date.replace(/-/g, "");
   const heure = (rdv.heure || "09:00").replace(":", "");
@@ -256,10 +256,10 @@ function exportRdvToICS(rdv, client) {
     "VERSION:2.0",
     "PRODID:-//BRIBLUE//CRM//FR",
     "BEGIN:VEVENT",
-    `DTSTART:${dt}T${heure}00`,
-    `DTEND:${dt}T${endTime}00`,
-    `SUMMARY:${summary}`,
-    `DESCRIPTION:${desc}`,
+    "DTSTART:" + dt + "T" + heure + "00",
+    "DTEND:" + dt + "T" + endTime + "00",
+    "SUMMARY:" + summary,
+    "DESCRIPTION:" + desc,
     locationLine,
     "BEGIN:VALARM",
     "TRIGGER:-PT30M",
@@ -281,7 +281,7 @@ function exportRdvToICS(rdv, client) {
   setTimeout(() => URL.revokeObjectURL(url), 3000);
 }
 
-// ─── NOTIFICATION SOUND ─────────────────────────────────────────────────────
+// NOTIFICATION SOUND
 function playNotifSound() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -296,7 +296,7 @@ function playNotifSound() {
   } catch {}
 }
 
-// ─── PWA SETUP ──────────────────────────────────────────────────────────────
+// PWA SETUP
 function setupPWA() {
   if (!document.querySelector('link[rel="manifest"]')) {
     const manifest = {name:"BRIBLUE CRM",short_name:"BRIBLUE",description:"Gestion entretien piscines",start_url:window.location.href,display:"standalone",background_color:"#0c1222",theme_color:"#0369a1",orientation:"portrait",icons:[{src:"data:image/svg+xml,"+encodeURIComponent('<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 192 192\"><rect width=\"192\" height=\"192\" rx=\"40\" fill=\"#0c1222\"/><path d=\"M30 70c15 18 30 18 45 0s30-18 45 0 30 18 45 0\" fill=\"none\" stroke=\"white\" stroke-width=\"8\" stroke-linecap=\"round\"/><path d=\"M30 100c15 18 30 18 45 0s30-18 45 0 30 18 45 0\" fill=\"none\" stroke=\"white\" stroke-width=\"8\" stroke-linecap=\"round\"/></svg>'),sizes:"192x192",type:"image/svg+xml"},{src:"data:image/svg+xml,"+encodeURIComponent('<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 512 512\"><rect width=\"512\" height=\"512\" rx=\"100\" fill=\"#0c1222\"/><path d=\"M80 190c40 48 80 48 120 0s80-48 120 0 80 48 120 0\" fill=\"none\" stroke=\"white\" stroke-width=\"20\" stroke-linecap=\"round\"/><path d=\"M80 270c40 48 80 48 120 0s80-48 120 0 80 48 120 0\" fill=\"none\" stroke=\"white\" stroke-width=\"20\" stroke-linecap=\"round\"/></svg>'),sizes:"512x512",type:"image/svg+xml"}]};
@@ -308,7 +308,7 @@ function setupPWA() {
   if ('serviceWorker' in navigator) { const swCode=`self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>self.clients.claim());self.addEventListener('fetch',e=>e.respondWith(fetch(e.request).catch(()=>new Response('Offline',{status:503}))));`; const swBlob=new Blob([swCode],{type:'application/javascript'}); navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(()=>{}); }
 }
 
-// ─── DESIGN SYSTEM V2 — MODERNE ─────────────────────────────────────────────
+// DESIGN SYSTEM V2  MODERNE
 const DS = {
   blue:"#0369a1", blueSoft:"#e0f2fe", blueGrad:"linear-gradient(135deg,#0284c7,#0ea5e9)",
   dark:"#0c1222", mid:"#64748b",
@@ -350,7 +350,7 @@ function getRapportStatus(p) {
   return "saisie";
 }
 
-// ─── STYLES GLOBAUX INJECTÉS ─────────────────────────────────────────────────
+// STYLES GLOBAUX INJECTS
 const GlobalStyles = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
@@ -375,7 +375,7 @@ const GlobalStyles = () => (
   `}</style>
 );
 
-// ─── COMPOSANTS DE BASE ───────────────────────────────────────────────────────
+// COMPOSANTS DE BASE
 function Avatar({ nom, size=40, photo }) {
   if (photo) return <img src={photo} alt={nom} style={{width:size,height:size,borderRadius:size*0.3,objectFit:"cover",flexShrink:0,border:"2px solid "+DS.border}}/>;
   const initials = (nom||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
@@ -471,7 +471,7 @@ function Select({ label, options, ...p }) {
   );
 }
 
-// ─── PHOTO PICKER ─────────────────────────────────────────────────────────────
+// PHOTO PICKER
 function PhotoPicker({ label, value, onChange, compact }) {
   const cameraRef = useRef(null);
   const galleryRef = useRef(null);
@@ -517,7 +517,7 @@ function PhotoPicker({ label, value, onChange, compact }) {
   );
 }
 
-// ─── BOUTON PRIMAIRE ─────────────────────────────────────────────────────────
+// BOUTON PRIMAIRE
 function BtnPrimary({ children, onClick, bg=DS.dark, color="#fff", icon, style={} }) {
   return (
     <button onClick={onClick} className="btn-hover" style={{padding:"12px 20px",borderRadius:DS.radiusSm,background:bg,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 2px 8px rgba(0,0,0,0.15)",transition:"all .2s",...style}}>
@@ -555,7 +555,7 @@ function RapportStatusPicker({ value, onChange, compact=false }) {
   );
 }
 
-// ─── FORMULAIRE CLIENT (avec Entretien/Contrôle par saison + PVC armé) ───────
+// FORMULAIRE CLIENT (avec Entretien/Contrle par saison + PVC arm)
 function FormClient({ initial, clients, onSave, onClose }) {
   const isNew = !initial?.id;
   const isMobile = useIsMobile();
@@ -665,7 +665,7 @@ function FormClient({ initial, clients, onSave, onClose }) {
   );
 }
 
-// ─── FORMULAIRE LIVRAISON ─────────────────────────────────────────────────────
+// FORMULAIRE LIVRAISON
 function FormLivraison({ initial, clientId, clients=[], onSave, onClose }) {
   const isEdit = !!initial?.id;
   const [f, setF] = useState(()=>initial || { id:uid(), clientId:clientId||"", date:TODAY, produits:[], description:"", montant:"", statut:"aFacturer" });
@@ -725,7 +725,7 @@ function FormLivraison({ initial, clientId, clients=[], onSave, onClose }) {
   );
 }
 
-// ─── FORMULAIRE RDV ───────────────────────────────────────────────────────────
+// FORMULAIRE RDV
 function FormRdv({ initial, clients, onSave, onClose }) {
   const isEdit = !!initial?.id;
   const [f, setF] = useState(()=> initial || {
@@ -779,7 +779,7 @@ function FormRdv({ initial, clients, onSave, onClose }) {
   );
 }
 
-// ─── FICHE CLIENT (avec différenciation Entretien/Contrôle) ──────────────────
+// FICHE CLIENT (avec diffrenciation Entretien/Contrle)
 function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus }) {
   const [tab, setTab] = useState("infos");
   const [showFormLiv, setShowFormLiv] = useState(false);
@@ -1055,7 +1055,7 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
   );
 }
 
-// ─── COMPOSANTS FORMULAIRE PASSAGE ───────────────────────────────────────────
+// COMPOSANTS FORMULAIRE PASSAGE
 const PRODUITS_LIVRAISON = ["Chlore lent Galet","PH minus","Flocculant","Anti-calcaire","Anti-Algues","Anti-Phosphate","Éponge Magique","Filtre à cartouche","Tac+","Chlore granule","Hypochlorite","Anti-Algues moutarde","Sac de sel"];
 const ETAT_LOCAL_OPTIONS = ["Nettoyage du sol","Trace d'eau au sol","Trace d'eau au mur","Fuite plomberie","Fuite moteur","Sur filtre ?"];
 
@@ -1131,7 +1131,7 @@ function NumField({ label, value, onChange, unit, ideal, okFn }) {
   );
 }
 
-// ─── SIGNATURE PAD ────────────────────────────────────────────────────────────
+// SIGNATURE PAD
 function SignaturePad({ value, onChange, label }) {
   const canvasRef = useRef(null);
   const drawing = useRef(false);
@@ -1172,7 +1172,7 @@ function SignaturePad({ value, onChange, label }) {
 }
 
 
-// ─── CONTRAT PDF (HTML → print) ─────────────────────────────────────────────
+// CONTRAT PDF (HTML  print)
 function genererContratHTML(client) {
   const mpm = migrateMois(client.moisParMois||client.saisons);
   const totalE = totalAnnuel(client.moisParMois||client.saisons,"entretien");
@@ -1331,7 +1331,7 @@ function ouvrirContrat(client) {
   setTimeout(()=>URL.revokeObjectURL(url), 5000);
 }
 
-// ─── RAPPORT HTML PREMIUM ─────────────────────────────────────────────────────
+// RAPPORT HTML PREMIUM
 function genererHTMLRapport(passage, client) {
   const d = new Date(passage.date).toLocaleDateString("fr", {day:"2-digit",month:"long",year:"numeric"});
   const val = (v, u="") => (v !== "" && v !== null && v !== undefined) ? `<strong>${v}</strong>${u?" "+u:""}` : `<span class="empty">—</span>`;
@@ -1550,7 +1550,7 @@ T. 06 67 18 61 15`
   alert(`Le rapport a été téléchargé.\n\nVotre messagerie va s'ouvrir.\nPensez à joindre le fichier "${filename}" en pièce jointe.`);
 }
 
-// ─── FORMULAIRE PASSAGE (avec Alcafix + types Entretien/Contrôle) ────────────
+// FORMULAIRE PASSAGE (avec Alcafix + types Entretien/Contrle)
 function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
   const EMPTY = {
     date:TODAY, clientId:defaultClientId||"", type:"Entretien complet", tech:"Dorian",
@@ -1847,14 +1847,14 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
   );
 }
 
-// ─── DASHBOARD — Bannière tâches + RDV ───────────────────────────────────────
+// DASHBOARD  Bannire tches + RDV
 function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, onAddLivraison, onAddClient, onAddRdv }) {
   const isMobile = useIsMobile();
   const moisCourant = MOIS_NOW;
   const saisonNow = getSaison(moisCourant);
   const sMeta = SAISONS_META[saisonNow];
 
-  // Tâches à effectuer ce mois
+// Tches  effectuer ce mois
   const tachesMois = clients.map(c=>{
     const prevE = getEntretienMois(c.moisParMois||c.saisons, moisCourant);
     const prevC = getControleMois(c.moisParMois||c.saisons, moisCourant);
@@ -1867,7 +1867,7 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
 
   const totalTaches = tachesMois.reduce((a,t)=>a+t.total,0);
 
-  // RDVs à venir (aujourd'hui et futur)
+// RDVs  venir (aujourd'hui et futur)
   const rdvsFuturs = rdvs.filter(r=>r.date>=TODAY).sort((a,b)=>a.date===b.date ? (a.heure||"").localeCompare(b.heure||"") : a.date.localeCompare(b.date));
   const rdvsToday = rdvsFuturs.filter(r=>r.date===TODAY);
   const rdvsProchains = rdvsFuturs.filter(r=>r.date>TODAY).slice(0,5);
@@ -2035,7 +2035,7 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
   );
 }
 
-// ─── PAGE CLIENTS ────────────────────────────────────────────────────────────
+// PAGE CLIENTS
 function PageClients({ clients, passages, onClientClick, onAdd }) {
   const [search, setSearch] = useState("");
   const isMobile = useIsMobile();
@@ -2125,7 +2125,7 @@ function PageClients({ clients, passages, onClientClick, onAdd }) {
   );
 }
 
-// ─── PAGE PASSAGES ────────────────────────────────────────────────────────────
+// PAGE PASSAGES
 function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePassageStatus }) {
   const [filter,setFilter]=useState("mois");
   const now=new Date();
@@ -2203,7 +2203,7 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
   );
 }
 
-// ─── PAGE RDV ─────────────────────────────────────────────────────────────────
+// PAGE RDV
 function PageRdv({ clients, rdvs, onAdd, onEdit, onDelete }) {
   const [filter,setFilter]=useState("avenir");
   const filtered=useMemo(()=>{
@@ -2267,7 +2267,7 @@ function PageRdv({ clients, rdvs, onAdd, onEdit, onDelete }) {
   );
 }
 
-// ─── AUTH ─────────────────────────────────────────────────────────────────────
+// AUTH
 const AUTH = { email: "briblue83@hotmail.com", code: "2004" };
 
 function LoginScreen({ onLogin }) {
@@ -2335,7 +2335,7 @@ function LoginScreen({ onLogin }) {
   );
 }
 
-// ─── APP ROOT ─────────────────────────────────────────────────────────────────
+// APP ROOT
 export default function App() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [page, setPage] = useState("dashboard");
@@ -2366,7 +2366,7 @@ export default function App() {
       const p = await load("bb_passages_v2", PASSAGES_INIT);
       const l = await load("bb_livraisons_v1", []);
       const r = await load("bb_rdvs_v1", []);
-      // Migrate saisons format for existing clients
+// Migrate saisons format for existing clients
       const cMigrated = c.map(cl => ({...cl, moisParMois: migrateMois(cl.moisParMois||cl.saisons), photoPiscine: cl.photoPiscine||"", prixPassageE: cl.prixPassageE||0, prixPassageC: cl.prixPassageC||0}));
       setClients(cMigrated); setPassages(p); setLivraisons(l); setRdvs(r); setReady(true);
     })();
@@ -2377,7 +2377,7 @@ export default function App() {
   useEffect(()=>{ if(ready) save("bb_livraisons_v1", livraisons); },[livraisons,ready]);
   useEffect(()=>{ if(ready) save("bb_rdvs_v1", rdvs); },[rdvs,ready]);
 
-  // Notification sound when new tasks appear
+// Notification sound when new tasks appear
   useEffect(()=>{
     if(!ready) return;
     const currentTasks = clients.reduce((a,c)=>{
