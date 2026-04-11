@@ -126,6 +126,31 @@ async function save(key, val) {
       });
   } catch {}
 }
+
+
+async function save(key, val) {
+  try {
+    const { data, error } = await supabase
+      .from("app_data")
+      .select("data")
+      .eq("id", 1)
+      .single();
+
+    const currentData = !error && data?.data ? data.data : {};
+
+    const updatedData = {
+      ...currentData,
+      [key]: val
+    };
+
+    await supabase
+      .from("app_data")
+      .upsert({
+        id: 1,
+        data: updatedData
+      });
+  } catch {}
+}
 // ─── UTILS ────────────────────────────────────────────────────────────────────
 function getSaison(m) {
   for (const [k,s] of Object.entries(SAISONS_META)) if (s.mois.includes(m)) return k;
