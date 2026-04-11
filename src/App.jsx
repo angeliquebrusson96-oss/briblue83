@@ -771,13 +771,20 @@ function FormRdv({ initial, clients, onSave, onClose }) {
         </div>
       </Section>
       <Section title="Type">
-        <div style={{display:"flex",flexDirection:"column",gap:4}}>
-          {["Rendez-vous client","Mise en route","Hivernage","Devis / Visite technique","Réparation / SAV","Autre"].map(t=>(
-            <label key={t} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:8,cursor:"pointer",background:f.type===t?DS.purpleSoft:DS.light,border:`1px solid ${f.type===t?DS.purple:DS.border}`,transition:"all .15s"}}>
-              <input type="radio" checked={f.type===t} onChange={()=>set("type",t)} style={{accentColor:DS.purple,width:15,height:15}}/>
-              <span style={{fontSize:13,fontWeight:f.type===t?700:400,color:f.type===t?DS.dark:DS.mid}}>{t}</span>
-            </label>
-          ))}
+        <div style={{display:"flex",flexDirection:"column",gap:5}}>
+          {[
+            {v:"Rendez-vous client",ico:"🤝"},{v:"Mise en route",ico:"▶️"},{v:"Hivernage",ico:"❄️"},
+            {v:"Devis / Visite technique",ico:"📋"},{v:"Réparation / SAV",ico:"🔧"},{v:"Autre",ico:"📌"}
+          ].map(({v,ico})=>{
+            const sel=f.type===v;
+            return (
+              <button key={v} onClick={()=>set("type",v)} className="btn-hover" style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",borderRadius:12,border:`1.5px solid ${sel?DS.purple:DS.border}`,background:sel?DS.purpleSoft:DS.white,cursor:"pointer",textAlign:"left",fontFamily:"inherit",transition:"all .2s"}}>
+                <span style={{fontSize:16}}>{ico}</span>
+                <span style={{fontSize:13,fontWeight:sel?700:400,color:sel?DS.purple:DS.mid,flex:1}}>{v}</span>
+                {sel && <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={DS.purple} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+              </button>
+            );
+          })}
         </div>
       </Section>
       <Section title="Description">
@@ -1118,30 +1125,49 @@ function MultiCheck({ label, options, values, onChange }) {
   const toggle = (v) => { const arr = values.includes(v) ? values.filter(x=>x!==v) : [...values,v]; onChange(arr); };
   return (
     <div>
-      {label && <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>{label}</span>}
-      <div style={{display:"flex",flexDirection:"column",gap:4}}>
-        {options.map(o=>(
-          <label key={o} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",borderRadius:8,cursor:"pointer",background:values.includes(o)?DS.blueSoft:DS.light,border:`1px solid ${values.includes(o)?DS.blue:DS.border}`,transition:"all .15s"}}>
-            <input type="checkbox" checked={values.includes(o)} onChange={()=>toggle(o)} style={{accentColor:DS.blue,width:15,height:15}}/>
-            <span style={{fontSize:13,fontWeight:values.includes(o)?700:400,color:values.includes(o)?DS.dark:DS.mid}}>{o}</span>
-          </label>
-        ))}
+      {label && (
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
+          <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>{label}</span>
+          {values.length>0 && <span style={{background:DS.blue,color:"#fff",fontSize:10,fontWeight:800,borderRadius:10,padding:"1px 7px",minWidth:18,textAlign:"center"}}>{values.length}</span>}
+        </div>
+      )}
+      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+        {options.map(o=>{
+          const sel=values.includes(o);
+          return (
+            <button key={o} onClick={()=>toggle(o)} className="btn-hover" style={{display:"inline-flex",alignItems:"center",gap:5,padding:"7px 12px",borderRadius:20,border:`1.5px solid ${sel?DS.blue:DS.border}`,background:sel?DS.blueGrad:DS.white,cursor:"pointer",fontFamily:"inherit",fontWeight:sel?700:500,fontSize:12,color:sel?"#fff":DS.mid,boxShadow:sel?"0 2px 8px "+DS.blue+"33":"none",transition:"all .2s",WebkitTapHighlightColor:"transparent"}}>
+              {sel
+                ? <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                : <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke={DS.border} strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              }
+              {o}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function RadioGroup({ label, options, value, onChange }) {
+function RadioGroup({ label, options, value, onChange, color }) {
+  const activeColor = color || DS.blue;
+  const activeGrad = color ? `linear-gradient(135deg,${color},${color}cc)` : DS.blueGrad;
   return (
     <div>
-      {label && <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>{label}</span>}
-      <div style={{display:"flex",flexDirection:"column",gap:4}}>
-        {options.map(o=>(
-          <label key={o} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",borderRadius:8,cursor:"pointer",background:value===o?DS.blueSoft:DS.light,border:`1px solid ${value===o?DS.blue:DS.border}`,transition:"all .15s"}}>
-            <input type="radio" checked={value===o} onChange={()=>onChange(o)} style={{accentColor:DS.blue,width:15,height:15}}/>
-            <span style={{fontSize:13,fontWeight:value===o?700:400,color:value===o?DS.dark:DS.mid}}>{o}</span>
-          </label>
-        ))}
+      {label && <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:8}}>{label}</span>}
+      <div style={{display:"flex",flexDirection:"column",gap:5}}>
+        {options.map(o=>{
+          const sel=value===o;
+          return (
+            <button key={o} onClick={()=>onChange(o)} className="btn-hover" style={{display:"flex",alignItems:"center",gap:11,padding:"11px 14px",borderRadius:12,border:`1.5px solid ${sel?activeColor:DS.border}`,background:sel?activeGrad:DS.white,cursor:"pointer",textAlign:"left",fontFamily:"inherit",transition:"all .2s",boxShadow:sel?`0 2px 10px ${activeColor}33`:"none",WebkitTapHighlightColor:"transparent"}}>
+              <div style={{width:18,height:18,borderRadius:9,border:`2px solid ${sel?"transparent":DS.border}`,background:sel?"rgba(255,255,255,0.3)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .2s"}}>
+                {sel && <div style={{width:8,height:8,borderRadius:4,background:"#fff"}}/>}
+              </div>
+              <span style={{fontSize:13,fontWeight:sel?700:400,color:sel?"#fff":DS.mid,flex:1}}>{o}</span>
+              {sel && <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.8)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -1150,38 +1176,70 @@ function RadioGroup({ label, options, value, onChange }) {
 function OuiNon({ label, value, onChange }) {
   return (
     <div>
-      {label && <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>{label}</span>}
+      {label && <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:7}}>{label}</span>}
       <div style={{display:"flex",gap:8}}>
-        {["Oui","Non"].map(v=>(
-          <button key={v} onClick={()=>onChange(v==="Oui")} className="btn-hover" style={{flex:1,padding:"9px",borderRadius:9,border:`1.5px solid ${value===(v==="Oui")?DS.blue:DS.border}`,background:value===(v==="Oui")?DS.blue:DS.white,color:value===(v==="Oui")?"#fff":DS.mid,fontWeight:700,fontSize:13,cursor:"pointer",transition:"all .15s"}}>{v}</button>
-        ))}
+        <button onClick={()=>onChange(true)} className="btn-hover" style={{flex:1,padding:"10px",borderRadius:10,border:`1.5px solid ${value===true?DS.green:DS.border}`,background:value===true?DS.greenSoft:DS.white,color:value===true?DS.green:DS.mid,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6,transition:"all .2s",boxShadow:value===true?"0 2px 8px "+DS.green+"33":"none"}}>
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Oui
+        </button>
+        <button onClick={()=>onChange(false)} className="btn-hover" style={{flex:1,padding:"10px",borderRadius:10,border:`1.5px solid ${value===false?DS.red:DS.border}`,background:value===false?DS.redSoft:DS.white,color:value===false?DS.red:DS.mid,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6,transition:"all .2s",boxShadow:value===false?"0 2px 8px "+DS.red+"33":"none"}}>
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Non
+        </button>
       </div>
     </div>
   );
 }
 
 function StarRating({ value, onChange }) {
+  const labels=["","Mauvais","Passable","Bien","Très bien","Excellent"];
   return (
-    <div style={{display:"flex",alignItems:"center",gap:4}}>
-      {[1,2,3,4,5].map(n=>(
-        <button key={n} onClick={()=>onChange(n)} style={{background:"none",border:"none",cursor:"pointer",fontSize:28,color:n<=value?"#f59e0b":"#e2e8f0",padding:"0 2px",lineHeight:1,transition:"all .15s",transform:n<=value?"scale(1.1)":"scale(1)"}}>★</button>
-      ))}
-      {value>0 && <span style={{fontSize:12,color:"#94a3b8",marginLeft:4,fontWeight:600}}>{value}/5</span>}
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+        {[1,2,3,4,5].map(n=>(
+          <button key={n} onClick={()=>onChange(n)} style={{background:"none",border:"none",cursor:"pointer",padding:"2px",lineHeight:1,transition:"all .2s",transform:n<=value?"scale(1.15)":"scale(1)"}}>
+            {Ico.star(28,n<=value?"#f59e0b":"#e2e8f0",n<=value?"#f59e0b":"none")}
+          </button>
+        ))}
+      </div>
+      {value>0 && (
+        <div style={{display:"inline-flex",alignItems:"center",gap:5,background:"#fffbeb",borderRadius:8,padding:"4px 10px",border:"1px solid #fcd34d"}}>
+          <span style={{fontSize:12,fontWeight:800,color:"#d97706"}}>{value}/5</span>
+          <span style={{fontSize:11,color:"#92400e",fontWeight:500}}>{labels[value]}</span>
+        </div>
+      )}
     </div>
   );
 }
 
 function NumField({ label, value, onChange, unit, ideal, okFn }) {
-  const ok = okFn ? okFn(value) : true;
+  const hasVal = value !== "" && value !== null && value !== undefined;
+  const ok = hasVal && okFn ? okFn(value) : true;
+  const statusColor = !hasVal ? DS.border : ok ? "#22c55e" : "#ef4444";
+  const statusBg = !hasVal ? DS.light : ok ? "#f0fdf4" : "#fef2f2";
+  const statusTx = !hasVal ? DS.mid : ok ? "#16a34a" : "#dc2626";
   return (
-    <div>
-      <div style={{fontSize:11,fontWeight:700,color:DS.mid,marginBottom:4}}>
-        {label}
-        {unit && <span style={{color:"#94a3b8",fontWeight:400}}> ({unit})</span>}
-        {ideal && <span style={{color:"#94a3b8",fontWeight:400,fontSize:10}}> — idéal {ideal}</span>}
+    <div style={{background:statusBg,borderRadius:10,padding:"10px 12px",border:`1.5px solid ${hasVal?(ok?"#86efac":"#fca5a5"):DS.border}`,transition:"all .2s"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+        <div style={{fontSize:11,fontWeight:700,color:DS.mid}}>
+          {label}{unit && <span style={{color:"#94a3b8",fontWeight:400}}> ({unit})</span>}
+        </div>
+        {ideal && (
+          <span style={{fontSize:9,fontWeight:700,color:hasVal?statusTx:"#94a3b8",background:hasVal?(ok?"#dcfce7":"#fee2e2"):"#f1f5f9",padding:"2px 7px",borderRadius:8,letterSpacing:.3}}>
+            {hasVal ? (ok ? "✓ OK" : "⚠ Hors plage") : `idéal ${ideal}`}
+          </span>
+        )}
       </div>
-      <input type="number" step="0.1" value={value||""} onChange={e=>onChange(e.target.value===""?"":+e.target.value)}
-        style={{padding:"9px 12px",borderRadius:9,border:`2px solid ${value!==""&&value!==null&&value!==undefined?(ok?"#86efac":"#fca5a5"):"#e2e8f0"}`,fontSize:14,fontWeight:800,width:"100%",boxSizing:"border-box",color:value!==""&&value!==null&&value!==undefined?(ok?"#16a34a":"#dc2626"):"#1e293b",transition:"all .2s"}}/>
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
+        <input type="number" step="0.1" value={value||""} onChange={e=>onChange(e.target.value===""?"":+e.target.value)}
+          style={{flex:1,padding:"8px 10px",borderRadius:8,border:`1.5px solid ${statusColor}`,fontSize:16,fontWeight:800,boxSizing:"border-box",color:statusTx,background:"#fff",transition:"all .2s",outline:"none",fontFamily:"inherit",minWidth:0}}/>
+        {hasVal && (
+          <div style={{width:28,height:28,borderRadius:14,background:ok?"#22c55e":"#ef4444",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:`0 2px 6px ${ok?"#22c55e":"#ef4444"}44`}}>
+            {ok
+              ? <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              : <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            }
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1784,8 +1842,27 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
             )}
           </div>
           <div style={{marginTop:16}}>
-            <RadioGroup label="Type d'intervention" value={f.type} onChange={v=>set("type",v)}
-              options={["Entretien complet","Contrôle d'eau","Visite technique","Bassin en rattrapage","Fin de rattrapage"]}/>
+            <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:8}}>Type d'intervention</span>
+            <div style={{display:"flex",flexDirection:"column",gap:5}}>
+              {[
+                {v:"Entretien complet",ico:Ico.wrench,col:"#0284c7",bg:"#e0f2fe"},
+                {v:"Contrôle d'eau",ico:Ico.drop,col:"#0891b2",bg:"#e0f7fa"},
+                {v:"Visite technique",ico:Ico.brush,col:"#7c3aed",bg:"#ede9fe"},
+                {v:"Bassin en rattrapage",ico:Ico.chemicals,col:"#ea580c",bg:"#ffedd5"},
+                {v:"Fin de rattrapage",ico:Ico.check,col:"#059669",bg:"#d1fae5"},
+              ].map(({v,ico,col,bg})=>{
+                const sel=f.type===v;
+                return (
+                  <button key={v} onClick={()=>set("type",v)} className="btn-hover" style={{display:"flex",alignItems:"center",gap:11,padding:"11px 14px",borderRadius:12,border:`1.5px solid ${sel?col:DS.border}`,background:sel?bg:DS.white,cursor:"pointer",textAlign:"left",fontFamily:"inherit",transition:"all .2s",boxShadow:sel?`0 2px 10px ${col}22`:"none"}}>
+                    <div style={{width:32,height:32,borderRadius:9,background:sel?col:"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .2s"}}>
+                      {ico(15,sel?"#fff":DS.mid)}
+                    </div>
+                    <span style={{fontSize:13,fontWeight:sel?700:400,color:sel?col:DS.mid,flex:1}}>{v}</span>
+                    {sel && <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                  </button>
+                );
+              })}
+            </div>
           </div>
           <div style={{borderTop:"1px solid "+DS.border,paddingTop:16,marginTop:16}}>
             <PhotoPicker label="Photo à l'arrivée" value={f.photoArrivee} onChange={v=>set("photoArrivee",v)}/>
@@ -1797,10 +1874,13 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
         <div className="fade-in">
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16}}>
             <div style={{background:DS.light,borderRadius:DS.radius,padding:16,border:"1px solid "+DS.border}}>
-              <div style={{fontSize:11,fontWeight:800,color:"#0891b2",textTransform:"uppercase",letterSpacing:.8,marginBottom:14,display:"flex",alignItems:"center",gap:6}}>
-                <div style={{width:6,height:6,borderRadius:3,background:"#0891b2"}}/>Test bandelette
+              <div style={{fontSize:11,fontWeight:800,color:"#0891b2",textTransform:"uppercase",letterSpacing:.8,marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
+                <div style={{width:26,height:26,borderRadius:8,background:"#0891b2",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  {Ico.phTest(13,"#fff")}
+                </div>
+                Test bandelette
               </div>
-              <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 <NumField label="Chlore libre" unit="ppm" value={f.chloreLibre} onChange={v=>set("chloreLibre",v)} ideal="1–3" okFn={v=>v>=1&&v<=3}/>
                 <NumField label="pH" value={f.ph} onChange={v=>set("ph",v)} ideal="7.2–7.8" okFn={v=>v>=7.2&&v<=7.8}/>
                 <NumField label="Alcalinité totale" unit="ppm" value={f.alcalinite} onChange={v=>set("alcalinite",v)} ideal="80–120" okFn={v=>v>=80&&v<=120}/>
@@ -1808,10 +1888,13 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
               </div>
             </div>
             <div style={{background:DS.light,borderRadius:DS.radius,padding:16,border:"1px solid "+DS.border}}>
-              <div style={{fontSize:11,fontWeight:800,color:"#7c3aed",textTransform:"uppercase",letterSpacing:.8,marginBottom:14,display:"flex",alignItems:"center",gap:6}}>
-                <div style={{width:6,height:6,borderRadius:3,background:"#7c3aed"}}/>Mesures détaillées
+              <div style={{fontSize:11,fontWeight:800,color:"#7c3aed",textTransform:"uppercase",letterSpacing:.8,marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
+                <div style={{width:26,height:26,borderRadius:8,background:"#7c3aed",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  {Ico.chart(13,"#fff")}
+                </div>
+                Mesures détaillées
               </div>
-              <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 <NumField label="Taux de sel" value={f.tSel} onChange={v=>set("tSel",v)}/>
                 <NumField label="Taux de phosphate" value={f.tPhosphate} onChange={v=>set("tPhosphate",v)}/>
                 <NumField label="Taux stabilisant" value={f.tStabilisant} onChange={v=>set("tStabilisant",v)}/>
@@ -1827,7 +1910,27 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
         <div className="fade-in">
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16}}>
             <div style={{display:"flex",flexDirection:"column",gap:16}}>
-              <RadioGroup label="Qualité de l'eau" value={f.qualiteEau} onChange={v=>set("qualiteEau",v)} options={["Cristalline","Trouble","Laiteuse","Verte"]}/>
+              {/* Qualité eau — chips visuels colorés */}
+              <div>
+                <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:8}}>Qualité de l'eau</span>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                  {[
+                    {v:"Cristalline",icon:"💎",color:"#0891b2",bg:"#e0f7fa"},
+                    {v:"Trouble",icon:"🌫️",color:"#64748b",bg:"#f1f5f9"},
+                    {v:"Laiteuse",icon:"🥛",color:"#94a3b8",bg:"#f8fafc"},
+                    {v:"Verte",icon:"🌿",color:"#16a34a",bg:"#f0fdf4"},
+                  ].map(({v,icon,color,bg})=>{
+                    const sel=f.qualiteEau===v;
+                    return (
+                      <button key={v} onClick={()=>set("qualiteEau",v)} className="btn-hover" style={{padding:"12px 10px",borderRadius:12,border:`2px solid ${sel?color:DS.border}`,background:sel?bg:DS.white,cursor:"pointer",fontFamily:"inherit",textAlign:"center",transition:"all .2s",boxShadow:sel?`0 2px 10px ${color}33`:"none"}}>
+                        <div style={{fontSize:22,marginBottom:3}}>{icon}</div>
+                        <div style={{fontSize:11,fontWeight:sel?800:500,color:sel?color:DS.mid}}>{v}</div>
+                        {sel && <div style={{width:8,height:8,borderRadius:4,background:color,margin:"4px auto 0"}}/>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <MultiCheck label="État du fond" values={f.etatFond} onChange={v=>set("etatFond",v)} options={["Sale","Très sale","Attaque d'algues"]}/>
               <MultiCheck label="État des parois" values={f.etatParois} onChange={v=>set("etatParois",v)} options={["Propre","Sale","Attaque d'algues"]}/>
             </div>
@@ -1843,20 +1946,35 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
       {/* ÉTAPE 4 — Correctifs avec Alcafix */}
       {step===4 && (
         <div className="fade-in">
-          <div style={{background:`linear-gradient(135deg,#7c3aed08,#7c3aed12)`,borderRadius:DS.radius,padding:18,border:"1px solid #7c3aed18"}}>
-            <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr 1fr",gap:12}}>
-              <Input label="Chlore" value={f.corrChlore} onChange={e=>set("corrChlore",e.target.value)} placeholder="ex: 200g"/>
-              <Input label="pH" value={f.corrPH} onChange={e=>set("corrPH",e.target.value)} placeholder="ex: pH- 100ml"/>
-              <Input label="Sel" value={f.corrSel} onChange={e=>set("corrSel",e.target.value)} placeholder="ex: 2 sacs"/>
-              <Input label="Algicide" value={f.corrAlgicide} onChange={e=>set("corrAlgicide",e.target.value)}/>
-              <Input label="Peroxyde" value={f.corrPeroxyde} onChange={e=>set("corrPeroxyde",e.target.value)}/>
-              <Input label="Chlore Choc" value={f.corrChloreChoc} onChange={e=>set("corrChloreChoc",e.target.value)}/>
-              <Input label="Phosphate" value={f.corrPhosphate} onChange={e=>set("corrPhosphate",e.target.value)}/>
-              <Input label="Alcafix" value={f.corrAlcafix||""} onChange={e=>set("corrAlcafix",e.target.value)} placeholder="ex: 500ml"/>
-              <Input label="Autre" value={f.corrAutre} onChange={e=>set("corrAutre",e.target.value)}/>
+          <div style={{background:`linear-gradient(135deg,#7c3aed08,#7c3aed12)`,borderRadius:DS.radius,padding:18,border:"1px solid #7c3aed18",marginBottom:16}}>
+            <div style={{fontSize:11,fontWeight:800,color:"#7c3aed",textTransform:"uppercase",letterSpacing:.8,marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
+              <div style={{width:26,height:26,borderRadius:8,background:"#7c3aed",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.chemicals(13,"#fff")}</div>
+              Produits apportés
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"1fr 1fr 1fr",gap:10}}>
+              {[
+                {k:"corrChlore",l:"Chlore",ico:"🧪",col:"#0891b2"},
+                {k:"corrPH",l:"pH",ico:"⚗️",col:"#7c3aed"},
+                {k:"corrSel",l:"Sel",ico:"🧂",col:"#64748b"},
+                {k:"corrAlgicide",l:"Algicide",ico:"🌿",col:"#16a34a"},
+                {k:"corrPeroxyde",l:"Peroxyde",ico:"💧",col:"#0284c7"},
+                {k:"corrChloreChoc",l:"Chlore Choc",ico:"⚡",col:"#ea580c"},
+                {k:"corrPhosphate",l:"Phosphate",ico:"🔬",col:"#be185d"},
+                {k:"corrAlcafix",l:"Alcafix",ico:"🧫",col:"#059669"},
+                {k:"corrAutre",l:"Autre",ico:"📦",col:"#94a3b8"},
+              ].map(({k,l,ico,col})=>(
+                <div key={k} style={{background:"#fff",borderRadius:10,padding:"10px 12px",border:"1px solid "+DS.border}}>
+                  <div style={{fontSize:10,fontWeight:700,color:col,marginBottom:5,display:"flex",alignItems:"center",gap:4}}>
+                    <span style={{fontSize:13}}>{ico}</span> {l}
+                  </div>
+                  <input value={f[k]||""} onChange={e=>set(k,e.target.value)}
+                    placeholder={k==="corrSel"?"ex: 2 sacs":k==="corrChlore"?"ex: 200g":"ex: 500ml"}
+                    style={{width:"100%",padding:"7px 10px",borderRadius:8,border:"1.5px solid "+DS.border,fontSize:13,outline:"none",boxSizing:"border-box",color:DS.dark,fontFamily:"inherit",transition:"all .2s",background:f[k]?col+"08":DS.white}}/>
+                </div>
+              ))}
             </div>
           </div>
-          <div style={{marginTop:16}}>
+          <div style={{marginTop:8}}>
             <OuiNon label="Devis à faire ?" value={f.devis} onChange={v=>set("devis",v)}/>
           </div>
         </div>
@@ -2367,13 +2485,24 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
     }).sort((a,b)=>new Date(b.date)-new Date(a.date));
   },[passages,filter]);
 
+  const counts = useMemo(()=>({
+    semaine: passages.filter(p=>{const d=new Date(p.date);return (now-d)/86400000<=7&&d<=now;}).length,
+    mois: passages.filter(p=>{const d=new Date(p.date);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();}).length,
+    tout: passages.length,
+  }),[passages]);
+
   return (
     <div>
-      <div style={{display:"flex",gap:8,marginBottom:14}}>
-        {[["semaine","Semaine"],["mois","Mois"],["tout","Tout"]].map(([v,l])=>(
-          <button key={v} onClick={()=>setFilter(v)} className="btn-hover" style={{padding:"7px 16px",borderRadius:20,border:filter===v?"none":"1px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:12,fontFamily:"inherit",background:filter===v?DS.blueGrad:DS.white,color:filter===v?"#fff":DS.mid,boxShadow:filter===v?"0 2px 8px "+DS.blue+"44":"none"}}>{l}</button>
-        ))}
-        <span style={{marginLeft:"auto",fontSize:12,color:DS.mid,alignSelf:"center",fontWeight:600}}>{filtered.length} passage{filtered.length!==1?"s":""}</span>
+      <div style={{display:"flex",gap:6,marginBottom:14,background:DS.light,borderRadius:DS.radius,padding:4}}>
+        {[["semaine","7 jours",Ico.clock],[" mois","Ce mois",Ico.calendar],["tout","Tout",Ico.clipboard]].map(([v,l,ico])=>{
+          const key=v.trim(); const active=filter===key;
+          return (
+            <button key={key} onClick={()=>setFilter(key)} className="btn-hover" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"8px 4px",borderRadius:DS.radiusSm,border:"none",cursor:"pointer",fontFamily:"inherit",background:active?DS.white:"transparent",color:active?DS.dark:DS.mid,boxShadow:active?"0 1px 4px rgba(0,0,0,0.08)":"none",transition:"all .2s"}}>
+              <span style={{fontWeight:800,fontSize:16,color:active?DS.blue:DS.mid}}>{counts[key]}</span>
+              <span style={{fontSize:10,fontWeight:active?700:500}}>{l}</span>
+            </button>
+          );
+        })}
       </div>
       {filtered.length===0
         ? <div style={{textAlign:"center",color:DS.mid,padding:40,fontSize:13}}>Aucun passage sur cette période</div>
@@ -2401,11 +2530,15 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                         {p.ok?<IcoBubble ico={Ico.check(11,DS.green)} color={DS.green} size={24}/>:<IcoBubble ico={Ico.x(11,DS.red)} color={DS.red} size={24}/>}
                       </div>
                     </div>
-                    <div style={{display:"flex",gap:8,marginBottom:6,flexWrap:"wrap"}}>
-                      <Tag color={isCtrl?DS.teal:DS.blue}>{isCtrl?"💧":"🔧"} {p.type}</Tag>
-                      {p.ph&&<Tag color={phOk?DS.green:DS.red}>pH {p.ph}</Tag>}
-                      {p.chlore&&<Tag color={clOk?DS.green:DS.red}>Cl {p.chlore}</Tag>}
-                      <Tag color={rapportMeta.color} bg={rapportMeta.bg}>{rapportMeta.label}</Tag>
+                    <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap",alignItems:"center"}}>
+                      <Tag color={isCtrl?DS.teal:DS.blue} style={{fontSize:11}}>
+                        <span style={{display:"flex",alignItems:"center",gap:4}}>
+                          {isCtrl ? Ico.drop(11,DS.teal) : Ico.wrench(11,DS.blue)} {p.type}
+                        </span>
+                      </Tag>
+                      {p.ph&&<Tag color={phOk?DS.green:DS.red} style={{fontSize:11}}>pH {p.ph}</Tag>}
+                      {p.chlore&&<Tag color={clOk?DS.green:DS.red} style={{fontSize:11}}>Cl {p.chlore}</Tag>}
+                      <Tag color={rapportMeta.color} bg={rapportMeta.bg} style={{fontSize:11}}>{rapportMeta.label}</Tag>
                     </div>
                     {(p.photoArrivee||p.photoDepart) && (
                       <div style={{display:"flex",gap:6,marginBottom:6}}>
@@ -2415,11 +2548,22 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                     )}
                     {p.actions&&<div style={{fontSize:12,color:DS.mid,marginBottom:4}}>{p.actions}</div>}
                     {p.obs&&<div style={{fontSize:11,color:DS.orange,display:"flex",alignItems:"center",gap:4}}>{Ico.note(11,DS.orange)} {p.obs}</div>}
-                    <div style={{display:"flex",gap:6,marginTop:10,paddingTop:10,borderTop:"1px solid "+DS.border}}>
-                      <button onClick={()=>onEdit(p)} className="btn-hover" style={{flex:1,padding:"7px",borderRadius:10,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(13,DS.mid)} Modifier</button>
-                      <button onClick={()=>ouvrirRapport(p,c)} className="btn-hover" style={{flex:1,padding:"7px",borderRadius:10,background:DS.blueSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.blue,fontFamily:"inherit",fontWeight:700}}>{Ico.pdf(13,DS.blue)} Rapport</button>
-                      {c?.email&&<button onClick={()=>envoyerEmail(p,c,onUpdatePassageStatus)} className="btn-hover" style={{flex:1,padding:"7px",borderRadius:10,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.green,fontFamily:"inherit",fontWeight:700}}>{Ico.send(13,DS.green)} Email</button>}
-                      <button onClick={()=>{if(confirm("Supprimer ce passage ?"))onDelete(p.id)}} className="btn-hover" style={{width:34,height:34,borderRadius:10,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(13,DS.red)}</button>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginTop:10,paddingTop:10,borderTop:"1px solid "+DS.border}}>
+                      <button onClick={()=>ouvrirRapport(p,c)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.blueSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.blue,fontFamily:"inherit",fontWeight:700,boxShadow:"0 1px 4px "+DS.blue+"22"}}>
+                        {Ico.pdf(14,DS.blue)} Rapport PDF
+                      </button>
+                      {c?.email
+                        ? <button onClick={()=>envoyerEmail(p,c,onUpdatePassageStatus)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.green,fontFamily:"inherit",fontWeight:700}}>
+                            {Ico.send(13,DS.green)} Envoyer email
+                          </button>
+                        : <div style={{borderRadius:10,background:DS.light,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:DS.mid,fontWeight:500}}>{Ico.mail(12,DS.mid)} Pas d'email</div>
+                      }
+                      <button onClick={()=>onEdit(p)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>
+                        {Ico.edit(13,DS.mid)} Modifier
+                      </button>
+                      <button onClick={()=>{if(confirm("Supprimer ce passage ?"))onDelete(p.id)}} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.red,fontFamily:"inherit",fontWeight:700}}>
+                        {Ico.trash(13,DS.red)} Supprimer
+                      </button>
                     </div>
                   </div>
                 </div>
