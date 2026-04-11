@@ -286,6 +286,19 @@ const AC = {
   ok:     { bg:DS.greenSoft,  bd:"#86efac", tx:DS.green,  lbl:"OK"       },
 };
 
+const RAPPORT_STATUS = {
+  saisie: { label:"En cours de saisie", color:DS.orange, bg:DS.orangeSoft },
+  cree:   { label:"Créé", color:DS.blue, bg:DS.blueSoft },
+  envoye: { label:"Envoyé", color:DS.green, bg:DS.greenSoft },
+};
+
+function getRapportStatus(p) {
+  if (p?.rapportStatut) return p.rapportStatut;
+  if (p?.rapportEnvoyeAt) return "envoye";
+  if (p?.ok) return "cree";
+  return "saisie";
+}
+
 // ─── STYLES GLOBAUX INJECTÉS ─────────────────────────────────────────────────
 const GlobalStyles = () => (
   <style>{`
@@ -687,7 +700,7 @@ function FormRdv({ initial, clients, onSave, onClose }) {
 }
 
 // ─── FICHE CLIENT (avec différenciation Entretien/Contrôle) ──────────────────
-function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onClose, onAddPassage, onEditPassage }) {
+function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus }) {
   const [tab, setTab] = useState("infos");
   const [showFormLiv, setShowFormLiv] = useState(false);
   const [editLiv, setEditLiv] = useState(null);
@@ -848,6 +861,8 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
               const phOk=p.ph>=7.0&&p.ph<=7.6;
               const clOk=p.chlore>=0.5&&p.chlore<=3.0;
               const isCtrl = isControleType(p.type);
+              const rapportStatus = getRapportStatus(p);
+              const rapportMeta = RAPPORT_STATUS[rapportStatus];
               return (
                 <Card key={p.id} style={{marginBottom:10}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
@@ -857,7 +872,7 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
                         <Tag color={isCtrl?DS.teal:DS.blue}>{isCtrl?"💧":"🔧"} {p.type}</Tag>
                         {p.ph&&<Tag color={phOk?DS.green:DS.red}>pH {p.ph}</Tag>}
                         {p.chlore&&<Tag color={clOk?DS.green:DS.red}>Cl {p.chlore}</Tag>}
-                        {p.ok ? <Tag color={DS.green}>{Ico.check(10,DS.green)} Validé</Tag> : <Tag color={DS.red}>{Ico.x(10,DS.red)} En attente</Tag>}
+                        <Tag color={rapportMeta.color} bg={rapportMeta.bg}>{rapportMeta.label}</Tag>
                       </div>
                     </div>
                     {p.tech&&<span style={{fontSize:11,color:DS.mid,display:"flex",alignItems:"center",gap:3}}>{Ico.user(10,DS.mid)} {p.tech}</span>}
@@ -873,7 +888,7 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
                   <div style={{display:"flex",gap:6,paddingTop:8,borderTop:"1px solid "+DS.border}}>
                     <button onClick={()=>onEditPassage&&onEditPassage(p)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(12,DS.mid)} Modifier</button>
                     <button onClick={(e)=>{e.stopPropagation();ouvrirRapport(p,client);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.blueSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,color:DS.blue,fontFamily:"inherit",fontWeight:700}}>{Ico.pdf(12,DS.blue)} Rapport</button>
-                    {client.email&&<button onClick={(e)=>{e.stopPropagation();envoyerEmail(p,client);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,color:DS.green,fontFamily:"inherit",fontWeight:700}}>{Ico.send(12,DS.green)} Email</button>}
+                    {client.email&&<button onClick={(e)=>{e.stopPropagation();envoyerEmail(p,client,onUpdatePassageStatus);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,color:DS.green,fontFamily:"inherit",fontWeight:700}}>{Ico.send(12,DS.green)} Email</button>}
                   </div>
                 </Card>
               );
@@ -1402,7 +1417,7 @@ function ouvrirRapport(passage, client) {
   setTimeout(()=>URL.revokeObjectURL(url), 5000);
 }
 
-function envoyerEmail(passage, client) {
+function envoyerEmail(passage, client, onSent) {
   const html = genererHTMLRapport(passage, client);
   const blob = new Blob([html], {type:"text/html;charset=utf-8"});
   const url = URL.createObjectURL(blob);
@@ -1430,6 +1445,15 @@ Dorian — BRIBLUE
 Entretien & Traitement de piscines
 T. 06 67 18 61 15`
   );
+
+  if (onSent) {
+    onSent({
+      ...passage,
+      rapportStatut: "envoye",
+      rapportEnvoyeAt: new Date().toISOString(),
+    });
+  }
+
   setTimeout(()=>{ window.location.href = `mailto:${client?.email||""}?subject=${sujet}&body=${corps}`; }, 800);
 
   alert(`Le rapport a été téléchargé.\n\nVotre messagerie va s'ouvrir.\nPensez à joindre le fichier "${filename}" en pièce jointe.`);
@@ -1468,6 +1492,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
       id: isEdit ? f.id : uid(),
       ph:ph||f.tPH||f.ph||"",
       chlore:cl||f.tChlore||f.chloreLibre||"",
+      rapportStatut: f.ok ? "cree" : "saisie",
       actions:[
         f.corrChlore&&`Chlore: ${f.corrChlore}`,
         f.corrPH&&`pH: ${f.corrPH}`,
@@ -2005,7 +2030,7 @@ function PageClients({ clients, passages, onClientClick, onAdd }) {
 }
 
 // ─── PAGE PASSAGES ────────────────────────────────────────────────────────────
-function PagePassages({ clients, passages, onAdd, onDelete, onEdit }) {
+function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePassageStatus }) {
   const [filter,setFilter]=useState("mois");
   const now=new Date();
   const filtered=useMemo(()=>{
@@ -2032,6 +2057,8 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit }) {
             const c=clients.find(x=>x.id===p.clientId);
             const phOk=p.ph>=7&&p.ph<=7.6, clOk=p.chlore>=0.5&&p.chlore<=3;
             const isCtrl = isControleType(p.type);
+            const rapportStatus = getRapportStatus(p);
+            const rapportMeta = RAPPORT_STATUS[rapportStatus];
             return (
               <Card key={p.id} className="fade-in" style={{animationDelay:`${idx*0.05}s`}}>
                 <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
@@ -2053,6 +2080,7 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit }) {
                       <Tag color={isCtrl?DS.teal:DS.blue}>{isCtrl?"💧":"🔧"} {p.type}</Tag>
                       {p.ph&&<Tag color={phOk?DS.green:DS.red}>pH {p.ph}</Tag>}
                       {p.chlore&&<Tag color={clOk?DS.green:DS.red}>Cl {p.chlore}</Tag>}
+                      <Tag color={rapportMeta.color} bg={rapportMeta.bg}>{rapportMeta.label}</Tag>
                     </div>
                     {(p.photoArrivee||p.photoDepart) && (
                       <div style={{display:"flex",gap:6,marginBottom:6}}>
@@ -2065,7 +2093,7 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit }) {
                     <div style={{display:"flex",gap:6,marginTop:10,paddingTop:10,borderTop:"1px solid "+DS.border}}>
                       <button onClick={()=>onEdit(p)} className="btn-hover" style={{flex:1,padding:"7px",borderRadius:10,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(13,DS.mid)} Modifier</button>
                       <button onClick={()=>ouvrirRapport(p,c)} className="btn-hover" style={{flex:1,padding:"7px",borderRadius:10,background:DS.blueSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.blue,fontFamily:"inherit",fontWeight:700}}>{Ico.pdf(13,DS.blue)} Rapport</button>
-                      {c?.email&&<button onClick={()=>envoyerEmail(p,c)} className="btn-hover" style={{flex:1,padding:"7px",borderRadius:10,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.green,fontFamily:"inherit",fontWeight:700}}>{Ico.send(13,DS.green)} Email</button>}
+                      {c?.email&&<button onClick={()=>envoyerEmail(p,c,onUpdatePassageStatus)} className="btn-hover" style={{flex:1,padding:"7px",borderRadius:10,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.green,fontFamily:"inherit",fontWeight:700}}>{Ico.send(13,DS.green)} Email</button>}
                       <button onClick={()=>{if(confirm("Supprimer ce passage ?"))onDelete(p.id)}} className="btn-hover" style={{width:34,height:34,borderRadius:10,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(13,DS.red)}</button>
                     </div>
                   </div>
@@ -2272,6 +2300,9 @@ export default function App() {
   const saveClient = useCallback(c=>{ setClients(prev=>prev.find(x=>x.id===c.id)?prev.map(x=>x.id===c.id?c:x):[...prev,c]); setShowFormClient(false);setEditClient(null);setFicheClient(c); },[]);
   const deleteClient = useCallback(id=>{ if(!confirm("Supprimer ce client ?"))return; setClients(prev=>prev.filter(x=>x.id!==id)); setPassages(prev=>prev.filter(x=>x.clientId!==id)); setFicheClient(null); },[]);
   const savePassage = useCallback(p=>{ setPassages(prev=>prev.find(x=>x.id===p.id)?prev.map(x=>x.id===p.id?p:x):[...prev,p]); setShowFormPassage(false);setEditPassage(null); },[]);
+  const updatePassageRapportStatus = useCallback((passageMaj) => {
+    setPassages(prev => prev.map(x => x.id === passageMaj.id ? { ...x, ...passageMaj } : x));
+  }, []);
   const deletePassage = useCallback(id=>setPassages(prev=>prev.filter(x=>x.id!==id)),[]);
   const openAddPassageFromClient = useCallback(cid=>{ setEditPassage(null);setDefaultClientId(cid);setShowFormPassage(true); },[]);
   const openEditPassage = useCallback(p=>{ setEditPassage(p);setDefaultClientId(p.clientId);setShowFormPassage(true); },[]);
@@ -2355,7 +2386,7 @@ export default function App() {
       <div style={{padding:isMobile?"6px 16px 110px":"8px 28px 110px"}}>
         {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}}/>}
         {page==="clients"&&<PageClients clients={clients} passages={passages} onClientClick={setFicheClient} onAdd={openAddClient}/>}
-        {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage}/>}
+        {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus}/>}
         {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
       </div>
 
@@ -2373,7 +2404,7 @@ export default function App() {
       {/* MODALS */}
       {ficheClient&&(()=>{
         const latest=clients.find(c=>c.id===ficheClient.id)||ficheClient;
-        return <FicheClient client={latest} passages={passages} livraisons={livraisons.filter(l=>l.clientId===latest.id)} onSaveLivraison={saveLivraison} onDeleteLivraison={deleteLivraison} onUpdateStatutLivraison={updateStatutLivraison} onClose={()=>setFicheClient(null)} onEdit={()=>{setEditClient(latest);setShowFormClient(true);setFicheClient(null);}} onDelete={()=>deleteClient(latest.id)} onAddPassage={()=>openAddPassageFromClient(latest.id)} onEditPassage={openEditPassage}/>;
+        return <FicheClient client={latest} passages={passages} livraisons={livraisons.filter(l=>l.clientId===latest.id)} onSaveLivraison={saveLivraison} onDeleteLivraison={deleteLivraison} onUpdateStatutLivraison={updateStatutLivraison} onClose={()=>setFicheClient(null)} onEdit={()=>{setEditClient(latest);setShowFormClient(true);setFicheClient(null);}} onDelete={()=>deleteClient(latest.id)} onAddPassage={()=>openAddPassageFromClient(latest.id)} onEditPassage={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus}/>;
       })()}
 
       {showFormClient&&<FormClient initial={editClient} clients={clients} onSave={saveClient} onClose={()=>{setShowFormClient(false);setEditClient(null);}}/>}
