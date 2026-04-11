@@ -21,7 +21,7 @@ const BRAND_LOGO = `data:image/svg+xml;utf8,${encodeURIComponent(`
     <path d="M10 38c5 6 10 6 15 0s10-6 15 0 10 6 15 0" fill="none" stroke="white" stroke-width="4" stroke-linecap="round"/>
   </g>
   <text x="94" y="42" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="800" fill="#0c1222">BRIBLUE</text>
-  <text x="94" y="66" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="600" fill="#0369a1">Entretien &amp; traitement de piscines</text>
+  <text x="94" y="66" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="600" fill="#0369a1">Création - Traitement de l&apos;eau - Installation - Dépannage</text>
 </svg>`)}`;
 
 
@@ -1235,7 +1235,8 @@ table td{padding:7px 12px;border:1px solid #e2e8f0;font-size:12px}
 </div>
 
 <div class="subtitle" style="display:flex;justify-content:center;align-items:center;padding:0 0 14px"><img src="${BRAND_LOGO}" alt="BRIBLUE" style="max-width:340px;width:100%;height:auto;object-fit:contain;display:block"/></div>
-<h1 style="margin-top:0">CONTRAT D'ENTRETIEN PISCINE</h1>
+<h1 style="margin-top:0">CONTRAT PISCINE</h1>
+<div class="subtitle" style="text-align:center;color:#0369a1;font-size:13px;font-weight:700;margin-bottom:20px;letter-spacing:0.5px">Création · Traitement de l'eau · Installation · Dépannage</div>
 
 <div class="section">
   <div class="section-title">Informations du contrat</div>
@@ -1847,6 +1848,140 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
   );
 }
 
+// CALENDRIER INTERACTIF
+function CalendrierInteractif({ passages, rdvs, clients, onClientClick }) {
+  const [calMonth, setCalMonth] = useState(MOIS_NOW);
+  const [calYear, setCalYear] = useState(YEAR_NOW);
+  const [selectedDay, setSelectedDay] = useState(null);
+
+  const prevMonth = () => {
+    if (calMonth===1) { setCalMonth(12); setCalYear(y=>y-1); }
+    else setCalMonth(m=>m-1);
+    setSelectedDay(null);
+  };
+  const nextMonth = () => {
+    if (calMonth===12) { setCalMonth(1); setCalYear(y=>y+1); }
+    else setCalMonth(m=>m+1);
+    setSelectedDay(null);
+  };
+  const goToday = () => { setCalMonth(MOIS_NOW); setCalYear(YEAR_NOW); setSelectedDay(null); };
+
+  const firstDay=new Date(calYear,calMonth-1,1).getDay();
+  const nbDays=new Date(calYear,calMonth,0).getDate();
+  const todayDate=new Date();
+  const isCurrentMonth=calMonth===todayDate.getMonth()+1&&calYear===todayDate.getFullYear();
+  const today=isCurrentMonth?todayDate.getDate():null;
+
+  const passageDays=new Set(passages.filter(p=>{ const d=new Date(p.date); return d.getMonth()+1===calMonth&&d.getFullYear()===calYear; }).map(p=>new Date(p.date).getDate()));
+  const rdvDays=new Set(rdvs.filter(r=>{const d=new Date(r.date);return d.getMonth()+1===calMonth&&d.getFullYear()===calYear;}).map(r=>new Date(r.date).getDate()));
+  const offset=(firstDay+6)%7;
+  const cells=[...Array(offset).fill(null),...Array.from({length:nbDays},(_,i)=>i+1)];
+
+  const selDateStr = selectedDay ? `${calYear}-${String(calMonth).padStart(2,"0")}-${String(selectedDay).padStart(2,"0")}` : null;
+  const dayPassages = selDateStr ? passages.filter(p=>p.date===selDateStr) : [];
+  const dayRdvs = selDateStr ? rdvs.filter(r=>r.date===selDateStr) : [];
+
+  return (
+    <Card style={{marginBottom:14}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+        <button onClick={prevMonth} className="btn-hover" style={{width:34,height:34,borderRadius:10,background:DS.light,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.back(14,DS.mid)}</button>
+        <div style={{textAlign:"center",flex:1}}>
+          <button onClick={goToday} style={{background:"none",border:"none",cursor:"pointer",fontFamily:"inherit"}}>
+            <div style={{fontSize:15,fontWeight:900,color:DS.dark,letterSpacing:-0.3}}>{MOIS_L[calMonth]}</div>
+            <div style={{fontSize:11,fontWeight:600,color:DS.mid}}>{calYear}{!isCurrentMonth?" · Retour aujourd'hui":""}</div>
+          </button>
+        </div>
+        <button onClick={nextMonth} className="btn-hover" style={{width:34,height:34,borderRadius:10,background:DS.light,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.next(14,DS.mid)}</button>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:4}}>
+        {["L","M","M","J","V","S","D"].map((d,i)=>(<div key={i} style={{textAlign:"center",fontSize:9,fontWeight:800,color:DS.mid,padding:"2px 0"}}>{d}</div>))}
+        {cells.map((day,i)=>{
+          if(!day) return <div key={i}/>;
+          const isToday=day===today, hasP=passageDays.has(day), hasR=rdvDays.has(day), isSel=day===selectedDay;
+          const hasEvents=hasP||hasR;
+          return (
+            <div key={i} onClick={()=>setSelectedDay(day===selectedDay?null:day)}
+              style={{textAlign:"center",padding:"5px 2px",borderRadius:7,
+                background:isSel?DS.blue:isToday?DS.dark:hasP?DS.blueSoft:hasR?DS.purpleSoft:"transparent",
+                border:isSel?"2px solid "+DS.blue:isToday?"none":hasP?"1.5px solid "+DS.blue:hasR?"1.5px solid "+DS.purple:"1px solid transparent",
+                position:"relative",cursor:"pointer",transition:"all .15s"}}>
+              <span style={{fontSize:10,fontWeight:isToday||hasP||hasR||isSel?800:400,color:isSel||isToday?"#fff":hasP?DS.blue:hasR?DS.purple:DS.mid}}>{day}</span>
+              <div style={{display:"flex",justifyContent:"center",gap:2,marginTop:1}}>
+                {hasP&&!isToday&&!isSel&&<div style={{width:4,height:4,borderRadius:2,background:DS.blue}}/>}
+                {hasR&&!isToday&&!isSel&&<div style={{width:4,height:4,borderRadius:2,background:DS.purple}}/>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{display:"flex",gap:12,fontSize:11,color:DS.mid,justifyContent:"flex-end",fontWeight:600,marginTop:4}}>
+        <span style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:4,background:DS.dark}}/> Aujourd'hui</span>
+        <span style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:4,background:DS.blue}}/> Passage</span>
+        <span style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:4,background:DS.purple}}/> RDV</span>
+      </div>
+
+      {selectedDay && (dayPassages.length>0||dayRdvs.length>0) && (
+        <div className="fade-in" style={{marginTop:12,padding:"14px",background:DS.light,borderRadius:DS.radiusSm,border:"1px solid "+DS.border}}>
+          <div style={{fontWeight:800,fontSize:13,color:DS.dark,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
+            {Ico.calendar(14,DS.blue)} {selectedDay} {MOIS_L[calMonth]} {calYear}
+          </div>
+
+          {dayPassages.length>0 && (
+            <div style={{marginBottom:dayRdvs.length>0?10:0}}>
+              <div style={{fontSize:10,fontWeight:800,color:DS.blue,textTransform:"uppercase",letterSpacing:.8,marginBottom:6}}>Passages ({dayPassages.length})</div>
+              {dayPassages.map(p=>{
+                const c=clients.find(x=>x.id===p.clientId);
+                const isCtrl=isControleType(p.type);
+                return (
+                  <div key={p.id} onClick={()=>c&&onClientClick(c)} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:DS.white,borderRadius:8,marginBottom:4,border:"1px solid "+DS.border,cursor:c?"pointer":"default"}}>
+                    <Avatar nom={c?.nom||"?"} size={30} photo={c?.photoPiscine}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:700,fontSize:12,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c?.nom||p.clientId}</div>
+                      <div style={{fontSize:11,color:DS.mid,marginTop:1}}>{isCtrl?"💧":"🔧"} {p.type}{p.tech?" · "+p.tech:""}</div>
+                    </div>
+                    {p.ok?<div style={{width:20,height:20,borderRadius:10,background:DS.greenSoft,display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.check(10,DS.green)}</div>
+                         :<div style={{width:20,height:20,borderRadius:10,background:DS.redSoft,display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.x(10,DS.red)}</div>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {dayRdvs.length>0 && (
+            <div>
+              <div style={{fontSize:10,fontWeight:800,color:DS.purple,textTransform:"uppercase",letterSpacing:.8,marginBottom:6}}>RDV ({dayRdvs.length})</div>
+              {dayRdvs.map(r=>{
+                const c=clients.find(x=>x.id===r.clientId);
+                return (
+                  <div key={r.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:DS.white,borderRadius:8,marginBottom:4,border:"1px solid "+DS.purple+"33"}}>
+                    <div style={{width:30,textAlign:"center",flexShrink:0}}>
+                      <div style={{fontSize:13,fontWeight:900,color:DS.purple}}>{r.heure||"--:--"}</div>
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:700,fontSize:12,color:DS.dark}}>{r.type}</div>
+                      {c&&<div style={{fontSize:11,color:DS.mid,marginTop:1}}>{c.nom}</div>}
+                      {r.description&&<div style={{fontSize:11,color:DS.mid}}>{r.description}</div>}
+                    </div>
+                    <Tag color={DS.purple} style={{fontSize:10}}>{r.duree||60}min</Tag>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {selectedDay && dayPassages.length===0 && dayRdvs.length===0 && (
+        <div className="fade-in" style={{marginTop:12,padding:"16px",background:DS.light,borderRadius:DS.radiusSm,textAlign:"center",color:DS.mid,fontSize:12,fontWeight:500}}>
+          Aucun événement le {selectedDay} {MOIS_L[calMonth]}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 // DASHBOARD  Bannire tches + RDV
 function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, onAddLivraison, onAddClient, onAddRdv }) {
   const isMobile = useIsMobile();
@@ -1965,45 +2100,8 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
         </Card>
       )}
 
-      {/* Mini calendar */}
-      <Card style={{marginBottom:14}}>
-        <div style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Calendrier — {MOIS_L[moisCourant]}</div>
-        {(()=>{
-          const year=YEAR_NOW;
-          const firstDay=new Date(year,moisCourant-1,1).getDay();
-          const nbDays=new Date(year,moisCourant,0).getDate();
-          const today=new Date().getDate();
-          const passageDays=new Set(passages.filter(p=>{ const d=new Date(p.date); return d.getMonth()+1===moisCourant&&d.getFullYear()===year; }).map(p=>new Date(p.date).getDate()));
-          const rdvDays=new Set(rdvs.filter(r=>{const d=new Date(r.date);return d.getMonth()+1===moisCourant&&d.getFullYear()===year;}).map(r=>new Date(r.date).getDate()));
-          const offset=(firstDay+6)%7;
-          const cells=[...Array(offset).fill(null),...Array.from({length:nbDays},(_,i)=>i+1)];
-          return (
-            <div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:4}}>
-                {["L","M","M","J","V","S","D"].map((d,i)=>(<div key={i} style={{textAlign:"center",fontSize:9,fontWeight:800,color:DS.mid,padding:"2px 0"}}>{d}</div>))}
-                {cells.map((day,i)=>{
-                  if(!day) return <div key={i}/>;
-                  const isToday=day===today, hasP=passageDays.has(day), hasR=rdvDays.has(day);
-                  return (
-                    <div key={i} style={{textAlign:"center",padding:"5px 2px",borderRadius:7,background:isToday?DS.dark:hasP?DS.blueSoft:hasR?DS.purpleSoft:"transparent",border:isToday?"none":hasP?"1.5px solid "+DS.blue:hasR?"1.5px solid "+DS.purple:"1px solid transparent",position:"relative"}}>
-                      <span style={{fontSize:10,fontWeight:isToday||hasP||hasR?800:400,color:isToday?"#fff":hasP?DS.blue:hasR?DS.purple:DS.mid}}>{day}</span>
-                      <div style={{display:"flex",justifyContent:"center",gap:2,marginTop:1}}>
-                        {hasP&&!isToday&&<div style={{width:4,height:4,borderRadius:2,background:DS.blue}}/>}
-                        {hasR&&!isToday&&<div style={{width:4,height:4,borderRadius:2,background:DS.purple}}/>}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{display:"flex",gap:12,fontSize:11,color:DS.mid,justifyContent:"flex-end",fontWeight:600,marginTop:4}}>
-                <span style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:4,background:DS.dark}}/> Aujourd'hui</span>
-                <span style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:4,background:DS.blue}}/> Passage</span>
-                <span style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:4,background:DS.purple}}/> RDV</span>
-              </div>
-            </div>
-          );
-        })()}
-      </Card>
+      {/* Mini calendar INTERACTIF */}
+      <CalendrierInteractif passages={passages} rdvs={rdvs} clients={clients} onClientClick={onClientClick}/>
 
       {/* Alertes */}
       {(()=>{
@@ -2297,7 +2395,7 @@ function LoginScreen({ onLogin }) {
         <div style={{width:80,height:80,borderRadius:24,background:"linear-gradient(135deg,#0c1222,#1e3a5f)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 12px 40px rgba(12,18,34,0.4)"}}>{Ico.wave(42,"white")}</div>
         <div style={{textAlign:"center"}}>
           <div style={{fontWeight:900,fontSize:28,color:DS.dark,letterSpacing:-1}}>BRIBLUE</div>
-          <div style={{color:DS.mid,fontSize:13,marginTop:2,fontWeight:500}}>Entretien & Traitement de piscines</div>
+          <div style={{color:DS.mid,fontSize:12,marginTop:2,fontWeight:500}}>Création · Traitement de l'eau · Installation · Dépannage</div>
         </div>
       </div>
       <div className="fade-in" style={{width:"100%",maxWidth:400,background:DS.white,borderRadius:DS.radiusLg,padding:28,boxShadow:DS.shadowMd,border:"1px solid "+DS.border,position:"relative"}}>
@@ -2354,6 +2452,7 @@ export default function App() {
   const [defaultLivraisonClientId, setDefaultLivraisonClientId] = useState("");
   const [showFormRdv, setShowFormRdv] = useState(false);
   const [editRdv, setEditRdv] = useState(null);
+  const [showModalAlertes, setShowModalAlertes] = useState(false);
   const prevTaskCount = useRef(0);
   const isMobile = useIsMobile();
 
@@ -2507,6 +2606,47 @@ export default function App() {
       {showFormPassage&&<FormPassage clients={clients} defaultClientId={defaultClientId} initial={editPassage} onSave={p=>savePassage(p)} onClose={()=>{setShowFormPassage(false);setEditPassage(null);}}/>}
       {showFormLivraison&&<FormLivraison clientId={defaultLivraisonClientId} clients={clients} onSave={l=>{saveLivraison(l);setShowFormLivraison(false);}} onClose={()=>setShowFormLivraison(false)}/>}
       {showFormRdv&&<FormRdv initial={editRdv} clients={clients} onSave={saveRdv} onClose={()=>{setShowFormRdv(false);setEditRdv(null);}}/>}
+
+      {/* MODAL ALERTES */}
+      {showModalAlertes&&(()=>{
+        const alertes = clients.filter(c=>alerteClient(c,passages)!=="ok");
+        return (
+          <Modal title={`Alertes (${alertes.length})`} onClose={()=>setShowModalAlertes(false)}>
+            {alertes.length===0
+              ? <div style={{textAlign:"center",color:DS.mid,padding:32,fontSize:13}}>Aucune alerte en cours</div>
+              : <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {alertes.map(c=>{
+                  const al=alerteClient(c,passages); const col=AC[al]; const j=daysUntil(c.dateFin);
+                  const mpm=c.moisParMois||c.saisons||{};
+                  const tE=totalAnnuel(mpm,"entretien"), tC=totalAnnuel(mpm,"controle"), tot=tE+tC;
+                  const eE=passages.filter(p=>p.clientId===c.id&&isEntretienType(p.type)).length;
+                  const eC=passages.filter(p=>p.clientId===c.id&&isControleType(p.type)).length;
+                  const eff=eE+eC;
+                  const pct=tot>0?Math.round(eff/tot*100):0;
+                  return (
+                    <div key={c.id} onClick={()=>{setShowModalAlertes(false);setFicheClient(c);}} className="card-hover" style={{display:"flex",alignItems:"center",gap:12,padding:"14px 16px",background:col.bg,borderRadius:DS.radiusSm,border:"1.5px solid "+col.bd,cursor:"pointer"}}>
+                      <Avatar nom={c.nom} size={42} photo={c.photoPiscine}/>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontWeight:800,fontSize:14,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
+                        <div style={{fontSize:12,color:col.tx,fontWeight:600,marginTop:3}}>
+                          {al==="rouge"?`Contrat expire dans ${j} jour${j>1?"s":""}`
+                           :al==="jaune"?`Contrat expire dans ${j} jours`
+                           :`Passages en retard — ${eff}/${tot} (${pct}%)`}
+                        </div>
+                        <div style={{display:"flex",gap:6,marginTop:6}}>
+                          {tE>0&&<span style={{fontSize:11,fontWeight:700,color:eE>=tE?DS.green:DS.blue}}>🔧 {eE}/{tE}</span>}
+                          {tC>0&&<span style={{fontSize:11,fontWeight:700,color:eC>=tC?DS.green:DS.teal}}>💧 {eC}/{tC}</span>}
+                        </div>
+                      </div>
+                      <Tag color={col.tx} bg={col.bg}>{col.lbl}</Tag>
+                    </div>
+                  );
+                })}
+              </div>
+            }
+          </Modal>
+        );
+      })()}
     </div>
     </>
   );
