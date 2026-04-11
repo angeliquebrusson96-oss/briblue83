@@ -500,7 +500,7 @@ function FormClient({ initial, clients, onSave, onClose }) {
       <Section title="Contrat">
         <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"1fr 1fr 1fr",gap:12}}>
           <Select label="Formule" value={f.formule} onChange={e=>set("formule",e.target.value)} options={["VAC","VAC+","Confort","Confort+"]}/>
-          <Input label="Prix (€)" type="number" value={f.prix} onChange={e=>set("prix",+e.target.value)}/>
+          <div/>
           {!isMobile&&<div/>}
           <Input label="Date début" type="date" value={f.dateDebut} onChange={e=>set("dateDebut",e.target.value)}/>
           <Input label="Date fin" type="date" value={f.dateFin} onChange={e=>set("dateFin",e.target.value)}/>
@@ -543,10 +543,28 @@ function FormClient({ initial, clients, onSave, onClose }) {
           <Input label="Prix/passage entretien (€)" type="number" value={f.prixPassageE||""} onChange={e=>set("prixPassageE",+e.target.value||0)}/>
           <Input label="Prix/passage contrôle (€)" type="number" value={f.prixPassageC||""} onChange={e=>set("prixPassageC",+e.target.value||0)}/>
         </div>
+        {/* Récap tarification auto */}
+        <div style={{marginTop:12,background:"linear-gradient(135deg,#0c1222,#1a365d)",borderRadius:DS.radiusSm,padding:"14px 16px",color:"#fff"}}>
+          <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:1,color:"rgba(255,255,255,0.5)",marginBottom:10}}>Tarification</div>
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:12,color:"rgba(255,255,255,0.7)"}}>🔧 {totalE} entretiens × {f.prixPassageE||0}€</span>
+              <span style={{fontSize:14,fontWeight:800}}>{totalE*(f.prixPassageE||0)} €</span>
+            </div>
+            {totalC>0&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:12,color:"rgba(255,255,255,0.7)"}}>💧 {totalC} contrôles × {f.prixPassageC||0}€</span>
+              <span style={{fontSize:14,fontWeight:800}}>{totalC*(f.prixPassageC||0)} €</span>
+            </div>}
+            <div style={{borderTop:"1px solid rgba(255,255,255,0.15)",paddingTop:8,marginTop:4,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:13,fontWeight:700}}>Prix annuel</span>
+              <span style={{fontSize:22,fontWeight:900,color:"#22d3ee"}}>{(totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0)).toLocaleString("fr")} €</span>
+            </div>
+          </div>
+        </div>
       </Section>
       <div style={{display:"flex",gap:10}}>
         <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
-        <BtnPrimary onClick={()=>{ if(!f.nom.trim()) return alert("Nom requis"); onSave(f); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
+        <BtnPrimary onClick={()=>{ if(!f.nom.trim()) return alert("Nom requis"); const prixCalc=totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0); onSave({...f, prix:prixCalc||f.prix||0}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
       </div>
     </Modal>
   );
@@ -684,76 +702,101 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
   const jours = daysUntil(client.dateFin);
   const moisCourant = MOIS_NOW;
 
+  const pct = total>0?Math.round(eff/total*100):0;
+  const rest = Math.max(0,total-eff);
+
   return (
-    <Modal title={client.nom} onClose={onClose} wide>
-      <div style={{display:"flex",gap:14,alignItems:"center",marginBottom:18}}>
-        <Avatar nom={client.nom} size={56} photo={client.photoPiscine}/>
-        <div style={{flex:1}}>
-          <div style={{fontWeight:800,fontSize:17,color:DS.dark,letterSpacing:-0.3}}>{client.nom}</div>
-          <div style={{fontSize:12,color:DS.mid,marginTop:2}}>{client.formule} · {client.bassin}</div>
-          <Tag color={col.tx} style={{marginTop:6,display:"inline-flex"}}>
-            {jours!==null&&jours>=0 ? `Expire dans ${jours}j` : jours!==null ? `Expiré depuis ${Math.abs(jours)}j` : col.lbl}
-          </Tag>
-        </div>
+    <Modal title="" onClose={onClose} wide>
+      {/* Hero header */}
+      <div style={{margin:"-24px -28px 0",marginTop:isMobile?"-18px":"-24px",marginLeft:isMobile?"-20px":"-28px",marginRight:isMobile?"-20px":"-28px"}}>
+        {client.photoPiscine
+          ? <div style={{height:130,background:`url(${client.photoPiscine}) center/cover`,position:"relative"}}>
+              <div style={{position:"absolute",inset:0,background:"linear-gradient(transparent 20%,rgba(12,18,34,0.85))"}}/>
+              <div style={{position:"absolute",bottom:14,left:18,right:18,display:"flex",gap:14,alignItems:"flex-end"}}>
+                <Avatar nom={client.nom} size={52} photo={null}/>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:900,fontSize:17,color:"#fff",letterSpacing:-0.3,textShadow:"0 1px 4px rgba(0,0,0,0.4)"}}>{client.nom}</div>
+                  <div style={{display:"flex",gap:6,marginTop:4}}>
+                    <Tag color="#fff" bg="rgba(255,255,255,0.2)" style={{backdropFilter:"blur(4px)"}}>{client.formule}</Tag>
+                    <Tag color={col.tx} bg={col.bg}>{jours!==null&&jours>=0?`${jours}j restants`:jours!==null?`Expiré ${Math.abs(jours)}j`:col.lbl}</Tag>
+                  </div>
+                </div>
+              </div>
+            </div>
+          : <div style={{background:"linear-gradient(135deg,#0c1222,#1a365d,#0369a1)",padding:"22px 20px 18px",position:"relative",overflow:"hidden"}}>
+              <div style={{position:"absolute",top:"-20%",right:"-10%",width:120,height:120,borderRadius:60,background:"rgba(255,255,255,0.05)"}}/>
+              <div style={{display:"flex",gap:14,alignItems:"center",position:"relative"}}>
+                <Avatar nom={client.nom} size={52} photo={null}/>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:900,fontSize:17,color:"#fff",letterSpacing:-0.3}}>{client.nom}</div>
+                  <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
+                    <Tag color="#fff" bg="rgba(255,255,255,0.15)">{client.formule}</Tag>
+                    {client.bassin&&<Tag color="#fff" bg="rgba(255,255,255,0.1)">{client.bassin}</Tag>}
+                    <Tag color={col.tx} bg={col.bg}>{jours!==null&&jours>=0?`${jours}j restants`:jours!==null?`Expiré ${Math.abs(jours)}j`:col.lbl}</Tag>
+                  </div>
+                </div>
+              </div>
+            </div>
+        }
       </div>
 
-      {client.photoPiscine && <div style={{marginBottom:14,borderRadius:DS.radiusSm,overflow:"hidden",border:"1px solid "+DS.border}}><img src={client.photoPiscine} alt="Piscine" style={{width:"100%",height:120,objectFit:"cover",display:"block"}}/></div>}
-
-      {/* Stats with Entretien / Contrôle split */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:8}}>
-        <div style={{background:DS.blueSoft,borderRadius:DS.radiusSm,padding:"10px 12px",border:"1px solid "+DS.blue+"22"}}>
-          <div style={{fontSize:10,color:DS.blue,fontWeight:700,marginBottom:2,display:"flex",alignItems:"center",gap:4}}>{Ico.wrench(10,DS.blue)} Entretiens complets</div>
-          <div style={{display:"flex",alignItems:"baseline",gap:4}}>
-            <span style={{fontSize:22,fontWeight:900,color:DS.blue}}>{effE}</span>
-            <span style={{fontSize:13,color:DS.mid,fontWeight:600}}>/ {totalE}</span>
+      {/* Stats ring */}
+      <div style={{display:"flex",gap:8,marginTop:16,marginBottom:14}}>
+        <div style={{flex:1,background:`linear-gradient(135deg,${DS.blue}08,${DS.blue}15)`,borderRadius:DS.radiusSm,padding:"12px",border:"1px solid "+DS.blue+"18"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+            <span style={{fontSize:10,fontWeight:700,color:DS.blue,textTransform:"uppercase",letterSpacing:.5}}>🔧 Entretiens</span>
+            <span style={{fontSize:13,fontWeight:900,color:DS.blue}}>{effE}<span style={{fontWeight:500,color:DS.mid}}>/{totalE}</span></span>
           </div>
-          <ProgressBar value={effE} max={totalE} height={4}/>
+          <ProgressBar value={effE} max={totalE} height={5}/>
         </div>
-        <div style={{background:DS.tealSoft,borderRadius:DS.radiusSm,padding:"10px 12px",border:"1px solid "+DS.teal+"22"}}>
-          <div style={{fontSize:10,color:DS.teal,fontWeight:700,marginBottom:2,display:"flex",alignItems:"center",gap:4}}>{Ico.drop(10,DS.teal)} Contrôles d'eau</div>
-          <div style={{display:"flex",alignItems:"baseline",gap:4}}>
-            <span style={{fontSize:22,fontWeight:900,color:DS.teal}}>{effC}</span>
-            <span style={{fontSize:13,color:DS.mid,fontWeight:600}}>/ {totalC}</span>
+        <div style={{flex:1,background:`linear-gradient(135deg,${DS.teal}08,${DS.teal}15)`,borderRadius:DS.radiusSm,padding:"12px",border:"1px solid "+DS.teal+"18"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+            <span style={{fontSize:10,fontWeight:700,color:DS.teal,textTransform:"uppercase",letterSpacing:.5}}>💧 Contrôles</span>
+            <span style={{fontSize:13,fontWeight:900,color:DS.teal}}>{effC}<span style={{fontWeight:500,color:DS.mid}}>/{totalC}</span></span>
           </div>
-          <ProgressBar value={effC} max={totalC} height={4}/>
-        </div>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:14}}>
-        <div style={{background:DS.light,borderRadius:DS.radiusSm,padding:"8px",textAlign:"center"}}>
-          <div style={{fontSize:18,fontWeight:900,color:DS.dark}}>{total}</div>
-          <div style={{fontSize:10,color:DS.mid,fontWeight:600}}>Total prévus</div>
-        </div>
-        <div style={{background:DS.light,borderRadius:DS.radiusSm,padding:"8px",textAlign:"center"}}>
-          <div style={{fontSize:18,fontWeight:900,color:Math.max(0,total-eff)>0?DS.orange:DS.green}}>{Math.max(0,total-eff)}</div>
-          <div style={{fontSize:10,color:DS.mid,fontWeight:600}}>Restants</div>
-        </div>
-        <div style={{background:DS.light,borderRadius:DS.radiusSm,padding:"8px",textAlign:"center"}}>
-          <div style={{fontSize:18,fontWeight:900,color:DS.purple}}>{client.prix?.toLocaleString("fr")}€</div>
-          <div style={{fontSize:10,color:DS.mid,fontWeight:600}}>Prix</div>
+          <ProgressBar value={effC} max={totalC} height={5}/>
         </div>
       </div>
 
-      <div style={{display:"flex",gap:2,marginBottom:16,background:DS.light,borderRadius:DS.radiusSm,padding:3}}>
+      {/* Summary bar */}
+      <div style={{display:"flex",gap:6,marginBottom:16}}>
+        <div style={{flex:1,background:DS.light,borderRadius:10,padding:"10px 8px",textAlign:"center"}}>
+          <div style={{fontSize:20,fontWeight:900,color:pct>=100?DS.green:DS.dark}}>{pct}<span style={{fontSize:12,fontWeight:600}}>%</span></div>
+          <div style={{fontSize:9,color:DS.mid,fontWeight:600,marginTop:1}}>Avancement</div>
+        </div>
+        <div style={{flex:1,background:rest>0?DS.orangeSoft:DS.greenSoft,borderRadius:10,padding:"10px 8px",textAlign:"center",border:"1px solid "+(rest>0?DS.orange:DS.green)+"22"}}>
+          <div style={{fontSize:20,fontWeight:900,color:rest>0?DS.orange:DS.green}}>{rest}</div>
+          <div style={{fontSize:9,color:rest>0?DS.orange:DS.green,fontWeight:600,marginTop:1}}>Restants</div>
+        </div>
+        <div style={{flex:1,background:"linear-gradient(135deg,#7c3aed08,#7c3aed15)",borderRadius:10,padding:"10px 8px",textAlign:"center",border:"1px solid #7c3aed18"}}>
+          <div style={{fontSize:16,fontWeight:900,color:DS.purple}}>{client.prix?client.prix.toLocaleString("fr"):"—"}<span style={{fontSize:10}}>€</span></div>
+          <div style={{fontSize:9,color:DS.purple,fontWeight:600,marginTop:1}}>Prix annuel</div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{display:"flex",gap:0,marginBottom:16,background:DS.light,borderRadius:DS.radiusSm,padding:3}}>
         {[["infos","Infos"],["saisons","Planning"],["passages","Passages"],["livraisons","Livraisons"]].map(([id,l])=>(
-          <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"8px 4px",borderRadius:10,border:"none",cursor:"pointer",fontWeight:700,fontSize:11,fontFamily:"inherit",background:tab===id?DS.white:"transparent",color:tab===id?DS.dark:DS.mid,boxShadow:tab===id?DS.shadow:"none",transition:"all .2s"}}>{l}</button>
+          <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"9px 4px",borderRadius:10,border:"none",cursor:"pointer",fontWeight:tab===id?800:600,fontSize:11,fontFamily:"inherit",background:tab===id?DS.white:"transparent",color:tab===id?DS.dark:DS.mid,boxShadow:tab===id?"0 1px 4px rgba(0,0,0,0.08)":"none",transition:"all .25s"}}>{l}</button>
         ))}
       </div>
 
+      {/* Tab: Infos */}
       {tab==="infos" && (
-        <div style={{display:"flex",flexDirection:"column",gap:8}} className="fade-in">
+        <div className="fade-in" style={{display:"flex",flexDirection:"column",gap:6}}>
           {[
-            {ico:Ico.phone(13,DS.blue),l:"Téléphone",v:client.tel,href:"tel:"+client.tel},
-            {ico:Ico.mail(13,DS.blue),l:"Email",v:client.email,href:"mailto:"+client.email},
-            {ico:Ico.pin(13,DS.blue),l:"Adresse",v:client.adresse,href:null},
-            {ico:Ico.pool(13,DS.blue),l:"Bassin",v:`${client.bassin} — ${client.volume} m³`,href:null},
-            {ico:Ico.clipboard(13,DS.blue),l:"Formule",v:client.formule,href:null},
-            {ico:Ico.calendar(13,DS.blue),l:"Contrat",v:`Du ${new Date(client.dateDebut).toLocaleDateString("fr")} au ${new Date(client.dateFin).toLocaleDateString("fr")}`,href:null},
+            {ico:Ico.phone(13,DS.blue),l:"Téléphone",v:client.tel,href:client.tel?"tel:"+client.tel:null},
+            {ico:Ico.mail(13,DS.blue),l:"Email",v:client.email,href:client.email?"mailto:"+client.email:null},
+            {ico:Ico.pin(13,DS.blue),l:"Adresse",v:client.adresse},
+            {ico:Ico.pool(13,DS.blue),l:"Bassin",v:[client.bassin,client.volume?client.volume+" m³":null].filter(Boolean).join(" — ")},
+            {ico:Ico.calendar(13,DS.blue),l:"Début",v:client.dateDebut?new Date(client.dateDebut).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}):null},
+            {ico:Ico.calendar(13,DS.orange),l:"Fin",v:client.dateFin?new Date(client.dateFin).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}):null},
           ].filter(r=>r.v).map(r=>(
-            <div key={r.l} style={{display:"flex",gap:12,padding:"11px 14px",background:DS.light,borderRadius:DS.radiusSm,alignItems:"center"}}>
-              <IcoBubble ico={r.ico} color={DS.blue} size={32}/>
-              <div style={{flex:1}}>
-                <div style={{fontSize:11,color:DS.mid,fontWeight:600}}>{r.l}</div>
-                {r.href ? <a href={r.href} style={{fontSize:13,color:DS.blue,fontWeight:700,textDecoration:"none"}}>{r.v}</a> : <span style={{fontSize:13,color:DS.dark,fontWeight:700}}>{r.v}</span>}
+            <div key={r.l} style={{display:"flex",gap:12,padding:"10px 14px",background:DS.white,borderRadius:10,alignItems:"center",border:"1px solid "+DS.border}}>
+              <div style={{width:32,height:32,borderRadius:8,background:DS.blueSoft,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{r.ico}</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:10,color:DS.mid,fontWeight:600,textTransform:"uppercase",letterSpacing:.5}}>{r.l}</div>
+                {r.href ? <a href={r.href} style={{fontSize:13,color:DS.blue,fontWeight:700,textDecoration:"none"}}>{r.v}</a> : <div style={{fontSize:13,color:DS.dark,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis"}}>{r.v}</div>}
               </div>
             </div>
           ))}
@@ -888,10 +931,17 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
         <FormLivraison initial={editLiv} clientId={client.id} onSave={l=>{onSaveLivraison(l);setShowFormLiv(false);setEditLiv(null);}} onClose={()=>{setShowFormLiv(false);setEditLiv(null);}}/>
       )}
 
-      <div style={{display:"flex",gap:8,marginTop:20,paddingTop:16,borderTop:"1px solid "+DS.border}}>
-        <BtnPrimary onClick={()=>ouvrirContrat(client)} bg={DS.blue} color="#fff" icon={Ico.contract(14,"#fff")} style={{flex:1}}>Contrat</BtnPrimary>
-        <BtnPrimary onClick={onEdit} bg={DS.light} color={DS.dark} icon={Ico.edit(14,DS.dark)} style={{flex:1}}>Modifier</BtnPrimary>
-        <button onClick={onDelete} className="btn-hover" style={{width:44,borderRadius:DS.radiusSm,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(15,DS.red)}</button>
+      {/* Action buttons */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:8,marginTop:20,paddingTop:16,borderTop:"1px solid "+DS.border}}>
+        <button onClick={()=>ouvrirContrat(client)} className="btn-hover" style={{padding:"12px 8px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6,boxShadow:"0 2px 8px rgba(2,132,199,0.3)"}}>
+          {Ico.contract(14,"#fff")} Contrat
+        </button>
+        <button onClick={onEdit} className="btn-hover" style={{padding:"12px 8px",borderRadius:DS.radiusSm,background:DS.white,border:"1.5px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:12,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+          {Ico.edit(13,DS.dark)} Modifier
+        </button>
+        <button onClick={onDelete} className="btn-hover" style={{width:44,height:44,borderRadius:DS.radiusSm,background:DS.redSoft,border:"1px solid #fca5a5",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          {Ico.trash(14,DS.red)}
+        </button>
       </div>
     </Modal>
   );
@@ -1849,68 +1899,89 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
   );
 }
 
-// ─── PAGE CLIENTS — AVEC BOUTON AJOUTER + Entretien/Contrôle ─────────────────
+// ─── PAGE CLIENTS ────────────────────────────────────────────────────────────
 function PageClients({ clients, passages, onClientClick, onAdd }) {
   const [search, setSearch] = useState("");
   const isMobile = useIsMobile();
   const filtered = useMemo(()=>clients.filter(c=>c.nom.toLowerCase().includes(search.toLowerCase())||c.adresse?.toLowerCase().includes(search.toLowerCase())),[clients,search]);
+  const totalAll = clients.length;
+  const alertCount = clients.filter(c=>alerteClient(c,passages)!=="ok").length;
 
   return (
     <div>
+      {/* Stats bar */}
+      <div style={{display:"flex",gap:8,marginBottom:14}}>
+        <div style={{flex:1,background:"linear-gradient(135deg,#0c1222,#1e3a5f)",borderRadius:DS.radiusSm,padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.12)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.clients(18,"#fff")}</div>
+          <div><div style={{fontSize:20,fontWeight:900,color:"#fff"}}>{totalAll}</div><div style={{fontSize:10,color:"rgba(255,255,255,0.6)",fontWeight:600}}>Clients</div></div>
+        </div>
+        {alertCount>0&&<div style={{background:DS.redSoft,borderRadius:DS.radiusSm,padding:"12px 16px",display:"flex",alignItems:"center",gap:8,border:"1px solid #fca5a5"}}>
+          <div style={{width:36,height:36,borderRadius:10,background:DS.red+"18",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.alert(16,DS.red)}</div>
+          <div><div style={{fontSize:20,fontWeight:900,color:DS.red}}>{alertCount}</div><div style={{fontSize:10,color:DS.red,fontWeight:600}}>Alertes</div></div>
+        </div>}
+      </div>
+
+      {/* Search + Add */}
       <div style={{display:"flex",gap:10,marginBottom:14}}>
         <div style={{flex:1,position:"relative"}}>
-          <div style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}>{Ico.search(16,DS.mid)}</div>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher un client..."
-            style={{width:"100%",padding:"11px 14px 11px 38px",borderRadius:DS.radius,border:"1.5px solid "+DS.border,fontSize:13,outline:"none",boxSizing:"border-box",background:DS.white,color:DS.dark,fontFamily:"inherit",transition:"all .2s"}}/>
+          <div style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}>{Ico.search(16,"#94a3b8")}</div>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher…"
+            style={{width:"100%",padding:"12px 14px 12px 40px",borderRadius:DS.radius,border:"1.5px solid "+DS.border,fontSize:13,outline:"none",boxSizing:"border-box",background:DS.white,color:DS.dark,fontFamily:"inherit"}}/>
         </div>
-        <BtnPrimary onClick={onAdd} bg="#7c3aed" icon={Ico.userPlus(16,"#fff")} style={{flexShrink:0}}>
-          {!isMobile && "Ajouter"}
+        <BtnPrimary onClick={onAdd} bg={DS.purple} icon={Ico.userPlus(16,"#fff")} style={{flexShrink:0}}>
+          {!isMobile && "Nouveau"}
         </BtnPrimary>
       </div>
-      {filtered.length===0&&<div style={{textAlign:"center",color:DS.mid,padding:40}}>Aucun client trouvé</div>}
-      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+
+      {filtered.length===0&&<div style={{textAlign:"center",color:DS.mid,padding:40,fontSize:13}}>Aucun client trouvé</div>}
+
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
         {filtered.map((c,idx)=>{
           const al=alerteClient(c,passages); const col=AC[al];
-          const totalE=totalAnnuel(c.moisParMois||c.saisons,"entretien");
-          const totalC=totalAnnuel(c.moisParMois||c.saisons,"controle");
-          const effE=passages.filter(p=>p.clientId===c.id&&isEntretienType(p.type)).length;
-          const effC=passages.filter(p=>p.clientId===c.id&&isControleType(p.type)).length;
-          const tot=totalE+totalC;
-          const eff=effE+effC;
-          const moisPrevE=getEntretienMois(c.moisParMois||c.saisons,MOIS_NOW);
-          const moisPrevC=getControleMois(c.moisParMois||c.saisons,MOIS_NOW);
-          const moisEffE=passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===MOIS_NOW&&isEntretienType(p.type)).length;
-          const moisEffC=passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===MOIS_NOW&&isControleType(p.type)).length;
+          const mpm=c.moisParMois||c.saisons||{};
+          const tE=totalAnnuel(mpm,"entretien"), tC=totalAnnuel(mpm,"controle"), tot=tE+tC;
+          const eE=passages.filter(p=>p.clientId===c.id&&isEntretienType(p.type)).length;
+          const eC=passages.filter(p=>p.clientId===c.id&&isControleType(p.type)).length;
+          const eff=eE+eC;
+          const pct=tot>0?Math.round(eff/tot*100):0;
+          const rest=Math.max(0,tot-eff);
           return (
-            <Card key={c.id} onClick={()=>onClientClick(c)} className="fade-in" style={{animationDelay:`${idx*0.05}s`}}>
-              <div style={{display:"flex",gap:12,alignItems:"center"}}>
-                <Avatar nom={c.nom} size={44} photo={c.photoPiscine}/>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                    <div style={{fontWeight:800,fontSize:14,color:DS.dark,letterSpacing:-0.2}}>{c.nom}</div>
-                    <Tag color={col.tx}>{col.lbl}</Tag>
-                  </div>
-                  <div style={{fontSize:12,color:DS.mid,marginTop:3,display:"flex",gap:10,flexWrap:"wrap"}}>
-                    {c.tel&&<span style={{display:"flex",alignItems:"center",gap:3}}>{Ico.phone(11,DS.mid)} {c.tel}</span>}
-                    {c.adresse&&<span style={{display:"flex",alignItems:"center",gap:3}}>{Ico.pin(11,DS.mid)} {c.adresse.split(",").pop()?.trim()}</span>}
-                  </div>
-                  <div style={{display:"flex",gap:10,marginTop:6,flexWrap:"wrap"}}>
-                    {totalE>0&&<span style={{fontSize:11,fontWeight:700,color:DS.blue}}>🔧 {effE}/{totalE}</span>}
-                    {totalC>0&&<span style={{fontSize:11,fontWeight:700,color:DS.teal}}>💧 {effC}/{totalC}</span>}
-                  </div>
-                  <div style={{marginTop:6}}>
-                    <ProgressBar value={eff} max={tot}/>
-                    <div style={{display:"flex",justifyContent:"space-between",marginTop:4}}>
-                      <span style={{fontSize:11,color:DS.mid,fontWeight:600}}>{eff}/{tot} passages</span>
-                      <div style={{display:"flex",gap:4}}>
-                        {moisPrevE>0&&<Tag color={moisEffE>=moisPrevE?DS.green:DS.orange}>🔧 {moisEffE}/{moisPrevE}</Tag>}
-                        {moisPrevC>0&&<Tag color={moisEffC>=moisPrevC?DS.green:DS.orange}>💧 {moisEffC}/{moisPrevC}</Tag>}
-                      </div>
+            <div key={c.id} onClick={()=>onClientClick(c)} className="fade-in card-hover" style={{animationDelay:`${idx*0.03}s`,background:DS.white,borderRadius:DS.radius,overflow:"hidden",boxShadow:DS.shadow,border:"1px solid "+DS.border,cursor:"pointer"}}>
+              {/* Photo banner or gradient */}
+              {c.photoPiscine
+                ? <div style={{height:56,background:`url(${c.photoPiscine}) center/cover`,position:"relative"}}><div style={{position:"absolute",inset:0,background:"linear-gradient(transparent 30%,rgba(0,0,0,0.5))"}}/></div>
+                : <div style={{height:6,background:`linear-gradient(90deg,${col.tx}44,${col.tx}11)`}}/>
+              }
+              <div style={{padding:"12px 16px"}}>
+                <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+                  <Avatar nom={c.nom} size={42} photo={c.photoPiscine?null:undefined}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+                      <div style={{fontWeight:800,fontSize:14,color:DS.dark,letterSpacing:-0.3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
+                      <Tag color={col.tx}>{col.lbl}</Tag>
+                    </div>
+                    <div style={{display:"flex",gap:8,marginTop:4,flexWrap:"wrap",fontSize:11,color:DS.mid}}>
+                      <span style={{background:DS.light,padding:"2px 8px",borderRadius:6,fontWeight:600}}>{c.formule}</span>
+                      {c.adresse&&<span style={{display:"flex",alignItems:"center",gap:3}}>{Ico.pin(10,"#94a3b8")} {c.adresse.split(",").pop()?.trim()}</span>}
                     </div>
                   </div>
                 </div>
+
+                {/* Progress section */}
+                {tot>0&&<div style={{marginTop:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                    <div style={{display:"flex",gap:8}}>
+                      {tE>0&&<span style={{fontSize:11,fontWeight:700,color:eE>=tE?DS.green:DS.blue}}>🔧 {eE}/{tE}</span>}
+                      {tC>0&&<span style={{fontSize:11,fontWeight:700,color:eC>=tC?DS.green:DS.teal}}>💧 {eC}/{tC}</span>}
+                    </div>
+                    <span style={{fontSize:11,fontWeight:800,color:pct>=100?DS.green:rest>3?DS.orange:DS.dark}}>{pct}%</span>
+                  </div>
+                  <div style={{height:5,background:DS.light,borderRadius:99,overflow:"hidden"}}>
+                    <div style={{height:"100%",width:`${pct}%`,background:pct>=100?DS.greenGrad:pct>=50?DS.blueGrad:`linear-gradient(90deg,${DS.orange},#fbbf24)`,borderRadius:99,transition:"width .6s ease"}}/>
+                  </div>
+                </div>}
               </div>
-            </Card>
+            </div>
           );
         })}
       </div>
