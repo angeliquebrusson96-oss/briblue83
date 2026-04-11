@@ -194,7 +194,7 @@ function isControleType(type) {
 function alerteClient(c, passages) {
   const j = daysUntil(c.dateFin);
   const eff = passages.filter(p=>p.clientId===c.id).length;
-  const prev = totalAnnuel(c.saisons);
+  const prev = totalAnnuel(c.moisParMois||c.saisons);
   if (j !== null && j >= 0 && j <= 30) return "rouge";
   if (j !== null && j > 30 && j <= 60) return "jaune";
   if (prev > 0 && eff / prev < 0.5 && (prev - eff) > 3) return "orange";
@@ -675,7 +675,6 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
   const effC = passC.filter(p=>isControleType(p.type)).length;
   const eff = passC.length;
   const jours = daysUntil(client.dateFin);
-  const pm = passagesParMois(client.saisons);
 
   return (
     <Modal title={client.nom} onClose={onClose} wide>
@@ -1692,8 +1691,8 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
 
   // Tâches à effectuer ce mois
   const tachesMois = clients.map(c=>{
-    const prevE = getEntretienMois(c.saisons, moisCourant);
-    const prevC = getControleMois(c.saisons, moisCourant);
+    const prevE = getEntretienMois(c.moisParMois||c.saisons, moisCourant);
+    const prevC = getControleMois(c.moisParMois||c.saisons, moisCourant);
     const effE = passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===moisCourant&&new Date(p.date).getFullYear()===YEAR_NOW&&isEntretienType(p.type)).length;
     const effC = passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===moisCourant&&new Date(p.date).getFullYear()===YEAR_NOW&&isControleType(p.type)).length;
     const restE = Math.max(0,prevE-effE);
