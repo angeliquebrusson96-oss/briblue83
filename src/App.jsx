@@ -71,10 +71,10 @@ const SAISONS_META = {
 const MOIS = ["","Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
 const MOIS_L = ["","Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
 
-// Migration: old saisons format OR moisParMois → normalized moisParMois
+// Migration: old saisons format OR moisParMois → normalized moisParMois (keys always integers)
 function migrateMois(data) {
   if (!data) return {...MOIS_PAR_MOIS_DEF};
-  // Already mois-par-mois? (keys 1-12)
+  // Already mois-par-mois? (keys 1-12 as string or number)
   if (data["1"] || data[1]) {
     const r = {};
     for (let m=1;m<=12;m++) { const v=data[m]||data[String(m)]||{entretien:0,controle:0}; r[m]={entretien:v.entretien??0,controle:v.controle??0}; }
@@ -92,6 +92,7 @@ function migrateMois(data) {
   }
   return r;
 }
+function getMoisVal(mpm, m) { const d = migrateMois(mpm); return d[m] || d[String(m)] || {entretien:0,controle:0}; }
 
 const CLIENTS_INIT = [
   { id:"C001", nom:"GAMBIN IMMO - COPRO O GARDEN", tel:"", email:"", adresse:"", bassin:"Liner", volume:0, formule:"Confort+", prix:2418, prixPassageE:78, prixPassageC:0, dateDebut:"2025-09-29", dateFin:"2026-09-29", photoPiscine:"", moisParMois:{1:{entretien:1,controle:0},2:{entretien:2,controle:0},3:{entretien:2,controle:0},4:{entretien:2,controle:0},5:{entretien:2,controle:0},6:{entretien:4,controle:0},7:{entretien:4,controle:0},8:{entretien:4,controle:0},9:{entretien:4,controle:0},10:{entretien:2,controle:0},11:{entretien:2,controle:0},12:{entretien:2,controle:0}} },
@@ -173,15 +174,15 @@ function getSaison(m) {
   for (const [k,s] of Object.entries(SAISONS_META)) if (s.mois.includes(m)) return k;
   return "ete";
 }
-function getEntretienMois(mpm, m) { const d = migrateMois(mpm); return d[m]?.entretien ?? 0; }
-function getControleMois(mpm, m) { const d = migrateMois(mpm); return d[m]?.controle ?? 0; }
+function getEntretienMois(mpm, m) { return getMoisVal(mpm, m).entretien; }
+function getControleMois(mpm, m) { return getMoisVal(mpm, m).controle; }
 function totalAnnuel(mpm, type="all") {
-  const d = migrateMois(mpm);
   let t=0;
   for (let m=1;m<=12;m++) {
-    if (type==="entretien") t+=d[m]?.entretien??0;
-    else if (type==="controle") t+=d[m]?.controle??0;
-    else t+=(d[m]?.entretien??0)+(d[m]?.controle??0);
+    const v = getMoisVal(mpm, m);
+    if (type==="entretien") t+=v.entretien;
+    else if (type==="controle") t+=v.controle;
+    else t+=v.entretien+v.controle;
   }
   return t;
 }
@@ -512,7 +513,7 @@ function FormClient({ initial, clients, onSave, onClose }) {
         </div>
         <div style={{border:"1px solid "+DS.border,borderTop:"none",borderRadius:"0 0 12px 12px",overflow:"hidden"}}>
           {[...Array(12)].map((_,i)=>{
-            const m=i+1; const mv=f.moisParMois?.[m]||{entretien:0,controle:0}; const sc=SAISONS_META[getSaison(m)];
+            const m=i+1; const mv=getMoisVal(f.moisParMois,m); const sc=SAISONS_META[getSaison(m)];
             return (
               <div key={m} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderBottom:i<11?"1px solid "+DS.border:"none",background:i%2===0?DS.white:DS.light}}>
                 <div style={{width:36,display:"flex",alignItems:"center",gap:4}}>
