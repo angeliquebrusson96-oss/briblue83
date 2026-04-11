@@ -1,5 +1,3 @@
-
-
 import { createClient } from '@supabase/supabase-js'
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 
@@ -50,11 +48,13 @@ const Ico = {
   camera: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>,
   image: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>,
   userPlus: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>,
+  rdv: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="12" cy="15" r="2"/></svg>,
 };
 
 
 // ─── DONNÉES PAR DÉFAUT ───────────────────────────────────────────────────────
-const SAISONS_DEF = { hiver: 0, printemps: 2, ete: 4, automne: 2 };
+// Chaque saison a maintenant entretien + controle
+const SAISONS_DEF = { hiver: {entretien:0,controle:0}, printemps: {entretien:2,controle:0}, ete: {entretien:4,controle:0}, automne: {entretien:2,controle:0} };
 const SAISONS_META = {
   hiver:     { label: "Hiver",     icon: "snow",    mois: [12,1,2],  color: "#60a5fa", bg: "#eff6ff" },
   printemps: { label: "Printemps", icon: "flower",  mois: [3,4,5],   color: "#34d399", bg: "#ecfdf5" },
@@ -64,15 +64,31 @@ const SAISONS_META = {
 const MOIS = ["","Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
 const MOIS_L = ["","Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
 
+// Migration helper: convert old saisons format {hiver:4,...} to new {hiver:{entretien:4,controle:0},...}
+function migrateSaisons(saisons) {
+  if (!saisons) return {...SAISONS_DEF};
+  const migrated = {};
+  for (const [k, v] of Object.entries(saisons)) {
+    if (typeof v === 'number') {
+      migrated[k] = { entretien: v, controle: 0 };
+    } else if (typeof v === 'object' && v !== null) {
+      migrated[k] = { entretien: v.entretien ?? 0, controle: v.controle ?? 0 };
+    } else {
+      migrated[k] = { entretien: 0, controle: 0 };
+    }
+  }
+  return migrated;
+}
+
 const CLIENTS_INIT = [
-  { id:"C001", nom:"Dupont Marie",  tel:"06 12 34 56 78", email:"marie@email.com",  adresse:"12 Rue des Pins, Hyères",    bassin:"Coque polyester", volume:45, formule:"Confort+", prix:1800, dateDebut:"2026-04-01", dateFin:"2027-03-31", saisons:{ hiver:4, printemps:4, ete:4, automne:4 } },
-  { id:"C002", nom:"Martin Pierre", tel:"06 98 76 54 32", email:"pierre@email.com", adresse:"5 Av. de la Mer, Toulon",    bassin:"Béton",           volume:60, formule:"VAC+",     prix:1200, dateDebut:"2026-04-01", dateFin:"2026-09-30", saisons:{ hiver:0, printemps:2, ete:4, automne:2 } },
-  { id:"C003", nom:"Garcia Sophie", tel:"06 11 22 33 44", email:"sophie@email.com", adresse:"8 Chemin du Lac, La Seyne", bassin:"Liner",           volume:35, formule:"VAC",      prix:850,  dateDebut:"2026-05-01", dateFin:"2026-09-30", saisons:{ hiver:0, printemps:2, ete:4, automne:2 } },
+  { id:"C001", nom:"Dupont Marie",  tel:"06 12 34 56 78", email:"marie@email.com",  adresse:"12 Rue des Pins, Hyères",    bassin:"Coque polyester", volume:45, formule:"Confort+", prix:1800, dateDebut:"2026-04-01", dateFin:"2027-03-31", saisons:{ hiver:{entretien:4,controle:0}, printemps:{entretien:4,controle:0}, ete:{entretien:4,controle:0}, automne:{entretien:4,controle:0} } },
+  { id:"C002", nom:"Martin Pierre", tel:"06 98 76 54 32", email:"pierre@email.com", adresse:"5 Av. de la Mer, Toulon",    bassin:"Béton",           volume:60, formule:"VAC+",     prix:1200, dateDebut:"2026-04-01", dateFin:"2026-09-30", saisons:{ hiver:{entretien:0,controle:0}, printemps:{entretien:2,controle:1}, ete:{entretien:4,controle:2}, automne:{entretien:2,controle:1} } },
+  { id:"C003", nom:"Garcia Sophie", tel:"06 11 22 33 44", email:"sophie@email.com", adresse:"8 Chemin du Lac, La Seyne", bassin:"Liner",           volume:35, formule:"VAC",      prix:850,  dateDebut:"2026-05-01", dateFin:"2026-09-30", saisons:{ hiver:{entretien:0,controle:0}, printemps:{entretien:2,controle:0}, ete:{entretien:4,controle:0}, automne:{entretien:2,controle:0} } },
 ];
 const PASSAGES_INIT = [
-  { id:1, clientId:"C001", date:"2026-04-06", type:"Entretien", ph:7.2, chlore:1.5, actions:"Nettoyage, vérif. pompe", obs:"RAS",                      tech:"Dorian", ok:true },
-  { id:2, clientId:"C002", date:"2026-04-06", type:"Entretien", ph:7.4, chlore:1.2, actions:"Nettoyage, ajust. pH",    obs:"Filtre à changer bientôt", tech:"Dorian", ok:true },
-  { id:3, clientId:"C001", date:"2026-04-07", type:"SAV",       ph:7.1, chlore:1.8, actions:"Remplacement joint pompe",obs:"Garantie OK",               tech:"Dorian", ok:true },
+  { id:1, clientId:"C001", date:"2026-04-06", type:"Entretien complet", ph:7.2, chlore:1.5, actions:"Nettoyage, vérif. pompe", obs:"RAS",                      tech:"Dorian", ok:true },
+  { id:2, clientId:"C002", date:"2026-04-06", type:"Entretien complet", ph:7.4, chlore:1.2, actions:"Nettoyage, ajust. pH",    obs:"Filtre à changer bientôt", tech:"Dorian", ok:true },
+  { id:3, clientId:"C001", date:"2026-04-07", type:"Contrôle d'eau",    ph:7.1, chlore:1.8, actions:"Contrôle mesures",          obs:"RAS",                      tech:"Dorian", ok:true },
 ];
 
 const STATUT_LIV = {
@@ -140,17 +156,47 @@ function getSaison(m) {
   for (const [k,s] of Object.entries(SAISONS_META)) if (s.mois.includes(m)) return k;
   return "ete";
 }
-function passagesParMois(saisons) {
+function getEntretienMois(saisons, m) {
+  const s = migrateSaisons(saisons);
+  const sk = getSaison(m);
+  return s[sk]?.entretien ?? 0;
+}
+function getControleMois(saisons, m) {
+  const s = migrateSaisons(saisons);
+  const sk = getSaison(m);
+  return s[sk]?.controle ?? 0;
+}
+function passagesParMois(saisons, type="all") {
+  const s = migrateSaisons(saisons);
   const r = {};
-  for (let m=1;m<=12;m++) r[m] = saisons?.[getSaison(m)] ?? 0;
+  for (let m=1;m<=12;m++) {
+    const sk = getSaison(m);
+    if (type==="entretien") r[m] = s[sk]?.entretien ?? 0;
+    else if (type==="controle") r[m] = s[sk]?.controle ?? 0;
+    else r[m] = (s[sk]?.entretien ?? 0) + (s[sk]?.controle ?? 0);
+  }
   return r;
 }
-function totalAnnuel(saisons) {
-  return Object.entries(SAISONS_META).reduce((a,[k,s])=> a + (saisons?.[k]??0)*s.mois.length, 0);
+function totalAnnuel(saisons, type="all") {
+  const s = migrateSaisons(saisons);
+  return Object.entries(SAISONS_META).reduce((a,[k,meta])=> {
+    const sv = s[k] || {entretien:0,controle:0};
+    if (type==="entretien") return a + (sv.entretien)*meta.mois.length;
+    if (type==="controle") return a + (sv.controle)*meta.mois.length;
+    return a + (sv.entretien + sv.controle)*meta.mois.length;
+  }, 0);
 }
 function daysUntil(d) {
   if (!d) return null;
   return Math.round((new Date(d) - new Date()) / 86400000);
+}
+function isEntretienType(type) {
+  const t = (type||"").toLowerCase();
+  return t.includes("entretien") || t.includes("visite complète") || t.includes("visite technique") || t.includes("rattrapage");
+}
+function isControleType(type) {
+  const t = (type||"").toLowerCase();
+  return t.includes("contrôle") || t.includes("controle");
 }
 function alerteClient(c, passages) {
   const j = daysUntil(c.dateFin);
@@ -164,6 +210,7 @@ function alerteClient(c, passages) {
 function uid() { return Date.now() + Math.random().toString(36).slice(2); }
 const TODAY = new Date().toISOString().split("T")[0];
 const MOIS_NOW = new Date().getMonth() + 1;
+const YEAR_NOW = new Date().getFullYear();
 
 // ─── DESIGN SYSTEM V2 — MODERNE ─────────────────────────────────────────────
 const DS = {
@@ -175,6 +222,7 @@ const DS = {
   orange:"#ea580c", orangeSoft:"#ffedd5",
   yellow:"#d97706", yellowSoft:"#fef3c7",
   purple:"#7c3aed", purpleSoft:"#ede9fe", purpleGrad:"linear-gradient(135deg,#7c3aed,#a78bfa)",
+  teal:"#0891b2", tealSoft:"#e0f7fa",
   radius: 16, radiusSm: 12, radiusLg: 22,
   shadow: "0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)",
   shadowMd: "0 4px 24px rgba(0,0,0,0.08)",
@@ -203,7 +251,6 @@ const GlobalStyles = () => (
     @keyframes slideUp { from { opacity:0; transform:translateY(100%); } to { opacity:1; transform:translateY(0); } }
     @keyframes scaleIn { from { opacity:0; transform:scale(0.95); } to { opacity:1; transform:scale(1); } }
     @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.6; } }
-    @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
     .fade-in { animation: fadeIn .4s ease-out both; }
     .slide-up { animation: slideUp .35s cubic-bezier(.22,1,.36,1) both; }
     .scale-in { animation: scaleIn .3s ease-out both; }
@@ -237,7 +284,7 @@ function Avatar({ nom, size=40 }) {
 function IcoBubble({ ico, color=DS.blue, bg, size=38 }) {
   const bgCol = bg || color+"15";
   return (
-    <div style={{width:size,height:size,borderRadius:size*0.3,background:bgCol,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,backdropFilter:"blur(8px)"}}>
+    <div style={{width:size,height:size,borderRadius:size*0.3,background:bgCol,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
       {ico}
     </div>
   );
@@ -365,20 +412,27 @@ function BtnPrimary({ children, onClick, bg=DS.dark, color="#fff", icon, style={
   );
 }
 
-// ─── FORMULAIRE CLIENT ────────────────────────────────────────────────────────
+// ─── FORMULAIRE CLIENT (avec Entretien/Contrôle par saison + PVC armé) ───────
 function FormClient({ initial, clients, onSave, onClose }) {
   const isNew = !initial?.id;
   const isMobile = useIsMobile();
-  const [f, setF] = useState(() => initial || {
-    id: `C${String(clients.length+1).padStart(3,"0")}`,
-    nom:"", tel:"", email:"", adresse:"", bassin:"Liner", volume:30,
-    formule:"VAC", prix:0, dateDebut:TODAY,
-    dateFin: `${new Date().getFullYear()+1}-03-31`,
-    saisons: {...SAISONS_DEF},
+  const [f, setF] = useState(() => {
+    if (initial) {
+      return { ...initial, saisons: migrateSaisons(initial.saisons) };
+    }
+    return {
+      id: `C${String(clients.length+1).padStart(3,"0")}`,
+      nom:"", tel:"", email:"", adresse:"", bassin:"Liner", volume:30,
+      formule:"VAC", prix:0, dateDebut:TODAY,
+      dateFin: `${new Date().getFullYear()+1}-03-31`,
+      saisons: {...SAISONS_DEF},
+    };
   });
   const set = (k,v) => setF(p=>({...p,[k]:v}));
-  const setSaison = (k,v) => setF(p=>({...p,saisons:{...p.saisons,[k]:v}}));
-  const total = totalAnnuel(f.saisons);
+  const setSaisonType = (saison,type,v) => setF(p=>({...p,saisons:{...p.saisons,[saison]:{...p.saisons[saison],[type]:v}}}));
+  const totalE = totalAnnuel(f.saisons,"entretien");
+  const totalC = totalAnnuel(f.saisons,"controle");
+  const total = totalE + totalC;
 
   return (
     <Modal title={isNew ? "Nouveau client" : `Modifier — ${f.nom}`} onClose={onClose} wide>
@@ -388,7 +442,7 @@ function FormClient({ initial, clients, onSave, onClose }) {
           <Input label="Téléphone" value={f.tel} onChange={e=>set("tel",e.target.value)}/>
           <Input label="Email" type="email" value={f.email} onChange={e=>set("email",e.target.value)}/>
           <div style={{gridColumn:"1/-1"}}><Input label="Adresse" value={f.adresse} onChange={e=>set("adresse",e.target.value)}/></div>
-          <Select label="Type bassin" value={f.bassin} onChange={e=>set("bassin",e.target.value)} options={["Liner","Béton","Coque polyester","Hors-sol","Autre"]}/>
+          <Select label="Type bassin" value={f.bassin} onChange={e=>set("bassin",e.target.value)} options={["Liner","Béton","Coque polyester","PVC armé","Hors-sol","Autre"]}/>
           <Input label="Volume (m³)" type="number" value={f.volume} onChange={e=>set("volume",+e.target.value)}/>
         </div>
       </Section>
@@ -404,26 +458,54 @@ function FormClient({ initial, clients, onSave, onClose }) {
       <Section title="Passages par saison">
         <div style={{background:DS.light,borderRadius:DS.radius,padding:18,border:"1px solid "+DS.border}}>
           {Object.entries(SAISONS_META).map(([key,s])=>{
-            const val = f.saisons?.[key]??0;
+            const sv = f.saisons?.[key] || {entretien:0,controle:0};
             return (
-              <div key={key} style={{marginBottom:18}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+              <div key={key} style={{marginBottom:22}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
                   <div>
                     <span style={{fontWeight:800,color:s.color,fontSize:13,display:"flex",alignItems:"center",gap:5}}>{Ico[s.icon]&&Ico[s.icon](15,s.color)} {s.label}</span>
                     <span style={{fontSize:11,color:DS.mid}}>{s.mois.map(m=>MOIS[m]).join(" · ")}</span>
                   </div>
-                  <div style={{display:"flex",alignItems:"center",gap:6}}>
-                    <Tag color={s.color}>{val}×/mois</Tag>
-                    <Tag color={DS.mid}>{val*s.mois.length} saison</Tag>
-                  </div>
+                  <Tag color={s.color}>{(sv.entretien+sv.controle)*s.mois.length} total</Tag>
                 </div>
-                <input type="range" min={0} max={8} value={val} onChange={e=>setSaison(key,+e.target.value)} style={{width:"100%",accentColor:s.color,cursor:"pointer"}}/>
+                {/* Entretien complet */}
+                <div style={{marginBottom:8}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                    <span style={{fontSize:12,fontWeight:600,color:DS.dark,display:"flex",alignItems:"center",gap:5}}>{Ico.wrench(12,DS.blue)} Entretien complet</span>
+                    <div style={{display:"flex",gap:4}}>
+                      <Tag color={DS.blue}>{sv.entretien}×/mois</Tag>
+                      <Tag color={DS.mid}>{sv.entretien*s.mois.length} saison</Tag>
+                    </div>
+                  </div>
+                  <input type="range" min={0} max={8} value={sv.entretien} onChange={e=>setSaisonType(key,"entretien",+e.target.value)} style={{width:"100%",accentColor:DS.blue,cursor:"pointer"}}/>
+                </div>
+                {/* Contrôle d'eau */}
+                <div>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                    <span style={{fontSize:12,fontWeight:600,color:DS.dark,display:"flex",alignItems:"center",gap:5}}>{Ico.drop(12,DS.teal)} Contrôle d'eau</span>
+                    <div style={{display:"flex",gap:4}}>
+                      <Tag color={DS.teal}>{sv.controle}×/mois</Tag>
+                      <Tag color={DS.mid}>{sv.controle*s.mois.length} saison</Tag>
+                    </div>
+                  </div>
+                  <input type="range" min={0} max={8} value={sv.controle} onChange={e=>setSaisonType(key,"controle",+e.target.value)} style={{width:"100%",accentColor:DS.teal,cursor:"pointer"}}/>
+                </div>
               </div>
             );
           })}
-          <div style={{background:DS.blueGrad,borderRadius:DS.radiusSm,padding:"12px 18px",display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:4}}>
-            <span style={{color:"rgba(255,255,255,0.85)",fontSize:12,fontWeight:700}}>Total annuel estimé</span>
-            <span style={{color:"#fff",fontSize:22,fontWeight:900}}>{total} passages</span>
+          <div style={{borderRadius:DS.radiusSm,overflow:"hidden",marginTop:4}}>
+            <div style={{background:DS.blueGrad,padding:"10px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{color:"rgba(255,255,255,0.85)",fontSize:12,fontWeight:700}}>Entretiens complets</span>
+              <span style={{color:"#fff",fontSize:20,fontWeight:900}}>{totalE}</span>
+            </div>
+            <div style={{background:"linear-gradient(135deg,#0891b2,#22d3ee)",padding:"10px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{color:"rgba(255,255,255,0.85)",fontSize:12,fontWeight:700}}>Contrôles d'eau</span>
+              <span style={{color:"#fff",fontSize:20,fontWeight:900}}>{totalC}</span>
+            </div>
+            <div style={{background:DS.dark,padding:"10px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{color:"rgba(255,255,255,0.85)",fontSize:12,fontWeight:700}}>Total annuel</span>
+              <span style={{color:"#fff",fontSize:22,fontWeight:900}}>{total}</span>
+            </div>
           </div>
         </div>
       </Section>
@@ -495,7 +577,61 @@ function FormLivraison({ initial, clientId, clients=[], onSave, onClose }) {
   );
 }
 
-// ─── FICHE CLIENT ─────────────────────────────────────────────────────────────
+// ─── FORMULAIRE RDV ───────────────────────────────────────────────────────────
+function FormRdv({ initial, clients, onSave, onClose }) {
+  const isEdit = !!initial?.id;
+  const [f, setF] = useState(()=> initial || {
+    id: uid(), clientId:"", date:TODAY, heure:"09:00", duree:"60",
+    type:"Rendez-vous client", description:"", rappel:false
+  });
+  const set = (k,v) => setF(p=>({...p,[k]:v}));
+
+  return (
+    <Modal title={isEdit ? "Modifier le RDV" : "Nouveau rendez-vous"} onClose={onClose}>
+      <Section title="Client (optionnel)">
+        <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:180,overflowY:"auto"}}>
+          <button onClick={()=>set("clientId","")} style={{padding:"8px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+(f.clientId===""?DS.blue:DS.border),background:f.clientId===""?DS.blueSoft:DS.white,cursor:"pointer",textAlign:"left",fontFamily:"inherit",fontSize:13,fontWeight:f.clientId===""?700:400,color:f.clientId===""?DS.blue:DS.mid}}>— Aucun client —</button>
+          {clients.map(c=>{
+            const sel = f.clientId===c.id;
+            return (
+              <button key={c.id} onClick={()=>set("clientId",c.id)} className="card-hover" style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+(sel?DS.blue:DS.border),background:sel?DS.blueSoft:DS.white,cursor:"pointer",textAlign:"left",fontFamily:"inherit"}}>
+                <Avatar nom={c.nom} size={30}/>
+                <span style={{fontWeight:sel?700:400,fontSize:13,color:sel?DS.dark:DS.mid}}>{c.nom}</span>
+              </button>
+            );
+          })}
+        </div>
+      </Section>
+      <Section title="Date & heure">
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+          <Input label="Date *" type="date" value={f.date} onChange={e=>set("date",e.target.value)}/>
+          <Input label="Heure" type="time" value={f.heure} onChange={e=>set("heure",e.target.value)}/>
+          <Input label="Durée (min)" type="number" value={f.duree} onChange={e=>set("duree",e.target.value)}/>
+        </div>
+      </Section>
+      <Section title="Type">
+        <div style={{display:"flex",flexDirection:"column",gap:4}}>
+          {["Rendez-vous client","Mise en route","Hivernage","Devis / Visite technique","Réparation / SAV","Autre"].map(t=>(
+            <label key={t} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:8,cursor:"pointer",background:f.type===t?DS.purpleSoft:DS.light,border:`1px solid ${f.type===t?DS.purple:DS.border}`,transition:"all .15s"}}>
+              <input type="radio" checked={f.type===t} onChange={()=>set("type",t)} style={{accentColor:DS.purple,width:15,height:15}}/>
+              <span style={{fontSize:13,fontWeight:f.type===t?700:400,color:f.type===t?DS.dark:DS.mid}}>{t}</span>
+            </label>
+          ))}
+        </div>
+      </Section>
+      <Section title="Description">
+        <textarea value={f.description} onChange={e=>set("description",e.target.value)} placeholder="Détails, adresse, notes..."
+          style={{width:"100%",padding:"10px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:13,minHeight:64,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,outline:"none"}}/>
+      </Section>
+      <div style={{display:"flex",gap:10}}>
+        <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
+        <BtnPrimary onClick={()=>{ if(!f.date) return alert("Date requise"); onSave({...f,id:isEdit?f.id:uid()}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
+      </div>
+    </Modal>
+  );
+}
+
+// ─── FICHE CLIENT (avec différenciation Entretien/Contrôle) ──────────────────
 function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onClose, onAddPassage, onEditPassage }) {
   const [tab, setTab] = useState("infos");
   const [showFormLiv, setShowFormLiv] = useState(false);
@@ -504,7 +640,11 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
   const al = alerteClient(client, passages);
   const col = AC[al];
   const passC = passages.filter(p=>p.clientId===client.id).sort((a,b)=>new Date(b.date)-new Date(a.date));
-  const total = totalAnnuel(client.saisons);
+  const totalE = totalAnnuel(client.saisons,"entretien");
+  const totalC = totalAnnuel(client.saisons,"controle");
+  const total = totalE + totalC;
+  const effE = passC.filter(p=>isEntretienType(p.type)).length;
+  const effC = passC.filter(p=>isControleType(p.type)).length;
   const eff = passC.length;
   const jours = daysUntil(client.dateFin);
   const pm = passagesParMois(client.saisons);
@@ -521,16 +661,40 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
           </Tag>
         </div>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:14}}>
-        {[{l:"Prévus",v:total,c:DS.blue,g:DS.blueGrad},{l:"Faits",v:eff,c:DS.green,g:DS.greenGrad},{l:"Reste",v:Math.max(0,total-eff),c:DS.orange,g:"linear-gradient(135deg,#ea580c,#f97316)"},{l:"Prix",v:`${client.prix?.toLocaleString("fr")}€`,c:"#7c3aed",g:DS.purpleGrad}].map(k=>(
-          <div key={k.l} style={{background:DS.light,borderRadius:DS.radiusSm,padding:"10px 8px",textAlign:"center"}}>
-            <div style={{fontSize:20,fontWeight:900,color:k.c,lineHeight:1}}>{k.v}</div>
-            <div style={{fontSize:10,color:DS.mid,marginTop:3,fontWeight:600}}>{k.l}</div>
+
+      {/* Stats with Entretien / Contrôle split */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:8}}>
+        <div style={{background:DS.blueSoft,borderRadius:DS.radiusSm,padding:"10px 12px",border:"1px solid "+DS.blue+"22"}}>
+          <div style={{fontSize:10,color:DS.blue,fontWeight:700,marginBottom:2,display:"flex",alignItems:"center",gap:4}}>{Ico.wrench(10,DS.blue)} Entretiens complets</div>
+          <div style={{display:"flex",alignItems:"baseline",gap:4}}>
+            <span style={{fontSize:22,fontWeight:900,color:DS.blue}}>{effE}</span>
+            <span style={{fontSize:13,color:DS.mid,fontWeight:600}}>/ {totalE}</span>
           </div>
-        ))}
+          <ProgressBar value={effE} max={totalE} height={4}/>
+        </div>
+        <div style={{background:DS.tealSoft,borderRadius:DS.radiusSm,padding:"10px 12px",border:"1px solid "+DS.teal+"22"}}>
+          <div style={{fontSize:10,color:DS.teal,fontWeight:700,marginBottom:2,display:"flex",alignItems:"center",gap:4}}>{Ico.drop(10,DS.teal)} Contrôles d'eau</div>
+          <div style={{display:"flex",alignItems:"baseline",gap:4}}>
+            <span style={{fontSize:22,fontWeight:900,color:DS.teal}}>{effC}</span>
+            <span style={{fontSize:13,color:DS.mid,fontWeight:600}}>/ {totalC}</span>
+          </div>
+          <ProgressBar value={effC} max={totalC} height={4}/>
+        </div>
       </div>
-      <ProgressBar value={eff} max={total}/>
-      <div style={{fontSize:11,color:DS.mid,textAlign:"right",marginTop:4,marginBottom:16,fontWeight:600}}>{total>0?Math.round(eff/total*100):0}% avancement</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:14}}>
+        <div style={{background:DS.light,borderRadius:DS.radiusSm,padding:"8px",textAlign:"center"}}>
+          <div style={{fontSize:18,fontWeight:900,color:DS.dark}}>{total}</div>
+          <div style={{fontSize:10,color:DS.mid,fontWeight:600}}>Total prévus</div>
+        </div>
+        <div style={{background:DS.light,borderRadius:DS.radiusSm,padding:"8px",textAlign:"center"}}>
+          <div style={{fontSize:18,fontWeight:900,color:Math.max(0,total-eff)>0?DS.orange:DS.green}}>{Math.max(0,total-eff)}</div>
+          <div style={{fontSize:10,color:DS.mid,fontWeight:600}}>Restants</div>
+        </div>
+        <div style={{background:DS.light,borderRadius:DS.radiusSm,padding:"8px",textAlign:"center"}}>
+          <div style={{fontSize:18,fontWeight:900,color:DS.purple}}>{client.prix?.toLocaleString("fr")}€</div>
+          <div style={{fontSize:10,color:DS.mid,fontWeight:600}}>Prix</div>
+        </div>
+      </div>
 
       <div style={{display:"flex",gap:2,marginBottom:16,background:DS.light,borderRadius:DS.radiusSm,padding:3}}>
         {[["infos","Infos"],["saisons","Saisons"],["passages","Passages"],["livraisons","Livraisons"]].map(([id,l])=>(
@@ -563,17 +727,21 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
         <div className="fade-in">
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
             {Object.entries(SAISONS_META).map(([key,s])=>{
-              const nb = client.saisons?.[key]??0;
+              const sv = migrateSaisons(client.saisons)[key] || {entretien:0,controle:0};
               return (
                 <div key={key} style={{background:s.bg,borderRadius:DS.radius,padding:"14px 16px",border:`1px solid ${s.color}33`}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <div>
-                      <div style={{fontWeight:800,color:s.color,fontSize:13,display:"flex",alignItems:"center",gap:5}}>{Ico[s.icon]&&Ico[s.icon](15,s.color)} {s.label}</div>
-                      <div style={{fontSize:10,color:DS.mid,marginTop:2}}>{s.mois.map(m=>MOIS[m]).join(" · ")}</div>
+                  <div style={{fontWeight:800,color:s.color,fontSize:13,display:"flex",alignItems:"center",gap:5,marginBottom:4}}>{Ico[s.icon]&&Ico[s.icon](15,s.color)} {s.label}</div>
+                  <div style={{fontSize:10,color:DS.mid,marginBottom:8}}>{s.mois.map(m=>MOIS[m]).join(" · ")}</div>
+                  <div style={{display:"flex",gap:6,flexDirection:"column"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:11}}>
+                      <span style={{color:DS.blue,fontWeight:700}}>🔧 Entretiens</span>
+                      <span style={{fontWeight:800,color:DS.blue}}>{sv.entretien}/mois · {sv.entretien*s.mois.length}</span>
                     </div>
-                    <div style={{fontSize:28,fontWeight:900,color:s.color}}>{nb}</div>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:11}}>
+                      <span style={{color:DS.teal,fontWeight:700}}>💧 Contrôles</span>
+                      <span style={{fontWeight:800,color:DS.teal}}>{sv.controle}/mois · {sv.controle*s.mois.length}</span>
+                    </div>
                   </div>
-                  <div style={{fontSize:10,color:DS.mid,marginTop:6,fontWeight:600}}>{nb}/mois · {nb*s.mois.length} total</div>
                 </div>
               );
             })}
@@ -582,9 +750,13 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
             {[...Array(12)].map((_,i)=>{
               const m=i+1;
-              const prev=pm[m]||0;
-              const effM=passages.filter(p=>p.clientId===client.id&&new Date(p.date).getMonth()+1===m&&new Date(p.date).getFullYear()===2026).length;
-              const rest=Math.max(0,prev-effM);
+              const prevE=getEntretienMois(client.saisons,m);
+              const prevC=getControleMois(client.saisons,m);
+              const prevT=prevE+prevC;
+              const effM=passages.filter(p=>p.clientId===client.id&&new Date(p.date).getMonth()+1===m&&new Date(p.date).getFullYear()===YEAR_NOW).length;
+              const effME=passages.filter(p=>p.clientId===client.id&&new Date(p.date).getMonth()+1===m&&new Date(p.date).getFullYear()===YEAR_NOW&&isEntretienType(p.type)).length;
+              const effMC=passages.filter(p=>p.clientId===client.id&&new Date(p.date).getMonth()+1===m&&new Date(p.date).getFullYear()===YEAR_NOW&&isControleType(p.type)).length;
+              const rest=Math.max(0,prevT-effM);
               const sc=SAISONS_META[getSaison(m)];
               const isCur=m===MOIS_NOW;
               return (
@@ -592,9 +764,18 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
                   <div style={{background:isCur?sc.color:DS.light,padding:"5px 8px",textAlign:"center"}}>
                     <div style={{fontWeight:700,fontSize:11,color:isCur?"#fff":DS.mid}}>{MOIS[m]}</div>
                   </div>
-                  <div style={{padding:"8px 6px",textAlign:"center"}}>
-                    <div style={{fontSize:20,fontWeight:900,color:prev>0?DS.blue:DS.border,lineHeight:1}}>{prev}</div>
-                    {prev>0&&<div style={{fontSize:10,fontWeight:700,color:rest>0?DS.orange:DS.green,marginTop:3}}>{rest>0?`${rest} rest.`:"✓ ok"}</div>}
+                  <div style={{padding:"6px 6px",textAlign:"center"}}>
+                    {prevT>0 ? (
+                      <>
+                        <div style={{display:"flex",justifyContent:"center",gap:8,marginBottom:2}}>
+                          {prevE>0&&<span style={{fontSize:11,fontWeight:800,color:DS.blue}}>🔧{effME}/{prevE}</span>}
+                          {prevC>0&&<span style={{fontSize:11,fontWeight:800,color:DS.teal}}>💧{effMC}/{prevC}</span>}
+                        </div>
+                        <div style={{fontSize:10,fontWeight:700,color:rest>0?DS.orange:DS.green}}>{rest>0?`${rest} rest.`:"✓ ok"}</div>
+                      </>
+                    ) : (
+                      <div style={{fontSize:16,fontWeight:900,color:DS.border,lineHeight:1.5}}>—</div>
+                    )}
                   </div>
                 </div>
               );
@@ -613,13 +794,14 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
             : passC.map(p=>{
               const phOk=p.ph>=7.0&&p.ph<=7.6;
               const clOk=p.chlore>=0.5&&p.chlore<=3.0;
+              const isCtrl = isControleType(p.type);
               return (
                 <Card key={p.id} style={{marginBottom:10}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                     <div>
                       <div style={{fontWeight:700,fontSize:13,color:DS.dark}}>{new Date(p.date).toLocaleDateString("fr",{day:"2-digit",month:"long"})}</div>
                       <div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap"}}>
-                        <Tag color={DS.blue}>{p.type}</Tag>
+                        <Tag color={isCtrl?DS.teal:DS.blue}>{isCtrl?"💧":"🔧"} {p.type}</Tag>
                         {p.ph&&<Tag color={phOk?DS.green:DS.red}>pH {p.ph}</Tag>}
                         {p.chlore&&<Tag color={clOk?DS.green:DS.red}>Cl {p.chlore}</Tag>}
                         {p.ok ? <Tag color={DS.green}>{Ico.check(10,DS.green)} Validé</Tag> : <Tag color={DS.red}>{Ico.x(10,DS.red)} En attente</Tag>}
@@ -862,7 +1044,6 @@ function genererHTMLRapport(passage, client) {
   .sec-icon{font-size:14px}
   .section-body{padding:14px 18px}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
   .field{padding:8px 12px;background:#f8fafc;border-radius:8px;border:1px solid #f1f5f9}
   .field-label{font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px}
   .field-value{font-size:13px;color:#1e293b;font-weight:500}
@@ -950,6 +1131,7 @@ function genererHTMLRapport(passage, client) {
     <div class="field"><div class="field-label">Peroxyde</div><div class="field-value">${val(passage.corrPeroxyde)}</div></div>
     <div class="field"><div class="field-label">Chlore choc</div><div class="field-value">${val(passage.corrChloreChoc)}</div></div>
     <div class="field"><div class="field-label">Phosphate</div><div class="field-value">${val(passage.corrPhosphate)}</div></div>
+    <div class="field"><div class="field-label">Alcafix</div><div class="field-value">${val(passage.corrAlcafix)}</div></div>
     <div class="field"><div class="field-label">Autre</div><div class="field-value">${val(passage.corrAutre)}</div></div>
   </div>
 </div>
@@ -999,16 +1181,13 @@ function ouvrirRapport(passage, client) {
   setTimeout(()=>URL.revokeObjectURL(url), 5000);
 }
 
-// ─── ENVOI EMAIL — Télécharge d'abord le PDF, puis ouvre mailto ──────────────
 function envoyerEmail(passage, client) {
-  // 1) Générer et télécharger le rapport HTML (que le technicien convertira en PDF via Imprimer)
   const html = genererHTMLRapport(passage, client);
   const blob = new Blob([html], {type:"text/html;charset=utf-8"});
   const url = URL.createObjectURL(blob);
   const dateStr = new Date(passage.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"});
   const filename = `Rapport_BRIBLUE_${client?.nom?.replace(/\s/g,"_")||"client"}_${passage.date}.html`;
 
-  // Télécharger le fichier
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
@@ -1017,7 +1196,6 @@ function envoyerEmail(passage, client) {
   document.body.removeChild(a);
   setTimeout(()=>URL.revokeObjectURL(url), 3000);
 
-  // 2) Ouvrir le client mail avec un message propre (sans les données en corps)
   const sujet = encodeURIComponent(`Rapport entretien piscine — ${dateStr}`);
   const corps = encodeURIComponent(
 `Bonjour ${client?.nom||""},
@@ -1033,18 +1211,17 @@ T. 06 67 18 61 15`
   );
   setTimeout(()=>{ window.location.href = `mailto:${client?.email||""}?subject=${sujet}&body=${corps}`; }, 800);
 
-  // Notification
   alert(`Le rapport a été téléchargé.\n\nVotre messagerie va s'ouvrir.\nPensez à joindre le fichier "${filename}" en pièce jointe.`);
 }
 
-// ─── FORMULAIRE PASSAGE ───────────────────────────────────────────────────────
+// ─── FORMULAIRE PASSAGE (avec Alcafix + types Entretien/Contrôle) ────────────
 function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
   const EMPTY = {
-    date:TODAY, clientId:defaultClientId||"", type:"visite complète", tech:"Dorian",
+    date:TODAY, clientId:defaultClientId||"", type:"Entretien complet", tech:"Dorian",
     chloreLibre:"", ph:"", alcalinite:"", stabilisant:"",
     tSel:"", tPhosphate:"", tStabilisant:"", tChlore:"", tPH:"",
     qualiteEau:"", etatFond:[], etatParois:[], etatLocal:[], etatBacTampon:[], etatVoletBac:[],
-    corrChlore:"", corrPhosphate:"", corrPH:"", corrSel:"", corrAlgicide:"", corrPeroxyde:"", corrChloreChoc:"", corrAutre:"",
+    corrChlore:"", corrPhosphate:"", corrPH:"", corrSel:"", corrAlgicide:"", corrPeroxyde:"", corrChloreChoc:"", corrAlcafix:"", corrAutre:"",
     devis:null, priseEchantillon:null, commentaires:"",
     livraisonProduits:null, produitsLivres:[], livraisonAutre:"",
     ressenti:0, presenceClient:null,
@@ -1075,6 +1252,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
         f.corrPH&&`pH: ${f.corrPH}`,
         f.corrAlgicide&&`Algicide: ${f.corrAlgicide}`,
         f.corrChloreChoc&&`Chlore choc: ${f.corrChloreChoc}`,
+        f.corrAlcafix&&`Alcafix: ${f.corrAlcafix}`,
         f.corrAutre&&f.corrAutre,
       ].filter(Boolean).join(", ") || "",
       obs: f.commentaires,
@@ -1092,7 +1270,6 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
     {ic:"✍️",l:"Signatures",color:"#be185d"},
   ];
 
-  // Stepper moderne style timeline
   const Stepper = () => (
     <div style={{marginBottom:24}}>
       <div style={{display:"flex",alignItems:"center",gap:0,position:"relative"}}>
@@ -1102,13 +1279,10 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
           const col = active ? s.color : done ? DS.green : DS.border;
           return (
             <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",position:"relative",cursor:"pointer",zIndex:1}} onClick={()=>setStep(i+1)}>
-              {/* Ligne connecteur */}
               {i>0 && <div style={{position:"absolute",top:18,right:"50%",width:"100%",height:3,background:done||active?`linear-gradient(90deg,${DS.green},${col})`:DS.border,zIndex:0}}/>}
-              {/* Cercle */}
               <div style={{width:36,height:36,borderRadius:18,background:active?`linear-gradient(135deg,${s.color},${s.color}cc)`:done?DS.greenGrad:DS.white,border:active?"none":done?"none":`2px solid ${DS.border}`,display:"flex",alignItems:"center",justifyContent:"center",zIndex:2,boxShadow:active?`0 4px 16px ${s.color}44`:done?"0 2px 8px rgba(5,150,105,0.2)":"none",transition:"all .3s"}}>
                 {done ? Ico.check(14,"#fff") : <span style={{fontSize:16,filter:active?"none":"grayscale(0.5) opacity(0.6)"}}>{s.ic}</span>}
               </div>
-              {/* Label */}
               <span style={{fontSize:isMobile?8:10,fontWeight:active?800:done?700:500,color:active?s.color:done?DS.green:DS.mid,marginTop:6,textAlign:"center",lineHeight:1.2,letterSpacing:-0.2}}>
                 {isMobile?s.l.split(" ")[0]:s.l}
               </span>
@@ -1116,14 +1290,12 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
           );
         })}
       </div>
-      {/* Barre de progression globale */}
       <div style={{height:3,background:DS.border,borderRadius:99,marginTop:16,overflow:"hidden"}}>
         <div style={{height:"100%",width:`${(step/STEPS)*100}%`,background:`linear-gradient(90deg,${STEP_INFO[0].color},${STEP_INFO[step-1].color})`,borderRadius:99,transition:"width .5s cubic-bezier(.22,1,.36,1)"}}/>
       </div>
     </div>
   );
 
-  // Titre d'étape
   const StepHeader = ({icon, title, subtitle, color}) => (
     <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:20,padding:"16px 18px",background:`linear-gradient(135deg,${color}08,${color}15)`,borderRadius:DS.radius,border:`1px solid ${color}22`}}>
       <div style={{width:44,height:44,borderRadius:14,background:`linear-gradient(135deg,${color},${color}cc)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,boxShadow:`0 4px 16px ${color}33`,flexShrink:0}}>{icon}</div>
@@ -1142,7 +1314,6 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
     <Modal title={isEdit ? "Modifier le passage" : "Fiche Entretien"} onClose={onClose} wide>
       <Stepper/>
 
-      {/* ÉTAPE 1 */}
       {step===1 && (
         <div className="fade-in">
           <StepHeader icon="🔧" title="Intervention" subtitle="Client, date et type" color="#0369a1"/>
@@ -1170,7 +1341,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
           </div>
           <div style={{marginTop:16}}>
             <RadioGroup label="Type d'intervention" value={f.type} onChange={v=>set("type",v)}
-              options={["visite complète","visite technique","bassin en rattrapage","fin de rattrapage"]}/>
+              options={["Entretien complet","Contrôle d'eau","Visite technique","Bassin en rattrapage","Fin de rattrapage"]}/>
           </div>
           <div style={{borderTop:"1px solid "+DS.border,paddingTop:16,marginTop:16}}>
             <PhotoPicker label="Photo à l'arrivée" value={f.photoArrivee} onChange={v=>set("photoArrivee",v)}/>
@@ -1178,7 +1349,6 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
         </div>
       )}
 
-      {/* ÉTAPE 2 */}
       {step===2 && (
         <div className="fade-in">
           <StepHeader icon="💧" title="Analyses eau" subtitle="Bandelette et mesures détaillées" color="#0891b2"/>
@@ -1210,7 +1380,6 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
         </div>
       )}
 
-      {/* ÉTAPE 3 */}
       {step===3 && (
         <div className="fade-in">
           <StepHeader icon="🏊" title="État du bassin" subtitle="Eau, fond, parois, local" color="#059669"/>
@@ -1229,12 +1398,12 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
         </div>
       )}
 
-      {/* ÉTAPE 4 */}
+      {/* ÉTAPE 4 — Correctifs avec Alcafix */}
       {step===4 && (
         <div className="fade-in">
           <StepHeader icon="⚗️" title="Correctifs" subtitle="Traitements et produits ajoutés" color="#7c3aed"/>
           <div style={{background:`linear-gradient(135deg,#7c3aed08,#7c3aed12)`,borderRadius:DS.radius,padding:18,border:"1px solid #7c3aed18"}}>
-            <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"1fr 1fr 1fr 1fr",gap:12}}>
+            <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"1fr 1fr 1fr",gap:12}}>
               <Input label="Chlore" value={f.corrChlore} onChange={e=>set("corrChlore",e.target.value)} placeholder="ex: 200g"/>
               <Input label="pH" value={f.corrPH} onChange={e=>set("corrPH",e.target.value)} placeholder="ex: pH- 100ml"/>
               <Input label="Sel" value={f.corrSel} onChange={e=>set("corrSel",e.target.value)} placeholder="ex: 2 sacs"/>
@@ -1242,6 +1411,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
               <Input label="Peroxyde" value={f.corrPeroxyde} onChange={e=>set("corrPeroxyde",e.target.value)}/>
               <Input label="Chlore Choc" value={f.corrChloreChoc} onChange={e=>set("corrChloreChoc",e.target.value)}/>
               <Input label="Phosphate" value={f.corrPhosphate} onChange={e=>set("corrPhosphate",e.target.value)}/>
+              <Input label="Alcafix" value={f.corrAlcafix||""} onChange={e=>set("corrAlcafix",e.target.value)} placeholder="ex: 500ml"/>
               <Input label="Autre" value={f.corrAutre} onChange={e=>set("corrAutre",e.target.value)}/>
             </div>
           </div>
@@ -1251,7 +1421,6 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
         </div>
       )}
 
-      {/* ÉTAPE 5 */}
       {step===5 && (
         <div className="fade-in">
           <StepHeader icon="✅" title="Clôture" subtitle="Commentaires, livraisons, validation" color="#ea580c"/>
@@ -1295,7 +1464,6 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
         </div>
       )}
 
-      {/* ÉTAPE 6 */}
       {step===6 && (
         <div className="fade-in">
           <StepHeader icon="✍️" title="Signatures & Export" subtitle="Finaliser et envoyer le rapport" color="#be185d"/>
@@ -1332,7 +1500,6 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
         </div>
       )}
 
-      {/* Navigation */}
       <div style={{display:"flex",gap:10,marginTop:24,paddingTop:16,borderTop:"1px solid "+DS.border}}>
         <button onClick={step===1?onClose:()=>setStep(s=>s-1)} className="btn-hover" style={{flex:1,padding:"13px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
           {step===1?<>{Ico.close(13,DS.mid)} Annuler</>:<>{Ico.back(13,DS.mid)} Retour</>}
@@ -1346,140 +1513,195 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
   );
 }
 
-// ─── DASHBOARD ────────────────────────────────────────────────────────────────
-function Dashboard({ clients, passages, onClientClick, onAddPassage, onAddLivraison, onAddClient }) {
+// ─── DASHBOARD — Bannière tâches + RDV ───────────────────────────────────────
+function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, onAddLivraison, onAddClient, onAddRdv }) {
   const isMobile = useIsMobile();
   const moisCourant = MOIS_NOW;
   const saisonNow = getSaison(moisCourant);
   const sMeta = SAISONS_META[saisonNow];
-  const alertes = clients.filter(c=>alerteClient(c,passages)!=="ok");
 
-  const passagesMois = clients.map(c=>{
-    const pm = passagesParMois(c.saisons);
-    const prev = pm[moisCourant]||0;
-    const eff = passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===moisCourant&&new Date(p.date).getFullYear()===new Date().getFullYear()).length;
-    return { client:c, prev, eff, rest:Math.max(0,prev-eff) };
-  }).filter(x=>x.prev>0).sort((a,b)=>b.rest-a.rest);
+  // Tâches à effectuer ce mois
+  const tachesMois = clients.map(c=>{
+    const prevE = getEntretienMois(c.saisons, moisCourant);
+    const prevC = getControleMois(c.saisons, moisCourant);
+    const effE = passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===moisCourant&&new Date(p.date).getFullYear()===YEAR_NOW&&isEntretienType(p.type)).length;
+    const effC = passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===moisCourant&&new Date(p.date).getFullYear()===YEAR_NOW&&isControleType(p.type)).length;
+    const restE = Math.max(0,prevE-effE);
+    const restC = Math.max(0,prevC-effC);
+    return { client:c, prevE, prevC, effE, effC, restE, restC, total:restE+restC };
+  }).filter(x=>(x.prevE+x.prevC)>0).sort((a,b)=>b.total-a.total);
 
-  const totalPrev = clients.reduce((a,c)=>a+totalAnnuel(c.saisons),0);
-  const totalEff = passages.length;
+  const totalTaches = tachesMois.reduce((a,t)=>a+t.total,0);
+
+  // RDVs à venir (aujourd'hui et futur)
+  const rdvsFuturs = rdvs.filter(r=>r.date>=TODAY).sort((a,b)=>a.date===b.date ? (a.heure||"").localeCompare(b.heure||"") : a.date.localeCompare(b.date));
+  const rdvsToday = rdvsFuturs.filter(r=>r.date===TODAY);
+  const rdvsProchains = rdvsFuturs.filter(r=>r.date>TODAY).slice(0,5);
 
   return (
     <div>
-      {/* Stats cards */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
-        {[
-          {ico:Ico.clients(18,"#fff"),    l:"Clients",     v:clients.length, g:"linear-gradient(135deg,#0284c7,#06b6d4)"},
-          {ico:Ico.calendar(18,"#fff"),   l:"Prévus / an", v:totalPrev,      g:"linear-gradient(135deg,#7c3aed,#a78bfa)"},
-          {ico:Ico.check(18,"#fff"),      l:"Effectués",   v:totalEff,       g:"linear-gradient(135deg,#059669,#34d399)"},
-        ].map(k=>(
-          <Card key={k.l} style={{padding:"16px 14px",border:"none",background:DS.white}}>
-            <div style={{width:36,height:36,borderRadius:11,background:k.g,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:10,boxShadow:"0 4px 12px rgba(0,0,0,0.15)"}}>
-              {k.ico}
-            </div>
-            <div style={{fontSize:24,fontWeight:900,color:DS.dark,lineHeight:1,letterSpacing:-1}}>{k.v}</div>
-            <div style={{fontSize:11,color:DS.mid,marginTop:4,fontWeight:600}}>{k.l}</div>
-          </Card>
-        ))}
-      </div>
-
-      {/* Action buttons */}
-      <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"1fr 1fr 1fr",gap:10,marginBottom:16}}>
-        <BtnPrimary onClick={onAddPassage} bg={DS.dark} icon={Ico.clipboard(16,"#fff")} style={{width:"100%",boxShadow:"0 4px 16px rgba(12,18,34,0.3)"}}>Passage</BtnPrimary>
-        <BtnPrimary onClick={()=>onAddLivraison()} bg={DS.blue} icon={Ico.truck(16,"#fff")} style={{width:"100%",boxShadow:"0 4px 16px "+DS.blue+"44"}}>Livraison</BtnPrimary>
-        {!isMobile && <BtnPrimary onClick={onAddClient} bg="#7c3aed" icon={Ico.userPlus(16,"#fff")} style={{width:"100%",boxShadow:"0 4px 16px #7c3aed44"}}>Client</BtnPrimary>}
-      </div>
-
-      {/* Mini calendar + month progress */}
-      <Card style={{marginBottom:16}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+      {/* Bannière tâches du mois */}
+      <Card style={{marginBottom:14,border:"none",background:totalTaches>0?"linear-gradient(135deg,#0c1222,#1a365d)":DS.greenGrad,padding:"18px 20px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
           <div>
-            <div style={{fontWeight:900,fontSize:17,color:DS.dark,letterSpacing:-0.3}}>{MOIS_L[moisCourant]}</div>
-            <div style={{fontSize:12,color:DS.mid,marginTop:1}}>Passages du mois</div>
+            <div style={{fontWeight:900,fontSize:18,color:"#fff",letterSpacing:-0.3}}>{MOIS_L[moisCourant]}</div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,0.7)",marginTop:2}}>
+              {totalTaches>0 ? `${totalTaches} passage${totalTaches>1?"s":""} restant${totalTaches>1?"s":""}` : "Tout est à jour !"}
+            </div>
           </div>
           <Tag color={sMeta.color} bg={sMeta.bg}><span style={{display:"flex",alignItems:"center",gap:4}}>{Ico[sMeta.icon]&&Ico[sMeta.icon](12,sMeta.color)} {sMeta.label}</span></Tag>
         </div>
-
-        {(()=>{
-          const year=new Date().getFullYear();
-          const firstDay=new Date(year,moisCourant-1,1).getDay();
-          const nbDays=new Date(year,moisCourant,0).getDate();
-          const today=new Date().getDate();
-          const passageDays=new Set(passages.filter(p=>{ const d=new Date(p.date); return d.getMonth()+1===moisCourant&&d.getFullYear()===year; }).map(p=>new Date(p.date).getDate()));
-          const offset=(firstDay+6)%7;
-          const cells=[...Array(offset).fill(null),...Array.from({length:nbDays},(_,i)=>i+1)];
-          return (
-            <div style={{marginBottom:14}}>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:4}}>
-                {["L","M","M","J","V","S","D"].map((d,i)=>(<div key={i} style={{textAlign:"center",fontSize:9,fontWeight:800,color:DS.mid,padding:"2px 0"}}>{d}</div>))}
-                {cells.map((day,i)=>{
-                  if(!day) return <div key={i}/>;
-                  const isToday=day===today, hasP=passageDays.has(day);
-                  return (
-                    <div key={i} style={{textAlign:"center",padding:"5px 2px",borderRadius:7,background:isToday?DS.dark:hasP?DS.blueSoft:"transparent",border:isToday?"none":hasP?"1.5px solid "+DS.blue:"1px solid transparent",position:"relative"}}>
-                      <span style={{fontSize:10,fontWeight:isToday||hasP?800:400,color:isToday?"#fff":hasP?DS.blue:DS.mid}}>{day}</span>
-                      {hasP&&!isToday&&<div style={{width:4,height:4,borderRadius:2,background:DS.blue,margin:"1px auto 0"}}/>}
-                    </div>
-                  );
-                })}
+        {totalTaches > 0 && (
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            {tachesMois.filter(t=>t.total>0).map(({client,restE,restC,effE,prevE,effC,prevC})=>(
+              <div key={client.id} onClick={()=>onClientClick(client)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:"rgba(255,255,255,0.08)",borderRadius:DS.radiusSm,cursor:"pointer",border:"1px solid rgba(255,255,255,0.08)"}}>
+                <Avatar nom={client.nom} size={34}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:700,fontSize:13,color:"#fff"}}>{client.nom}</div>
+                  <div style={{display:"flex",gap:8,marginTop:3}}>
+                    {prevE>0&&<span style={{fontSize:11,fontWeight:700,color:restE>0?"#fbbf24":"#86efac"}}>🔧 {effE}/{prevE}</span>}
+                    {prevC>0&&<span style={{fontSize:11,fontWeight:700,color:restC>0?"#fbbf24":"#86efac"}}>💧 {effC}/{prevC}</span>}
+                  </div>
+                </div>
+                {(restE+restC)>0 && <Tag color="#fff" bg="rgba(251,191,36,0.25)">{restE+restC} rest.</Tag>}
               </div>
-              <div style={{display:"flex",gap:12,fontSize:11,color:DS.mid,justifyContent:"flex-end",fontWeight:600}}>
-                <span style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:4,background:DS.dark}}/> Aujourd'hui</span>
-                <span style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:4,background:DS.blue}}/> Passage</span>
-              </div>
-            </div>
-          );
-        })()}
-
-        {passagesMois.length===0
-          ? <div style={{color:DS.mid,fontSize:13,textAlign:"center",padding:"8px 0"}}>Aucun passage prévu ce mois</div>
-          : passagesMois.map(({client,prev,eff,rest})=>(
-            <div key={client.id} onClick={()=>onClientClick(client)} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid "+DS.border,cursor:"pointer"}}>
-              <Avatar nom={client.nom} size={36}/>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontWeight:700,fontSize:13,color:DS.dark,marginBottom:3}}>{client.nom}</div>
-                <ProgressBar value={eff} max={prev}/>
-              </div>
-              <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
-                <span style={{fontSize:15,fontWeight:800,color:DS.green}}>{eff}</span>
-                <span style={{color:DS.border}}>/</span>
-                <span style={{fontSize:15,fontWeight:800,color:DS.dark}}>{prev}</span>
-                {rest>0?<Tag color={DS.orange}>{rest}</Tag>:<IcoBubble ico={Ico.check(11,DS.green)} color={DS.green} size={22}/>}
-              </div>
-            </div>
-          ))
-        }
-        <button onClick={onAddPassage} className="btn-hover" style={{width:"100%",marginTop:14,padding:"11px",borderRadius:DS.radiusSm,background:DS.blueSoft,color:DS.blue,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontFamily:"inherit"}}>
-          {Ico.plus(13,DS.blue)} Saisir un passage
-        </button>
+            ))}
+          </div>
+        )}
       </Card>
 
-      {alertes.length > 0 && (
-        <Card style={{border:"1px solid "+DS.red+"33"}}>
-          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-            <IcoBubble ico={Ico.alert(14,DS.red)} color={DS.red} size={30}/>
-            <span style={{fontWeight:800,fontSize:14,color:DS.dark}}>Alertes ({alertes.length})</span>
+      {/* Action buttons */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>
+        <BtnPrimary onClick={onAddPassage} bg={DS.dark} icon={Ico.clipboard(15,"#fff")} style={{width:"100%",fontSize:12,padding:"11px 8px"}}>Passage</BtnPrimary>
+        <BtnPrimary onClick={()=>onAddLivraison()} bg={DS.blue} icon={Ico.truck(15,"#fff")} style={{width:"100%",fontSize:12,padding:"11px 8px"}}>Livraison</BtnPrimary>
+        <BtnPrimary onClick={onAddRdv} bg={DS.purple} icon={Ico.rdv(15,"#fff")} style={{width:"100%",fontSize:12,padding:"11px 8px"}}>RDV</BtnPrimary>
+      </div>
+
+      {/* RDVs Aujourd'hui */}
+      {rdvsToday.length>0 && (
+        <Card style={{marginBottom:14,border:"1.5px solid "+DS.purple+"33"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+            <IcoBubble ico={Ico.rdv(14,DS.purple)} color={DS.purple} size={30}/>
+            <span style={{fontWeight:800,fontSize:14,color:DS.dark}}>Aujourd'hui</span>
           </div>
-          {alertes.map(c=>{
-            const al=alerteClient(c,passages); const col=AC[al]; const j=daysUntil(c.dateFin);
+          {rdvsToday.map(r=>{
+            const c = clients.find(x=>x.id===r.clientId);
             return (
-              <div key={c.id} onClick={()=>onClientClick(c)} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid "+DS.border,cursor:"pointer"}}>
-                <Avatar nom={c.nom} size={36}/>
-                <div style={{flex:1}}>
-                  <div style={{fontWeight:700,fontSize:13,color:DS.dark}}>{c.nom}</div>
-                  <div style={{fontSize:11,color:DS.mid,marginTop:2}}>{al==="rouge"||al==="jaune"?`Expire dans ${j} jours`:"Passages en retard"}</div>
+              <div key={r.id} style={{display:"flex",gap:10,alignItems:"center",padding:"8px 0",borderBottom:"1px solid "+DS.border}}>
+                <div style={{width:42,textAlign:"center"}}>
+                  <div style={{fontSize:15,fontWeight:900,color:DS.purple}}>{r.heure||"--:--"}</div>
                 </div>
-                <Tag color={col.tx}>{col.lbl}</Tag>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:13,color:DS.dark}}>{r.type}</div>
+                  {c&&<div style={{fontSize:11,color:DS.mid,marginTop:1}}>{c.nom} · {c.adresse?.split(",").pop()?.trim()}</div>}
+                  {r.description&&<div style={{fontSize:11,color:DS.mid}}>{r.description}</div>}
+                </div>
+                <Tag color={DS.purple}>{r.duree||60} min</Tag>
               </div>
             );
           })}
         </Card>
       )}
+
+      {/* RDVs à venir */}
+      {rdvsProchains.length>0 && (
+        <Card style={{marginBottom:14}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+            <IcoBubble ico={Ico.calendar(14,DS.blue)} color={DS.blue} size={30}/>
+            <span style={{fontWeight:800,fontSize:14,color:DS.dark}}>Prochains RDV</span>
+          </div>
+          {rdvsProchains.map(r=>{
+            const c = clients.find(x=>x.id===r.clientId);
+            const d = new Date(r.date);
+            return (
+              <div key={r.id} style={{display:"flex",gap:10,alignItems:"center",padding:"8px 0",borderBottom:"1px solid "+DS.border}}>
+                <div style={{width:46,textAlign:"center",flexShrink:0}}>
+                  <div style={{fontSize:10,fontWeight:700,color:DS.mid,textTransform:"uppercase"}}>{d.toLocaleDateString("fr",{weekday:"short"})}</div>
+                  <div style={{fontSize:18,fontWeight:900,color:DS.dark,lineHeight:1}}>{d.getDate()}</div>
+                  <div style={{fontSize:10,color:DS.mid}}>{MOIS[d.getMonth()+1]}</div>
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:13,color:DS.dark,display:"flex",alignItems:"center",gap:6}}>{r.heure||""} — {r.type}</div>
+                  {c&&<div style={{fontSize:11,color:DS.mid,marginTop:1}}>{c.nom}</div>}
+                  {r.description&&<div style={{fontSize:11,color:DS.mid}}>{r.description}</div>}
+                </div>
+              </div>
+            );
+          })}
+        </Card>
+      )}
+
+      {/* Mini calendar */}
+      <Card style={{marginBottom:14}}>
+        <div style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Calendrier — {MOIS_L[moisCourant]}</div>
+        {(()=>{
+          const year=YEAR_NOW;
+          const firstDay=new Date(year,moisCourant-1,1).getDay();
+          const nbDays=new Date(year,moisCourant,0).getDate();
+          const today=new Date().getDate();
+          const passageDays=new Set(passages.filter(p=>{ const d=new Date(p.date); return d.getMonth()+1===moisCourant&&d.getFullYear()===year; }).map(p=>new Date(p.date).getDate()));
+          const rdvDays=new Set(rdvs.filter(r=>{const d=new Date(r.date);return d.getMonth()+1===moisCourant&&d.getFullYear()===year;}).map(r=>new Date(r.date).getDate()));
+          const offset=(firstDay+6)%7;
+          const cells=[...Array(offset).fill(null),...Array.from({length:nbDays},(_,i)=>i+1)];
+          return (
+            <div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:4}}>
+                {["L","M","M","J","V","S","D"].map((d,i)=>(<div key={i} style={{textAlign:"center",fontSize:9,fontWeight:800,color:DS.mid,padding:"2px 0"}}>{d}</div>))}
+                {cells.map((day,i)=>{
+                  if(!day) return <div key={i}/>;
+                  const isToday=day===today, hasP=passageDays.has(day), hasR=rdvDays.has(day);
+                  return (
+                    <div key={i} style={{textAlign:"center",padding:"5px 2px",borderRadius:7,background:isToday?DS.dark:hasP?DS.blueSoft:hasR?DS.purpleSoft:"transparent",border:isToday?"none":hasP?"1.5px solid "+DS.blue:hasR?"1.5px solid "+DS.purple:"1px solid transparent",position:"relative"}}>
+                      <span style={{fontSize:10,fontWeight:isToday||hasP||hasR?800:400,color:isToday?"#fff":hasP?DS.blue:hasR?DS.purple:DS.mid}}>{day}</span>
+                      <div style={{display:"flex",justifyContent:"center",gap:2,marginTop:1}}>
+                        {hasP&&!isToday&&<div style={{width:4,height:4,borderRadius:2,background:DS.blue}}/>}
+                        {hasR&&!isToday&&<div style={{width:4,height:4,borderRadius:2,background:DS.purple}}/>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{display:"flex",gap:12,fontSize:11,color:DS.mid,justifyContent:"flex-end",fontWeight:600,marginTop:4}}>
+                <span style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:4,background:DS.dark}}/> Aujourd'hui</span>
+                <span style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:4,background:DS.blue}}/> Passage</span>
+                <span style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:4,background:DS.purple}}/> RDV</span>
+              </div>
+            </div>
+          );
+        })()}
+      </Card>
+
+      {/* Alertes */}
+      {(()=>{
+        const alertes = clients.filter(c=>alerteClient(c,passages)!=="ok");
+        if (alertes.length===0) return null;
+        return (
+          <Card style={{border:"1px solid "+DS.red+"33"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+              <IcoBubble ico={Ico.alert(14,DS.red)} color={DS.red} size={30}/>
+              <span style={{fontWeight:800,fontSize:14,color:DS.dark}}>Alertes ({alertes.length})</span>
+            </div>
+            {alertes.map(c=>{
+              const al=alerteClient(c,passages); const col=AC[al]; const j=daysUntil(c.dateFin);
+              return (
+                <div key={c.id} onClick={()=>onClientClick(c)} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid "+DS.border,cursor:"pointer"}}>
+                  <Avatar nom={c.nom} size={36}/>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:700,fontSize:13,color:DS.dark}}>{c.nom}</div>
+                    <div style={{fontSize:11,color:DS.mid,marginTop:2}}>{al==="rouge"||al==="jaune"?`Expire dans ${j} jours`:"Passages en retard"}</div>
+                  </div>
+                  <Tag color={col.tx}>{col.lbl}</Tag>
+                </div>
+              );
+            })}
+          </Card>
+        );
+      })()}
     </div>
   );
 }
 
-// ─── PAGE CLIENTS — AVEC BOUTON AJOUTER ──────────────────────────────────────
+// ─── PAGE CLIENTS — AVEC BOUTON AJOUTER + Entretien/Contrôle ─────────────────
 function PageClients({ clients, passages, onClientClick, onAdd }) {
   const [search, setSearch] = useState("");
   const isMobile = useIsMobile();
@@ -1487,14 +1709,13 @@ function PageClients({ clients, passages, onClientClick, onAdd }) {
 
   return (
     <div>
-      {/* Barre de recherche + bouton ajouter */}
       <div style={{display:"flex",gap:10,marginBottom:14}}>
         <div style={{flex:1,position:"relative"}}>
           <div style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}>{Ico.search(16,DS.mid)}</div>
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher un client..."
             style={{width:"100%",padding:"11px 14px 11px 38px",borderRadius:DS.radius,border:"1.5px solid "+DS.border,fontSize:13,outline:"none",boxSizing:"border-box",background:DS.white,color:DS.dark,fontFamily:"inherit",transition:"all .2s"}}/>
         </div>
-        <BtnPrimary onClick={onAdd} bg="#7c3aed" icon={Ico.userPlus(16,"#fff")} style={{flexShrink:0,boxShadow:"0 4px 12px #7c3aed44"}}>
+        <BtnPrimary onClick={onAdd} bg="#7c3aed" icon={Ico.userPlus(16,"#fff")} style={{flexShrink:0}}>
           {!isMobile && "Ajouter"}
         </BtnPrimary>
       </div>
@@ -1502,10 +1723,16 @@ function PageClients({ clients, passages, onClientClick, onAdd }) {
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
         {filtered.map((c,idx)=>{
           const al=alerteClient(c,passages); const col=AC[al];
-          const eff=passages.filter(p=>p.clientId===c.id).length;
-          const tot=totalAnnuel(c.saisons);
-          const moisPrev=passagesParMois(c.saisons)[MOIS_NOW]||0;
-          const moisEff=passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===MOIS_NOW).length;
+          const totalE=totalAnnuel(c.saisons,"entretien");
+          const totalC=totalAnnuel(c.saisons,"controle");
+          const effE=passages.filter(p=>p.clientId===c.id&&isEntretienType(p.type)).length;
+          const effC=passages.filter(p=>p.clientId===c.id&&isControleType(p.type)).length;
+          const tot=totalE+totalC;
+          const eff=effE+effC;
+          const moisPrevE=getEntretienMois(c.saisons,MOIS_NOW);
+          const moisPrevC=getControleMois(c.saisons,MOIS_NOW);
+          const moisEffE=passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===MOIS_NOW&&isEntretienType(p.type)).length;
+          const moisEffC=passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===MOIS_NOW&&isControleType(p.type)).length;
           return (
             <Card key={c.id} onClick={()=>onClientClick(c)} className="fade-in" style={{animationDelay:`${idx*0.05}s`}}>
               <div style={{display:"flex",gap:12,alignItems:"center"}}>
@@ -1519,11 +1746,18 @@ function PageClients({ clients, passages, onClientClick, onAdd }) {
                     {c.tel&&<span style={{display:"flex",alignItems:"center",gap:3}}>{Ico.phone(11,DS.mid)} {c.tel}</span>}
                     {c.adresse&&<span style={{display:"flex",alignItems:"center",gap:3}}>{Ico.pin(11,DS.mid)} {c.adresse.split(",").pop()?.trim()}</span>}
                   </div>
-                  <div style={{marginTop:8}}>
+                  <div style={{display:"flex",gap:10,marginTop:6,flexWrap:"wrap"}}>
+                    {totalE>0&&<span style={{fontSize:11,fontWeight:700,color:DS.blue}}>🔧 {effE}/{totalE}</span>}
+                    {totalC>0&&<span style={{fontSize:11,fontWeight:700,color:DS.teal}}>💧 {effC}/{totalC}</span>}
+                  </div>
+                  <div style={{marginTop:6}}>
                     <ProgressBar value={eff} max={tot}/>
                     <div style={{display:"flex",justifyContent:"space-between",marginTop:4}}>
                       <span style={{fontSize:11,color:DS.mid,fontWeight:600}}>{eff}/{tot} passages</span>
-                      {moisPrev>0&&<Tag color={moisEff>=moisPrev?DS.green:DS.orange}>Ce mois: {moisEff}/{moisPrev}</Tag>}
+                      <div style={{display:"flex",gap:4}}>
+                        {moisPrevE>0&&<Tag color={moisEffE>=moisPrevE?DS.green:DS.orange}>🔧 {moisEffE}/{moisPrevE}</Tag>}
+                        {moisPrevC>0&&<Tag color={moisEffC>=moisPrevC?DS.green:DS.orange}>💧 {moisEffC}/{moisPrevC}</Tag>}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1563,6 +1797,7 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit }) {
           {filtered.map((p,idx)=>{
             const c=clients.find(x=>x.id===p.clientId);
             const phOk=p.ph>=7&&p.ph<=7.6, clOk=p.chlore>=0.5&&p.chlore<=3;
+            const isCtrl = isControleType(p.type);
             return (
               <Card key={p.id} className="fade-in" style={{animationDelay:`${idx*0.05}s`}}>
                 <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
@@ -1581,7 +1816,7 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit }) {
                       </div>
                     </div>
                     <div style={{display:"flex",gap:8,marginBottom:6,flexWrap:"wrap"}}>
-                      <Tag color={DS.blue}>{p.type}</Tag>
+                      <Tag color={isCtrl?DS.teal:DS.blue}>{isCtrl?"💧":"🔧"} {p.type}</Tag>
                       {p.ph&&<Tag color={phOk?DS.green:DS.red}>pH {p.ph}</Tag>}
                       {p.chlore&&<Tag color={clOk?DS.green:DS.red}>Cl {p.chlore}</Tag>}
                     </div>
@@ -1598,6 +1833,69 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit }) {
                       <button onClick={()=>ouvrirRapport(p,c)} className="btn-hover" style={{flex:1,padding:"7px",borderRadius:10,background:DS.blueSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.blue,fontFamily:"inherit",fontWeight:700}}>{Ico.pdf(13,DS.blue)} Rapport</button>
                       {c?.email&&<button onClick={()=>envoyerEmail(p,c)} className="btn-hover" style={{flex:1,padding:"7px",borderRadius:10,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.green,fontFamily:"inherit",fontWeight:700}}>{Ico.send(13,DS.green)} Email</button>}
                       <button onClick={()=>{if(confirm("Supprimer ce passage ?"))onDelete(p.id)}} className="btn-hover" style={{width:34,height:34,borderRadius:10,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(13,DS.red)}</button>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      }
+    </div>
+  );
+}
+
+// ─── PAGE RDV ─────────────────────────────────────────────────────────────────
+function PageRdv({ clients, rdvs, onAdd, onEdit, onDelete }) {
+  const [filter,setFilter]=useState("avenir");
+  const filtered=useMemo(()=>{
+    let list = [...rdvs];
+    if(filter==="avenir") list = list.filter(r=>r.date>=TODAY);
+    else if(filter==="passe") list = list.filter(r=>r.date<TODAY);
+    return list.sort((a,b)=>filter==="passe"?b.date.localeCompare(a.date):a.date.localeCompare(b.date));
+  },[rdvs,filter]);
+
+  return (
+    <div>
+      <div style={{display:"flex",gap:8,marginBottom:14}}>
+        {[["avenir","À venir"],["passe","Passés"],["tout","Tous"]].map(([v,l])=>(
+          <button key={v} onClick={()=>setFilter(v)} className="btn-hover" style={{padding:"7px 16px",borderRadius:20,border:filter===v?"none":"1px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:12,fontFamily:"inherit",background:filter===v?DS.purpleGrad:DS.white,color:filter===v?"#fff":DS.mid,boxShadow:filter===v?"0 2px 8px #7c3aed44":"none"}}>{l}</button>
+        ))}
+        <span style={{marginLeft:"auto",fontSize:12,color:DS.mid,alignSelf:"center",fontWeight:600}}>{filtered.length} RDV</span>
+      </div>
+      <BtnPrimary onClick={onAdd} bg={DS.purple} icon={Ico.plus(14,"#fff")} style={{width:"100%",marginBottom:14}}>Nouveau rendez-vous</BtnPrimary>
+      {filtered.length===0
+        ? <div style={{textAlign:"center",color:DS.mid,padding:40,fontSize:13}}>Aucun rendez-vous</div>
+        : <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {filtered.map((r,idx)=>{
+            const c = clients.find(x=>x.id===r.clientId);
+            const d = new Date(r.date);
+            const isToday = r.date===TODAY;
+            const isPast = r.date<TODAY;
+            return (
+              <Card key={r.id} className="fade-in" style={{animationDelay:`${idx*0.04}s`,opacity:isPast?0.6:1}}>
+                <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+                  <div style={{width:52,textAlign:"center",flexShrink:0,padding:"6px 0"}}>
+                    <div style={{fontSize:10,fontWeight:700,color:isToday?DS.purple:DS.mid,textTransform:"uppercase"}}>{d.toLocaleDateString("fr",{weekday:"short"})}</div>
+                    <div style={{fontSize:22,fontWeight:900,color:isToday?DS.purple:DS.dark,lineHeight:1}}>{d.getDate()}</div>
+                    <div style={{fontSize:10,color:DS.mid}}>{MOIS[d.getMonth()+1]}</div>
+                  </div>
+                  <div style={{flex:1}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                      <div>
+                        <div style={{fontWeight:800,fontSize:14,color:DS.dark}}>{r.type}</div>
+                        <div style={{fontSize:12,color:DS.mid,marginTop:2}}>
+                          {r.heure&&<span style={{fontWeight:600}}>{r.heure}</span>}
+                          {r.duree&&<span> · {r.duree} min</span>}
+                        </div>
+                      </div>
+                      {isToday&&<Tag color={DS.purple}>Aujourd'hui</Tag>}
+                    </div>
+                    {c&&<div style={{fontSize:12,color:DS.blue,fontWeight:600,marginTop:4,display:"flex",alignItems:"center",gap:4}}>{Ico.user(11,DS.blue)} {c.nom}</div>}
+                    {r.description&&<div style={{fontSize:12,color:DS.mid,marginTop:2}}>{r.description}</div>}
+                    <div style={{display:"flex",gap:6,marginTop:10,paddingTop:8,borderTop:"1px solid "+DS.border}}>
+                      <button onClick={()=>onEdit(r)} className="btn-hover" style={{flex:1,padding:"7px",borderRadius:10,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(13,DS.mid)} Modifier</button>
+                      <button onClick={()=>{if(confirm("Supprimer ce RDV ?"))onDelete(r.id)}} className="btn-hover" style={{width:34,height:34,borderRadius:10,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(13,DS.red)}</button>
                     </div>
                   </div>
                 </div>
@@ -1633,7 +1931,6 @@ function LoginScreen({ onLogin }) {
 
   return (
     <div style={{minHeight:"100vh",background:DS.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px 20px",fontFamily:"'Inter', -apple-system, system-ui, sans-serif",position:"relative",overflow:"hidden"}}>
-      {/* Background gradient decoration */}
       <div style={{position:"absolute",top:"-30%",right:"-20%",width:"60vw",height:"60vw",borderRadius:"50%",background:"radial-gradient(circle, #0284c720 0%, transparent 70%)",pointerEvents:"none"}}/>
       <div style={{position:"absolute",bottom:"-20%",left:"-15%",width:"50vw",height:"50vw",borderRadius:"50%",background:"radial-gradient(circle, #7c3aed15 0%, transparent 70%)",pointerEvents:"none"}}/>
 
@@ -1686,6 +1983,7 @@ export default function App() {
   const [clients, setClients] = useState([]);
   const [passages, setPassages] = useState([]);
   const [livraisons, setLivraisons] = useState([]);
+  const [rdvs, setRdvs] = useState([]);
   const [ready, setReady] = useState(false);
   const [ficheClient, setFicheClient] = useState(null);
   const [showFormClient, setShowFormClient] = useState(false);
@@ -1693,10 +1991,10 @@ export default function App() {
   const [showFormPassage, setShowFormPassage] = useState(false);
   const [defaultClientId, setDefaultClientId] = useState("");
   const [editPassage, setEditPassage] = useState(null);
-  const [showModalAlertes, setShowModalAlertes] = useState(false);
-  const [showModalMois, setShowModalMois] = useState(false);
   const [showFormLivraison, setShowFormLivraison] = useState(false);
   const [defaultLivraisonClientId, setDefaultLivraisonClientId] = useState("");
+  const [showFormRdv, setShowFormRdv] = useState(false);
+  const [editRdv, setEditRdv] = useState(null);
   const isMobile = useIsMobile();
 
   useEffect(()=>{ try { if(sessionStorage.getItem("bb_auth")==="1") setLoggedIn(true); } catch {} },[]);
@@ -1707,16 +2005,20 @@ export default function App() {
       const c = await load("bb_clients_v2", CLIENTS_INIT);
       const p = await load("bb_passages_v2", PASSAGES_INIT);
       const l = await load("bb_livraisons_v1", []);
-      setClients(c); setPassages(p); setLivraisons(l); setReady(true);
+      const r = await load("bb_rdvs_v1", []);
+      // Migrate saisons format for existing clients
+      const cMigrated = c.map(cl => ({...cl, saisons: migrateSaisons(cl.saisons)}));
+      setClients(cMigrated); setPassages(p); setLivraisons(l); setRdvs(r); setReady(true);
     })();
   },[loggedIn]);
 
   useEffect(()=>{ if(ready) save("bb_clients_v2", clients); },[clients,ready]);
   useEffect(()=>{ if(ready) save("bb_passages_v2", passages); },[passages,ready]);
   useEffect(()=>{ if(ready) save("bb_livraisons_v1", livraisons); },[livraisons,ready]);
+  useEffect(()=>{ if(ready) save("bb_rdvs_v1", rdvs); },[rdvs,ready]);
 
   const handleLogin = useCallback(()=>{ try{sessionStorage.setItem("bb_auth","1");}catch{} setLoggedIn(true); },[]);
-  const handleLogout = useCallback(()=>{ try{sessionStorage.removeItem("bb_auth");}catch{} setLoggedIn(false);setReady(false);setClients([]);setPassages([]);setLivraisons([]); },[]);
+  const handleLogout = useCallback(()=>{ try{sessionStorage.removeItem("bb_auth");}catch{} setLoggedIn(false);setReady(false);setClients([]);setPassages([]);setLivraisons([]);setRdvs([]); },[]);
 
   const saveClient = useCallback(c=>{ setClients(prev=>prev.find(x=>x.id===c.id)?prev.map(x=>x.id===c.id?c:x):[...prev,c]); setShowFormClient(false);setEditClient(null);setFicheClient(c); },[]);
   const deleteClient = useCallback(id=>{ if(!confirm("Supprimer ce client ?"))return; setClients(prev=>prev.filter(x=>x.id!==id)); setPassages(prev=>prev.filter(x=>x.clientId!==id)); setFicheClient(null); },[]);
@@ -1727,12 +2029,13 @@ export default function App() {
   const saveLivraison = useCallback(l=>{ setLivraisons(prev=>prev.find(x=>x.id===l.id)?prev.map(x=>x.id===l.id?l:x):[...prev,l]); },[]);
   const deleteLivraison = useCallback(id=>setLivraisons(prev=>prev.filter(x=>x.id!==id)),[]);
   const updateStatutLivraison = useCallback((id,statut)=>{ setLivraisons(prev=>prev.map(x=>x.id===id?{...x,statut}:x)); },[]);
+  const saveRdv = useCallback(r=>{ setRdvs(prev=>prev.find(x=>x.id===r.id)?prev.map(x=>x.id===r.id?r:x):[...prev,r]); setShowFormRdv(false);setEditRdv(null); },[]);
+  const deleteRdv = useCallback(id=>setRdvs(prev=>prev.filter(x=>x.id!==id)),[]);
 
   const openAddClient = useCallback(()=>{ setEditClient(null); setShowFormClient(true); },[]);
 
   const nbAlertes = useMemo(()=>clients.filter(c=>alerteClient(c,passages)!=="ok").length,[clients,passages]);
   const nbAFacturer = useMemo(()=>livraisons.filter(l=>l.statut==="aFacturer").length,[livraisons]);
-  const nbMois = useMemo(()=>clients.reduce((a,c)=>{ const prev=passagesParMois(c.saisons)[MOIS_NOW]||0; const eff=passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===MOIS_NOW).length; return a+Math.max(0,prev-eff); },0),[clients,passages]);
 
   if(!loggedIn) return <><GlobalStyles/><LoginScreen onLogin={handleLogin}/></>;
 
@@ -1751,9 +2054,10 @@ export default function App() {
     { id:"dashboard", l:"Accueil", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill={a?"#0369a1":"none"} stroke={a?"#0369a1":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg> },
     { id:"clients",   l:"Clients", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#0369a1":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/><path d="M16 3.13a4 4 0 010 7.75"/><path d="M21 21v-2a4 4 0 00-3-3.87"/></svg> },
     { id:"interventions", l:"Passages", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#0369a1":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg> },
+    { id:"rdv", l:"RDV", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#7c3aed":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="12" cy="15" r="2"/></svg> },
   ];
 
-  const PAGE_LABELS = { dashboard:`Bonjour Dorian. Aujourd'hui tachons de ne rien oublier ;)`, clients:"Clients", passages:"Passages", interventions:"Passages" };
+  const PAGE_LABELS = { dashboard:`Bonjour Dorian 👋`, clients:"Clients", passages:"Passages", interventions:"Passages", rdv:"Rendez-vous" };
 
   return (
     <>
@@ -1768,15 +2072,9 @@ export default function App() {
         </div>
         <div style={{display:"flex",gap:6,alignItems:"center"}}>
           {nbAlertes>0&&(
-            <button onClick={()=>setShowModalAlertes(true)} className="btn-hover" style={{position:"relative",width:38,height:38,borderRadius:12,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <button onClick={()=>setPage("dashboard")} className="btn-hover" style={{position:"relative",width:38,height:38,borderRadius:12,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
               {Ico.alert(16,DS.red)}
               <span style={{position:"absolute",top:-4,right:-4,width:18,height:18,borderRadius:9,background:DS.red,color:"#fff",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid #fff"}}>{nbAlertes}</span>
-            </button>
-          )}
-          {(nbMois+nbAFacturer)>0&&(
-            <button onClick={()=>setShowModalMois(true)} className="btn-hover" style={{position:"relative",width:38,height:38,borderRadius:12,background:DS.blueSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-              {Ico.clipboard(16,DS.blue)}
-              <span style={{position:"absolute",top:-4,right:-4,width:18,height:18,borderRadius:9,background:DS.blue,color:"#fff",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid #fff"}}>{nbMois+nbAFacturer}</span>
             </button>
           )}
           <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} className="btn-hover" style={{width:38,height:38,borderRadius:12,background:DS.blueGrad,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 12px "+DS.blue+"44"}}>
@@ -1793,24 +2091,25 @@ export default function App() {
 
       {/* TITRE */}
       <div style={{padding:isMobile?"16px 16px 4px":"20px 28px 8px"}}>
-        <h2 style={{margin:0,fontSize:isMobile?20:24,fontWeight:900,color:DS.dark,letterSpacing:-0.5}}>{PAGE_LABELS[page]} {page==="dashboard"&&"👋"}</h2>
-        {page==="dashboard"&&<p style={{margin:"2px 0 0",color:DS.mid,fontSize:12,fontWeight:500}}>{MOIS_L[MOIS_NOW]} · {clients.length} clients actifs</p>}
+        <h2 style={{margin:0,fontSize:isMobile?20:24,fontWeight:900,color:DS.dark,letterSpacing:-0.5}}>{PAGE_LABELS[page]}</h2>
+        {page==="dashboard"&&<p style={{margin:"2px 0 0",color:DS.mid,fontSize:12,fontWeight:500}}>Aujourd'hui tâchons de ne rien oublier ;)</p>}
       </div>
 
       {/* CONTENU */}
       <div style={{padding:isMobile?"6px 16px 110px":"8px 28px 110px"}}>
-        {page==="dashboard"&&<Dashboard clients={clients} passages={passages} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient}/>}
+        {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}}/>}
         {page==="clients"&&<PageClients clients={clients} passages={passages} onClientClick={setFicheClient} onAdd={openAddClient}/>}
         {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage}/>}
+        {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
       </div>
 
-      {/* NAV BAS */}
+      {/* NAV BAS — 4 items */}
       <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:isMobile?640:960,background:"rgba(255,255,255,0.95)",backdropFilter:"blur(12px)",borderTop:"1px solid "+DS.border,display:"flex",alignItems:"flex-end",boxShadow:"0 -2px 16px rgba(0,0,0,0.05)",zIndex:50,paddingBottom:"env(safe-area-inset-bottom,4px)"}}>
         {NAV.map(n=>(
           <button key={n.id} onClick={()=>setPage(n.id)} style={{flex:1,padding:"10px 4px 12px",border:"none",cursor:"pointer",background:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:3,transition:"all .15s"}}>
             {n.icon(page===n.id)}
-            <span style={{fontSize:10,fontWeight:page===n.id?800:500,color:page===n.id?DS.blue:"#94a3b8"}}>{n.l}</span>
-            {page===n.id && <div style={{width:20,height:3,borderRadius:2,background:DS.blueGrad,marginTop:1}}/>}
+            <span style={{fontSize:10,fontWeight:page===n.id?800:500,color:page===n.id?(n.id==="rdv"?"#7c3aed":DS.blue):"#94a3b8"}}>{n.l}</span>
+            {page===n.id && <div style={{width:20,height:3,borderRadius:2,background:n.id==="rdv"?DS.purpleGrad:DS.blueGrad,marginTop:1}}/>}
           </button>
         ))}
       </div>
@@ -1824,59 +2123,8 @@ export default function App() {
       {showFormClient&&<FormClient initial={editClient} clients={clients} onSave={saveClient} onClose={()=>{setShowFormClient(false);setEditClient(null);}}/>}
       {showFormPassage&&<FormPassage clients={clients} defaultClientId={defaultClientId} initial={editPassage} onSave={p=>savePassage(p)} onClose={()=>{setShowFormPassage(false);setEditPassage(null);}}/>}
       {showFormLivraison&&<FormLivraison clientId={defaultLivraisonClientId} clients={clients} onSave={l=>{saveLivraison(l);setShowFormLivraison(false);}} onClose={()=>setShowFormLivraison(false)}/>}
-
-      {showModalAlertes&&(
-        <Modal title="Alertes" onClose={()=>setShowModalAlertes(false)}>
-          {clients.filter(c=>alerteClient(c,passages)!=="ok").length===0
-            ? <div style={{textAlign:"center",color:DS.mid,padding:24}}>Aucune alerte</div>
-            : clients.filter(c=>alerteClient(c,passages)!=="ok").map(c=>{
-              const al=alerteClient(c,passages);const col=AC[al];const j=daysUntil(c.dateFin);
-              return (
-                <Card key={c.id} style={{marginBottom:10,cursor:"pointer"}} onClick={()=>{setFicheClient(c);setShowModalAlertes(false);}}>
-                  <div style={{display:"flex",gap:12,alignItems:"center"}}>
-                    <IcoBubble ico={Ico.alert(15,col.tx)} color={col.tx} size={40}/>
-                    <div style={{flex:1}}>
-                      <div style={{fontWeight:800,fontSize:14,color:DS.dark}}>{c.nom}</div>
-                      <div style={{fontSize:12,color:DS.mid,marginTop:2}}>{al==="rouge"||al==="jaune"?(j>=0?`Expire dans ${j}j`:`Expiré il y a ${Math.abs(j)}j`):"Passages en retard"}</div>
-                    </div>
-                    <Tag color={col.tx}>{col.lbl}</Tag>
-                  </div>
-                </Card>
-              );
-            })
-          }
-        </Modal>
-      )}
-
-      {showModalMois&&(
-        <Modal title={`${MOIS_L[MOIS_NOW]} — à faire`} onClose={()=>setShowModalMois(false)}>
-          {clients.map(c=>{
-            const prev=passagesParMois(c.saisons)[MOIS_NOW]||0;
-            const eff=passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===MOIS_NOW).length;
-            const rest=Math.max(0,prev-eff);
-            if(prev===0)return null;
-            return (
-              <Card key={c.id} style={{marginBottom:10,cursor:"pointer"}} onClick={()=>{setFicheClient(c);setShowModalMois(false);}}>
-                <div style={{display:"flex",gap:12,alignItems:"center"}}>
-                  <Avatar nom={c.nom} size={40}/>
-                  <div style={{flex:1}}>
-                    <div style={{fontWeight:800,fontSize:13,color:DS.dark}}>{c.nom}</div>
-                    <div style={{marginTop:5}}><ProgressBar value={eff} max={prev}/></div>
-                    <div style={{fontSize:11,color:DS.mid,marginTop:3,fontWeight:600}}>{eff}/{prev} passages</div>
-                  </div>
-                  {rest>0?<Tag color={DS.orange}>{rest} restant{rest>1?"s":""}</Tag>:<IcoBubble ico={Ico.check(11,DS.green)} color={DS.green} size={26}/>}
-                </div>
-              </Card>
-            );
-          }).filter(Boolean)}
-        </Modal>
-      )}
+      {showFormRdv&&<FormRdv initial={editRdv} clients={clients} onSave={saveRdv} onClose={()=>{setShowFormRdv(false);setEditRdv(null);}}/>}
     </div>
     </>
   );
 }
-
-
-
-
-
