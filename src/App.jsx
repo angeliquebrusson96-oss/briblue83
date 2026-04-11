@@ -793,13 +793,14 @@ function FormRdv({ initial, clients, onSave, onClose }) {
 }
 
 // FICHE CLIENT (avec diffrenciation Entretien/Contrle)
-function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus }) {
+function FicheClient({ client, passages, livraisons=[], rdvs=[], onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
   const [tab, setTab] = useState("infos");
   const [showFormLiv, setShowFormLiv] = useState(false);
   const [editLiv, setEditLiv] = useState(null);
   const isMobile = useIsMobile();
   const al = alerteClient(client, passages);
   const col = AC[al];
+  const rdvClient = rdvs.filter(r=>r.clientId===client.id).sort((a,b)=>a.date.localeCompare(b.date));
   const passC = passages.filter(p=>p.clientId===client.id).sort((a,b)=>new Date(b.date)-new Date(a.date));
   const totalE = totalAnnuel(client.moisParMois||client.saisons,"entretien");
   const totalC = totalAnnuel(client.moisParMois||client.saisons,"controle");
@@ -884,7 +885,7 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
 
       {/* Tabs */}
       <div style={{display:"flex",gap:0,marginBottom:16,background:DS.light,borderRadius:DS.radiusSm,padding:3}}>
-        {[["infos","Infos"],["saisons","Planning"],["passages","Passages"],["livraisons","Livraisons"]].map(([id,l])=>(
+        {[["infos","Infos"],["saisons","Planning"],["passages","Passages"],["rdvs","RDV"],["livraisons","Livr."]].map(([id,l])=>(
           <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"9px 4px",borderRadius:10,border:"none",cursor:"pointer",fontWeight:tab===id?800:600,fontSize:11,fontFamily:"inherit",background:tab===id?DS.white:"transparent",color:tab===id?DS.dark:DS.mid,boxShadow:tab===id?"0 1px 4px rgba(0,0,0,0.08)":"none",transition:"all .25s"}}>{l}</button>
         ))}
       </div>
@@ -995,6 +996,47 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
                     {client.email&&<button onClick={(e)=>{e.stopPropagation();envoyerEmail(p,client,onUpdatePassageStatus);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,color:DS.green,fontFamily:"inherit",fontWeight:700}}>{Ico.send(12,DS.green)} Email</button>}
                   </div>
                 </Card>
+              );
+            })
+          }
+        </div>
+      )}
+
+      {tab==="rdvs" && (
+        <div className="fade-in">
+          <button onClick={onAddRdv} className="btn-hover" style={{width:"100%",marginBottom:12,padding:"11px",borderRadius:DS.radiusSm,background:DS.purpleSoft,color:DS.purple,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontFamily:"inherit"}}>
+            {Ico.plus(13,DS.purple)} Ajouter un RDV
+          </button>
+          {rdvClient.length===0
+            ? <div style={{textAlign:"center",color:DS.mid,padding:32,fontSize:13}}>Aucun rendez-vous pour ce client</div>
+            : rdvClient.map(r=>{
+              const d = new Date(r.date);
+              const isToday = r.date===TODAY;
+              const isPast = r.date<TODAY;
+              return (
+                <div key={r.id} style={{background:isPast?DS.light:DS.white,borderRadius:DS.radiusSm,border:"1.5px solid "+(isToday?DS.purple:DS.border),padding:"12px 14px",marginBottom:8,opacity:isPast?0.7:1}}>
+                  <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+                    <div style={{width:46,textAlign:"center",flexShrink:0,background:isToday?DS.purpleSoft:DS.light,borderRadius:10,padding:"6px 4px"}}>
+                      <div style={{fontSize:9,fontWeight:700,color:isToday?DS.purple:DS.mid,textTransform:"uppercase"}}>{d.toLocaleDateString("fr",{weekday:"short"})}</div>
+                      <div style={{fontSize:20,fontWeight:900,color:isToday?DS.purple:DS.dark,lineHeight:1}}>{d.getDate()}</div>
+                      <div style={{fontSize:9,color:DS.mid}}>{MOIS[d.getMonth()+1]}</div>
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:800,fontSize:13,color:DS.dark}}>{r.type}</div>
+                      <div style={{fontSize:11,color:DS.mid,marginTop:2,display:"flex",gap:8}}>
+                        {r.heure&&<span style={{fontWeight:600,color:DS.purple}}>{r.heure}</span>}
+                        {r.duree&&<span>{r.duree} min</span>}
+                      </div>
+                      {r.description&&<div style={{fontSize:12,color:DS.mid,marginTop:4}}>{r.description}</div>}
+                      {isToday&&<div style={{marginTop:5}}><Tag color={DS.purple}>Aujourd'hui</Tag></div>}
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:6,marginTop:10,paddingTop:8,borderTop:"1px solid "+DS.border}}>
+                    <button onClick={()=>onEditRdv&&onEditRdv(r)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(12,DS.mid)} Modifier</button>
+                    <button onClick={()=>exportRdvToICS(r,client)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.purpleSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,color:DS.purple,fontFamily:"inherit",fontWeight:700}}>{Ico.download(12,DS.purple)} Calendrier</button>
+                    <button onClick={()=>{if(confirm("Supprimer ce RDV ?"))onDeleteRdv&&onDeleteRdv(r.id);}} style={{width:32,borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(12,DS.red)}</button>
+                  </div>
+                </div>
               );
             })
           }
@@ -1247,7 +1289,7 @@ table td{padding:7px 12px;border:1px solid #e2e8f0;font-size:12px}
   <button onclick="window.close()" class="btn-close">Fermer</button>
 </div>
 
-<div style="text-align:center;padding:0 0 10px"><span style=\"font-family:Inter,system-ui,sans-serif;font-size:36px;font-weight:900;color:#0c1222;letter-spacing:-1px\">Bri<span style=\"color:#0369a1\"><div style="text-align:center;padding:0 0 10px"><span style="font-family:Inter,system-ui,sans-serif;font-size:36px;font-weight:900;color:#0c1222;letter-spacing:-1px">Bri'<span style="color:#0369a1">blue</span></span></div>apos;</span>blue</span></div>
+<div style="text-align:center;padding:0 0 14px"><span style="font-family:Inter,system-ui,sans-serif;font-size:40px;font-weight:900;color:#0c1222;letter-spacing:-2px">Bri<span style="color:#0369a1">&#x2019;</span>blue</span></div>
 <h1 style="margin-top:0">CONTRAT PISCINE</h1>
 <div class="subtitle" style="text-align:center;color:#0369a1;font-size:13px;font-weight:700;margin-bottom:20px;letter-spacing:0.5px">Création · Traitement de l'eau · Installation · Dépannage</div>
 
@@ -1638,37 +1680,75 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
   ];
 
   const Stepper = () => (
-    <div style={{marginBottom:20}}>
-      <div style={{display:"flex",gap:6,marginBottom:8,overflowX:isMobile?"auto":"visible",paddingBottom:isMobile?4:0,scrollSnapType:isMobile?"x proximity":"none"}}>
+    <div style={{marginBottom:18}}>
+      {/* Stepper circulaire moderne */}
+      <div style={{display:"flex",alignItems:"center",gap:0,marginBottom:14}}>
         {STEP_INFO.map((s,i)=>{
           const done=i+1<step, active=i+1===step;
           return (
-            <button key={i} onClick={()=>setStep(i+1)} style={{flex:isMobile?"0 0 auto":(active?2:1),minWidth:isMobile?92:"auto",padding:isMobile?"10px 10px":"8px 6px",borderRadius:14,border:"none",cursor:"pointer",background:active?s.color:done?DS.green+"22":DS.light,display:"flex",alignItems:"center",justifyContent:"center",gap:6,transition:"all .3s",boxShadow:active?`0 2px 12px ${s.color}44`:"none",scrollSnapAlign:isMobile?"start":"none"}}>
-              {done ? Ico.check(12,DS.green) : (typeof s.ic==="function" ? s.ic(active?"#fff":DS.mid, active?16:14) : <span style={{fontSize:active?14:12,filter:!active&&!done?"grayscale(0.6)":"none"}}>{s.ic}</span>)}
-              {(active || isMobile) && <span style={{fontSize:isMobile?11:10,fontWeight:800,color:active?"#fff":DS.dark,letterSpacing:-0.2}}>{s.l}</span>}
-            </button>
+            <div key={i} style={{display:"flex",alignItems:"center",flex:i<STEPS-1?1:"none"}}>
+              <button onClick={()=>setStep(i+1)} title={s.l} style={{
+                width:active?42:32, height:active?42:32,
+                borderRadius:"50%", border:"none", cursor:"pointer",
+                background:active?s.color:done?"#059669":"#f1f5f9",
+                display:"flex",alignItems:"center",justifyContent:"center",
+                flexShrink:0, position:"relative", transition:"all .3s cubic-bezier(.22,1,.36,1)",
+                boxShadow:active?`0 4px 16px ${s.color}55`:"none",
+                zIndex:1,
+              }}>
+                {done
+                  ? <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  : (typeof s.ic==="function" ? s.ic(active?"#fff":done?"#fff":"#94a3b8", active?17:13) : <span style={{fontSize:active?14:11}}>{s.ic}</span>)
+                }
+                {active && <div style={{position:"absolute",inset:-3,borderRadius:"50%",border:`2px solid ${s.color}44`,pointerEvents:"none"}}/>}
+              </button>
+              {i<STEPS-1 && (
+                <div style={{flex:1,height:2,background:i+1<step?"#059669":"#e2e8f0",marginLeft:-1,marginRight:-1,transition:"background .4s",borderRadius:1}}/>
+              )}
+            </div>
           );
         })}
       </div>
-      <div style={{height:3,background:DS.border,borderRadius:99,overflow:"hidden"}}>
-        <div style={{height:"100%",width:`${(step/STEPS)*100}%`,background:`linear-gradient(90deg,${STEP_INFO[0].color},${STEP_INFO[step-1].color})`,borderRadius:99,transition:"width .4s ease"}}/>
-      </div>
-      <div style={{display:"flex",justifyContent:"space-between",marginTop:6}}>
-        <span style={{fontSize:11,fontWeight:700,color:STEP_INFO[step-1].color}}>{step}. {STEP_INFO[step-1].l}</span>
-        <span style={{fontSize:11,color:DS.mid,fontWeight:600}}>{step}/{STEPS}</span>
+      {/* Label étape active */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",borderRadius:12,background:`linear-gradient(135deg,${STEP_INFO[step-1].color}10,${STEP_INFO[step-1].color}18)`,border:`1.5px solid ${STEP_INFO[step-1].color}28`}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:32,height:32,borderRadius:10,background:STEP_INFO[step-1].color,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 2px 8px ${STEP_INFO[step-1].color}44`}}>
+            {typeof STEP_INFO[step-1].ic==="function" ? STEP_INFO[step-1].ic("#fff",16) : <span style={{fontSize:15}}>{STEP_INFO[step-1].ic}</span>}
+          </div>
+          <div>
+            <div style={{fontSize:13,fontWeight:800,color:STEP_INFO[step-1].color}}>{STEP_INFO[step-1].l}</div>
+            <div style={{fontSize:10,color:"#94a3b8",fontWeight:500}}>Étape {step} sur {STEPS}</div>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:2}}>
+          {STEP_INFO.map((_,i)=>(
+            <div key={i} style={{width:i+1===step?20:6,height:6,borderRadius:3,background:i+1<step?"#059669":i+1===step?STEP_INFO[step-1].color:"#e2e8f0",transition:"all .3s"}}/>
+          ))}
+        </div>
       </div>
     </div>
   );
 
-
+  const clientSel = clients.find(c=>c.id===f.clientId);
 
   return (
     <Modal title={isEdit ? "Modifier le passage" : "Fiche Entretien"} onClose={onClose} wide>
+      {/* Bandeau client sélectionné */}
+      {clientSel && (
+        <div style={{margin:"-24px -28px 16px",marginTop:isMobile?"-18px":"-24px",marginLeft:isMobile?"-20px":"-28px",marginRight:isMobile?"-20px":"-28px",background:"linear-gradient(135deg,#0c1222,#0f2a4a)",padding:"12px 20px",display:"flex",alignItems:"center",gap:12}}>
+          <Avatar nom={clientSel.nom} size={36}/>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontWeight:800,fontSize:13,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{clientSel.nom}</div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.5)",marginTop:1}}>{clientSel.formule} · {clientSel.bassin} {clientSel.volume?clientSel.volume+"m³":""}</div>
+          </div>
+          <Tag color="#38bdf8" bg="rgba(56,189,248,0.15)">{new Date(f.date).toLocaleDateString("fr",{day:"2-digit",month:"short"})}</Tag>
+        </div>
+      )}
       <Stepper/>
 
       {step===1 && (
         <div className="fade-in">
-                    <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12}}>
+          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12}}>
             <Input label="Date *" type="date" value={f.date} onChange={e=>set("date",e.target.value)}/>
             <Input label="Technicien" value={f.tech} onChange={e=>set("tech",e.target.value)} placeholder="Prénom"/>
           </div>
@@ -1715,7 +1795,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
 
       {step===2 && (
         <div className="fade-in">
-                    <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16}}>
+          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16}}>
             <div style={{background:DS.light,borderRadius:DS.radius,padding:16,border:"1px solid "+DS.border}}>
               <div style={{fontSize:11,fontWeight:800,color:"#0891b2",textTransform:"uppercase",letterSpacing:.8,marginBottom:14,display:"flex",alignItems:"center",gap:6}}>
                 <div style={{width:6,height:6,borderRadius:3,background:"#0891b2"}}/>Test bandelette
@@ -1745,7 +1825,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
 
       {step===3 && (
         <div className="fade-in">
-                    <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16}}>
+          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16}}>
             <div style={{display:"flex",flexDirection:"column",gap:16}}>
               <RadioGroup label="Qualité de l'eau" value={f.qualiteEau} onChange={v=>set("qualiteEau",v)} options={["Cristalline","Trouble","Laiteuse","Verte"]}/>
               <MultiCheck label="État du fond" values={f.etatFond} onChange={v=>set("etatFond",v)} options={["Sale","Très sale","Attaque d'algues"]}/>
@@ -1763,7 +1843,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
       {/* ÉTAPE 4 — Correctifs avec Alcafix */}
       {step===4 && (
         <div className="fade-in">
-                    <div style={{background:`linear-gradient(135deg,#7c3aed08,#7c3aed12)`,borderRadius:DS.radius,padding:18,border:"1px solid #7c3aed18"}}>
+          <div style={{background:`linear-gradient(135deg,#7c3aed08,#7c3aed12)`,borderRadius:DS.radius,padding:18,border:"1px solid #7c3aed18"}}>
             <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr 1fr",gap:12}}>
               <Input label="Chlore" value={f.corrChlore} onChange={e=>set("corrChlore",e.target.value)} placeholder="ex: 200g"/>
               <Input label="pH" value={f.corrPH} onChange={e=>set("corrPH",e.target.value)} placeholder="ex: pH- 100ml"/>
@@ -1784,7 +1864,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
 
       {step===5 && (
         <div className="fade-in">
-                    <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16}}>
+          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16}}>
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
               <OuiNon label="Prise d'échantillon ?" value={f.priseEchantillon} onChange={v=>set("priseEchantillon",v)}/>
               <div>
@@ -1826,7 +1906,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
 
       {step===6 && (
         <div className="fade-in">
-                    <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16,marginBottom:16}}>
+          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16,marginBottom:16}}>
             <SignaturePad label="Signature du technicien" value={f.signatureTech} onChange={v=>set("signatureTech",v)}/>
             <SignaturePad label="Signature du client / propriétaire" value={f.signatureClient} onChange={v=>set("signatureClient",v)}/>
           </div>
@@ -1863,13 +1943,27 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
         </div>
       )}
 
-      <div style={{display:"flex",gap:10,marginTop:24,paddingTop:16,borderTop:"1px solid "+DS.border}}>
-        <button onClick={step===1?onClose:()=>setStep(s=>s-1)} className="btn-hover" style={{flex:1,padding:"13px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-          {step===1?<>{Ico.close(13,DS.mid)} Annuler</>:<>{Ico.back(13,DS.mid)} Retour</>}
+      {/* Navigation modernisée */}
+      <div style={{display:"flex",gap:10,marginTop:24,paddingTop:16,borderTop:"1px solid "+DS.border,alignItems:"center"}}>
+        <button onClick={step===1?onClose:()=>setStep(s=>s-1)} className="btn-hover" style={{padding:"13px 18px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+          {step===1
+            ? <><svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Annuler</>
+            : <><svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg> Retour</>
+          }
         </button>
+        {/* Dots progression */}
+        <div style={{flex:1,display:"flex",justifyContent:"center",gap:5}}>
+          {STEP_INFO.map((_,i)=>(
+            <button key={i} onClick={()=>setStep(i+1)} style={{width:i+1===step?20:7,height:7,borderRadius:4,border:"none",cursor:"pointer",background:i+1<step?"#059669":i+1===step?STEP_INFO[step-1].color:"#e2e8f0",transition:"all .3s",padding:0}}/>
+          ))}
+        </div>
         {step<STEPS
-          ? <BtnPrimary onClick={()=>setStep(s=>s+1)} icon={null} style={{flex:2,padding:"13px"}}>Suivant {Ico.next(14,"#fff")}</BtnPrimary>
-          : <BtnPrimary onClick={handleSave} icon={Ico.save(15,"#fff")} style={{flex:2,padding:"13px"}}>Enregistrer</BtnPrimary>
+          ? <button onClick={()=>setStep(s=>s+1)} className="btn-hover" style={{padding:"13px 22px",borderRadius:DS.radiusSm,background:STEP_INFO[step].color,border:"none",cursor:"pointer",fontWeight:800,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:7,boxShadow:`0 4px 16px ${STEP_INFO[step].color}44`,flexShrink:0}}>
+              {STEP_INFO[step].l} <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          : <button onClick={handleSave} className="btn-hover" style={{padding:"13px 22px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:800,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:7,boxShadow:"0 4px 16px #05996944",flexShrink:0}}>
+              <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Enregistrer
+            </button>
         }
       </div>
     </Modal>
@@ -2689,7 +2783,7 @@ export default function App() {
       {/* MODALS */}
       {ficheClient&&(()=>{
         const latest=clients.find(c=>c.id===ficheClient.id)||ficheClient;
-        return <FicheClient client={latest} passages={passages} livraisons={livraisons.filter(l=>l.clientId===latest.id)} onSaveLivraison={saveLivraison} onDeleteLivraison={deleteLivraison} onUpdateStatutLivraison={updateStatutLivraison} onClose={()=>setFicheClient(null)} onEdit={()=>{setEditClient(latest);setShowFormClient(true);setFicheClient(null);}} onDelete={()=>deleteClient(latest.id)} onAddPassage={()=>openAddPassageFromClient(latest.id)} onEditPassage={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus}/>;
+        return <FicheClient client={latest} passages={passages} livraisons={livraisons.filter(l=>l.clientId===latest.id)} rdvs={rdvs} onSaveLivraison={saveLivraison} onDeleteLivraison={deleteLivraison} onUpdateStatutLivraison={updateStatutLivraison} onClose={()=>setFicheClient(null)} onEdit={()=>{setEditClient(latest);setShowFormClient(true);setFicheClient(null);}} onDelete={()=>deleteClient(latest.id)} onAddPassage={()=>openAddPassageFromClient(latest.id)} onEditPassage={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddRdv={()=>{setEditRdv({clientId:latest.id});setShowFormRdv(true);}} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} onDeleteRdv={deleteRdv}/>;
       })()}
 
       {showFormClient&&<FormClient initial={editClient} clients={clients} onSave={saveClient} onClose={()=>{setShowFormClient(false);setEditClient(null);}}/>}
