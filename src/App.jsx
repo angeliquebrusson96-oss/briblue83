@@ -87,13 +87,45 @@ function useIsMobile() {
 
 // ─── STORAGE ──────────────────────────────────────────────────────────────────
 async function load(key, fallback) {
-  try { const r = await window.storage.get(key); return r ? JSON.parse(r.value) : fallback; }
-  catch { return fallback; }
-}
-async function save(key, val) {
-  try { await window.storage.set(key, JSON.stringify(val)); } catch {}
+  try {
+    const { data, error } = await supabase
+      .from("app_data")
+      .select("data")
+      .eq("id", 1)
+      .single();
+
+    if (error || !data?.data) return fallback;
+
+    const allData = data.data;
+    return allData[key] ?? fallback;
+  } catch {
+    return fallback;
+  }
 }
 
+async function save(key, val) {
+  try {
+    const { data, error } = await supabase
+      .from("app_data")
+      .select("data")
+      .eq("id", 1)
+      .single();
+
+    const currentData = !error && data?.data ? data.data : {};
+
+    const updatedData = {
+      ...currentData,
+      [key]: val
+    };
+
+    await supabase
+      .from("app_data")
+      .upsert({
+        id: 1,
+        data: updatedData
+      });
+  } catch {}
+}
 // ─── UTILS ────────────────────────────────────────────────────────────────────
 function getSaison(m) {
   for (const [k,s] of Object.entries(SAISONS_META)) if (s.mois.includes(m)) return k;
