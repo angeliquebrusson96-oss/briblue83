@@ -499,66 +499,42 @@ function FormClient({ initial, clients, onSave, onClose }) {
           <Input label="Date fin" type="date" value={f.dateFin} onChange={e=>set("dateFin",e.target.value)}/>
         </div>
       </Section>
-      <Section title="Passages par saison">
-        <div style={{background:DS.light,borderRadius:DS.radius,padding:18,border:"1px solid "+DS.border}}>
-          {Object.entries(SAISONS_META).map(([key,s])=>{
-            const sv = f.saisons?.[key] || {entretien:0,controle:0};
+      <Section title="Passages par mois">
+        <div style={{background:DS.dark,padding:"8px 14px",borderRadius:"12px 12px 0 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{color:"rgba(255,255,255,0.8)",fontSize:11,fontWeight:700}}>Planning mensuel</span>
+          <span style={{color:"#fff",fontSize:11,fontWeight:800}}>🔧 {totalE}  ·  💧 {totalC}  ·  Total {totalE+totalC}</span>
+        </div>
+        <div style={{border:"1px solid "+DS.border,borderTop:"none",borderRadius:"0 0 12px 12px",overflow:"hidden"}}>
+          {[...Array(12)].map((_,i)=>{
+            const m=i+1; const mv=f.moisParMois?.[m]||{entretien:0,controle:0}; const sc=SAISONS_META[getSaison(m)];
             return (
-              <div key={key} style={{marginBottom:22}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                  <div>
-                    <span style={{fontWeight:800,color:s.color,fontSize:13,display:"flex",alignItems:"center",gap:5}}>{Ico[s.icon]&&Ico[s.icon](15,s.color)} {s.label}</span>
-                    <span style={{fontSize:11,color:DS.mid}}>{s.mois.map(m=>MOIS[m]).join(" · ")}</span>
-                  </div>
-                  <Tag color={s.color}>{(sv.entretien+sv.controle)*s.mois.length} total</Tag>
+              <div key={m} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderBottom:i<11?"1px solid "+DS.border:"none",background:i%2===0?DS.white:DS.light}}>
+                <div style={{width:36,display:"flex",alignItems:"center",gap:4}}>
+                  <div style={{width:4,height:24,borderRadius:2,background:sc.color}}/>
+                  <span style={{fontSize:12,fontWeight:700,color:sc.color}}>{MOIS[m]}</span>
                 </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                  <div style={{background:DS.white,borderRadius:10,padding:"10px 12px",border:"1px solid "+DS.blue+"22"}}>
-                    <div style={{fontSize:10,fontWeight:700,color:DS.blue,marginBottom:6,display:"flex",alignItems:"center",gap:4}}>🔧 Entretien</div>
-                    <div style={{display:"flex",alignItems:"center",gap:6}}>
-                      <button onClick={()=>setSaisonType(key,"entretien",Math.max(0,sv.entretien-1))} style={{width:28,height:28,borderRadius:8,border:"1.5px solid "+DS.border,background:DS.light,cursor:"pointer",fontSize:16,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
-                      <span style={{fontSize:20,fontWeight:900,color:DS.blue,minWidth:20,textAlign:"center"}}>{sv.entretien}</span>
-                      <button onClick={()=>setSaisonType(key,"entretien",sv.entretien+1)} style={{width:28,height:28,borderRadius:8,border:"1.5px solid "+DS.blue,background:DS.blueSoft,cursor:"pointer",fontSize:16,fontWeight:700,color:DS.blue,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
-                      <span style={{fontSize:9,color:DS.mid,fontWeight:600}}>/mois<br/>={sv.entretien*s.mois.length}</span>
-                    </div>
+                <div style={{flex:1,display:"flex",alignItems:"center",gap:12}}>
+                  <div style={{display:"flex",alignItems:"center",gap:4}}>
+                    <span style={{fontSize:10,color:DS.blue}}>🔧</span>
+                    <button onClick={()=>setMoisVal(m,"entretien",mv.entretien-1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.border,background:DS.white,cursor:"pointer",fontSize:14,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                    <span style={{fontSize:16,fontWeight:900,color:DS.blue,minWidth:16,textAlign:"center"}}>{mv.entretien}</span>
+                    <button onClick={()=>setMoisVal(m,"entretien",mv.entretien+1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.blue,background:DS.blueSoft,cursor:"pointer",fontSize:14,fontWeight:700,color:DS.blue,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
                   </div>
-                  <div style={{background:DS.white,borderRadius:10,padding:"10px 12px",border:"1px solid "+DS.teal+"22"}}>
-                    <div style={{fontSize:10,fontWeight:700,color:DS.teal,marginBottom:6,display:"flex",alignItems:"center",gap:4}}>💧 Contrôle</div>
-                    <div style={{display:"flex",alignItems:"center",gap:6}}>
-                      <button onClick={()=>setSaisonType(key,"controle",Math.max(0,sv.controle-1))} style={{width:28,height:28,borderRadius:8,border:"1.5px solid "+DS.border,background:DS.light,cursor:"pointer",fontSize:16,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
-                      <span style={{fontSize:20,fontWeight:900,color:DS.teal,minWidth:20,textAlign:"center"}}>{sv.controle}</span>
-                      <button onClick={()=>setSaisonType(key,"controle",sv.controle+1)} style={{width:28,height:28,borderRadius:8,border:"1.5px solid "+DS.teal,background:DS.tealSoft,cursor:"pointer",fontSize:16,fontWeight:700,color:DS.teal,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
-                      <span style={{fontSize:9,color:DS.mid,fontWeight:600}}>/mois<br/>={sv.controle*s.mois.length}</span>
-                    </div>
+                  <div style={{display:"flex",alignItems:"center",gap:4}}>
+                    <span style={{fontSize:10,color:DS.teal}}>💧</span>
+                    <button onClick={()=>setMoisVal(m,"controle",mv.controle-1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.border,background:DS.white,cursor:"pointer",fontSize:14,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                    <span style={{fontSize:16,fontWeight:900,color:DS.teal,minWidth:16,textAlign:"center"}}>{mv.controle}</span>
+                    <button onClick={()=>setMoisVal(m,"controle",mv.controle+1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.teal,background:DS.tealSoft,cursor:"pointer",fontSize:14,fontWeight:700,color:DS.teal,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
                   </div>
                 </div>
+                <div style={{fontSize:11,fontWeight:700,color:mv.entretien+mv.controle>0?DS.dark:DS.border,minWidth:20,textAlign:"right"}}>{mv.entretien+mv.controle>0?mv.entretien+mv.controle:"—"}</div>
               </div>
             );
           })}
-          {/* Récap mois par mois */}
-          <div style={{marginTop:8,background:DS.white,borderRadius:DS.radiusSm,border:"1px solid "+DS.border,overflow:"hidden"}}>
-            <div style={{background:DS.dark,padding:"8px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{color:"rgba(255,255,255,0.8)",fontSize:11,fontWeight:700}}>Récap mensuel</span>
-              <span style={{color:"#fff",fontSize:11,fontWeight:800}}>🔧 {totalE}  ·  💧 {totalC}</span>
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:0}}>
-              {[...Array(12)].map((_,i)=>{
-                const m=i+1; const e=getEntretienMois(f.saisons,m); const c=getControleMois(f.saisons,m);
-                const sc=SAISONS_META[getSaison(m)];
-                return (
-                  <div key={m} style={{padding:"8px 4px",textAlign:"center",borderRight:i%6<5?"1px solid "+DS.border:"none",borderBottom:i<6?"1px solid "+DS.border:"none",background:e+c>0?"transparent":DS.light}}>
-                    <div style={{fontSize:9,fontWeight:700,color:sc.color}}>{MOIS[m]}</div>
-                    {e+c>0 ? (
-                      <div style={{marginTop:2}}>
-                        {e>0&&<div style={{fontSize:11,fontWeight:800,color:DS.blue}}>🔧{e}</div>}
-                        {c>0&&<div style={{fontSize:11,fontWeight:800,color:DS.teal}}>💧{c}</div>}
-                      </div>
-                    ) : <div style={{fontSize:13,color:DS.border,marginTop:2}}>—</div>}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:12}}>
+          <Input label="Prix/passage entretien (€)" type="number" value={f.prixPassageE||""} onChange={e=>set("prixPassageE",+e.target.value||0)}/>
+          <Input label="Prix/passage contrôle (€)" type="number" value={f.prixPassageC||""} onChange={e=>set("prixPassageC",+e.target.value||0)}/>
         </div>
       </Section>
       <div style={{display:"flex",gap:10}}>
