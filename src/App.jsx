@@ -49,6 +49,7 @@ const Ico = {
   image: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>,
   userPlus: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>,
   rdv: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="12" cy="15" r="2"/></svg>,
+  download: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
 };
 
 
@@ -81,9 +82,9 @@ function migrateSaisons(saisons) {
 }
 
 const CLIENTS_INIT = [
-  { id:"C001", nom:"Dupont Marie",  tel:"06 12 34 56 78", email:"marie@email.com",  adresse:"12 Rue des Pins, Hyères",    bassin:"Coque polyester", volume:45, formule:"Confort+", prix:1800, dateDebut:"2026-04-01", dateFin:"2027-03-31", saisons:{ hiver:{entretien:4,controle:0}, printemps:{entretien:4,controle:0}, ete:{entretien:4,controle:0}, automne:{entretien:4,controle:0} } },
-  { id:"C002", nom:"Martin Pierre", tel:"06 98 76 54 32", email:"pierre@email.com", adresse:"5 Av. de la Mer, Toulon",    bassin:"Béton",           volume:60, formule:"VAC+",     prix:1200, dateDebut:"2026-04-01", dateFin:"2026-09-30", saisons:{ hiver:{entretien:0,controle:0}, printemps:{entretien:2,controle:1}, ete:{entretien:4,controle:2}, automne:{entretien:2,controle:1} } },
-  { id:"C003", nom:"Garcia Sophie", tel:"06 11 22 33 44", email:"sophie@email.com", adresse:"8 Chemin du Lac, La Seyne", bassin:"Liner",           volume:35, formule:"VAC",      prix:850,  dateDebut:"2026-05-01", dateFin:"2026-09-30", saisons:{ hiver:{entretien:0,controle:0}, printemps:{entretien:2,controle:0}, ete:{entretien:4,controle:0}, automne:{entretien:2,controle:0} } },
+  { id:"C001", nom:"Dupont Marie",  tel:"06 12 34 56 78", email:"marie@email.com",  adresse:"12 Rue des Pins, Hyères",    bassin:"Coque polyester", volume:45, formule:"Confort+", prix:1800, dateDebut:"2026-04-01", dateFin:"2027-03-31", photoPiscine:"", saisons:{ hiver:{entretien:4,controle:0}, printemps:{entretien:4,controle:0}, ete:{entretien:4,controle:0}, automne:{entretien:4,controle:0} } },
+  { id:"C002", nom:"Martin Pierre", tel:"06 98 76 54 32", email:"pierre@email.com", adresse:"5 Av. de la Mer, Toulon",    bassin:"Béton",           volume:60, formule:"VAC+",     prix:1200, dateDebut:"2026-04-01", dateFin:"2026-09-30", photoPiscine:"", saisons:{ hiver:{entretien:0,controle:0}, printemps:{entretien:2,controle:1}, ete:{entretien:4,controle:2}, automne:{entretien:2,controle:1} } },
+  { id:"C003", nom:"Garcia Sophie", tel:"06 11 22 33 44", email:"sophie@email.com", adresse:"8 Chemin du Lac, La Seyne", bassin:"Liner",           volume:35, formule:"VAC",      prix:850,  dateDebut:"2026-05-01", dateFin:"2026-09-30", photoPiscine:"", saisons:{ hiver:{entretien:0,controle:0}, printemps:{entretien:2,controle:0}, ete:{entretien:4,controle:0}, automne:{entretien:2,controle:0} } },
 ];
 const PASSAGES_INIT = [
   { id:1, clientId:"C001", date:"2026-04-06", type:"Entretien complet", ph:7.2, chlore:1.5, actions:"Nettoyage, vérif. pompe", obs:"RAS",                      tech:"Dorian", ok:true },
@@ -212,6 +213,53 @@ const TODAY = new Date().toISOString().split("T")[0];
 const MOIS_NOW = new Date().getMonth() + 1;
 const YEAR_NOW = new Date().getFullYear();
 
+
+// ─── ICS EXPORT ─────────────────────────────────────────────────────────────
+function exportRdvToICS(rdv, client) {
+  const dt = rdv.date.replace(/-/g,"");
+  const heure = (rdv.heure||"09:00").replace(":","");
+  const duree = parseInt(rdv.duree)||60;
+  const endH = Math.floor((parseInt(heure.slice(0,2))*60 + parseInt(heure.slice(2)) + duree)/60);
+  const endM = (parseInt(heure.slice(0,2))*60 + parseInt(heure.slice(2)) + duree)%60;
+  const endTime = String(endH).padStart(2,"0") + String(endM).padStart(2,"0");
+  const desc = [rdv.description, client?`Client: ${client.nom}`:"", client?.adresse?`Adresse: ${client.adresse}`:""].filter(Boolean).join("\\n");
+  const ics = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//BRIBLUE//CRM//FR\nBEGIN:VEVENT\nDTSTART:${dt}T${heure}00\nDTEND:${dt}T${endTime}00\nSUMMARY:BRIBLUE - ${rdv.type}${client?` - ${client.nom}`:""}
+DESCRIPTION:${desc}\n${client?.adresse?`LOCATION:${client.adresse}\n`:""}BEGIN:VALARM\nTRIGGER:-PT30M\nACTION:DISPLAY\nDESCRIPTION:RDV BRIBLUE dans 30 min\nEND:VALARM\nEND:VEVENT\nEND:VCALENDAR`;
+  const blob = new Blob([ics], {type:"text/calendar;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `BRIBLUE_RDV_${dt}.ics`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 3000);
+}
+
+// ─── NOTIFICATION SOUND ─────────────────────────────────────────────────────
+function playNotifSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator(); const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
+    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.2);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.4);
+  } catch {}
+}
+
+// ─── PWA SETUP ──────────────────────────────────────────────────────────────
+function setupPWA() {
+  if (!document.querySelector('link[rel="manifest"]')) {
+    const manifest = {name:"BRIBLUE CRM",short_name:"BRIBLUE",description:"Gestion entretien piscines",start_url:window.location.href,display:"standalone",background_color:"#0c1222",theme_color:"#0369a1",orientation:"portrait",icons:[{src:"data:image/svg+xml,"+encodeURIComponent('<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 192 192\"><rect width=\"192\" height=\"192\" rx=\"40\" fill=\"#0c1222\"/><path d=\"M30 70c15 18 30 18 45 0s30-18 45 0 30 18 45 0\" fill=\"none\" stroke=\"white\" stroke-width=\"8\" stroke-linecap=\"round\"/><path d=\"M30 100c15 18 30 18 45 0s30-18 45 0 30 18 45 0\" fill=\"none\" stroke=\"white\" stroke-width=\"8\" stroke-linecap=\"round\"/></svg>'),sizes:"192x192",type:"image/svg+xml"},{src:"data:image/svg+xml,"+encodeURIComponent('<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 512 512\"><rect width=\"512\" height=\"512\" rx=\"100\" fill=\"#0c1222\"/><path d=\"M80 190c40 48 80 48 120 0s80-48 120 0 80 48 120 0\" fill=\"none\" stroke=\"white\" stroke-width=\"20\" stroke-linecap=\"round\"/><path d=\"M80 270c40 48 80 48 120 0s80-48 120 0 80 48 120 0\" fill=\"none\" stroke=\"white\" stroke-width=\"20\" stroke-linecap=\"round\"/></svg>'),sizes:"512x512",type:"image/svg+xml"}]};
+    const blob = new Blob([JSON.stringify(manifest)], {type:"application/json"});
+    const link = document.createElement("link"); link.rel="manifest"; link.href=URL.createObjectURL(blob); document.head.appendChild(link);
+  }
+  if (!document.querySelector('meta[name="theme-color"]')) { const m=document.createElement("meta"); m.name="theme-color"; m.content="#0369a1"; document.head.appendChild(m); }
+  if (!document.querySelector('meta[name="apple-mobile-web-app-capable"]')) { const m1=document.createElement("meta"); m1.name="apple-mobile-web-app-capable"; m1.content="yes"; document.head.appendChild(m1); const m2=document.createElement("meta"); m2.name="apple-mobile-web-app-status-bar-style"; m2.content="black-translucent"; document.head.appendChild(m2); const m3=document.createElement("meta"); m3.name="apple-mobile-web-app-title"; m3.content="BRIBLUE"; document.head.appendChild(m3); }
+  if ('serviceWorker' in navigator) { const swCode=`self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>self.clients.claim());self.addEventListener('fetch',e=>e.respondWith(fetch(e.request).catch(()=>new Response('Offline',{status:503}))));`; const swBlob=new Blob([swCode],{type:'application/javascript'}); navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(()=>{}); }
+}
+
 // ─── DESIGN SYSTEM V2 — MODERNE ─────────────────────────────────────────────
 const DS = {
   blue:"#0369a1", blueSoft:"#e0f2fe", blueGrad:"linear-gradient(135deg,#0284c7,#0ea5e9)",
@@ -263,7 +311,8 @@ const GlobalStyles = () => (
 );
 
 // ─── COMPOSANTS DE BASE ───────────────────────────────────────────────────────
-function Avatar({ nom, size=40 }) {
+function Avatar({ nom, size=40, photo }) {
+  if (photo) return <img src={photo} alt={nom} style={{width:size,height:size,borderRadius:size*0.3,objectFit:"cover",flexShrink:0,border:"2px solid "+DS.border}}/>;
   const initials = (nom||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
   const colors = [
     "linear-gradient(135deg,#0284c7,#06b6d4)",
@@ -358,7 +407,7 @@ function Select({ label, options, ...p }) {
 }
 
 // ─── PHOTO PICKER ─────────────────────────────────────────────────────────────
-function PhotoPicker({ label, value, onChange }) {
+function PhotoPicker({ label, value, onChange, compact }) {
   const cameraRef = useRef(null);
   const galleryRef = useRef(null);
   const handleFile = (e) => {
@@ -379,7 +428,7 @@ function PhotoPicker({ label, value, onChange }) {
       )}
       {value ? (
         <div style={{position:"relative",borderRadius:DS.radius,overflow:"hidden",border:"2px solid "+DS.blue,background:"#000"}}>
-          <img src={value} alt="photo" style={{width:"100%",maxHeight:220,objectFit:"cover",display:"block"}}/>
+          <img src={value} alt="photo" style={{width:"100%",maxHeight:compact?120:220,objectFit:"cover",display:"block"}}/>
           <button onClick={() => onChange("")} style={{position:"absolute",top:8,right:8,width:32,height:32,borderRadius:16,background:"rgba(0,0,0,0.6)",border:"2px solid rgba(255,255,255,0.4)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2}}>{Ico.close(14,"#fff")}</button>
           <button onClick={() => cameraRef.current?.click()} style={{position:"absolute",bottom:8,right:8,padding:"6px 12px",borderRadius:10,background:"rgba(0,0,0,0.55)",border:"1px solid rgba(255,255,255,0.3)",cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontSize:11,fontWeight:600,color:"#fff",fontFamily:"inherit"}}>{Ico.camera(13,"#fff")} Reprendre</button>
         </div>
@@ -418,12 +467,12 @@ function FormClient({ initial, clients, onSave, onClose }) {
   const isMobile = useIsMobile();
   const [f, setF] = useState(() => {
     if (initial) {
-      return { ...initial, saisons: migrateSaisons(initial.saisons) };
+      return { ...initial, saisons: migrateSaisons(initial.saisons), photoPiscine: initial.photoPiscine||"" };
     }
     return {
       id: `C${String(clients.length+1).padStart(3,"0")}`,
       nom:"", tel:"", email:"", adresse:"", bassin:"Liner", volume:30,
-      formule:"VAC", prix:0, dateDebut:TODAY,
+      formule:"VAC", prix:0, dateDebut:TODAY, photoPiscine:"",
       dateFin: `${new Date().getFullYear()+1}-03-31`,
       saisons: {...SAISONS_DEF},
     };
@@ -445,6 +494,9 @@ function FormClient({ initial, clients, onSave, onClose }) {
           <Select label="Type bassin" value={f.bassin} onChange={e=>set("bassin",e.target.value)} options={["Liner","Béton","Coque polyester","PVC armé","Hors-sol","Autre"]}/>
           <Input label="Volume (m³)" type="number" value={f.volume} onChange={e=>set("volume",+e.target.value)}/>
         </div>
+      </Section>
+      <Section title="Photo de la piscine">
+        <PhotoPicker value={f.photoPiscine||""} onChange={v=>set("photoPiscine",v)} compact/>
       </Section>
       <Section title="Contrat">
         <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"1fr 1fr 1fr",gap:12}}>
@@ -468,43 +520,51 @@ function FormClient({ initial, clients, onSave, onClose }) {
                   </div>
                   <Tag color={s.color}>{(sv.entretien+sv.controle)*s.mois.length} total</Tag>
                 </div>
-                {/* Entretien complet */}
-                <div style={{marginBottom:8}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                    <span style={{fontSize:12,fontWeight:600,color:DS.dark,display:"flex",alignItems:"center",gap:5}}>{Ico.wrench(12,DS.blue)} Entretien complet</span>
-                    <div style={{display:"flex",gap:4}}>
-                      <Tag color={DS.blue}>{sv.entretien}×/mois</Tag>
-                      <Tag color={DS.mid}>{sv.entretien*s.mois.length} saison</Tag>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  <div style={{background:DS.white,borderRadius:10,padding:"10px 12px",border:"1px solid "+DS.blue+"22"}}>
+                    <div style={{fontSize:10,fontWeight:700,color:DS.blue,marginBottom:6,display:"flex",alignItems:"center",gap:4}}>🔧 Entretien</div>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <button onClick={()=>setSaisonType(key,"entretien",Math.max(0,sv.entretien-1))} style={{width:28,height:28,borderRadius:8,border:"1.5px solid "+DS.border,background:DS.light,cursor:"pointer",fontSize:16,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                      <span style={{fontSize:20,fontWeight:900,color:DS.blue,minWidth:20,textAlign:"center"}}>{sv.entretien}</span>
+                      <button onClick={()=>setSaisonType(key,"entretien",sv.entretien+1)} style={{width:28,height:28,borderRadius:8,border:"1.5px solid "+DS.blue,background:DS.blueSoft,cursor:"pointer",fontSize:16,fontWeight:700,color:DS.blue,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                      <span style={{fontSize:9,color:DS.mid,fontWeight:600}}>/mois<br/>={sv.entretien*s.mois.length}</span>
                     </div>
                   </div>
-                  <input type="range" min={0} max={8} value={sv.entretien} onChange={e=>setSaisonType(key,"entretien",+e.target.value)} style={{width:"100%",accentColor:DS.blue,cursor:"pointer"}}/>
-                </div>
-                {/* Contrôle d'eau */}
-                <div>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                    <span style={{fontSize:12,fontWeight:600,color:DS.dark,display:"flex",alignItems:"center",gap:5}}>{Ico.drop(12,DS.teal)} Contrôle d'eau</span>
-                    <div style={{display:"flex",gap:4}}>
-                      <Tag color={DS.teal}>{sv.controle}×/mois</Tag>
-                      <Tag color={DS.mid}>{sv.controle*s.mois.length} saison</Tag>
+                  <div style={{background:DS.white,borderRadius:10,padding:"10px 12px",border:"1px solid "+DS.teal+"22"}}>
+                    <div style={{fontSize:10,fontWeight:700,color:DS.teal,marginBottom:6,display:"flex",alignItems:"center",gap:4}}>💧 Contrôle</div>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <button onClick={()=>setSaisonType(key,"controle",Math.max(0,sv.controle-1))} style={{width:28,height:28,borderRadius:8,border:"1.5px solid "+DS.border,background:DS.light,cursor:"pointer",fontSize:16,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                      <span style={{fontSize:20,fontWeight:900,color:DS.teal,minWidth:20,textAlign:"center"}}>{sv.controle}</span>
+                      <button onClick={()=>setSaisonType(key,"controle",sv.controle+1)} style={{width:28,height:28,borderRadius:8,border:"1.5px solid "+DS.teal,background:DS.tealSoft,cursor:"pointer",fontSize:16,fontWeight:700,color:DS.teal,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                      <span style={{fontSize:9,color:DS.mid,fontWeight:600}}>/mois<br/>={sv.controle*s.mois.length}</span>
                     </div>
                   </div>
-                  <input type="range" min={0} max={8} value={sv.controle} onChange={e=>setSaisonType(key,"controle",+e.target.value)} style={{width:"100%",accentColor:DS.teal,cursor:"pointer"}}/>
                 </div>
               </div>
             );
           })}
-          <div style={{borderRadius:DS.radiusSm,overflow:"hidden",marginTop:4}}>
-            <div style={{background:DS.blueGrad,padding:"10px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{color:"rgba(255,255,255,0.85)",fontSize:12,fontWeight:700}}>Entretiens complets</span>
-              <span style={{color:"#fff",fontSize:20,fontWeight:900}}>{totalE}</span>
+          {/* Récap mois par mois */}
+          <div style={{marginTop:8,background:DS.white,borderRadius:DS.radiusSm,border:"1px solid "+DS.border,overflow:"hidden"}}>
+            <div style={{background:DS.dark,padding:"8px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{color:"rgba(255,255,255,0.8)",fontSize:11,fontWeight:700}}>Récap mensuel</span>
+              <span style={{color:"#fff",fontSize:11,fontWeight:800}}>🔧 {totalE}  ·  💧 {totalC}</span>
             </div>
-            <div style={{background:"linear-gradient(135deg,#0891b2,#22d3ee)",padding:"10px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{color:"rgba(255,255,255,0.85)",fontSize:12,fontWeight:700}}>Contrôles d'eau</span>
-              <span style={{color:"#fff",fontSize:20,fontWeight:900}}>{totalC}</span>
-            </div>
-            <div style={{background:DS.dark,padding:"10px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{color:"rgba(255,255,255,0.85)",fontSize:12,fontWeight:700}}>Total annuel</span>
-              <span style={{color:"#fff",fontSize:22,fontWeight:900}}>{total}</span>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:0}}>
+              {[...Array(12)].map((_,i)=>{
+                const m=i+1; const e=getEntretienMois(f.saisons,m); const c=getControleMois(f.saisons,m);
+                const sc=SAISONS_META[getSaison(m)];
+                return (
+                  <div key={m} style={{padding:"8px 4px",textAlign:"center",borderRight:i%6<5?"1px solid "+DS.border:"none",borderBottom:i<6?"1px solid "+DS.border:"none",background:e+c>0?"transparent":DS.light}}>
+                    <div style={{fontSize:9,fontWeight:700,color:sc.color}}>{MOIS[m]}</div>
+                    {e+c>0 ? (
+                      <div style={{marginTop:2}}>
+                        {e>0&&<div style={{fontSize:11,fontWeight:800,color:DS.blue}}>🔧{e}</div>}
+                        {c>0&&<div style={{fontSize:11,fontWeight:800,color:DS.teal}}>💧{c}</div>}
+                      </div>
+                    ) : <div style={{fontSize:13,color:DS.border,marginTop:2}}>—</div>}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -652,7 +712,7 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
   return (
     <Modal title={client.nom} onClose={onClose} wide>
       <div style={{display:"flex",gap:14,alignItems:"center",marginBottom:18}}>
-        <Avatar nom={client.nom} size={56}/>
+        <Avatar nom={client.nom} size={56} photo={client.photoPiscine}/>
         <div style={{flex:1}}>
           <div style={{fontWeight:800,fontSize:17,color:DS.dark,letterSpacing:-0.3}}>{client.nom}</div>
           <div style={{fontSize:12,color:DS.mid,marginTop:2}}>{client.formule} · {client.bassin}</div>
@@ -661,6 +721,8 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
           </Tag>
         </div>
       </div>
+
+      {client.photoPiscine && <div style={{marginBottom:14,borderRadius:DS.radiusSm,overflow:"hidden",border:"1px solid "+DS.border}}><img src={client.photoPiscine} alt="Piscine" style={{width:"100%",height:120,objectFit:"cover",display:"block"}}/></div>}
 
       {/* Stats with Entretien / Contrôle split */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:8}}>
@@ -1271,44 +1333,29 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
   ];
 
   const Stepper = () => (
-    <div style={{marginBottom:24}}>
-      <div style={{display:"flex",alignItems:"center",gap:0,position:"relative"}}>
+    <div style={{marginBottom:20}}>
+      <div style={{display:"flex",gap:4,marginBottom:8}}>
         {STEP_INFO.map((s,i)=>{
-          const done = i+1 < step;
-          const active = i+1 === step;
-          const col = active ? s.color : done ? DS.green : DS.border;
+          const done=i+1<step, active=i+1===step;
           return (
-            <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",position:"relative",cursor:"pointer",zIndex:1}} onClick={()=>setStep(i+1)}>
-              {i>0 && <div style={{position:"absolute",top:18,right:"50%",width:"100%",height:3,background:done||active?`linear-gradient(90deg,${DS.green},${col})`:DS.border,zIndex:0}}/>}
-              <div style={{width:36,height:36,borderRadius:18,background:active?`linear-gradient(135deg,${s.color},${s.color}cc)`:done?DS.greenGrad:DS.white,border:active?"none":done?"none":`2px solid ${DS.border}`,display:"flex",alignItems:"center",justifyContent:"center",zIndex:2,boxShadow:active?`0 4px 16px ${s.color}44`:done?"0 2px 8px rgba(5,150,105,0.2)":"none",transition:"all .3s"}}>
-                {done ? Ico.check(14,"#fff") : <span style={{fontSize:16,filter:active?"none":"grayscale(0.5) opacity(0.6)"}}>{s.ic}</span>}
-              </div>
-              <span style={{fontSize:isMobile?8:10,fontWeight:active?800:done?700:500,color:active?s.color:done?DS.green:DS.mid,marginTop:6,textAlign:"center",lineHeight:1.2,letterSpacing:-0.2}}>
-                {isMobile?s.l.split(" ")[0]:s.l}
-              </span>
-            </div>
+            <button key={i} onClick={()=>setStep(i+1)} style={{flex:active?2:1,padding:"8px 6px",borderRadius:10,border:"none",cursor:"pointer",background:active?s.color:done?DS.green+"22":DS.light,display:"flex",alignItems:"center",justifyContent:"center",gap:4,transition:"all .3s",boxShadow:active?`0 2px 12px ${s.color}44`:"none"}}>
+              {done ? Ico.check(12,DS.green) : <span style={{fontSize:active?14:12,filter:!active&&!done?"grayscale(0.6)":"none"}}>{s.ic}</span>}
+              {active && <span style={{fontSize:10,fontWeight:800,color:"#fff",letterSpacing:-0.2}}>{s.l}</span>}
+            </button>
           );
         })}
       </div>
-      <div style={{height:3,background:DS.border,borderRadius:99,marginTop:16,overflow:"hidden"}}>
-        <div style={{height:"100%",width:`${(step/STEPS)*100}%`,background:`linear-gradient(90deg,${STEP_INFO[0].color},${STEP_INFO[step-1].color})`,borderRadius:99,transition:"width .5s cubic-bezier(.22,1,.36,1)"}}/>
+      <div style={{height:3,background:DS.border,borderRadius:99,overflow:"hidden"}}>
+        <div style={{height:"100%",width:`${(step/STEPS)*100}%`,background:`linear-gradient(90deg,${STEP_INFO[0].color},${STEP_INFO[step-1].color})`,borderRadius:99,transition:"width .4s ease"}}/>
+      </div>
+      <div style={{display:"flex",justifyContent:"space-between",marginTop:6}}>
+        <span style={{fontSize:11,fontWeight:700,color:STEP_INFO[step-1].color}}>{step}. {STEP_INFO[step-1].l}</span>
+        <span style={{fontSize:11,color:DS.mid,fontWeight:600}}>{step}/{STEPS}</span>
       </div>
     </div>
   );
 
-  const StepHeader = ({icon, title, subtitle, color}) => (
-    <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:20,padding:"16px 18px",background:`linear-gradient(135deg,${color}08,${color}15)`,borderRadius:DS.radius,border:`1px solid ${color}22`}}>
-      <div style={{width:44,height:44,borderRadius:14,background:`linear-gradient(135deg,${color},${color}cc)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,boxShadow:`0 4px 16px ${color}33`,flexShrink:0}}>{icon}</div>
-      <div>
-        <div style={{fontWeight:900,fontSize:16,color:DS.dark,letterSpacing:-0.3}}>{title}</div>
-        <div style={{fontSize:12,color:DS.mid,marginTop:1,fontWeight:500}}>{subtitle}</div>
-      </div>
-      <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
-        <span style={{fontSize:22,fontWeight:900,color}}>{step}</span>
-        <span style={{fontSize:13,color:DS.mid,fontWeight:600}}>/ {STEPS}</span>
-      </div>
-    </div>
-  );
+
 
   return (
     <Modal title={isEdit ? "Modifier le passage" : "Fiche Entretien"} onClose={onClose} wide>
@@ -1316,8 +1363,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
 
       {step===1 && (
         <div className="fade-in">
-          <StepHeader icon="🔧" title="Intervention" subtitle="Client, date et type" color="#0369a1"/>
-          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12}}>
+                    <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12}}>
             <Input label="Date *" type="date" value={f.date} onChange={e=>set("date",e.target.value)}/>
             <Input label="Technicien" value={f.tech} onChange={e=>set("tech",e.target.value)} placeholder="Prénom"/>
           </div>
@@ -1351,8 +1397,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
 
       {step===2 && (
         <div className="fade-in">
-          <StepHeader icon="💧" title="Analyses eau" subtitle="Bandelette et mesures détaillées" color="#0891b2"/>
-          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16}}>
+                    <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16}}>
             <div style={{background:DS.light,borderRadius:DS.radius,padding:16,border:"1px solid "+DS.border}}>
               <div style={{fontSize:11,fontWeight:800,color:"#0891b2",textTransform:"uppercase",letterSpacing:.8,marginBottom:14,display:"flex",alignItems:"center",gap:6}}>
                 <div style={{width:6,height:6,borderRadius:3,background:"#0891b2"}}/>Test bandelette
@@ -1382,8 +1427,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
 
       {step===3 && (
         <div className="fade-in">
-          <StepHeader icon="🏊" title="État du bassin" subtitle="Eau, fond, parois, local" color="#059669"/>
-          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16}}>
+                    <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16}}>
             <div style={{display:"flex",flexDirection:"column",gap:16}}>
               <RadioGroup label="Qualité de l'eau" value={f.qualiteEau} onChange={v=>set("qualiteEau",v)} options={["Cristalline","Trouble","Laiteuse","Verte"]}/>
               <MultiCheck label="État du fond" values={f.etatFond} onChange={v=>set("etatFond",v)} options={["Sale","Très sale","Attaque d'algues"]}/>
@@ -1401,8 +1445,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
       {/* ÉTAPE 4 — Correctifs avec Alcafix */}
       {step===4 && (
         <div className="fade-in">
-          <StepHeader icon="⚗️" title="Correctifs" subtitle="Traitements et produits ajoutés" color="#7c3aed"/>
-          <div style={{background:`linear-gradient(135deg,#7c3aed08,#7c3aed12)`,borderRadius:DS.radius,padding:18,border:"1px solid #7c3aed18"}}>
+                    <div style={{background:`linear-gradient(135deg,#7c3aed08,#7c3aed12)`,borderRadius:DS.radius,padding:18,border:"1px solid #7c3aed18"}}>
             <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"1fr 1fr 1fr",gap:12}}>
               <Input label="Chlore" value={f.corrChlore} onChange={e=>set("corrChlore",e.target.value)} placeholder="ex: 200g"/>
               <Input label="pH" value={f.corrPH} onChange={e=>set("corrPH",e.target.value)} placeholder="ex: pH- 100ml"/>
@@ -1423,8 +1466,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
 
       {step===5 && (
         <div className="fade-in">
-          <StepHeader icon="✅" title="Clôture" subtitle="Commentaires, livraisons, validation" color="#ea580c"/>
-          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16}}>
+                    <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16}}>
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
               <OuiNon label="Prise d'échantillon ?" value={f.priseEchantillon} onChange={v=>set("priseEchantillon",v)}/>
               <div>
@@ -1466,8 +1508,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
 
       {step===6 && (
         <div className="fade-in">
-          <StepHeader icon="✍️" title="Signatures & Export" subtitle="Finaliser et envoyer le rapport" color="#be185d"/>
-          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16,marginBottom:16}}>
+                    <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16,marginBottom:16}}>
             <SignaturePad label="Signature du technicien" value={f.signatureTech} onChange={v=>set("signatureTech",v)}/>
             <SignaturePad label="Signature du client / propriétaire" value={f.signatureClient} onChange={v=>set("signatureClient",v)}/>
           </div>
@@ -1555,7 +1596,7 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             {tachesMois.filter(t=>t.total>0).map(({client,restE,restC,effE,prevE,effC,prevC})=>(
               <div key={client.id} onClick={()=>onClientClick(client)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:"rgba(255,255,255,0.08)",borderRadius:DS.radiusSm,cursor:"pointer",border:"1px solid rgba(255,255,255,0.08)"}}>
-                <Avatar nom={client.nom} size={34}/>
+                <Avatar nom={client.nom} size={34} photo={client.photoPiscine}/>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontWeight:700,fontSize:13,color:"#fff"}}>{client.nom}</div>
                   <div style={{display:"flex",gap:8,marginTop:3}}>
@@ -1685,7 +1726,7 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
               const al=alerteClient(c,passages); const col=AC[al]; const j=daysUntil(c.dateFin);
               return (
                 <div key={c.id} onClick={()=>onClientClick(c)} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid "+DS.border,cursor:"pointer"}}>
-                  <Avatar nom={c.nom} size={36}/>
+                  <Avatar nom={c.nom} size={36} photo={c.photoPiscine}/>
                   <div style={{flex:1}}>
                     <div style={{fontWeight:700,fontSize:13,color:DS.dark}}>{c.nom}</div>
                     <div style={{fontSize:11,color:DS.mid,marginTop:2}}>{al==="rouge"||al==="jaune"?`Expire dans ${j} jours`:"Passages en retard"}</div>
@@ -1736,7 +1777,7 @@ function PageClients({ clients, passages, onClientClick, onAdd }) {
           return (
             <Card key={c.id} onClick={()=>onClientClick(c)} className="fade-in" style={{animationDelay:`${idx*0.05}s`}}>
               <div style={{display:"flex",gap:12,alignItems:"center"}}>
-                <Avatar nom={c.nom} size={44}/>
+                <Avatar nom={c.nom} size={44} photo={c.photoPiscine}/>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                     <div style={{fontWeight:800,fontSize:14,color:DS.dark,letterSpacing:-0.2}}>{c.nom}</div>
@@ -1801,7 +1842,7 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit }) {
             return (
               <Card key={p.id} className="fade-in" style={{animationDelay:`${idx*0.05}s`}}>
                 <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
-                  <Avatar nom={c?.nom||"?"} size={42}/>
+                  <Avatar nom={c?.nom||"?"} size={42} photo={c?.photoPiscine}/>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
                       <div>
@@ -1895,6 +1936,7 @@ function PageRdv({ clients, rdvs, onAdd, onEdit, onDelete }) {
                     {r.description&&<div style={{fontSize:12,color:DS.mid,marginTop:2}}>{r.description}</div>}
                     <div style={{display:"flex",gap:6,marginTop:10,paddingTop:8,borderTop:"1px solid "+DS.border}}>
                       <button onClick={()=>onEdit(r)} className="btn-hover" style={{flex:1,padding:"7px",borderRadius:10,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(13,DS.mid)} Modifier</button>
+                      <button onClick={()=>exportRdvToICS(r,c)} className="btn-hover" style={{flex:1,padding:"7px",borderRadius:10,background:DS.purpleSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.purple,fontFamily:"inherit",fontWeight:700}}>{Ico.download(13,DS.purple)} Calendrier</button>
                       <button onClick={()=>{if(confirm("Supprimer ce RDV ?"))onDelete(r.id)}} className="btn-hover" style={{width:34,height:34,borderRadius:10,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(13,DS.red)}</button>
                     </div>
                   </div>
@@ -1995,9 +2037,10 @@ export default function App() {
   const [defaultLivraisonClientId, setDefaultLivraisonClientId] = useState("");
   const [showFormRdv, setShowFormRdv] = useState(false);
   const [editRdv, setEditRdv] = useState(null);
+  const prevTaskCount = useRef(0);
   const isMobile = useIsMobile();
 
-  useEffect(()=>{ try { if(sessionStorage.getItem("bb_auth")==="1") setLoggedIn(true); } catch {} },[]);
+  useEffect(()=>{ setupPWA(); try { if(sessionStorage.getItem("bb_auth")==="1") setLoggedIn(true); } catch {} },[]);
 
   useEffect(()=>{
     if(!loggedIn) return;
@@ -2007,7 +2050,7 @@ export default function App() {
       const l = await load("bb_livraisons_v1", []);
       const r = await load("bb_rdvs_v1", []);
       // Migrate saisons format for existing clients
-      const cMigrated = c.map(cl => ({...cl, saisons: migrateSaisons(cl.saisons)}));
+      const cMigrated = c.map(cl => ({...cl, saisons: migrateSaisons(cl.saisons), photoPiscine: cl.photoPiscine||""}));
       setClients(cMigrated); setPassages(p); setLivraisons(l); setRdvs(r); setReady(true);
     })();
   },[loggedIn]);
@@ -2016,6 +2059,19 @@ export default function App() {
   useEffect(()=>{ if(ready) save("bb_passages_v2", passages); },[passages,ready]);
   useEffect(()=>{ if(ready) save("bb_livraisons_v1", livraisons); },[livraisons,ready]);
   useEffect(()=>{ if(ready) save("bb_rdvs_v1", rdvs); },[rdvs,ready]);
+
+  // Notification sound when new tasks appear
+  useEffect(()=>{
+    if(!ready) return;
+    const currentTasks = clients.reduce((a,c)=>{
+      const prevE=getEntretienMois(c.saisons,MOIS_NOW);const prevC=getControleMois(c.saisons,MOIS_NOW);
+      const effE=passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===MOIS_NOW&&new Date(p.date).getFullYear()===YEAR_NOW&&isEntretienType(p.type)).length;
+      const effC=passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===MOIS_NOW&&new Date(p.date).getFullYear()===YEAR_NOW&&isControleType(p.type)).length;
+      return a+Math.max(0,prevE-effE)+Math.max(0,prevC-effC);
+    },0);
+    if(prevTaskCount.current>0 && currentTasks>prevTaskCount.current) playNotifSound();
+    prevTaskCount.current=currentTasks;
+  },[clients,passages,ready]);
 
   const handleLogin = useCallback(()=>{ try{sessionStorage.setItem("bb_auth","1");}catch{} setLoggedIn(true); },[]);
   const handleLogout = useCallback(()=>{ try{sessionStorage.removeItem("bb_auth");}catch{} setLoggedIn(false);setReady(false);setClients([]);setPassages([]);setLivraisons([]);setRdvs([]); },[]);
