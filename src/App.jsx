@@ -233,21 +233,55 @@ const YEAR_NOW = new Date().getFullYear();
 
 // ─── ICS EXPORT ─────────────────────────────────────────────────────────────
 function exportRdvToICS(rdv, client) {
-  const dt = rdv.date.replace(/-/g,"");
-  const heure = (rdv.heure||"09:00").replace(":","");
-  const duree = parseInt(rdv.duree)||60;
-  const endH = Math.floor((parseInt(heure.slice(0,2))*60 + parseInt(heure.slice(2)) + duree)/60);
-  const endM = (parseInt(heure.slice(0,2))*60 + parseInt(heure.slice(2)) + duree)%60;
-  const endTime = String(endH).padStart(2,"0") + String(endM).padStart(2,"0");
-  const desc = [rdv.description, client?`Client: ${client.nom}`:"", client?.adresse?`Adresse: ${client.adresse}`:""].filter(Boolean).join("\\n");
-  const ics = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//BRIBLUE//CRM//FR\nBEGIN:VEVENT\nDTSTART:${dt}T${heure}00\nDTEND:${dt}T${endTime}00\nSUMMARY:BRIBLUE - ${rdv.type}${client?` - ${client.nom}`:""}
-DESCRIPTION:${desc}\n${client?.adresse?`LOCATION:${client.adresse}\n`:""}BEGIN:VALARM\nTRIGGER:-PT30M\nACTION:DISPLAY\nDESCRIPTION:RDV BRIBLUE dans 30 min\nEND:VALARM\nEND:VEVENT\nEND:VCALENDAR`;
-  const blob = new Blob([ics], {type:"text/calendar;charset=utf-8"});
+  const dt = rdv.date.replace(/-/g, "");
+  const heure = (rdv.heure || "09:00").replace(":", "");
+  const duree = parseInt(rdv.duree, 10) || 60;
+  const startMinutes = parseInt(heure.slice(0, 2), 10) * 60 + parseInt(heure.slice(2), 10);
+  const endMinutes = startMinutes + duree;
+  const endH = Math.floor(endMinutes / 60);
+  const endM = endMinutes % 60;
+  const endTime = String(endH).padStart(2, "0") + String(endM).padStart(2, "0");
+
+  const desc = [
+    rdv.description || "",
+    client ? "Client: " + (client.nom || "") : "",
+    client && client.adresse ? "Adresse: " + client.adresse : "",
+  ].filter(Boolean).join("
+");
+
+  const summary = "BRIBLUE - " + (rdv.type || "RDV") + (client ? " - " + (client.nom || "") : "");
+  const location = client && client.adresse ? "LOCATION:" + client.adresse + "
+" : "";
+
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//BRIBLUE//CRM//FR",
+    "BEGIN:VEVENT",
+    `DTSTART:${dt}T${heure}00`,
+    `DTEND:${dt}T${endTime}00`,
+    `SUMMARY:${summary}`,
+    `DESCRIPTION:${desc}`,
+    location.trimEnd(),
+    "BEGIN:VALARM",
+    "TRIGGER:-PT30M",
+    "ACTION:DISPLAY",
+    "DESCRIPTION:RDV BRIBLUE dans 30 min",
+    "END:VALARM",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].filter(Boolean).join("
+");
+
+  const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url; a.download = `BRIBLUE_RDV_${dt}.ics`;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  setTimeout(()=>URL.revokeObjectURL(url), 3000);
+  a.href = url;
+  a.download = `BRIBLUE_RDV_${dt}.ics`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
 }
 
 // ─── NOTIFICATION SOUND ─────────────────────────────────────────────────────
