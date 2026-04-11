@@ -54,8 +54,8 @@ const Ico = {
 
 
 // ─── DONNÉES PAR DÉFAUT ───────────────────────────────────────────────────────
-// Chaque saison a maintenant entretien + controle
-const SAISONS_DEF = { hiver: {entretien:0,controle:0}, printemps: {entretien:2,controle:0}, ete: {entretien:4,controle:0}, automne: {entretien:2,controle:0} };
+// Modèle mois par mois: {1:{entretien:0,controle:0}, 2:{...}, ... 12:{...}}
+const MOIS_PAR_MOIS_DEF = Object.fromEntries([...Array(12)].map((_,i)=>[i+1,{entretien:0,controle:0}]));
 const SAISONS_META = {
   hiver:     { label: "Hiver",     icon: "snow",    mois: [12,1,2],  color: "#60a5fa", bg: "#eff6ff" },
   printemps: { label: "Printemps", icon: "flower",  mois: [3,4,5],   color: "#34d399", bg: "#ecfdf5" },
@@ -65,26 +65,36 @@ const SAISONS_META = {
 const MOIS = ["","Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
 const MOIS_L = ["","Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
 
-// Migration helper: convert old saisons format {hiver:4,...} to new {hiver:{entretien:4,controle:0},...}
-function migrateSaisons(saisons) {
-  if (!saisons) return {...SAISONS_DEF};
-  const migrated = {};
-  for (const [k, v] of Object.entries(saisons)) {
-    if (typeof v === 'number') {
-      migrated[k] = { entretien: v, controle: 0 };
-    } else if (typeof v === 'object' && v !== null) {
-      migrated[k] = { entretien: v.entretien ?? 0, controle: v.controle ?? 0 };
-    } else {
-      migrated[k] = { entretien: 0, controle: 0 };
-    }
+// Migration: old saisons format OR moisParMois → normalized moisParMois
+function migrateMois(data) {
+  if (!data) return {...MOIS_PAR_MOIS_DEF};
+  // Already mois-par-mois? (keys 1-12)
+  if (data["1"] || data[1]) {
+    const r = {};
+    for (let m=1;m<=12;m++) { const v=data[m]||data[String(m)]||{entretien:0,controle:0}; r[m]={entretien:v.entretien??0,controle:v.controle??0}; }
+    return r;
   }
-  return migrated;
+  // Old saisons format → convert
+  const SM = {hiver:[12,1,2],printemps:[3,4,5],ete:[6,7,8],automne:[9,10,11]};
+  const r = {};
+  for (let m=1;m<=12;m++) r[m]={entretien:0,controle:0};
+  for (const [k,mois] of Object.entries(SM)) {
+    const v = data[k]; if (!v) continue;
+    const e = typeof v === "number" ? v : v.entretien ?? 0;
+    const c = typeof v === "number" ? 0 : v.controle ?? 0;
+    for (const m of mois) { r[m] = {entretien:e, controle:c}; }
+  }
+  return r;
 }
 
 const CLIENTS_INIT = [
-  { id:"C001", nom:"Dupont Marie",  tel:"06 12 34 56 78", email:"marie@email.com",  adresse:"12 Rue des Pins, Hyères",    bassin:"Coque polyester", volume:45, formule:"Confort+", prix:1800, dateDebut:"2026-04-01", dateFin:"2027-03-31", photoPiscine:"", saisons:{ hiver:{entretien:4,controle:0}, printemps:{entretien:4,controle:0}, ete:{entretien:4,controle:0}, automne:{entretien:4,controle:0} } },
-  { id:"C002", nom:"Martin Pierre", tel:"06 98 76 54 32", email:"pierre@email.com", adresse:"5 Av. de la Mer, Toulon",    bassin:"Béton",           volume:60, formule:"VAC+",     prix:1200, dateDebut:"2026-04-01", dateFin:"2026-09-30", photoPiscine:"", saisons:{ hiver:{entretien:0,controle:0}, printemps:{entretien:2,controle:1}, ete:{entretien:4,controle:2}, automne:{entretien:2,controle:1} } },
-  { id:"C003", nom:"Garcia Sophie", tel:"06 11 22 33 44", email:"sophie@email.com", adresse:"8 Chemin du Lac, La Seyne", bassin:"Liner",           volume:35, formule:"VAC",      prix:850,  dateDebut:"2026-05-01", dateFin:"2026-09-30", photoPiscine:"", saisons:{ hiver:{entretien:0,controle:0}, printemps:{entretien:2,controle:0}, ete:{entretien:4,controle:0}, automne:{entretien:2,controle:0} } },
+  { id:"C001", nom:"GAMBIN IMMO - COPRO O GARDEN", tel:"", email:"", adresse:"", bassin:"Liner", volume:0, formule:"Confort+", prix:2418, prixPassageE:78, prixPassageC:0, dateDebut:"2025-09-29", dateFin:"2026-09-29", photoPiscine:"", moisParMois:{1:{entretien:1,controle:0},2:{entretien:2,controle:0},3:{entretien:2,controle:0},4:{entretien:2,controle:0},5:{entretien:2,controle:0},6:{entretien:4,controle:0},7:{entretien:4,controle:0},8:{entretien:4,controle:0},9:{entretien:4,controle:0},10:{entretien:2,controle:0},11:{entretien:2,controle:0},12:{entretien:2,controle:0}} },
+  { id:"C002", nom:"Mme HAMMER", tel:"", email:"", adresse:"", bassin:"Liner", volume:0, formule:"Confort", prix:2210, prixPassageE:85, prixPassageC:0, dateDebut:"2026-03-01", dateFin:"2027-03-01", photoPiscine:"", moisParMois:{1:{entretien:1,controle:0},2:{entretien:1,controle:0},3:{entretien:2,controle:0},4:{entretien:2,controle:0},5:{entretien:2,controle:0},6:{entretien:4,controle:0},7:{entretien:4,controle:0},8:{entretien:4,controle:0},9:{entretien:4,controle:0},10:{entretien:1,controle:0},11:{entretien:1,controle:0},12:{entretien:1,controle:0}} },
+  { id:"C003", nom:"Mme LOPEZ", tel:"", email:"", adresse:"", bassin:"Liner", volume:0, formule:"VAC+", prix:1690, prixPassageE:65, prixPassageC:0, dateDebut:"2025-06-01", dateFin:"2026-06-01", photoPiscine:"", moisParMois:{1:{entretien:1,controle:0},2:{entretien:1,controle:0},3:{entretien:2,controle:0},4:{entretien:2,controle:0},5:{entretien:2,controle:0},6:{entretien:4,controle:0},7:{entretien:4,controle:0},8:{entretien:4,controle:0},9:{entretien:4,controle:0},10:{entretien:1,controle:0},11:{entretien:1,controle:0},12:{entretien:1,controle:0}} },
+  { id:"C004", nom:"Mme MARCELLOT", tel:"", email:"", adresse:"", bassin:"Liner", volume:0, formule:"VAC+", prix:1690, prixPassageE:65, prixPassageC:0, dateDebut:"2025-11-20", dateFin:"2026-11-20", photoPiscine:"", moisParMois:{1:{entretien:1,controle:0},2:{entretien:1,controle:0},3:{entretien:1,controle:0},4:{entretien:2,controle:0},5:{entretien:2,controle:0},6:{entretien:4,controle:0},7:{entretien:4,controle:0},8:{entretien:4,controle:0},9:{entretien:4,controle:0},10:{entretien:1,controle:0},11:{entretien:1,controle:0},12:{entretien:1,controle:0}} },
+  { id:"C005", nom:"Mr MOREL", tel:"", email:"", adresse:"", bassin:"Liner", volume:0, formule:"VAC+", prix:1690, prixPassageE:65, prixPassageC:0, dateDebut:"2026-03-01", dateFin:"2027-03-01", photoPiscine:"", moisParMois:{1:{entretien:1,controle:0},2:{entretien:1,controle:0},3:{entretien:2,controle:0},4:{entretien:2,controle:0},5:{entretien:2,controle:0},6:{entretien:4,controle:0},7:{entretien:4,controle:0},8:{entretien:4,controle:0},9:{entretien:4,controle:0},10:{entretien:1,controle:0},11:{entretien:1,controle:0},12:{entretien:1,controle:0}} },
+  { id:"C006", nom:"Mr NEGRE Claude", tel:"", email:"", adresse:"", bassin:"Liner", volume:0, formule:"Confort", prix:1740, prixPassageE:65, prixPassageC:35, dateDebut:"2026-04-01", dateFin:"2027-04-01", photoPiscine:"", moisParMois:{1:{entretien:0,controle:1},2:{entretien:0,controle:1},3:{entretien:0,controle:1},4:{entretien:2,controle:1},5:{entretien:4,controle:0},6:{entretien:4,controle:0},7:{entretien:4,controle:0},8:{entretien:4,controle:0},9:{entretien:4,controle:0},10:{entretien:1,controle:1},11:{entretien:0,controle:1},12:{entretien:0,controle:1}} },
+  { id:"C007", nom:"Mme RITTER", tel:"", email:"", adresse:"", bassin:"Liner", volume:0, formule:"VAC+", prix:1690, prixPassageE:65, prixPassageC:0, dateDebut:"2025-07-28", dateFin:"2026-07-28", photoPiscine:"", moisParMois:{1:{entretien:1,controle:0},2:{entretien:1,controle:0},3:{entretien:2,controle:0},4:{entretien:2,controle:0},5:{entretien:2,controle:0},6:{entretien:4,controle:0},7:{entretien:4,controle:0},8:{entretien:4,controle:0},9:{entretien:4,controle:0},10:{entretien:1,controle:0},11:{entretien:1,controle:0},12:{entretien:1,controle:0}} },
 ];
 const PASSAGES_INIT = [
   { id:1, clientId:"C001", date:"2026-04-06", type:"Entretien complet", ph:7.2, chlore:1.5, actions:"Nettoyage, vérif. pompe", obs:"RAS",                      tech:"Dorian", ok:true },
@@ -157,35 +167,17 @@ function getSaison(m) {
   for (const [k,s] of Object.entries(SAISONS_META)) if (s.mois.includes(m)) return k;
   return "ete";
 }
-function getEntretienMois(saisons, m) {
-  const s = migrateSaisons(saisons);
-  const sk = getSaison(m);
-  return s[sk]?.entretien ?? 0;
-}
-function getControleMois(saisons, m) {
-  const s = migrateSaisons(saisons);
-  const sk = getSaison(m);
-  return s[sk]?.controle ?? 0;
-}
-function passagesParMois(saisons, type="all") {
-  const s = migrateSaisons(saisons);
-  const r = {};
+function getEntretienMois(mpm, m) { const d = migrateMois(mpm); return d[m]?.entretien ?? 0; }
+function getControleMois(mpm, m) { const d = migrateMois(mpm); return d[m]?.controle ?? 0; }
+function totalAnnuel(mpm, type="all") {
+  const d = migrateMois(mpm);
+  let t=0;
   for (let m=1;m<=12;m++) {
-    const sk = getSaison(m);
-    if (type==="entretien") r[m] = s[sk]?.entretien ?? 0;
-    else if (type==="controle") r[m] = s[sk]?.controle ?? 0;
-    else r[m] = (s[sk]?.entretien ?? 0) + (s[sk]?.controle ?? 0);
+    if (type==="entretien") t+=d[m]?.entretien??0;
+    else if (type==="controle") t+=d[m]?.controle??0;
+    else t+=(d[m]?.entretien??0)+(d[m]?.controle??0);
   }
-  return r;
-}
-function totalAnnuel(saisons, type="all") {
-  const s = migrateSaisons(saisons);
-  return Object.entries(SAISONS_META).reduce((a,[k,meta])=> {
-    const sv = s[k] || {entretien:0,controle:0};
-    if (type==="entretien") return a + (sv.entretien)*meta.mois.length;
-    if (type==="controle") return a + (sv.controle)*meta.mois.length;
-    return a + (sv.entretien + sv.controle)*meta.mois.length;
-  }, 0);
+  return t;
 }
 function daysUntil(d) {
   if (!d) return null;
@@ -467,20 +459,20 @@ function FormClient({ initial, clients, onSave, onClose }) {
   const isMobile = useIsMobile();
   const [f, setF] = useState(() => {
     if (initial) {
-      return { ...initial, saisons: migrateSaisons(initial.saisons), photoPiscine: initial.photoPiscine||"" };
+      return { ...initial, moisParMois: migrateMois(initial.moisParMois||initial.saisons), photoPiscine: initial.photoPiscine||"", prixPassageE: initial.prixPassageE||0, prixPassageC: initial.prixPassageC||0 };
     }
     return {
       id: `C${String(clients.length+1).padStart(3,"0")}`,
       nom:"", tel:"", email:"", adresse:"", bassin:"Liner", volume:30,
-      formule:"VAC", prix:0, dateDebut:TODAY, photoPiscine:"",
+      formule:"VAC", prix:0, prixPassageE:0, prixPassageC:0, dateDebut:TODAY, photoPiscine:"",
       dateFin: `${new Date().getFullYear()+1}-03-31`,
-      saisons: {...SAISONS_DEF},
+      moisParMois: {...MOIS_PAR_MOIS_DEF},
     };
   });
   const set = (k,v) => setF(p=>({...p,[k]:v}));
-  const setSaisonType = (saison,type,v) => setF(p=>({...p,saisons:{...p.saisons,[saison]:{...p.saisons[saison],[type]:v}}}));
-  const totalE = totalAnnuel(f.saisons,"entretien");
-  const totalC = totalAnnuel(f.saisons,"controle");
+  const setMoisVal = (m,type,v) => setF(p=>({...p,moisParMois:{...p.moisParMois,[m]:{...p.moisParMois[m],[type]:Math.max(0,v)}}}));
+  const totalE = totalAnnuel(f.moisParMois,"entretien");
+  const totalC = totalAnnuel(f.moisParMois,"controle");
   const total = totalE + totalC;
 
   return (
@@ -700,8 +692,8 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
   const al = alerteClient(client, passages);
   const col = AC[al];
   const passC = passages.filter(p=>p.clientId===client.id).sort((a,b)=>new Date(b.date)-new Date(a.date));
-  const totalE = totalAnnuel(client.saisons,"entretien");
-  const totalC = totalAnnuel(client.saisons,"controle");
+  const totalE = totalAnnuel(client.moisParMois||client.saisons,"entretien");
+  const totalC = totalAnnuel(client.moisParMois||client.saisons,"controle");
   const total = totalE + totalC;
   const effE = passC.filter(p=>isEntretienType(p.type)).length;
   const effC = passC.filter(p=>isControleType(p.type)).length;
@@ -789,7 +781,7 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
         <div className="fade-in">
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
             {Object.entries(SAISONS_META).map(([key,s])=>{
-              const sv = migrateSaisons(client.saisons)[key] || {entretien:0,controle:0};
+              const sv = migrateMois(client.moisParMois||client.saisons) || {entretien:0,controle:0};
               return (
                 <div key={key} style={{background:s.bg,borderRadius:DS.radius,padding:"14px 16px",border:`1px solid ${s.color}33`}}>
                   <div style={{fontWeight:800,color:s.color,fontSize:13,display:"flex",alignItems:"center",gap:5,marginBottom:4}}>{Ico[s.icon]&&Ico[s.icon](15,s.color)} {s.label}</div>
@@ -812,8 +804,8 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
             {[...Array(12)].map((_,i)=>{
               const m=i+1;
-              const prevE=getEntretienMois(client.saisons,m);
-              const prevC=getControleMois(client.saisons,m);
+              const prevE=getEntretienMois(client.moisParMois||client.saisons,m);
+              const prevC=getControleMois(client.moisParMois||client.saisons,m);
               const prevT=prevE+prevC;
               const effM=passages.filter(p=>p.clientId===client.id&&new Date(p.date).getMonth()+1===m&&new Date(p.date).getFullYear()===YEAR_NOW).length;
               const effME=passages.filter(p=>p.clientId===client.id&&new Date(p.date).getMonth()+1===m&&new Date(p.date).getFullYear()===YEAR_NOW&&isEntretienType(p.type)).length;
@@ -943,6 +935,7 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
       )}
 
       <div style={{display:"flex",gap:8,marginTop:20,paddingTop:16,borderTop:"1px solid "+DS.border}}>
+        <BtnPrimary onClick={()=>ouvrirContrat(client)} bg={DS.blue} color="#fff" icon={Ico.pdf(14,"#fff")} style={{flex:1}}>Contrat</BtnPrimary>
         <BtnPrimary onClick={onEdit} bg={DS.light} color={DS.dark} icon={Ico.edit(14,DS.dark)} style={{flex:1}}>Modifier</BtnPrimary>
         <button onClick={onDelete} className="btn-hover" style={{width:44,borderRadius:DS.radiusSm,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(15,DS.red)}</button>
       </div>
@@ -1064,6 +1057,166 @@ function SignaturePad({ value, onChange, label }) {
       {hasSign && <button onClick={clear} style={{marginTop:4,background:"none",border:"none",color:"#94a3b8",fontSize:12,cursor:"pointer",fontWeight:600}}>✕ Effacer</button>}
     </div>
   );
+}
+
+
+// ─── CONTRAT PDF (HTML → print) ─────────────────────────────────────────────
+function genererContratHTML(client) {
+  const mpm = migrateMois(client.moisParMois||client.saisons);
+  const totalE = totalAnnuel(client.moisParMois||client.saisons,"entretien");
+  const totalC = totalAnnuel(client.moisParMois||client.saisons,"controle");
+  const total = totalE + totalC;
+  const prixE = client.prixPassageE || 0;
+  const prixC = client.prixPassageC || 0;
+  const totalPrixE = totalE * prixE;
+  const totalPrixC = totalC * prixC;
+  const dateContrat = client.dateDebut ? new Date(client.dateDebut).toLocaleDateString("fr") : "—";
+  const dateFin = client.dateFin ? new Date(client.dateFin).toLocaleDateString("fr") : "—";
+  
+  let moisRows = "";
+  for (let m=1;m<=12;m++) {
+    const mv = mpm[m] || {entretien:0,controle:0};
+    moisRows += `<tr><td>${MOIS_L[m]}</td><td class="center">${mv.entretien||"—"}</td><td class="center">${mv.controle||"—"}</td></tr>`;
+  }
+  moisRows += `<tr class="total-row"><td><strong>TOTAL DE PASSAGE</strong></td><td class="center"><strong>${totalE}</strong></td><td class="center"><strong>${totalC}</strong></td></tr>`;
+
+  return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"/><title>Contrat BRIBLUE — ${client.nom}</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;font-size:12px;color:#1e293b;background:#fff}
+.page{max-width:780px;margin:0 auto;padding:32px}
+h1{font-size:28px;font-weight:900;color:#0c1222;text-align:center;letter-spacing:2px;margin-bottom:4px}
+.subtitle{text-align:center;color:#0369a1;font-size:12px;font-weight:600;margin-bottom:24px}
+.section{margin-bottom:20px}
+.section-title{background:linear-gradient(135deg,#0c1222,#1a365d);color:#fff;padding:10px 18px;border-radius:10px 10px 0 0;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:1px}
+table{width:100%;border-collapse:collapse;border:1px solid #e2e8f0}
+table th{background:#f0f9ff;color:#0369a1;font-size:10px;text-transform:uppercase;letter-spacing:.5px;padding:8px 12px;text-align:left;border:1px solid #e2e8f0}
+table td{padding:7px 12px;border:1px solid #e2e8f0;font-size:12px}
+.center{text-align:center}
+.total-row{background:#f0f9ff;font-weight:700}
+.info-grid{display:grid;grid-template-columns:140px 1fr;border:1px solid #e2e8f0;border-radius:0 0 10px 10px;overflow:hidden}
+.info-grid .label{background:#f8fafc;padding:8px 14px;font-weight:700;font-size:11px;color:#64748b;border-bottom:1px solid #e2e8f0}
+.info-grid .value{padding:8px 14px;font-weight:700;font-size:13px;color:#0c1222;border-bottom:1px solid #e2e8f0}
+.recap{background:linear-gradient(135deg,#0c1222,#1a365d);color:#fff;border-radius:12px;padding:20px 24px;margin:20px 0}
+.recap h3{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.7);margin-bottom:8px}
+.recap .prix{font-size:24px;font-weight:900}
+.conditions{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:18px;margin-bottom:20px}
+.conditions h3{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:10px}
+.conditions li{margin-bottom:6px;font-size:11px;color:#475569;line-height:1.5}
+.detail{border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:20px}
+.detail h4{background:#f0f9ff;padding:10px 16px;font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e2e8f0}
+.detail ul{padding:12px 16px 12px 32px;font-size:11px;color:#475569;line-height:1.8}
+.signatures{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:30px}
+.sig-box{border:1px solid #e2e8f0;border-radius:12px;padding:16px;min-height:100px}
+.sig-box .sig-label{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.footer{margin-top:24px;text-align:center;font-size:10px;color:#94a3b8;padding-top:16px;border-top:1px solid #e2e8f0}
+.no-print{margin-bottom:16px;display:flex;gap:8px}
+.btn-print{background:linear-gradient(135deg,#0c1222,#1a365d);color:#fff;border:none;padding:12px 24px;border-radius:12px;font-weight:700;cursor:pointer;font-size:14px;font-family:inherit}
+.btn-close{background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;padding:12px 24px;border-radius:12px;font-weight:700;cursor:pointer;font-size:14px;font-family:inherit}
+@media print{.page{padding:16px}.no-print{display:none!important}@page{margin:10mm}}
+</style></head><body>
+<div class="page">
+<div class="no-print">
+  <button onclick="window.print()" class="btn-print">Enregistrer en PDF</button>
+  <button onclick="window.close()" class="btn-close">Fermer</button>
+</div>
+
+<h1>CONTRAT D'ENTRETIEN PISCINE</h1>
+<div class="subtitle">BRIBLUE — Entretien & Traitement de piscines</div>
+
+<div class="section">
+  <div class="section-title">Informations du contrat</div>
+  <div class="info-grid">
+    <div class="label">Client</div><div class="value">${client.nom}</div>
+    <div class="label">Date du contrat</div><div class="value">${dateContrat}</div>
+    <div class="label">Début</div><div class="value">${dateContrat}</div>
+    <div class="label">Fin</div><div class="value">${dateFin}</div>
+    <div class="label">Total passages</div><div class="value">${total} passages annuels</div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">Planning des interventions</div>
+  <table>
+    <thead><tr><th>Mois</th><th class="center">Nettoyage complet</th><th class="center">Contrôle de l'eau</th></tr></thead>
+    <tbody>${moisRows}</tbody>
+  </table>
+</div>
+
+<div class="section">
+  <div class="section-title">Tarifs des prestations</div>
+  <table>
+    <thead><tr><th>Type</th><th class="center">Passages</th><th class="center">Prix/passage</th><th class="center">Total</th></tr></thead>
+    <tbody>
+      <tr><td>Nettoyage complet</td><td class="center">${totalE}</td><td class="center">${prixE} €</td><td class="center"><strong>${totalPrixE} €</strong></td></tr>
+      <tr><td>Contrôle de l'eau</td><td class="center">${totalC||"—"}</td><td class="center">${prixC||"—"} €</td><td class="center"><strong>${totalPrixC||"—"} €</strong></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="recap">
+  <h3>Récapitulatif</h3>
+  <div class="prix">Prix annuel : ${client.prix?.toLocaleString("fr")||totalPrixE+totalPrixC} €</div>
+</div>
+
+<div class="conditions">
+  <h3>Conditions & Informations</h3>
+  <ul>
+    <li>Utilisation exclusive des produits de la société pour garantir la qualité du traitement.</li>
+    <li><strong>Produits non inclus</strong> dans le forfait annuel.</li>
+    <li>Intervention supplémentaire possible en cas d'aléas climatiques (fortes pluies / vent).</li>
+    <li>Cahier d'entretien mis à jour rigoureusement à chaque passage.</li>
+    <li>Kit d'entretien fourni et facturé séparément (brosse, épuisette, manche, tuyau).</li>
+  </ul>
+</div>
+
+<div class="detail">
+  <h4>Nettoyage complet du bassin</h4>
+  <ul>
+    <li>Passage épuisette si nécessaire</li>
+    <li>Nettoyage au balai aspirateur</li>
+    <li>Vérification et ajustement (chlore, pH)</li>
+    <li>Contrôle technique (filtre, pompe)</li>
+    <li>Livraison de produits si besoin</li>
+  </ul>
+</div>
+
+<div class="detail">
+  <h4>Contrôle de l'eau</h4>
+  <ul>
+    <li>Nettoyage surface et fond</li>
+    <li>Vérification et ajustement (chlore, pH)</li>
+    <li>Contrôle technique</li>
+    <li>Livraison de produits si besoin</li>
+  </ul>
+</div>
+
+<div class="signatures">
+  <div class="sig-box">
+    <div class="sig-label">Le prestataire — BRIBLUE</div>
+    <div style="font-size:11px;color:#94a3b8;margin-top:40px">Date et signature</div>
+  </div>
+  <div class="sig-box">
+    <div class="sig-label">Le client — ${client.nom}</div>
+    <div style="font-size:11px;color:#94a3b8;margin-top:40px">Date et signature</div>
+  </div>
+</div>
+
+<div class="footer">
+  BRIBLUE · SIRET 84345436400053 · La Seyne-sur-Mer · 06 67 18 61 15 · briblue83@hotmail.com
+</div>
+</div></body></html>`;
+}
+
+function ouvrirContrat(client) {
+  const html = genererContratHTML(client);
+  const blob = new Blob([html], {type:"text/html;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.target = "_blank"; a.rel = "noopener";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 5000);
 }
 
 // ─── RAPPORT HTML PREMIUM ─────────────────────────────────────────────────────
@@ -1764,14 +1917,14 @@ function PageClients({ clients, passages, onClientClick, onAdd }) {
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
         {filtered.map((c,idx)=>{
           const al=alerteClient(c,passages); const col=AC[al];
-          const totalE=totalAnnuel(c.saisons,"entretien");
-          const totalC=totalAnnuel(c.saisons,"controle");
+          const totalE=totalAnnuel(c.moisParMois||c.saisons,"entretien");
+          const totalC=totalAnnuel(c.moisParMois||c.saisons,"controle");
           const effE=passages.filter(p=>p.clientId===c.id&&isEntretienType(p.type)).length;
           const effC=passages.filter(p=>p.clientId===c.id&&isControleType(p.type)).length;
           const tot=totalE+totalC;
           const eff=effE+effC;
-          const moisPrevE=getEntretienMois(c.saisons,MOIS_NOW);
-          const moisPrevC=getControleMois(c.saisons,MOIS_NOW);
+          const moisPrevE=getEntretienMois(c.moisParMois||c.saisons,MOIS_NOW);
+          const moisPrevC=getControleMois(c.moisParMois||c.saisons,MOIS_NOW);
           const moisEffE=passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===MOIS_NOW&&isEntretienType(p.type)).length;
           const moisEffC=passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===MOIS_NOW&&isControleType(p.type)).length;
           return (
@@ -2050,7 +2203,7 @@ export default function App() {
       const l = await load("bb_livraisons_v1", []);
       const r = await load("bb_rdvs_v1", []);
       // Migrate saisons format for existing clients
-      const cMigrated = c.map(cl => ({...cl, saisons: migrateSaisons(cl.saisons), photoPiscine: cl.photoPiscine||""}));
+      const cMigrated = c.map(cl => ({...cl, moisParMois: migrateMois(cl.moisParMois||cl.saisons), photoPiscine: cl.photoPiscine||"", prixPassageE: cl.prixPassageE||0, prixPassageC: cl.prixPassageC||0}));
       setClients(cMigrated); setPassages(p); setLivraisons(l); setRdvs(r); setReady(true);
     })();
   },[loggedIn]);
@@ -2064,7 +2217,7 @@ export default function App() {
   useEffect(()=>{
     if(!ready) return;
     const currentTasks = clients.reduce((a,c)=>{
-      const prevE=getEntretienMois(c.saisons,MOIS_NOW);const prevC=getControleMois(c.saisons,MOIS_NOW);
+      const prevE=getEntretienMois(c.moisParMois||c.saisons,MOIS_NOW);const prevC=getControleMois(c.moisParMois||c.saisons,MOIS_NOW);
       const effE=passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===MOIS_NOW&&new Date(p.date).getFullYear()===YEAR_NOW&&isEntretienType(p.type)).length;
       const effC=passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===MOIS_NOW&&new Date(p.date).getFullYear()===YEAR_NOW&&isControleType(p.type)).length;
       return a+Math.max(0,prevE-effE)+Math.max(0,prevC-effC);
