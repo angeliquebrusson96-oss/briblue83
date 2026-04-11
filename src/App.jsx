@@ -261,20 +261,20 @@ function setupPWA() {
 
 // ─── DESIGN SYSTEM V2 — MODERNE ─────────────────────────────────────────────
 const DS = {
-  blue:"#0369a1", blueSoft:"#e0f2fe", blueGrad:"linear-gradient(135deg,#0284c7,#0ea5e9)",
-  dark:"#0c1222", mid:"#64748b",
-  light:"#f1f5f9", bg:"#f8fafc", border:"#e2e8f0", white:"#ffffff",
-  green:"#059669", greenSoft:"#d1fae5", greenGrad:"linear-gradient(135deg,#059669,#34d399)",
-  red:"#dc2626", redSoft:"#fee2e2",
-  orange:"#ea580c", orangeSoft:"#ffedd5",
-  yellow:"#d97706", yellowSoft:"#fef3c7",
-  purple:"#7c3aed", purpleSoft:"#ede9fe", purpleGrad:"linear-gradient(135deg,#7c3aed,#a78bfa)",
-  teal:"#0891b2", tealSoft:"#e0f7fa",
-  radius: 16, radiusSm: 12, radiusLg: 22,
-  shadow: "0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)",
-  shadowMd: "0 4px 24px rgba(0,0,0,0.08)",
-  shadowLg: "0 8px 40px rgba(0,0,0,0.12)",
-  font: "'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
+  blue:"#0ea5e9", blueSoft:"#e0f2fe", blueGrad:"linear-gradient(135deg,#38bdf8,#0ea5e9)",
+  dark:"#0f172a", mid:"#64748b",
+  light:"#f8fafc", bg:"#f6f8fb", border:"#e2e8f0", white:"#ffffff",
+  green:"#22c55e", greenSoft:"#dcfce7", greenGrad:"linear-gradient(135deg,#4ade80,#22c55e)",
+  red:"#ef4444", redSoft:"#fee2e2",
+  orange:"#f59e0b", orangeSoft:"#fef3c7",
+  yellow:"#f59e0b", yellowSoft:"#fef3c7",
+  purple:"#8b5cf6", purpleSoft:"#f3e8ff", purpleGrad:"linear-gradient(135deg,#a78bfa,#8b5cf6)",
+  teal:"#14b8a6", tealSoft:"#ccfbf1",
+  radius: 18, radiusSm: 14, radiusLg: 28,
+  shadow: "0 10px 30px rgba(15,23,42,0.06)",
+  shadowMd: "0 18px 48px rgba(15,23,42,0.10)",
+  shadowLg: "0 30px 80px rgba(15,23,42,0.16)",
+  font: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
 };
 
 const AC = {
@@ -289,23 +289,42 @@ const GlobalStyles = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: ${DS.bg}; }
+    html, body, #root { min-height: 100%; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background:
+        radial-gradient(circle at top left, #eff6ff 0%, transparent 32%),
+        radial-gradient(circle at top right, #ecfeff 0%, transparent 28%),
+        linear-gradient(180deg, #f8fbff 0%, #f6f8fb 42%, #f3f6fa 100%);
+      color: ${DS.dark};
+    }
     input, select, textarea, button { font-family: inherit; }
-    input:focus, select:focus, textarea:focus { outline: none; border-color: ${DS.blue} !important; box-shadow: 0 0 0 3px ${DS.blue}22 !important; }
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    input, select, textarea {
+      background: #ffffff;
+      border: 1.5px solid ${DS.border};
+      box-shadow: 0 1px 2px rgba(15,23,42,0.02);
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: ${DS.blue} !important;
+      box-shadow: 0 0 0 4px rgba(14,165,233,0.12) !important;
+    }
+    ::placeholder { color: #94a3b8; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+    ::-webkit-scrollbar-track { background: transparent; }
     @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-    @keyframes slideUp { from { opacity:0; transform:translateY(100%); } to { opacity:1; transform:translateY(0); } }
-    @keyframes scaleIn { from { opacity:0; transform:scale(0.95); } to { opacity:1; transform:scale(1); } }
+    @keyframes slideUp { from { opacity:0; transform:translateY(24px) scale(.985); } to { opacity:1; transform:translateY(0) scale(1); } }
+    @keyframes scaleIn { from { opacity:0; transform:scale(0.97); } to { opacity:1; transform:scale(1); } }
     @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.6; } }
-    .fade-in { animation: fadeIn .4s ease-out both; }
-    .slide-up { animation: slideUp .35s cubic-bezier(.22,1,.36,1) both; }
-    .scale-in { animation: scaleIn .3s ease-out both; }
-    .btn-hover { transition: all .2s ease; }
-    .btn-hover:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    .fade-in { animation: fadeIn .35s ease-out both; }
+    .slide-up { animation: slideUp .32s cubic-bezier(.22,1,.36,1) both; }
+    .scale-in { animation: scaleIn .24s ease-out both; }
+    .btn-hover { transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease; }
+    .btn-hover:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(15,23,42,0.12); }
     .btn-hover:active { transform: translateY(0); }
-    .card-hover { transition: all .2s ease; }
-    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+    .card-hover { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 18px 36px rgba(15,23,42,0.10); border-color: #d6e3f0; }
   `}</style>
 );
 
@@ -348,14 +367,76 @@ function Tag({ children, color=DS.blue, bg, style={} }) {
 function Modal({ title, onClose, children, wide }) {
   const isMobile = useIsMobile();
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(8px)",zIndex:200,display:"flex",alignItems:isMobile?"flex-end":"center",justifyContent:"center"}} onClick={onClose}>
-      <div className="slide-up" style={{background:DS.white,borderRadius:isMobile?"24px 24px 0 0":DS.radiusLg,width:"100%",maxWidth:wide?720:560,maxHeight:isMobile?"93vh":"88vh",overflowY:"auto",boxShadow:DS.shadowLg}} onClick={e=>e.stopPropagation()}>
-        {isMobile && <div style={{display:"flex",justifyContent:"center",padding:"12px 0 4px"}}><div style={{width:36,height:4,borderRadius:2,background:DS.border}}/></div>}
-        <div style={{padding:isMobile?"8px 20px 16px":"16px 28px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid "+DS.border}}>
-          <span style={{color:DS.dark,fontWeight:800,fontSize:17,letterSpacing:-0.3}}>{title}</span>
-          <button onClick={onClose} className="btn-hover" style={{width:34,height:34,borderRadius:17,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.close(14,DS.mid)}</button>
+    <div
+      style={{
+        position:"fixed",
+        inset:0,
+        background:"rgba(148,163,184,0.22)",
+        backdropFilter:"blur(10px)",
+        zIndex:200,
+        display:"flex",
+        alignItems:isMobile?"flex-end":"center",
+        justifyContent:"center",
+        padding:isMobile?0:24
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="slide-up"
+        style={{
+          background:"linear-gradient(180deg,#ffffff 0%, #fbfdff 100%)",
+          borderRadius:isMobile?"28px 28px 0 0":DS.radiusLg,
+          width:"100%",
+          maxWidth:wide?820:620,
+          maxHeight:isMobile?"93vh":"88vh",
+          overflowY:"auto",
+          boxShadow:DS.shadowLg,
+          border:"1px solid rgba(255,255,255,0.85)"
+        }}
+        onClick={e=>e.stopPropagation()}
+      >
+        {isMobile && (
+          <div style={{display:"flex",justifyContent:"center",padding:"12px 0 2px"}}>
+            <div style={{width:42,height:5,borderRadius:999,background:"#dbe7f1"}}/>
+          </div>
+        )}
+        <div
+          style={{
+            padding:isMobile?"12px 20px 16px":"18px 28px 18px",
+            display:"flex",
+            justifyContent:"space-between",
+            alignItems:"center",
+            borderBottom:"1px solid "+DS.border,
+            background:"linear-gradient(180deg,#ffffff 0%, #f8fbff 100%)",
+            position:"sticky",
+            top:0,
+            zIndex:2
+          }}
+        >
+          <div>
+            <div style={{color:DS.dark,fontWeight:800,fontSize:18,letterSpacing:-0.35}}>{title}</div>
+            <div style={{fontSize:12,color:DS.mid,marginTop:3}}>Interface douce · style moderne</div>
+          </div>
+          <button
+            onClick={onClose}
+            className="btn-hover"
+            style={{
+              width:38,
+              height:38,
+              borderRadius:19,
+              background:"#f8fafc",
+              border:"1px solid "+DS.border,
+              cursor:"pointer",
+              display:"flex",
+              alignItems:"center",
+              justifyContent:"center",
+              boxShadow:"0 4px 12px rgba(15,23,42,0.05)"
+            }}
+          >
+            {Ico.close(14,DS.mid)}
+          </button>
         </div>
-        <div style={{padding:isMobile?"18px 20px 32px":"24px 28px 28px"}}>{children}</div>
+        <div style={{padding:isMobile?"18px 20px 30px":"24px 28px 30px"}}>{children}</div>
       </div>
     </div>
   );
@@ -381,24 +462,85 @@ function ProgressBar({ value, max, color=DS.blue, height=6 }) {
 
 function Card({ children, style={}, onClick, className="", id }) {
   return (
-    <div id={id} onClick={onClick} className={onClick?"card-hover":className} style={{background:DS.white,borderRadius:DS.radius,padding:"16px 18px",boxShadow:DS.shadow,border:"1px solid "+DS.border,cursor:onClick?"pointer":"default",transition:"all .2s",...style}}>{children}</div>
+    <div
+      id={id}
+      onClick={onClick}
+      className={onClick ? "card-hover" : className}
+      style={{
+        background:"linear-gradient(180deg,#ffffff 0%, #fcfdff 100%)",
+        borderRadius:DS.radius,
+        padding:"16px 18px",
+        boxShadow:DS.shadow,
+        border:"1px solid "+DS.border,
+        cursor:onClick?"pointer":"default",
+        transition:"all .2s",
+        ...style
+      }}
+    >
+      {children}
+    </div>
   );
 }
 
 function Input({ label, ...p }) {
   return (
-    <div style={{display:"flex",flexDirection:"column",gap:5}}>
-      {label && <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>{label}</span>}
-      <input style={{padding:"11px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:14,outline:"none",background:DS.white,boxSizing:"border-box",width:"100%",color:DS.dark,fontFamily:"inherit",transition:"all .2s",...(p.style||{})}} {...p}/>
+    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+      {label && (
+        <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.8}}>
+          {label}
+        </span>
+      )}
+      <input
+        style={{
+          padding:"12px 14px",
+          borderRadius:DS.radiusSm,
+          border:"1.5px solid "+DS.border,
+          fontSize:14,
+          outline:"none",
+          background:"#ffffff",
+          boxSizing:"border-box",
+          width:"100%",
+          color:DS.dark,
+          fontFamily:"inherit",
+          transition:"all .2s",
+          boxShadow:"0 1px 2px rgba(15,23,42,0.02)",
+          ...(p.style||{})
+        }}
+        {...p}
+      />
     </div>
   );
 }
 
 function Select({ label, options, ...p }) {
   return (
-    <div style={{display:"flex",flexDirection:"column",gap:5}}>
-      {label && <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>{label}</span>}
-      <select style={{padding:"11px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:14,outline:"none",background:DS.white,color:DS.dark,fontFamily:"inherit",cursor:"pointer",appearance:"none",backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,backgroundRepeat:"no-repeat",backgroundPosition:"right 12px center",paddingRight:36,transition:"all .2s"}} {...p}>
+    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+      {label && (
+        <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.8}}>
+          {label}
+        </span>
+      )}
+      <select
+        style={{
+          padding:"12px 14px",
+          borderRadius:DS.radiusSm,
+          border:"1.5px solid "+DS.border,
+          fontSize:14,
+          outline:"none",
+          background:"#ffffff",
+          color:DS.dark,
+          fontFamily:"inherit",
+          cursor:"pointer",
+          appearance:"none",
+          backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
+          backgroundRepeat:"no-repeat",
+          backgroundPosition:"right 14px center",
+          paddingRight:40,
+          transition:"all .2s",
+          boxShadow:"0 1px 2px rgba(15,23,42,0.02)"
+        }}
+        {...p}
+      >
         {options.map(o=><option key={o} value={o}>{o}</option>)}
       </select>
     </div>
@@ -452,9 +594,30 @@ function PhotoPicker({ label, value, onChange, compact }) {
 }
 
 // ─── BOUTON PRIMAIRE ─────────────────────────────────────────────────────────
-function BtnPrimary({ children, onClick, bg=DS.dark, color="#fff", icon, style={} }) {
+function BtnPrimary({ children, onClick, bg=DS.blueGrad, color="#fff", icon, style={} }) {
   return (
-    <button onClick={onClick} className="btn-hover" style={{padding:"12px 20px",borderRadius:DS.radiusSm,background:bg,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 2px 8px rgba(0,0,0,0.15)",transition:"all .2s",...style}}>
+    <button
+      onClick={onClick}
+      className="btn-hover"
+      style={{
+        padding:"12px 20px",
+        borderRadius:DS.radiusSm,
+        background:bg,
+        border:"none",
+        cursor:"pointer",
+        fontWeight:800,
+        fontSize:14,
+        color,
+        fontFamily:"inherit",
+        display:"flex",
+        alignItems:"center",
+        justifyContent:"center",
+        gap:8,
+        boxShadow:"0 10px 24px rgba(14,165,233,0.22)",
+        transition:"all .2s",
+        ...style
+      }}
+    >
       {icon}{children}
     </button>
   );
