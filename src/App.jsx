@@ -6,7 +6,23 @@ const supabase = createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFoZW14aG5oYmdkZnZqcWVkd3lpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4ODMzMDksImV4cCI6MjA5MTQ1OTMwOX0.JFcwVtN5QM-kEJISjU4l5qy9O559qo45LM2v62A9rMM"
 );
 
-const BRAND_LOGO = "/logo-briblue.png";
+const BRAND_LOGO = `data:image/svg+xml;utf8,${encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="96" viewBox="0 0 420 96">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#0369a1"/>
+    </linearGradient>
+  </defs>
+  <rect width="420" height="96" rx="22" fill="white"/>
+  <g transform="translate(18 18)">
+    <rect width="60" height="60" rx="18" fill="url(#g)"/>
+    <path d="M10 24c5 6 10 6 15 0s10-6 15 0 10 6 15 0" fill="none" stroke="white" stroke-width="4" stroke-linecap="round"/>
+    <path d="M10 38c5 6 10 6 15 0s10-6 15 0 10 6 15 0" fill="none" stroke="white" stroke-width="4" stroke-linecap="round"/>
+  </g>
+  <text x="94" y="42" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="800" fill="#0c1222">BRIBLUE</text>
+  <text x="94" y="66" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="600" fill="#0369a1">Entretien &amp; traitement de piscines</text>
+</svg>`)};
 
 
 // ─── ICÔNES SVG PREMIUM ──────────────────────────────────────────────────────
@@ -292,8 +308,12 @@ const RAPPORT_STATUS = {
   envoye: { label:"Envoyé", color:DS.green, bg:DS.greenSoft },
 };
 
+function normalizeRapportStatus(status) {
+  return RAPPORT_STATUS[status] ? status : "saisie";
+}
+
 function getRapportStatus(p) {
-  if (p?.rapportStatut) return p.rapportStatut;
+  if (p?.rapportStatut) return normalizeRapportStatus(p.rapportStatut);
   if (p?.rapportEnvoyeAt) return "envoye";
   if (p?.ok) return "cree";
   return "saisie";
@@ -472,6 +492,35 @@ function BtnPrimary({ children, onClick, bg=DS.dark, color="#fff", icon, style={
     <button onClick={onClick} className="btn-hover" style={{padding:"12px 20px",borderRadius:DS.radiusSm,background:bg,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 2px 8px rgba(0,0,0,0.15)",transition:"all .2s",...style}}>
       {icon}{children}
     </button>
+  );
+}
+
+function RapportStatusPicker({ value, onChange, compact=false }) {
+  const current = normalizeRapportStatus(value);
+  const meta = RAPPORT_STATUS[current];
+  return (
+    <select
+      value={current}
+      onChange={e=>onChange?.(e.target.value)}
+      style={{
+        padding:compact?"7px 10px":"11px 14px",
+        borderRadius:compact?10:DS.radiusSm,
+        border:"1.5px solid "+meta.color+"33",
+        background:meta.bg,
+        color:meta.color,
+        fontSize:compact?12:14,
+        fontWeight:800,
+        fontFamily:"inherit",
+        cursor:"pointer",
+        outline:"none",
+        appearance:"none",
+        minWidth:compact?138:"100%",
+      }}
+    >
+      {Object.entries(RAPPORT_STATUS).map(([k,s])=>(
+        <option key={k} value={k}>{s.label}</option>
+      ))}
+    </select>
   );
 }
 
@@ -885,7 +934,18 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
                   )}
                   {p.actions&&<div style={{fontSize:12,color:DS.mid,marginBottom:4}}>{p.actions}</div>}
                   {p.obs&&<div style={{fontSize:11,color:DS.orange,display:"flex",alignItems:"center",gap:4,marginBottom:8}}>{Ico.note(11,DS.orange)} {p.obs}</div>}
-                  <div style={{display:"flex",gap:6,paddingTop:8,borderTop:"1px solid "+DS.border}}>
+                  <div style={{display:"flex",gap:6,paddingTop:8,borderTop:"1px solid "+DS.border,flexWrap:"wrap"}}>
+                    <div onClick={(e)=>e.stopPropagation()} style={{flex:"1 1 160px"}}>
+                      <RapportStatusPicker
+                        compact
+                        value={rapportStatus}
+                        onChange={(next)=>onUpdatePassageStatus?.({
+                          ...p,
+                          rapportStatut: next,
+                          rapportEnvoyeAt: next==="envoye" ? (p.rapportEnvoyeAt || new Date().toISOString()) : null,
+                        })}
+                      />
+                    </div>
                     <button onClick={()=>onEditPassage&&onEditPassage(p)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(12,DS.mid)} Modifier</button>
                     <button onClick={(e)=>{e.stopPropagation();ouvrirRapport(p,client);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.blueSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,color:DS.blue,fontFamily:"inherit",fontWeight:700}}>{Ico.pdf(12,DS.blue)} Rapport</button>
                     {client.email&&<button onClick={(e)=>{e.stopPropagation();envoyerEmail(p,client,onUpdatePassageStatus);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,color:DS.green,fontFamily:"inherit",fontWeight:700}}>{Ico.send(12,DS.green)} Email</button>}
@@ -1143,8 +1203,8 @@ table td{padding:7px 12px;border:1px solid #e2e8f0;font-size:12px}
   <button onclick="window.close()" class="btn-close">Fermer</button>
 </div>
 
-<h1>CONTRAT D'ENTRETIEN PISCINE</h1>
-<div class="subtitle" style="display:flex;justify-content:center;align-items:center;padding:6px 0 2px"><img src="${BRAND_LOGO}" alt="BRIBLUE" style="max-width:360px;width:100%;height:auto;object-fit:contain"/></div>
+<div class="subtitle" style="display:flex;justify-content:center;align-items:center;padding:0 0 14px"><img src="${BRAND_LOGO}" alt="BRIBLUE" style="max-width:340px;width:100%;height:auto;object-fit:contain;display:block"/></div>
+<h1 style="margin-top:0">CONTRAT D'ENTRETIEN PISCINE</h1>
 
 <div class="section">
   <div class="section-title">Informations du contrat</div>
@@ -1325,7 +1385,7 @@ function genererHTMLRapport(passage, client) {
   <div class="section-title"><span class="sec-icon">🏊</span> Bassin & Intervention</div>
   <div class="section-body grid">
     <div class="field"><div class="field-label">Type</div><div class="field-value">${passage.type||"—"}</div></div>
-    <div class="field"><div class="field-label">Statut</div><div class="field-value">${passage.ok?`<span class="badge ok">✓ Validé</span>`:`<span class="badge no">En attente</span>`}</div></div>
+    <div class="field"><div class="field-label">Statut</div><div class="field-value">${(() => { const rs = RAPPORT_STATUS[getRapportStatus(passage)] || RAPPORT_STATUS.saisie; return `<span class="badge" style="background:${rs.bg};color:${rs.color}">${rs.label}</span>`; })()}</div></div>
     <div class="field"><div class="field-label">Type bassin</div><div class="field-value">${client?.bassin||"—"}</div></div>
     <div class="field"><div class="field-label">Volume</div><div class="field-value">${client?.volume?client.volume+" m³":"—"}</div></div>
   </div>
@@ -1474,10 +1534,11 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
     photoArrivee:"",
     photoDepart:"",
     ok:false,
+    rapportStatut:"saisie",
   };
   const isEdit = !!initial?.id;
   const isMobile = useIsMobile();
-  const [f,setF]=useState(isEdit ? {...EMPTY,...initial} : EMPTY);
+  const [f,setF]=useState(isEdit ? {...EMPTY,...initial, rapportStatut:getRapportStatus(initial)} : EMPTY);
   const [step,setStep]=useState(1);
   const STEPS=6;
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
@@ -1492,7 +1553,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
       id: isEdit ? f.id : uid(),
       ph:ph||f.tPH||f.ph||"",
       chlore:cl||f.tChlore||f.chloreLibre||"",
-      rapportStatut: f.ok ? "cree" : "saisie",
+      rapportStatut: normalizeRapportStatus(f.rapportStatut || (f.ok ? "cree" : "saisie")),
       actions:[
         f.corrChlore&&`Chlore: ${f.corrChlore}`,
         f.corrPH&&`pH: ${f.corrPH}`,
@@ -1720,6 +1781,10 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
           )}
           <div style={{background:`linear-gradient(135deg,#be185d08,#be185d12)`,borderRadius:DS.radius,padding:18,border:"1px solid #be185d18"}}>
             <div style={{fontSize:11,fontWeight:800,color:"#be185d",textTransform:"uppercase",letterSpacing:1,marginBottom:14}}>Exporter le rapport</div>
+            <div style={{marginBottom:12}}>
+              <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>Statut du rapport</span>
+              <RapportStatusPicker value={f.rapportStatut} onChange={v=>set("rapportStatut",v)} />
+            </div>
             <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:10}}>
               <button onClick={()=>ouvrirRapport(f,client)} className="btn-hover" style={{padding:"14px",borderRadius:DS.radiusSm,background:DS.white,border:"1.5px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:14,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
                 {Ico.pdf(18,DS.dark)} Télécharger PDF
