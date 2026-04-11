@@ -9,9 +9,13 @@ const supabase = createClient(
 
 // ─── ICÔNES SVG PREMIUM ──────────────────────────────────────────────────────
 const Ico = {
+  // Pool-themed professional icons
   home: (s=20,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg>,
   clients: (s=20,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/><path d="M16 3.13a4 4 0 010 7.75"/><path d="M21 21v-2a4 4 0 00-3-3.87"/></svg>,
   clipboard: (s=20,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>,
+  contract: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/></svg>,
+  epuisette: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="10" cy="9" r="6"/><path d="M10 9v6"/><path d="M4 9a6 6 0 0012 0"/><line x1="10" y1="15" x2="10" y2="22"/></svg>,
+  chemicals: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v5l3 9a3 3 0 01-3 3H9a3 3 0 01-3-3l3-9V3z"/><line x1="9" y1="3" x2="15" y2="3"/><path d="M7.5 15h9"/></svg>,
   edit: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
   trash: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>,
   close: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
@@ -33,17 +37,19 @@ const Ico = {
   sign: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>,
   calendar: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
   drop: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>,
+  phTest: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><line x1="7" y1="8" x2="17" y2="8"/><circle cx="12" cy="14" r="3"/><line x1="10" y1="5" x2="14" y2="5"/></svg>,
   chart: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>,
   euro: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round"><path d="M17 8a6 6 0 100 8"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="9" x2="12" y2="9"/></svg>,
-  pool: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round"><path d="M2 12c1.5 2 3 2 4.5 0S9 10 10.5 12s3 2 4.5 0 3-2 4.5 0"/><path d="M2 17c1.5 2 3 2 4.5 0S9 15 10.5 17s3 2 4.5 0 3-2 4.5 0"/><path d="M8 3v9M16 3v9M8 3h8"/></svg>,
+  pool: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 14c2 2 4 2 6 0s4-2 6 0 4 2 6 0"/><path d="M7 6V3M17 6V3"/></svg>,
   wrench: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>,
+  brush: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="17" width="12" height="4" rx="1"/><path d="M5 17V8a2 2 0 012-2h4a2 2 0 012 2v9"/><line x1="15" y1="19" x2="21" y2="19"/></svg>,
   clock: (s=14,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
   star: (s=16,c="currentColor",fill="none") => <svg width={s} height={s} viewBox="0 0 24 24" fill={fill} stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
   snow: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 7l-5-5-5 5"/><path d="M17 17l-5 5-5-5"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M7 7l-5 5 5 5"/><path d="M17 7l5 5-5 5"/></svg>,
   flower: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2a3 3 0 000 6M12 16a3 3 0 000 6M2 12a3 3 0 006 0M16 12a3 3 0 006 0M4.93 4.93a3 3 0 004.24 4.24M14.83 14.83a3 3 0 004.24 4.24M4.93 19.07a3 3 0 004.24-4.24M14.83 9.17a3 3 0 004.24-4.24"/></svg>,
   sun: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>,
   leaf: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round"><path d="M11 20A7 7 0 014 13c0-7 7-11 7-11s7 4 7 11a7 7 0 01-7 7z"/><line x1="11" y1="20" x2="11" y2="13"/></svg>,
-  wave: (s=28,c="white") => <svg width={s} height={s} viewBox="0 0 32 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/><path d="M2 15c2.5 3 5 3 7.5 0S14 12 16.5 15s5 3 7.5 0"/></svg>,
+  wave: (s=28,c="white") => <svg width={s} height={s} viewBox="0 0 32 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round"><path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/><path d="M2 16c2.5 3 5 3 7.5 0S14 13 16.5 16s5 3 7.5 0"/></svg>,
   truck: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 4v4h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>,
   camera: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>,
   image: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>,
@@ -726,7 +732,7 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
       </div>
 
       <div style={{display:"flex",gap:2,marginBottom:16,background:DS.light,borderRadius:DS.radiusSm,padding:3}}>
-        {[["infos","Infos"],["saisons","Saisons"],["passages","Passages"],["livraisons","Livraisons"]].map(([id,l])=>(
+        {[["infos","Infos"],["saisons","Planning"],["passages","Passages"],["livraisons","Livraisons"]].map(([id,l])=>(
           <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"8px 4px",borderRadius:10,border:"none",cursor:"pointer",fontWeight:700,fontSize:11,fontFamily:"inherit",background:tab===id?DS.white:"transparent",color:tab===id?DS.dark:DS.mid,boxShadow:tab===id?DS.shadow:"none",transition:"all .2s"}}>{l}</button>
         ))}
       </div>
@@ -754,58 +760,28 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
 
       {tab==="saisons" && (
         <div className="fade-in">
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
-            {Object.entries(SAISONS_META).map(([key,s])=>{
-              const sv = migrateMois(client.moisParMois||client.saisons) || {entretien:0,controle:0};
-              return (
-                <div key={key} style={{background:s.bg,borderRadius:DS.radius,padding:"14px 16px",border:`1px solid ${s.color}33`}}>
-                  <div style={{fontWeight:800,color:s.color,fontSize:13,display:"flex",alignItems:"center",gap:5,marginBottom:4}}>{Ico[s.icon]&&Ico[s.icon](15,s.color)} {s.label}</div>
-                  <div style={{fontSize:10,color:DS.mid,marginBottom:8}}>{s.mois.map(m=>MOIS[m]).join(" · ")}</div>
-                  <div style={{display:"flex",gap:6,flexDirection:"column"}}>
-                    <div style={{display:"flex",justifyContent:"space-between",fontSize:11}}>
-                      <span style={{color:DS.blue,fontWeight:700}}>🔧 Entretiens</span>
-                      <span style={{fontWeight:800,color:DS.blue}}>{sv.entretien}/mois · {sv.entretien*s.mois.length}</span>
-                    </div>
-                    <div style={{display:"flex",justifyContent:"space-between",fontSize:11}}>
-                      <span style={{color:DS.teal,fontWeight:700}}>💧 Contrôles</span>
-                      <span style={{fontWeight:800,color:DS.teal}}>{sv.controle}/mois · {sv.controle*s.mois.length}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Calendrier 2026</div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+          <div style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Calendrier {YEAR_NOW}</div>
+          <div style={{display:"flex",flexDirection:"column",gap:0,border:"1px solid "+DS.border,borderRadius:DS.radiusSm,overflow:"hidden"}}>
             {[...Array(12)].map((_,i)=>{
               const m=i+1;
               const prevE=getEntretienMois(client.moisParMois||client.saisons,m);
               const prevC=getControleMois(client.moisParMois||client.saisons,m);
               const prevT=prevE+prevC;
-              const effM=passages.filter(p=>p.clientId===client.id&&new Date(p.date).getMonth()+1===m&&new Date(p.date).getFullYear()===YEAR_NOW).length;
               const effME=passages.filter(p=>p.clientId===client.id&&new Date(p.date).getMonth()+1===m&&new Date(p.date).getFullYear()===YEAR_NOW&&isEntretienType(p.type)).length;
               const effMC=passages.filter(p=>p.clientId===client.id&&new Date(p.date).getMonth()+1===m&&new Date(p.date).getFullYear()===YEAR_NOW&&isControleType(p.type)).length;
-              const rest=Math.max(0,prevT-effM);
+              const rest=Math.max(0,prevT-(effME+effMC));
               const sc=SAISONS_META[getSaison(m)];
               const isCur=m===MOIS_NOW;
               return (
-                <div key={m} style={{borderRadius:DS.radiusSm,overflow:"hidden",border:`2px solid ${isCur?sc.color:DS.border}`,background:DS.white}}>
-                  <div style={{background:isCur?sc.color:DS.light,padding:"5px 8px",textAlign:"center"}}>
-                    <div style={{fontWeight:700,fontSize:11,color:isCur?"#fff":DS.mid}}>{MOIS[m]}</div>
+                <div key={m} style={{display:"flex",alignItems:"center",padding:"8px 12px",borderBottom:i<11?"1px solid "+DS.border:"none",background:isCur?sc.bg:i%2===0?DS.white:DS.light}}>
+                  <div style={{width:4,height:22,borderRadius:2,background:sc.color,marginRight:8,flexShrink:0}}/>
+                  <div style={{width:40,fontWeight:isCur?800:600,fontSize:12,color:isCur?sc.color:DS.mid}}>{MOIS_L[m].slice(0,4)}</div>
+                  <div style={{flex:1,display:"flex",gap:10,alignItems:"center"}}>
+                    {prevE>0&&<span style={{fontSize:12,fontWeight:700,color:effME>=prevE?DS.green:DS.blue}}>🔧 {effME}/{prevE}</span>}
+                    {prevC>0&&<span style={{fontSize:12,fontWeight:700,color:effMC>=prevC?DS.green:DS.teal}}>💧 {effMC}/{prevC}</span>}
+                    {prevT===0&&<span style={{fontSize:12,color:DS.border}}>—</span>}
                   </div>
-                  <div style={{padding:"6px 6px",textAlign:"center"}}>
-                    {prevT>0 ? (
-                      <>
-                        <div style={{display:"flex",justifyContent:"center",gap:8,marginBottom:2}}>
-                          {prevE>0&&<span style={{fontSize:11,fontWeight:800,color:DS.blue}}>🔧{effME}/{prevE}</span>}
-                          {prevC>0&&<span style={{fontSize:11,fontWeight:800,color:DS.teal}}>💧{effMC}/{prevC}</span>}
-                        </div>
-                        <div style={{fontSize:10,fontWeight:700,color:rest>0?DS.orange:DS.green}}>{rest>0?`${rest} rest.`:"✓ ok"}</div>
-                      </>
-                    ) : (
-                      <div style={{fontSize:16,fontWeight:900,color:DS.border,lineHeight:1.5}}>—</div>
-                    )}
-                  </div>
+                  {prevT>0&&<div style={{fontSize:11,fontWeight:700,color:rest>0?DS.orange:DS.green,background:rest>0?DS.orangeSoft:DS.greenSoft,padding:"2px 8px",borderRadius:6}}>{rest>0?`${rest} rest.`:"✓"}</div>}
                 </div>
               );
             })}
@@ -910,7 +886,7 @@ function FicheClient({ client, passages, livraisons=[], onSaveLivraison, onDelet
       )}
 
       <div style={{display:"flex",gap:8,marginTop:20,paddingTop:16,borderTop:"1px solid "+DS.border}}>
-        <BtnPrimary onClick={()=>ouvrirContrat(client)} bg={DS.blue} color="#fff" icon={Ico.pdf(14,"#fff")} style={{flex:1}}>Contrat</BtnPrimary>
+        <BtnPrimary onClick={()=>ouvrirContrat(client)} bg={DS.blue} color="#fff" icon={Ico.contract(14,"#fff")} style={{flex:1}}>Contrat</BtnPrimary>
         <BtnPrimary onClick={onEdit} bg={DS.light} color={DS.dark} icon={Ico.edit(14,DS.dark)} style={{flex:1}}>Modifier</BtnPrimary>
         <button onClick={onDelete} className="btn-hover" style={{width:44,borderRadius:DS.radiusSm,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(15,DS.red)}</button>
       </div>
@@ -1132,7 +1108,7 @@ table td{padding:7px 12px;border:1px solid #e2e8f0;font-size:12px}
 
 <div class="recap">
   <h3>Récapitulatif</h3>
-  <div class="prix">Prix annuel : ${client.prix?.toLocaleString("fr")||totalPrixE+totalPrixC} €</div>
+  <div class="prix">Prix annuel : ${(totalPrixE+totalPrixC).toLocaleString("fr")} €</div>
 </div>
 
 <div class="conditions">
@@ -1160,7 +1136,7 @@ table td{padding:7px 12px;border:1px solid #e2e8f0;font-size:12px}
 <div class="detail">
   <h4>Contrôle de l'eau</h4>
   <ul>
-    <li>Nettoyage surface et fond</li>
+    <li>Nettoyage rapide surface à l'épuisette</li>
     <li>Vérification et ajustement (chlore, pH)</li>
     <li>Contrôle technique</li>
     <li>Livraison de produits si besoin</li>
@@ -2235,10 +2211,10 @@ export default function App() {
   );
 
   const NAV = [
-    { id:"dashboard", l:"Accueil", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill={a?"#0369a1":"none"} stroke={a?"#0369a1":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg> },
-    { id:"clients",   l:"Clients", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#0369a1":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/><path d="M16 3.13a4 4 0 010 7.75"/><path d="M21 21v-2a4 4 0 00-3-3.87"/></svg> },
-    { id:"interventions", l:"Passages", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#0369a1":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg> },
-    { id:"rdv", l:"RDV", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#7c3aed":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="12" cy="15" r="2"/></svg> },
+    { id:"dashboard", l:"Accueil", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#0369a1":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M5 16c2 2 4 2 6 0s4-2 6 0" opacity={a?1:0.4}/><path d="M9 21V14h6v7"/></svg> },
+    { id:"clients",   l:"Clients", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#0369a1":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a4 4 0 014-4h8a4 4 0 014 4v2"/></svg> },
+    { id:"interventions", l:"Passages", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#0369a1":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 12c2 2.5 4 2.5 6 0s4-2.5 6 0 4 2.5 6 0"/><line x1="8" y1="4" x2="8" y2="2"/><line x1="16" y1="4" x2="16" y2="2"/></svg> },
+    { id:"rdv", l:"RDV", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#7c3aed":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="12" cy="15" r="2.5" fill={a?"#7c3aed":"none"}/></svg> },
   ];
 
   const PAGE_LABELS = { dashboard:`Bonjour Dorian 👋`, clients:"Clients", passages:"Passages", interventions:"Passages", rdv:"Rendez-vous" };
@@ -2256,7 +2232,7 @@ export default function App() {
         </div>
         <div style={{display:"flex",gap:6,alignItems:"center"}}>
           {nbAlertes>0&&(
-            <button onClick={()=>setPage("dashboard")} className="btn-hover" style={{position:"relative",width:38,height:38,borderRadius:12,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <button onClick={()=>{setPage("dashboard");setTimeout(()=>{const el=document.getElementById("alertes-section");if(el)el.scrollIntoView({behavior:"smooth"})},100)}} className="btn-hover" style={{position:"relative",width:38,height:38,borderRadius:12,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
               {Ico.alert(16,DS.red)}
               <span style={{position:"absolute",top:-4,right:-4,width:18,height:18,borderRadius:9,background:DS.red,color:"#fff",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid #fff"}}>{nbAlertes}</span>
             </button>
