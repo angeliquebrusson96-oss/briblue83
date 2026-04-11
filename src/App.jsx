@@ -246,12 +246,10 @@ function exportRdvToICS(rdv, client) {
     rdv.description || "",
     client ? "Client: " + (client.nom || "") : "",
     client && client.adresse ? "Adresse: " + client.adresse : "",
-  ].filter(Boolean).join("
-");
+  ].filter(Boolean).join("\\n");
 
   const summary = "BRIBLUE - " + (rdv.type || "RDV") + (client ? " - " + (client.nom || "") : "");
-  const location = client && client.adresse ? "LOCATION:" + client.adresse + "
-" : "";
+  const locationLine = client && client.adresse ? "LOCATION:" + client.adresse : "";
 
   const ics = [
     "BEGIN:VCALENDAR",
@@ -262,7 +260,7 @@ function exportRdvToICS(rdv, client) {
     `DTEND:${dt}T${endTime}00`,
     `SUMMARY:${summary}`,
     `DESCRIPTION:${desc}`,
-    location.trimEnd(),
+    locationLine,
     "BEGIN:VALARM",
     "TRIGGER:-PT30M",
     "ACTION:DISPLAY",
@@ -270,8 +268,7 @@ function exportRdvToICS(rdv, client) {
     "END:VALARM",
     "END:VEVENT",
     "END:VCALENDAR",
-  ].filter(Boolean).join("
-");
+  ].filter(Boolean).join("\\n");
 
   const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
   const url = URL.createObjectURL(blob);
