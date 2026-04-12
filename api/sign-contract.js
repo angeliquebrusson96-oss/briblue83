@@ -10,24 +10,24 @@ const FROM = "rapport-piscine@briblue83.com";
 
 async function sendConfirmationEmail(client, signedAt) {
   const dateStr = new Date(signedAt).toLocaleDateString("fr", {day:"2-digit", month:"long", year:"numeric"});
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head>
-<body style="font-family:Arial,sans-serif;background:#f8fafc;margin:0;padding:16px;">
-<table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
-  <tr><td style="background:#0c1222;padding:20px 28px;border-radius:10px 10px 0 0;">
-    <span style="font-size:20px;font-weight:bold;color:#ffffff;letter-spacing:2px;">BRI BLUE</span>
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
+<body style="font-family:Arial,sans-serif;background:#f8fafc;margin:0;padding:8px;">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;width:100%;">
+  <tr><td style="background:#0c1222;padding:16px 20px;border-radius:10px 10px 0 0;">
+    <span style="font-size:18px;font-weight:bold;color:#ffffff;letter-spacing:2px;">BRI BLUE</span>
   </td></tr>
-  <tr><td style="background:#ffffff;padding:28px;border:1px solid #e2e8f0;border-top:none;">
-    <p style="font-size:15px;color:#1e293b;margin:0 0 12px;">Bonjour <strong>${client.nom}</strong>,</p>
-    <p style="font-size:14px;color:#475569;margin:0 0 16px;line-height:1.6;">Votre contrat d'entretien piscine a bien été signé le <strong>${dateStr}</strong>.</p>
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;">
-      <tr><td style="background:#d1fae5;border-radius:10px;padding:14px 20px;border:1px solid #6ee7b7;">
-        <p style="margin:0;font-size:14px;color:#059669;font-weight:bold;">Contrat signé et enregistré</p>
-        <p style="margin:4px 0 0;font-size:12px;color:#047857;">Formule : ${client.formule || "—"}</p>
+  <tr><td style="background:#ffffff;padding:20px;border:1px solid #e2e8f0;border-top:none;">
+    <p style="font-size:16px;color:#1e293b;margin:0 0 10px;">Bonjour <strong>${client.nom}</strong>,</p>
+    <p style="font-size:14px;color:#475569;margin:0 0 14px;line-height:1.6;">Votre contrat d'entretien piscine a bien été signé le <strong>${dateStr}</strong>.</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:14px 0;">
+      <tr><td style="background:#d1fae5;border-radius:10px;padding:14px 16px;border:1px solid #6ee7b7;">
+        <p style="margin:0;font-size:15px;color:#059669;font-weight:bold;">Contrat signé et enregistré</p>
+        <p style="margin:6px 0 0;font-size:13px;color:#047857;">Formule : ${client.formule || "—"}</p>
       </td></tr>
     </table>
-    <p style="font-size:13px;color:#64748b;margin:0;">Conservez cet email comme preuve de signature. Pour toute question, contactez-nous.</p>
+    <p style="font-size:13px;color:#64748b;margin:0;line-height:1.5;">Conservez cet email comme preuve de signature. Pour toute question, contactez-nous au +33 6 67 18 61 15.</p>
   </td></tr>
-  <tr><td style="background:#f8fafc;padding:14px 28px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px;">
+  <tr><td style="background:#f8fafc;padding:14px 20px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px;">
     <p style="margin:0;font-size:12px;color:#64748b;"><strong>Dorian Briaire</strong><br/>Technicien de Piscine - BRI BLUE<br/>+33 6 67 18 61 15</p>
   </td></tr>
 </table>
