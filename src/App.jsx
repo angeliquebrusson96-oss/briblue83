@@ -85,7 +85,7 @@ const SAISONS_META = {
   hiver:     { label: "Hiver",     icon: "snow",    mois: [12,1,2],  color: "#60a5fa", bg: "#eff6ff" },
   printemps: { label: "Printemps", icon: "flower",  mois: [3,4,5],   color: "#34d399", bg: "#ecfdf5" },
   ete:       { label: "Été",       icon: "sun",     mois: [6,7,8],   color: "#f59e0b", bg: "#fffbeb" },
-  automne:   { label: "Automne",   icon: "leaf",    mois: [9,10,11], color: "#f97316", bg: "#fff7ed" },
+  automne:   { label: "Automne",   icon: "leaf",    mois: [9,10,11], color: "#d97706", bg: "#fff7ed" },
 };
 const MOIS = ["","Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
 const MOIS_L = ["","Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
@@ -131,7 +131,7 @@ const PASSAGES_INIT = [
 const PRODUITS_DEFAUT = ["Chlore lent Galet","PH minus","Flocculant","Anti-calcaire","Anti-Algues","Anti-Phosphate","Éponge Magique","Filtre à cartouche","Tac+","Chlore granule","Hypochlorite","Anti-Algues moutarde","Sac de sel"];
 
 const STATUT_LIV = {
-  aFacturer: { label:"À facturer", color:"#ea580c", bg:"#ffedd5" },
+  aFacturer: { label:"À facturer", color:"#b45309", bg:"#fef3c7" },
   facture:   { label:"Facturé",    color:"#0284c7", bg:"#e0f2fe" },
   paye:      { label:"Payé",       color:"#059669", bg:"#d1fae5" },
 };
@@ -321,10 +321,10 @@ const DS = {
   light:"#f0fdfe", bg:"#f8fffe", border:"#cffafe", white:"#ffffff",
   // Sémantiques
   green:"#059669", greenSoft:"#d1fae5", greenGrad:"linear-gradient(135deg,#059669,#34d399)",
-  red:"#e11d48", redSoft:"#fff1f2",
+  red:"#be123c", redSoft:"#fff1f2",
   orange:"#f59e0b", orangeSoft:"#fffbeb",
   yellow:"#d97706", yellowSoft:"#fef9c3",
-  purple:"#7c3aed", purpleSoft:"#ede9fe", purpleGrad:"linear-gradient(135deg,#7c3aed,#a78bfa)",
+  purple:"#4f46e5", purpleSoft:"#eef2ff", purpleGrad:"linear-gradient(135deg,#4f46e5,#818cf8)",
   teal:"#0e7490", tealSoft:"#cffafe",
   // Géométrie
   radius: 16, radiusSm: 12, radiusLg: 22,
@@ -335,14 +335,14 @@ const DS = {
 };
 
 const AC = {
-  rouge:  { bg:DS.redSoft,    bd:"#fca5a5", tx:DS.red,    lbl:"URGENT"   },
+  rouge:  { bg:DS.redSoft,    bd:"#fda4af", tx:DS.red,    lbl:"URGENT"   },
   jaune:  { bg:DS.yellowSoft, bd:"#fcd34d", tx:DS.yellow, lbl:"Attention" },
-  orange: { bg:DS.orangeSoft, bd:"#fdba74", tx:DS.orange, lbl:"Retard"   },
+  orange: { bg:DS.orangeSoft, bd:"#fcd34d", tx:DS.orange, lbl:"Retard"   },
   ok:     { bg:DS.greenSoft,  bd:"#86efac", tx:DS.green,  lbl:"OK"       },
 };
 
 const RAPPORT_STATUS = {
-  saisie: { label:"En cours de saisie", color:DS.orange, bg:DS.orangeSoft },
+  saisie: { label:"En cours de saisie", color:"#b45309", bg:"#fef3c7" },
   cree:   { label:"Créé", color:DS.blue, bg:DS.blueSoft },
   envoye: { label:"Envoyé", color:DS.green, bg:DS.greenSoft },
 };
@@ -402,11 +402,11 @@ function Avatar({ nom, size=40, photo }) {
   const initials = (nom||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
   const colors = [
     "linear-gradient(135deg,#0284c7,#06b6d4)",
-    "linear-gradient(135deg,#7c3aed,#a78bfa)",
+    "linear-gradient(135deg,#4f46e5,#818cf8)",
     "linear-gradient(135deg,#059669,#34d399)",
-    "linear-gradient(135deg,#ea580c,#f97316)",
+    "linear-gradient(135deg,#0891b2,#06b6d4)",
     "linear-gradient(135deg,#0891b2,#22d3ee)",
-    "linear-gradient(135deg,#be185d,#ec4899)"
+    "linear-gradient(135deg,#db2777,#f472b6)"
   ];
   const bg = colors[nom?.charCodeAt(0)%colors.length] || colors[0];
   return (
@@ -1364,7 +1364,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           );
           // Demande envoyée mais pas encore signée
           return (
-            <div style={{background:DS.orangeSoft,border:"1px solid "+DS.orange+"44",borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
+            <div style={{background:DS.orangeSoft,border:"1px solid "+"#d97706"+"33",borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
               {Ico.send(13,DS.orange)}
               <div style={{fontSize:15,fontWeight:700,color:DS.orange}}>📨 Demande envoyée — En attente de signature</div>
             </div>
@@ -1488,15 +1488,15 @@ function NumField({ label, value, onChange, unit, ideal, okFn }) {
   const ok = hasVal && okFn ? okFn(value) : true;
   const statusColor = !hasVal ? DS.border : ok ? "#22c55e" : "#ef4444";
   const statusBg = !hasVal ? DS.light : ok ? "#f0fdf4" : "#fef2f2";
-  const statusTx = !hasVal ? DS.mid : ok ? "#16a34a" : "#dc2626";
+  const statusTx = !hasVal ? DS.mid : ok ? "#16a34a" : "#be123c";
   return (
-    <div style={{background:statusBg,borderRadius:10,padding:"10px 12px",border:`1.5px solid ${hasVal?(ok?"#86efac":"#fca5a5"):DS.border}`,transition:"all .2s"}}>
+    <div style={{background:statusBg,borderRadius:10,padding:"10px 12px",border:`1.5px solid ${hasVal?(ok?"#86efac":"#fda4af"):DS.border}`,transition:"all .2s"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
         <div style={{fontSize:15,fontWeight:700,color:DS.mid}}>
           {label}{unit && <span style={{color:"#94a3b8",fontWeight:400}}> ({unit})</span>}
         </div>
         {ideal && (
-          <span style={{fontSize:9,fontWeight:700,color:hasVal?statusTx:"#94a3b8",background:hasVal?(ok?"#dcfce7":"#fee2e2"):"#f1f5f9",padding:"2px 7px",borderRadius:8,letterSpacing:.3}}>
+          <span style={{fontSize:9,fontWeight:700,color:hasVal?statusTx:"#94a3b8",background:hasVal?(ok?"#dcfce7":"#fff1f2"):"#f1f5f9",padding:"2px 7px",borderRadius:8,letterSpacing:.3}}>
             {hasVal ? (ok ? "✓ OK" : "⚠ Hors plage") : `idéal ${ideal}`}
           </span>
         )}
@@ -2055,7 +2055,7 @@ function MRow({label,unit,value,onChange,ideal,okFn,icon,color="#0891b2"}) {
         {ideal&&<div style={{fontSize:10,color:"#94a3b8",marginTop:2,fontWeight:500}}>idéal {ideal}</div>}
       </div>
       <input type="number" step="0.1" value={value===""||value===null||value===undefined?"":value} onChange={e=>onChange(e.target.value===""?"":+e.target.value)}
-        style={{width:72,padding:"8px 10px",borderRadius:9,border:`2px solid ${statusColor}`,fontSize:15,fontWeight:800,boxSizing:"border-box",color:hasVal?(ok?"#16a34a":"#dc2626"):DS.dark,background:"#fff",textAlign:"center",outline:"none",fontFamily:"inherit",flexShrink:0,transition:"all .2s"}}/>
+        style={{width:72,padding:"8px 10px",borderRadius:9,border:`2px solid ${statusColor}`,fontSize:15,fontWeight:800,boxSizing:"border-box",color:hasVal?(ok?"#16a34a":"#be123c"):DS.dark,background:"#fff",textAlign:"center",outline:"none",fontFamily:"inherit",flexShrink:0,transition:"all .2s"}}/>
       <div style={{width:28,height:28,borderRadius:14,background:!hasVal?"#f1f5f9":ok?"#22c55e":"#ef4444",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .3s",boxShadow:hasVal?`0 2px 6px ${ok?"#22c55e":"#ef4444"}44`:"none"}}>
         {!hasVal
           ? <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -2151,9 +2151,9 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
     {ic:STEP_ICONS[0],l:isMobile?"Interv.":"Intervention",color:"#0891b2"},
     {ic:STEP_ICONS[1],l:isMobile?"Analyses":"Analyses eau",color:"#0891b2"},
     {ic:STEP_ICONS[2],l:isMobile?"Bassin":"État bassin",color:"#059669"},
-    {ic:STEP_ICONS[3],l:"Correctifs",color:"#7c3aed"},
-    {ic:STEP_ICONS[4],l:"Clôture",color:"#ea580c"},
-    {ic:STEP_ICONS[5],l:isMobile?"Sign.":"Signatures",color:"#be185d"},
+    {ic:STEP_ICONS[3],l:"Correctifs",color:"#4f46e5"},
+    {ic:STEP_ICONS[4],l:"Clôture",color:"#b45309"},
+    {ic:STEP_ICONS[5],l:isMobile?"Sign.":"Signatures",color:"#059669"},
   ];
 
   const Stepper = () => {
@@ -2316,8 +2316,8 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
               {[
                 {v:"Entretien complet",ico:Ico.wrench,col:"#0284c7",bg:"#e0f2fe"},
                 {v:"Contrôle d'eau",ico:Ico.drop,col:"#0891b2",bg:"#e0f7fa"},
-                {v:"Visite technique",ico:Ico.brush,col:"#7c3aed",bg:"#ede9fe"},
-                {v:"Bassin en rattrapage",ico:Ico.chemicals,col:"#ea580c",bg:"#ffedd5"},
+                {v:"Visite technique",ico:Ico.brush,col:"#4f46e5",bg:"#eef2ff"},
+                {v:"Bassin en rattrapage",ico:Ico.chemicals,col:"#b45309",bg:"#fef3c7"},
                 {v:"Fin de rattrapage",ico:Ico.check,col:"#059669",bg:"#d1fae5"},
               ].map(({v,ico,col,bg})=>{
                 const sel=f.type===v;
@@ -2441,15 +2441,15 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                 <div>
                   <MRow label="Stabilisant" unit="ppm" value={f.stabilisant} onChange={v=>set("stabilisant",v)} ideal="30 – 50" okFn={v=>v>=30&&v<=50} color="#0891b2"
                     icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}/>
-                  <label style={{display:"flex",alignItems:"center",gap:8,marginTop:6,padding:"6px 10px",borderRadius:8,background:f.stabilisantHaut?"#fff7ed":"#f8fafc",border:"1px solid "+(f.stabilisantHaut?"#fdba74":"#e2e8f0"),cursor:"pointer",width:"fit-content"}}>
-                    <input type="checkbox" checked={!!f.stabilisantHaut} onChange={e=>set("stabilisantHaut",e.target.checked)} style={{width:16,height:16,accentColor:"#ea580c"}}/>
-                    <span style={{fontSize:12,fontWeight:700,color:f.stabilisantHaut?"#ea580c":"#64748b"}}>⚠️ Stabilisant HAUT</span>
+                  <label style={{display:"flex",alignItems:"center",gap:8,marginTop:6,padding:"6px 10px",borderRadius:8,background:f.stabilisantHaut?"#fff7ed":"#f8fafc",border:"1px solid "+(f.stabilisantHaut?"#fcd34d":"#e2e8f0"),cursor:"pointer",width:"fit-content"}}>
+                    <input type="checkbox" checked={!!f.stabilisantHaut} onChange={e=>set("stabilisantHaut",e.target.checked)} style={{width:16,height:16,accentColor:"#b45309"}}/>
+                    <span style={{fontSize:12,fontWeight:700,color:f.stabilisantHaut?"#b45309":"#64748b"}}>⚠️ Stabilisant HAUT</span>
                   </label>
                 </div>
               </div>
             </div>
             <div style={{borderRadius:DS.radius,overflow:"hidden",border:"1px solid "+DS.border,boxShadow:DS.shadow}}>
-              <div style={{background:"linear-gradient(135deg,#7c3aed,#a78bfa)",padding:"12px 16px",display:"flex",alignItems:"center",gap:10}}>
+              <div style={{background:"linear-gradient(135deg,#4f46e5,#818cf8)",padding:"12px 16px",display:"flex",alignItems:"center",gap:10}}>
                 <div style={{width:32,height:32,borderRadius:10,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.chart(16,"#fff")}</div>
                 <div>
                   <div style={{fontSize:13,fontWeight:800,color:"#fff",letterSpacing:.3}}>Mesures Électroniques</div>
@@ -2457,16 +2457,16 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                 </div>
               </div>
               <div style={{background:DS.white,padding:"10px 12px",display:"flex",flexDirection:"column",gap:6}}>
-                <MRow label="Taux de sel" value={f.tSel} onChange={v=>set("tSel",v)} color="#7c3aed"
+                <MRow label="Taux de sel" value={f.tSel} onChange={v=>set("tSel",v)} color="#4f46e5"
                   icon={<span style={{fontSize:16}}>🧂</span>}/>
-                <MRow label="Taux de phosphate" value={f.tPhosphate} onChange={v=>set("tPhosphate",v)} color="#7c3aed"
-                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v5l3 9a3 3 0 01-3 3H9a3 3 0 01-3-3l3-9V3z"/><path d="M6.5 15h11"/></svg>}/>
+                <MRow label="Taux de phosphate" value={f.tPhosphate} onChange={v=>set("tPhosphate",v)} color="#4f46e5"
+                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#4f46e5" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v5l3 9a3 3 0 01-3 3H9a3 3 0 01-3-3l3-9V3z"/><path d="M6.5 15h11"/></svg>}/>
                 <MRow label="Taux de chlore" value={f.tChlore} onChange={v=>set("tChlore",v)} ideal="1 – 1.5" okFn={v=>v>=0.5&&v<=3} color="#0891b2"
                   icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>}/>
                 <MRow label="Taux de pH" value={f.tPH} onChange={v=>set("tPH",v)} ideal="7.2 – 7.4" okFn={v=>v>=7.0&&v<=7.6} color="#0891b2"
-                  icon={<span style={{fontSize:13,fontWeight:900,color:"#7c3aed",letterSpacing:-1}}>pH</span>}/>
-                <MRow label="Taux stabilisant" value={f.tStabilisant} onChange={v=>set("tStabilisant",v)} color="#7c3aed"
-                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}/>
+                  icon={<span style={{fontSize:13,fontWeight:900,color:"#4f46e5",letterSpacing:-1}}>pH</span>}/>
+                <MRow label="Taux stabilisant" value={f.tStabilisant} onChange={v=>set("tStabilisant",v)} color="#4f46e5"
+                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#4f46e5" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}/>
               </div>
             </div>
           </div>
@@ -2516,18 +2516,18 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
       {step===4 && (
         <div className="fade-in">
           <div style={{background:`linear-gradient(135deg,#7c3aed08,#7c3aed12)`,borderRadius:DS.radius,padding:18,border:"1px solid #7c3aed18",marginBottom:16}}>
-            <div style={{fontSize:11,fontWeight:800,color:"#7c3aed",textTransform:"uppercase",letterSpacing:.8,marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
-              <div style={{width:26,height:26,borderRadius:8,background:"#7c3aed",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.chemicals(13,"#fff")}</div>
+            <div style={{fontSize:11,fontWeight:800,color:"#4f46e5",textTransform:"uppercase",letterSpacing:.8,marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
+              <div style={{width:26,height:26,borderRadius:8,background:"#4f46e5",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.chemicals(13,"#fff")}</div>
               Produits apportés
             </div>
             <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"1fr 1fr 1fr",gap:10}}>
               {[
                 {k:"corrChlore",l:"Chlore",ico:"🧪",col:"#0891b2"},
-                {k:"corrPH",l:"pH",ico:"⚗️",col:"#7c3aed"},
+                {k:"corrPH",l:"pH",ico:"⚗️",col:"#4f46e5"},
                 {k:"corrSel",l:"Sel",ico:"🧂",col:"#64748b"},
                 {k:"corrAlgicide",l:"Algicide",ico:"🌿",col:"#16a34a"},
                 {k:"corrPeroxyde",l:"Peroxyde",ico:"💧",col:"#0284c7"},
-                {k:"corrChloreChoc",l:"Chlore Choc",ico:"⚡",col:"#ea580c"},
+                {k:"corrChloreChoc",l:"Chlore Choc",ico:"⚡",col:"#b45309"},
                 {k:"corrPhosphate",l:"Phosphate",ico:"🔬",col:"#be185d"},
                 {k:"corrAlcafix",l:"Alcafix",ico:"🧫",col:"#059669"},
                 {k:"corrAutre",l:"Autre",ico:"📦",col:"#94a3b8"},
@@ -3608,7 +3608,7 @@ function ModalStock({ stock, onClose, onUpdateStock, onAddProduit, onDeleteProdu
             const qty = stock[p] ?? 0;
             const low = qty <= 2;
             return (
-              <div key={p} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:DS.radiusSm,background:low?DS.redSoft:DS.white,border:"1.5px solid "+(low?"#fca5a5":DS.border)}}>
+              <div key={p} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:DS.radiusSm,background:low?DS.redSoft:DS.white,border:"1.5px solid "+(low?"#fda4af":DS.border)}}>
                 <div style={{flex:1}}>
                   <span style={{fontSize:13,fontWeight:600,color:DS.dark}}>{p}</span>
                   {low&&<span style={{marginLeft:8,fontSize:10,fontWeight:700,color:DS.red}}>⚠️ Stock bas</span>}
@@ -3628,7 +3628,7 @@ function ModalStock({ stock, onClose, onUpdateStock, onAddProduit, onDeleteProdu
       </Section>
       <div style={{padding:"12px 16px",background:"linear-gradient(135deg,#0e7490,#0891b2)",borderRadius:DS.radiusSm,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <span style={{color:"rgba(255,255,255,0.7)",fontSize:12,fontWeight:600}}>Produits en stock bas (≤2)</span>
-        <span style={{color:"#fca5a5",fontSize:16,fontWeight:900}}>{Object.values(stock).filter(q=>q<=2).length}</span>
+        <span style={{color:"#fda4af",fontSize:16,fontWeight:900}}>{Object.values(stock).filter(q=>q<=2).length}</span>
       </div>
     </Modal>
   );
@@ -3775,7 +3775,7 @@ export default function App() {
     { id:"dashboard", l:"Accueil", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#38bdf8":"rgba(255,255,255,0.35)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M5 16c2 2 4 2 6 0s4-2 6 0" opacity={a?1:0.4}/><path d="M9 21V14h6v7"/></svg> },
     { id:"clients",   l:"Clients", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#38bdf8":"rgba(255,255,255,0.35)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a4 4 0 014-4h8a4 4 0 014 4v2"/></svg> },
     { id:"interventions", l:"Passages", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#38bdf8":"rgba(255,255,255,0.35)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 12c2 2.5 4 2.5 6 0s4-2.5 6 0 4 2.5 6 0"/><line x1="8" y1="4" x2="8" y2="2"/><line x1="16" y1="4" x2="16" y2="2"/></svg> },
-    { id:"rdv", l:"RDV", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#a78bfa":"rgba(255,255,255,0.35)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="12" cy="15" r="2.5" fill={a?"#a78bfa":"none"}/></svg> },
+    { id:"rdv", l:"RDV", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#818cf8":"rgba(255,255,255,0.35)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="12" cy="15" r="2.5" fill={a?"#818cf8":"none"}/></svg> },
   ];
 
   const PAGE_LABELS = { dashboard:`Bonjour Dorian 👋`, clients:"Clients", passages:"Passages", interventions:"Passages", rdv:"Rendez-vous" };
@@ -3807,7 +3807,7 @@ export default function App() {
           </button>
           {nbAlertes>0&&(
             <button onClick={()=>setShowModalAlertes(true)} className="btn-hover" style={{position:"relative",width:isMobile?32:34,height:isMobile?32:34,borderRadius:10,background:"rgba(239,68,68,0.15)",border:"1px solid rgba(239,68,68,0.3)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              {Ico.alert(isMobile?13:15,"#fca5a5")}
+              {Ico.alert(isMobile?13:15,"#fda4af")}
               <span style={{position:"absolute",top:-4,right:-4,width:16,height:16,borderRadius:8,background:"#ef4444",color:"#fff",fontSize:8,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid rgba(0,0,0,0.4)"}}>{nbAlertes}</span>
             </button>
           )}
@@ -3815,7 +3815,7 @@ export default function App() {
             {Ico.clipboard(isMobile?13:15,"#7dd3fc")}
           </button>
           {!isMobile&&<button onClick={openAddClient} className="btn-hover" style={{width:34,height:34,borderRadius:10,background:"rgba(124,58,237,0.2)",border:"1px solid rgba(124,58,237,0.35)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-            {Ico.userPlus(15,"#c4b5fd")}
+            {Ico.userPlus(15,"#a5b4fc")}
           </button>}
           <button onClick={handleLogout} className="btn-hover" style={{width:isMobile?32:34,height:isMobile?32:34,borderRadius:10,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
             <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -3849,7 +3849,7 @@ export default function App() {
               <div style={{display:"flex",flexDirection:"column",gap:6}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>Clients</span><span style={{fontSize:13,fontWeight:800,color:"#fff"}}>{clients.length}</span></div>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>Ce mois</span><span style={{fontSize:13,fontWeight:800,color:"#38bdf8"}}>{passages.filter(p=>new Date(p.date).getMonth()+1===MOIS_NOW&&new Date(p.date).getFullYear()===YEAR_NOW).length} pass.</span></div>
-                {nbAlertes>0&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>Alertes</span><span style={{fontSize:13,fontWeight:800,color:"#fca5a5"}}>{nbAlertes}</span></div>}
+                {nbAlertes>0&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>Alertes</span><span style={{fontSize:13,fontWeight:800,color:"#fda4af"}}>{nbAlertes}</span></div>}
               </div>
             </div>
             {/* Nav links */}
@@ -3866,7 +3866,7 @@ export default function App() {
                 {Ico.clipboard(14,"#7dd3fc")}<span style={{fontSize:12,fontWeight:700,color:"#7dd3fc"}}>Nouveau passage</span>
               </button>
               <button onClick={openAddClient} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",borderRadius:10,border:"1px solid rgba(124,58,237,0.3)",background:"rgba(124,58,237,0.1)",cursor:"pointer",fontFamily:"inherit",width:"100%"}}>
-                {Ico.userPlus(14,"#c4b5fd")}<span style={{fontSize:12,fontWeight:700,color:"#c4b5fd"}}>Nouveau client</span>
+                {Ico.userPlus(14,"#a5b4fc")}<span style={{fontSize:12,fontWeight:700,color:"#a5b4fc"}}>Nouveau client</span>
               </button>
             </div>
           </div>
@@ -3894,7 +3894,7 @@ export default function App() {
             <div style={{width:36,height:36,borderRadius:11,background:page===n.id?(n.id==="rdv"?"rgba(124,58,237,0.2)":"rgba(3,105,161,0.2)"):"transparent",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s"}}>
               {n.icon(page===n.id)}
             </div>
-            <span style={{fontSize:10,fontWeight:page===n.id?800:500,color:page===n.id?(n.id==="rdv"?"#a78bfa":"#38bdf8"):"rgba(255,255,255,0.35)"}}>{n.l}</span>
+            <span style={{fontSize:10,fontWeight:page===n.id?800:500,color:page===n.id?(n.id==="rdv"?"#818cf8":"#38bdf8"):"rgba(255,255,255,0.35)"}}>{n.l}</span>
           </button>
         ))}
       </div>}
