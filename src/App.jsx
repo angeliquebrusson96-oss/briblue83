@@ -362,10 +362,10 @@ const GlobalStyles = () => (
     body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: ${DS.bg}; overflow-x: hidden; }
     input, select, textarea, button { font-family: inherit; }
     input:focus, select:focus, textarea:focus { outline: none; border-color: ${DS.blue} !important; box-shadow: 0 0 0 3px ${DS.blue}22 !important; }
-    ::-webkit-scrollbar { width: 5px; height: 5px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
-    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 99px; }
+    ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 99px; border: 2px solid #f1f5f9; }
+    ::-webkit-scrollbar-thumb:hover { background: #64748b; }
     @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
     @keyframes fadeInFast { from { opacity:0; } to { opacity:1; } }
     @keyframes slideUp { from { opacity:0; transform:translateY(100%); } to { opacity:1; transform:translateY(0); } }
