@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
-  const RESEND_API_KEY = "re_MRGhNzwp40Osgm-4UaxqM00A5rB2alApNKKNXIoE6-bTRGTDI8JIAT1FPYoQqJQGvgR3yDtTxBXT5rgywCvWfQ";
+  const RESEND_API_KEY = "re_FLTMeUdh_vL8QGqJhP2C293WEVCm9c7rh";
   try {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
