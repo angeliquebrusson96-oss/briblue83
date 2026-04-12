@@ -1234,7 +1234,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
 }
 
 // COMPOSANTS FORMULAIRE PASSAGE
-const PRODUITS_LIVRAISON = produitsStock.length > 0 ? produitsStock : PRODUITS_DEFAUT;
+const PRODUITS_LIVRAISON = PRODUITS_DEFAUT;
 const ETAT_LOCAL_OPTIONS = ["Nettoyage du sol","Trace d'eau au sol","Trace d'eau au mur","Fuite plomberie","Fuite moteur","Sur filtre ?"];
 
 function MultiCheck({ label, options, values, onChange }) {
