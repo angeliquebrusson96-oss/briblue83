@@ -729,7 +729,7 @@ function genererHTMLLivraison(livraison, client) {
 
 async function envoyerEmailLivraison(livraison, client) {
   const RESEND_API_KEY = "re_FLTMeUdh_vL8QGqJhP2C293WEVCm9c7rh";
-  const FROM = "rapport-piscine@briblue83.icu";
+  const FROM = "rapport-piscine@briblue83.com";
 
   if (!client?.email) { alert("Aucun email renseigné pour ce client."); return; }
 
@@ -1732,7 +1732,7 @@ function ouvrirRapport(passage, client) {
 
 async function envoyerEmail(passage, client, onSent) {
   const RESEND_API_KEY = "re_FLTMeUdh_vL8QGqJhP2C293WEVCm9c7rh";
-  const FROM = "rapport-piscine@briblue83.icu";
+  const FROM = "rapport-piscine@briblue83.com";
 
   if (!client?.email) { alert("Aucun email renseigné pour ce client."); return; }
 
