@@ -233,6 +233,7 @@ const TODAY = new Date().toISOString().split("T")[0];
 const MOIS_NOW = new Date().getMonth() + 1;
 const YEAR_NOW = new Date().getFullYear();
 const MAX_CLIENT_PHOTOS = 10;
+const MAX_PASSAGE_PHOTOS = 10;
 
 function normalizePhotoList(value) {
   if (Array.isArray(value)) return value.filter(Boolean).slice(0, MAX_CLIENT_PHOTOS);
@@ -1742,11 +1743,12 @@ function genererHTMLRapport(passage, client) {
   const sigTech = passage.signatureTech ? `<img src="${passage.signatureTech}" class="sig-img"/>` : `<div class="sig-empty">Non signée</div>`;
   const sigClient = passage.signatureClient ? `<img src="${passage.signatureClient}" class="sig-img"/>` : `<div class="sig-empty">Non signée</div>`;
 
-  const hasPhotos = passage.photoArrivee || passage.photoDepart || (passage.photos||[]).some(Boolean);
+  const hasPhotos = passage.photoArrivee || passage.photoDepart || (passage.photos||[]).some(Boolean) || (passage.photosDepart||[]).some(Boolean);
   const allPhotos = [
     passage.photoArrivee ? {src:passage.photoArrivee, label:"À l'arrivée"} : null,
-    ...((passage.photos||[]).map((p,i)=>p?{src:p,label:`Photo ${i+2}`}:null)),
+    ...((passage.photos||[]).map((p,i)=>p?{src:p,label:`Photo arrivée ${i+2}`}:null)),
     passage.photoDepart ? {src:passage.photoDepart, label:"Au départ"} : null,
+    ...((passage.photosDepart||[]).map((p,i)=>p?{src:p,label:`Photo départ ${i+2}`}:null)),
   ].filter(Boolean);
   const sectionPhotos = hasPhotos ? `
 <div class="section">
@@ -2029,7 +2031,8 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
     signatureTech:"", signatureClient:"",
     photoArrivee:"",
     photoDepart:"",
-    photos:[],  // extra photos (up to 4 total)
+    photos:[],
+    photosDepart:[],
     ok:false,
     rapportStatut:"saisie",
   };
@@ -2045,8 +2048,14 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
 
   const handleSave = () => {
     if(!f.clientId||!f.date) return alert("Client et date requis");
+    const arrivalPhotos = normalizePhotoList([f.photoArrivee, ...(f.photos||[])]).slice(0, MAX_PASSAGE_PHOTOS);
+    const departPhotos = normalizePhotoList([f.photoDepart, ...(f.photosDepart||[])]).slice(0, MAX_PASSAGE_PHOTOS);
     const passage = {
       ...f,
+      photoArrivee: arrivalPhotos[0] || "",
+      photos: arrivalPhotos.slice(1),
+      photoDepart: departPhotos[0] || "",
+      photosDepart: departPhotos.slice(1),
       id: isEdit ? f.id : uid(),
       ph:ph||f.tPH||f.ph||"",
       chlore:cl||f.tChlore||f.chloreLibre||"",
@@ -2524,24 +2533,78 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
               </div>
               <OuiNon label="Présence du locataire / propriétaire ?" value={f.presenceClient} onChange={v=>set("presenceClient",v)}/>
               <div style={{borderTop:"1px solid "+DS.border,paddingTop:14}}>
-                {f.photoDepart
-                  ? <div style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid "+DS.border}}>
-                      <img src={f.photoDepart} alt="Départ" style={{width:"100%",height:110,objectFit:"cover",display:"block"}}/>
-                      <span style={{position:"absolute",bottom:4,left:6,fontSize:10,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:4,padding:"2px 8px"}}>📸 Au départ</span>
-                      <button onClick={()=>set("photoDepart","")} style={{position:"absolute",top:6,right:6,width:26,height:26,borderRadius:13,background:"rgba(0,0,0,0.65)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                        {Ico.close(11,"#fff")}
-                      </button>
+                {(() => {
+                  const filledDepartPhotos = [
+                    f.photoDepart ? {key:"pd", label:"Départ", val:f.photoDepart} : null,
+                    ...((f.photosDepart||[]).map((v,i)=>v?{key:`pd${i}`,label:`Photo départ ${i+2}`,val:v,idx:i}:null)),
+                  ].filter(Boolean);
+                  const canAddDepart = filledDepartPhotos.length < MAX_PASSAGE_PHOTOS;
+
+                  const addDepartPhotos = (e) => {
+                    const files = Array.from(e.target.files||[]).slice(0, MAX_PASSAGE_PHOTOS - filledDepartPhotos.length);
+                    if (!files.length) return;
+                    let newDepart = f.photoDepart||"";
+                    let newPhotosDepart = [...(f.photosDepart||[])];
+                    let readers = 0;
+                    files.forEach(file => {
+                      const r = new FileReader();
+                      r.onload = () => {
+                        if (!newDepart) newDepart = r.result;
+                        else newPhotosDepart = [...newPhotosDepart, r.result];
+                        readers++;
+                        if (readers === files.length) {
+                          set("photoDepart", newDepart);
+                          set("photosDepart", newPhotosDepart.slice(0, MAX_PASSAGE_PHOTOS - 1));
+                        }
+                      };
+                      r.readAsDataURL(file);
+                    });
+                    e.target.value="";
+                  };
+
+                  const removeDepartPhoto = (key, idx) => {
+                    if (key==="pd") set("photoDepart","");
+                    else {
+                      const arr = [...(f.photosDepart||[])];
+                      arr.splice(idx,1);
+                      set("photosDepart", arr);
+                    }
+                  };
+
+                  return (
+                    <div>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                        <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>
+                          Photos départ {filledDepartPhotos.length>0 && `(${filledDepartPhotos.length}/${MAX_PASSAGE_PHOTOS})`}
+                        </span>
+                        {canAddDepart && (
+                          <label style={{display:"flex",alignItems:"center",gap:5,padding:"7px 14px",borderRadius:8,background:DS.blueSoft,border:"1px solid "+DS.blue+"33",cursor:"pointer",fontSize:12,fontWeight:700,color:DS.blue}}>
+                            {Ico.plus(12,DS.blue)} Ajouter
+                            <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={addDepartPhotos}/>
+                          </label>
+                        )}
+                      </div>
+                      {filledDepartPhotos.length === 0
+                        ? <label style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8,padding:20,borderRadius:12,border:"2px dashed "+DS.border,background:DS.light,cursor:"pointer"}}>
+                            {Ico.camera(28,DS.mid)}
+                            <span style={{fontSize:13,color:DS.mid,fontWeight:600}}>Appuyez pour ajouter des photos au départ</span>
+                            <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={addDepartPhotos}/>
+                          </label>
+                        : <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                            {filledDepartPhotos.map(p=>(
+                              <div key={p.key} style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid "+DS.border}}>
+                                <img src={p.val} alt={p.label} style={{width:"100%",height:90,objectFit:"cover",display:"block"}}/>
+                                <span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:4,padding:"1px 6px"}}>{p.label}</span>
+                                <button onClick={()=>removeDepartPhoto(p.key,p.idx)} style={{position:"absolute",top:4,right:4,width:24,height:24,borderRadius:12,background:"rgba(0,0,0,0.65)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                                  {Ico.close(10,"#fff")}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                      }
                     </div>
-                  : <label style={{display:"flex",alignItems:"center",gap:8,padding:"12px 16px",borderRadius:10,border:"2px dashed "+DS.border,background:DS.light,cursor:"pointer"}}>
-                      {Ico.camera(18,DS.mid)}
-                      <span style={{fontSize:13,color:DS.mid,fontWeight:600}}>📸 Photo au départ</span>
-                      <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{
-                        const file=e.target.files?.[0]; if(!file) return;
-                        const r=new FileReader(); r.onload=()=>set("photoDepart",r.result); r.readAsDataURL(file);
-                        e.target.value="";
-                      }}/>
-                    </label>
-                }
+                  );
+                })()}
               </div>
               <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",background:`linear-gradient(135deg,${DS.greenSoft},#bbf7d0)`,padding:"14px 16px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.green+"44",marginTop:4,transition:"all .2s"}}>
                 <input type="checkbox" checked={f.ok} onChange={e=>set("ok",e.target.checked)} style={{width:20,height:20,accentColor:DS.green}}/>
@@ -2560,15 +2623,16 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
             <SignaturePad label="Signature du technicien" value={f.signatureTech} onChange={v=>set("signatureTech",v)}/>
             <SignaturePad label="Signature du client / propriétaire" value={f.signatureClient} onChange={v=>set("signatureClient",v)}/>
           </div>
-          {(f.photoArrivee||f.photoDepart||(f.photos||[]).some(Boolean)) && (
+          {(f.photoArrivee||f.photoDepart||(f.photos||[]).some(Boolean)||(f.photosDepart||[]).some(Boolean)) && (
             <div style={{background:DS.light,borderRadius:DS.radiusSm,padding:14,border:"1px solid "+DS.border,marginBottom:16}}>
               <div style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>
-                Photos jointes ({[f.photoArrivee,f.photoDepart,...(f.photos||[])].filter(Boolean).length}/5)
+                Photos jointes ({[f.photoArrivee,...(f.photos||[]),f.photoDepart,...(f.photosDepart||[])].filter(Boolean).length}/20)
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                 {f.photoArrivee && (<div style={{position:"relative"}}><img src={f.photoArrivee} alt="Arrivée" style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Arrivée</span></div>)}
-                {(f.photos||[]).map((ph,i)=>ph?(<div key={i} style={{position:"relative"}}><img src={ph} alt={`Photo ${i+2}`} style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Photo {i+2}</span></div>):null)}
+                {(f.photos||[]).map((ph,i)=>ph?(<div key={`a${i}`} style={{position:"relative"}}><img src={ph} alt={`Photo arrivée ${i+2}`} style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Arrivée {i+2}</span></div>):null)}
                 {f.photoDepart && (<div style={{position:"relative"}}><img src={f.photoDepart} alt="Départ" style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Départ</span></div>)}
+                {(f.photosDepart||[]).map((ph,i)=>ph?(<div key={`d${i}`} style={{position:"relative"}}><img src={ph} alt={`Photo départ ${i+2}`} style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Départ {i+2}</span></div>):null)}
               </div>
             </div>
           )}
