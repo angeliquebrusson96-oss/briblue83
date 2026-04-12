@@ -1738,31 +1738,32 @@ async function envoyerEmail(passage, client, onSent) {
   const dateStr = new Date(passage.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"});
   const htmlRapport = genererHTMLRapport(passage, client);
 
-  const htmlEmail = `
-<!DOCTYPE html>
+  const htmlEmail = `<!DOCTYPE html>
 <html lang="fr">
-<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
-<body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;">
-<div style="max-width:600px;margin:0 auto;padding:24px 16px;">
-  <div style="background:linear-gradient(135deg,#0c1222,#0369a1);border-radius:12px 12px 0 0;padding:24px 28px;color:#fff;">
-    <div style="font-size:22px;font-weight:900;letter-spacing:2px;">BRI'BLUE</div>
-    <div style="font-size:12px;opacity:.75;margin-top:4px;">Entretien & Traitement de piscines</div>
-  </div>
-  <div style="background:#fff;padding:28px;border:1px solid #e2e8f0;border-top:none;">
-    <p style="font-size:15px;color:#1e293b;">Bonjour <strong>${client?.nom||""}</strong>,</p>
-    <p style="font-size:14px;color:#475569;line-height:1.6;">Vous trouverez ci-dessous votre rapport d'entretien piscine du <strong>${dateStr}</strong>.</p>
-    <div style="border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;margin:20px 0;">
-      ${htmlRapport.replace(/<!DOCTYPE html>[\s\S]*?<body[^>]*>/i,'').replace(/<\/body>[\s\S]*?<\/html>/i,'').replace(/<div class="no-print"[\s\S]*?<\/div>/g,'')}
-    </div>
-    <p style="font-size:13px;color:#64748b;line-height:1.6;">Je reste à votre disposition pour toute question.</p>
-  </div>
-  <div style="background:#f0f9ff;border:1px solid #e0f2fe;border-top:none;border-radius:0 0 12px 12px;padding:16px 28px;">
-    <p style="margin:0;font-size:12px;color:#64748b;">
-      <strong style="color:#0369a1;">Dorian Briaire</strong><br/>
-      Technicien de Piscine — BRI BLUE
-    </p>
-  </div>
-</div>
+<head><meta charset="UTF-8"/></head>
+<body style="margin:0;padding:0;background:#f0f4f8;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;margin:0 auto;">
+  <tr><td style="background:#0c1222;padding:20px 28px;border-radius:10px 10px 0 0;">
+    <span style="font-size:20px;font-weight:bold;color:#ffffff;letter-spacing:2px;">BRI BLUE</span>
+  </td></tr>
+  <tr><td style="background:#ffffff;padding:28px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">
+    <p style="font-size:15px;color:#1e293b;margin:0 0 12px;">Bonjour <strong>${client?.nom||""}</strong>,</p>
+    <p style="font-size:14px;color:#475569;margin:0 0 20px;line-height:1.6;">Votre rapport d'entretien piscine du <strong>${dateStr}</strong> est disponible.</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+      <tr style="background:#f8fafc;"><td style="padding:10px 16px;font-size:11px;font-weight:bold;color:#64748b;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #e2e8f0;">Informations</td></tr>
+      <tr><td style="padding:10px 16px;border-bottom:1px solid #f1f5f9;"><span style="font-size:11px;color:#94a3b8;">Client</span><br/><strong style="font-size:13px;color:#1e293b;">${client?.nom||"—"}</strong></td></tr>
+      <tr><td style="padding:10px 16px;border-bottom:1px solid #f1f5f9;"><span style="font-size:11px;color:#94a3b8;">Date</span><br/><strong style="font-size:13px;color:#1e293b;">${dateStr}</strong></td></tr>
+      <tr><td style="padding:10px 16px;border-bottom:1px solid #f1f5f9;"><span style="font-size:11px;color:#94a3b8;">Type</span><br/><strong style="font-size:13px;color:#1e293b;">${passage.type||"—"}</strong></td></tr>
+      <tr><td style="padding:10px 16px;border-bottom:1px solid #f1f5f9;"><span style="font-size:11px;color:#94a3b8;">Technicien</span><br/><strong style="font-size:13px;color:#1e293b;">${passage.tech||"Dorian"}</strong></td></tr>
+      ${passage.ph||passage.chloreLibre ? `<tr style="background:#f0fdf4;"><td style="padding:10px 16px;border-bottom:1px solid #f1f5f9;"><span style="font-size:11px;color:#94a3b8;">Analyses eau</span><br/><strong style="font-size:13px;color:#1e293b;">${passage.ph?"pH: "+passage.ph+" &nbsp;":""}${passage.chloreLibre?"Chlore: "+passage.chloreLibre+" ppm":""}</strong></td></tr>` : ""}
+      ${passage.commentaires ? `<tr><td style="padding:10px 16px;"><span style="font-size:11px;color:#94a3b8;">Commentaires</span><br/><span style="font-size:13px;color:#475569;">${passage.commentaires}</span></td></tr>` : ""}
+    </table>
+    <p style="font-size:13px;color:#64748b;margin:20px 0 0;line-height:1.6;">Je reste a votre disposition pour toute question.</p>
+  </td></tr>
+  <tr><td style="background:#f8fafc;padding:16px 28px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px;">
+    <p style="margin:0;font-size:12px;color:#64748b;"><strong>Dorian Briaire</strong><br/>Technicien de Piscine — BRI BLUE</p>
+  </td></tr>
+</table>
 </body></html>`;
 
   try {
