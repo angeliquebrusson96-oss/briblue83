@@ -3182,15 +3182,28 @@ export default function App() {
   useEffect(()=>{ if(ready) save("bb_stock_v1", stock); },[stock,ready]);
   useEffect(()=>{ if(ready) save("bb_contrats_v1", contrats); },[contrats,ready]);
 
-  // Polling toutes les 30s pour détecter nouvelles signatures
+  // Polling toutes les 10s pour détecter nouvelles signatures
   useEffect(()=>{
     if(!ready) return;
     const interval = setInterval(async()=>{
       const ct = await load("bb_contrats_v1", {});
-      setContrats(ct);
-    }, 30000);
+      setContrats(prev => {
+        // Détecter nouvelle signature
+        const newSig = Object.values(ct).find(c =>
+          c.statut === "signe" &&
+          (!prev[Object.keys(ct).find(k => ct[k] === c)] ||
+           prev[Object.keys(ct).find(k => ct[k] === c)]?.statut !== "signe")
+        );
+        if (newSig) {
+          playNotifSound();
+          const cli = clients.find(c => c.id === newSig.clientId);
+          if (cli) alert(`✅ Contrat signé par ${cli.nom} !`);
+        }
+        return ct;
+      });
+    }, 10000);
     return ()=>clearInterval(interval);
-  },[ready]);
+  },[ready, clients]);
 
 // Notification sound when new tasks appear
   useEffect(()=>{
