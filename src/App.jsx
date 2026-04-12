@@ -1578,22 +1578,28 @@ function ouvrirContrat(client, sigPrestataire="", sigClient="") {
 async function envoyerContratSignature(client) {
   if (!client?.email) { alert("Aucun email renseigné pour ce client."); return; }
 
+  // Confirmation avant envoi
+  if (!confirm(`Envoyer le contrat à signer à :\n\n${client.nom}\n${client.email}\n\nConfirmer ?`)) return;
+
   const sigLink = `${window.location.origin}/sign.html?clientId=${client.id}&contractId=CT-${client.id}`;
   const dateStr = new Date().toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"});
 
   const htmlEmail = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head>
-<body style="font-family:Arial,sans-serif;background:#f8fafc;margin:0;padding:0;">
+<body style="font-family:Arial,sans-serif;background:#f8fafc;margin:0;padding:16px;">
 <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
   <tr><td style="background:#0c1222;padding:20px 28px;border-radius:10px 10px 0 0;">
-    <span style="font-size:20px;font-weight:bold;color:#fff;letter-spacing:2px;">BRI BLUE</span>
+    <span style="font-size:20px;font-weight:bold;color:#ffffff;letter-spacing:2px;">BRI BLUE</span>
   </td></tr>
-  <tr><td style="background:#fff;padding:28px;border:1px solid #e2e8f0;border-top:none;">
+  <tr><td style="background:#ffffff;padding:28px;border:1px solid #e2e8f0;border-top:none;">
     <p style="font-size:15px;color:#1e293b;margin:0 0 12px;">Bonjour <strong>${client.nom}</strong>,</p>
-    <p style="font-size:14px;color:#475569;margin:0 0 20px;line-height:1.6;">Votre contrat d'entretien piscine est prêt. Veuillez le consulter et le signer en cliquant sur le bouton ci-dessous.</p>
-    <div style="text-align:center;margin:24px 0;">
-      <a href="${sigLink}" style="background:linear-gradient(135deg,#0369a1,#0ea5e9);color:#fff;text-decoration:none;padding:16px 32px;border-radius:12px;font-weight:700;font-size:16px;display:inline-block;">Signer mon contrat</a>
-    </div>
-    <p style="font-size:12px;color:#94a3b8;margin:0;">Ce lien est valable pour votre contrat BRIBLUE du ${dateStr}.</p>
+    <p style="font-size:14px;color:#475569;margin:0 0 20px;line-height:1.6;">Votre contrat d'entretien piscine BRIBLUE est prêt. Veuillez cliquer sur le lien ci-dessous pour le consulter et le signer :</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;">
+      <tr><td style="background:#0369a1;border-radius:10px;padding:14px 24px;text-align:center;">
+        <a href="${sigLink}" style="color:#ffffff;font-size:16px;font-weight:bold;text-decoration:none;display:block;">➡ Cliquez ici pour signer votre contrat</a>
+      </td></tr>
+    </table>
+    <p style="font-size:12px;color:#64748b;margin:0 0 8px;">Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :</p>
+    <p style="font-size:11px;color:#0369a1;word-break:break-all;margin:0;">${sigLink}</p>
   </td></tr>
   <tr><td style="background:#f8fafc;padding:14px 28px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px;">
     <p style="margin:0;font-size:12px;color:#64748b;"><strong>Dorian Briaire</strong><br/>Technicien de Piscine - BRI BLUE</p>
@@ -1610,11 +1616,11 @@ async function envoyerContratSignature(client) {
         to: [client.email],
         subject: `Votre contrat BRIBLUE — À signer`,
         html: htmlEmail,
-        text: `Bonjour ${client.nom},\n\nVotre contrat est prêt à signer :\n${sigLink}\n\nCordialement,\nDorian Briaire\nTechnicien de Piscine - BRI BLUE`,
+        text: `Bonjour ${client.nom},\n\nVotre contrat BRIBLUE est prêt à signer.\n\nLien de signature :\n${sigLink}\n\nCordialement,\nDorian Briaire\nTechnicien de Piscine - BRI BLUE`,
       }),
     });
     const data = await res.json();
-    if (res.ok) alert(`✅ Email de signature envoyé à ${client.email} !`);
+    if (res.ok) alert(`✅ Email envoyé à ${client.email} !\n\nLe client recevra un lien pour signer son contrat.`);
     else alert(`❌ Erreur : ${data?.message}`);
   } catch(err) {
     alert(`❌ Erreur réseau : ${err.message}`);
