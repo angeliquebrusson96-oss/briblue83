@@ -68,6 +68,7 @@ const Ico = {
   sun: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>,
   leaf: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round"><path d="M11 20A7 7 0 014 13c0-7 7-11 7-11s7 4 7 11a7 7 0 01-7 7z"/><line x1="11" y1="20" x2="11" y2="13"/></svg>,
   wave: (s=28,c="white") => <svg width={s} height={s} viewBox="0 0 32 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round"><path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/><path d="M2 16c2.5 3 5 3 7.5 0S14 13 16.5 16s5 3 7.5 0"/></svg>,
+  cart: (s=20,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 001.95-1.57l1.65-8.42H6"/></svg>,
   truck: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 4v4h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>,
   camera: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>,
   image: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>,
@@ -767,11 +768,11 @@ async function envoyerEmailLivraison(livraison, client) {
   }
 }
 
-function FormLivraison({ initial, clientId, clients=[], onSave, onClose }) {
+function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave, onClose }) {
   const isEdit = !!initial?.id;
   const [f, setF] = useState(()=>initial || { id:uid(), clientId:clientId||"", date:TODAY, produits:[], description:"", montant:"", statut:"aFacturer" });
   const set = (k,v) => setF(p=>({...p,[k]:v}));
-  const PRODUITS_LIVRAISON = ["Chlore lent Galet","PH minus","Flocculant","Anti-calcaire","Anti-Algues","Anti-Phosphate","Éponge Magique","Filtre à cartouche","Tac+","Chlore granule","Hypochlorite","Anti-Algues moutarde","Sac de sel"];
+  const PRODUITS_LIVRAISON = produitsStock.length > 0 ? produitsStock : PRODUITS_DEFAUT;
   const toggleProduit = (p) => { const arr = f.produits.includes(p) ? f.produits.filter(x=>x!==p) : [...f.produits,p]; set("produits",arr); };
 
   return (
@@ -904,7 +905,7 @@ function FormRdv({ initial, clients, onSave, onClose }) {
 }
 
 // FICHE CLIENT (avec diffrenciation Entretien/Contrle)
-function FicheClient({ client, passages, livraisons=[], rdvs=[], onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
+function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[], onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
   const [tab, setTab] = useState("infos");
   const [showFormLiv, setShowFormLiv] = useState(false);
   const [editLiv, setEditLiv] = useState(null);
@@ -1035,15 +1036,19 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], onSaveLivraison
             const doneE = passM.filter(p=>isEntretienType(p.type)).length;
             const doneC = passM.filter(p=>isControleType(p.type)).length;
             const rest = Math.max(0, prevT - doneE - doneC);
+            const extraE = Math.max(0, doneE - prevE);
+            const extraC = Math.max(0, doneC - prevC);
+            const hasExtra = extraE > 0 || extraC > 0;
             const sc = SAISONS_META[getSaison(m)] || SAISONS_META.ete;
             const cur = m === MOIS_NOW;
             return <div key={m} style={{display:"flex",alignItems:"center",padding:"9px 12px",borderBottom:i<11?"1px solid "+DS.border:"none",background:cur?sc.bg:i%2===0?DS.white:"#f9fafb"}}>
               <div style={{width:4,height:22,borderRadius:2,background:sc.color,marginRight:8,flexShrink:0}}/>
               <div style={{width:42,fontWeight:cur?800:600,fontSize:12,color:cur?sc.color:DS.mid}}>{MOIS[m]}</div>
-              <div style={{flex:1,display:"flex",gap:8,alignItems:"center"}}>
-                {prevE>0 ? <span style={{fontSize:12,fontWeight:700,color:doneE>=prevE?DS.green:DS.blue}}>🔧 {doneE}/{prevE}</span> : null}
-                {prevC>0 ? <span style={{fontSize:12,fontWeight:700,color:doneC>=prevC?DS.green:DS.teal}}>💧 {doneC}/{prevC}</span> : null}
-                {prevT===0 ? <span style={{fontSize:12,color:"#d1d5db"}}>—</span> : null}
+              <div style={{flex:1,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                {prevE>0 ? <span style={{fontSize:12,fontWeight:700,color:doneE>=prevE?DS.green:DS.blue}}>🔧 {doneE}/{prevE}</span> : doneE>0 ? <span style={{fontSize:12,fontWeight:700,color:DS.blue}}>🔧 {doneE}/0</span> : null}
+                {prevC>0 ? <span style={{fontSize:12,fontWeight:700,color:doneC>=prevC?DS.green:DS.teal}}>💧 {doneC}/{prevC}</span> : doneC>0 ? <span style={{fontSize:12,fontWeight:700,color:DS.teal}}>💧 {doneC}/0</span> : null}
+                {prevT===0 && doneE===0 && doneC===0 ? <span style={{fontSize:12,color:"#d1d5db"}}>—</span> : null}
+                {hasExtra && <span title={`${extraE+extraC} passage${extraE+extraC>1?"s":""} non prévu${extraE+extraC>1?"s":""}`} style={{fontSize:14,lineHeight:1}}>⭐</span>}
               </div>
               {prevT>0 ? <div style={{fontSize:10,fontWeight:700,color:rest>0?DS.orange:DS.green,background:rest>0?DS.orangeSoft:DS.greenSoft,padding:"2px 8px",borderRadius:6}}>{rest>0?rest+" rest.":"✓"}</div> : null}
             </div>;
@@ -1053,6 +1058,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], onSaveLivraison
           <span style={{color:"rgba(255,255,255,0.7)",fontSize:11,fontWeight:600}}>Total annuel</span>
           <span style={{color:"#fff",fontSize:12,fontWeight:800}}>🔧 {totalE}  ·  💧 {totalC}  ·  {total} passages</span>
         </div>
+        <div style={{marginTop:8,fontSize:11,color:DS.mid,display:"flex",alignItems:"center",gap:5}}>⭐ = passage non prévu au planning</div>
       </div>}
 
       {tab==="passages" && (
@@ -1206,7 +1212,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], onSaveLivraison
       )}
 
       {showFormLiv && (
-        <FormLivraison initial={editLiv} clientId={client.id} clients={[client]} onSave={l=>{onSaveLivraison(l);setShowFormLiv(false);setEditLiv(null);}} onClose={()=>{setShowFormLiv(false);setEditLiv(null);}}/>
+        <FormLivraison initial={editLiv} clientId={client.id} clients={[client]} produitsStock={produitsStock} onSave={l=>{onSaveLivraison(l);setShowFormLiv(false);setEditLiv(null);}} onClose={()=>{setShowFormLiv(false);setEditLiv(null);}}/>
       )}
 
       {/* Action buttons */}
@@ -1226,7 +1232,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], onSaveLivraison
 }
 
 // COMPOSANTS FORMULAIRE PASSAGE
-const PRODUITS_LIVRAISON = ["Chlore lent Galet","PH minus","Flocculant","Anti-calcaire","Anti-Algues","Anti-Phosphate","Éponge Magique","Filtre à cartouche","Tac+","Chlore granule","Hypochlorite","Anti-Algues moutarde","Sac de sel"];
+const PRODUITS_LIVRAISON = produitsStock.length > 0 ? produitsStock : PRODUITS_DEFAUT;
 const ETAT_LOCAL_OPTIONS = ["Nettoyage du sol","Trace d'eau au sol","Trace d'eau au mur","Fuite plomberie","Fuite moteur","Sur filtre ?"];
 
 function MultiCheck({ label, options, values, onChange }) {
@@ -1811,7 +1817,7 @@ async function envoyerEmail(passage, client, onSent) {
 }
 
 // FORMULAIRE PASSAGE (avec Alcafix + types Entretien/Contrle)
-function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraison, onClose }) {
+function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraison, produitsStock=[], onClose }) {
   const EMPTY = {
     date:TODAY, clientId:defaultClientId||"", type:"Entretien complet", tech:"Dorian",
     chloreLibre:"", ph:"", alcalinite:"", stabilisant:"",
@@ -2316,7 +2322,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
 }
 
 // CALENDRIER INTERACTIF
-function CalendrierInteractif({ passages, rdvs, clients, onClientClick }) {
+function CalendrierInteractif({ passages, rdvs, clients, onClientClick, onEditPassage, onEditRdv }) {
   const [calMonth, setCalMonth] = useState(MOIS_NOW);
   const [calYear, setCalYear] = useState(YEAR_NOW);
   const [selectedDay, setSelectedDay] = useState(null);
@@ -2341,6 +2347,23 @@ function CalendrierInteractif({ passages, rdvs, clients, onClientClick }) {
 
   const passageDays=new Set(passages.filter(p=>{ const d=new Date(p.date); return d.getMonth()+1===calMonth&&d.getFullYear()===calYear; }).map(p=>new Date(p.date).getDate()));
   const rdvDays=new Set(rdvs.filter(r=>{const d=new Date(r.date);return d.getMonth()+1===calMonth&&d.getFullYear()===calYear;}).map(r=>new Date(r.date).getDate()));
+
+  // Jours avec passages non prévus (extra) — on compare passages du mois vs planning
+  const extraDays = new Set();
+  if (calYear === YEAR_NOW) {
+    clients.forEach(c => {
+      const prevE = getEntretienMois(c.moisParMois||c.saisons||{}, calMonth);
+      const prevC = getControleMois(c.moisParMois||c.saisons||{}, calMonth);
+      const passM = passages.filter(p => p.clientId===c.id && new Date(p.date).getMonth()+1===calMonth && new Date(p.date).getFullYear()===calYear);
+      const doneE = passM.filter(p=>isEntretienType(p.type)).length;
+      const doneC = passM.filter(p=>isControleType(p.type)).length;
+      if (doneE > prevE || doneC > prevC) {
+        // Mark the extra passage days
+        passM.slice(prevE+prevC).forEach(p => extraDays.add(new Date(p.date).getDate()));
+      }
+    });
+  }
+
   const offset=(firstDay+6)%7;
   const cells=[...Array(offset).fill(null),...Array.from({length:nbDays},(_,i)=>i+1)];
 
@@ -2366,7 +2389,7 @@ function CalendrierInteractif({ passages, rdvs, clients, onClientClick }) {
         {cells.map((day,i)=>{
           if(!day) return <div key={i}/>;
           const isToday=day===today, hasP=passageDays.has(day), hasR=rdvDays.has(day), isSel=day===selectedDay;
-          const hasEvents=hasP||hasR;
+          const isExtra=extraDays.has(day);
           return (
             <div key={i} onClick={()=>setSelectedDay(day===selectedDay?null:day)}
               style={{textAlign:"center",padding:"5px 2px",borderRadius:7,
@@ -2377,16 +2400,18 @@ function CalendrierInteractif({ passages, rdvs, clients, onClientClick }) {
               <div style={{display:"flex",justifyContent:"center",gap:2,marginTop:1}}>
                 {hasP&&!isToday&&!isSel&&<div style={{width:4,height:4,borderRadius:2,background:DS.blue}}/>}
                 {hasR&&!isToday&&!isSel&&<div style={{width:4,height:4,borderRadius:2,background:DS.purple}}/>}
+                {isExtra&&!isToday&&!isSel&&<span style={{fontSize:8,lineHeight:1}}>⭐</span>}
               </div>
             </div>
           );
         })}
       </div>
 
-      <div style={{display:"flex",gap:12,fontSize:11,color:DS.mid,justifyContent:"flex-end",fontWeight:600,marginTop:4}}>
+      <div style={{display:"flex",gap:12,fontSize:11,color:DS.mid,justifyContent:"flex-end",fontWeight:600,marginTop:4,flexWrap:"wrap"}}>
         <span style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:4,background:DS.dark}}/> Aujourd'hui</span>
         <span style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:4,background:DS.blue}}/> Passage</span>
         <span style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:4,background:DS.purple}}/> RDV</span>
+        <span style={{display:"flex",alignItems:"center",gap:4}}>⭐ Non prévu</span>
       </div>
 
       {selectedDay && (dayPassages.length>0||dayRdvs.length>0) && (
@@ -2402,14 +2427,17 @@ function CalendrierInteractif({ passages, rdvs, clients, onClientClick }) {
                 const c=clients.find(x=>x.id===p.clientId);
                 const isCtrl=isControleType(p.type);
                 return (
-                  <div key={p.id} onClick={()=>c&&onClientClick(c)} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:DS.white,borderRadius:8,marginBottom:4,border:"1px solid "+DS.border,cursor:c?"pointer":"default"}}>
+                  <div key={p.id} onClick={()=>onEditPassage&&onEditPassage(p)} className="card-hover" style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:DS.white,borderRadius:8,marginBottom:4,border:"1.5px solid "+DS.blue+"33",cursor:"pointer"}}>
                     <Avatar nom={c?.nom||"?"} size={30} photo={c?.photoPiscine}/>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontWeight:700,fontSize:12,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c?.nom||p.clientId}</div>
                       <div style={{fontSize:11,color:DS.mid,marginTop:1}}>{isCtrl?"💧":"🔧"} {p.type}{p.tech?" · "+p.tech:""}</div>
                     </div>
-                    {p.ok?<div style={{width:20,height:20,borderRadius:10,background:DS.greenSoft,display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.check(10,DS.green)}</div>
-                         :<div style={{width:20,height:20,borderRadius:10,background:DS.redSoft,display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.x(10,DS.red)}</div>}
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      {p.ok?<div style={{width:20,height:20,borderRadius:10,background:DS.greenSoft,display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.check(10,DS.green)}</div>
+                           :<div style={{width:20,height:20,borderRadius:10,background:DS.redSoft,display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.x(10,DS.red)}</div>}
+                      <div style={{width:20,height:20,borderRadius:10,background:DS.blueSoft,display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.edit(10,DS.blue)}</div>
+                    </div>
                   </div>
                 );
               })}
@@ -2422,7 +2450,7 @@ function CalendrierInteractif({ passages, rdvs, clients, onClientClick }) {
               {dayRdvs.map(r=>{
                 const c=clients.find(x=>x.id===r.clientId);
                 return (
-                  <div key={r.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:DS.white,borderRadius:8,marginBottom:4,border:"1px solid "+DS.purple+"33"}}>
+                  <div key={r.id} onClick={()=>onEditRdv&&onEditRdv(r)} className="card-hover" style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:DS.white,borderRadius:8,marginBottom:4,border:"1.5px solid "+DS.purple+"33",cursor:"pointer"}}>
                     <div style={{width:30,textAlign:"center",flexShrink:0}}>
                       <div style={{fontSize:13,fontWeight:900,color:DS.purple}}>{r.heure||"--:--"}</div>
                     </div>
@@ -2431,7 +2459,10 @@ function CalendrierInteractif({ passages, rdvs, clients, onClientClick }) {
                       {c&&<div style={{fontSize:11,color:DS.mid,marginTop:1}}>{c.nom}</div>}
                       {r.description&&<div style={{fontSize:11,color:DS.mid}}>{r.description}</div>}
                     </div>
-                    <Tag color={DS.purple} style={{fontSize:10}}>{r.duree||60}min</Tag>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <Tag color={DS.purple} style={{fontSize:10}}>{r.duree||60}min</Tag>
+                      <div style={{width:20,height:20,borderRadius:10,background:DS.purpleSoft,display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.edit(10,DS.purple)}</div>
+                    </div>
                   </div>
                 );
               })}
@@ -2450,7 +2481,7 @@ function CalendrierInteractif({ passages, rdvs, clients, onClientClick }) {
 }
 
 // DASHBOARD  Bannire tches + RDV
-function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, onAddLivraison, onAddClient, onAddRdv }) {
+function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, onAddLivraison, onAddClient, onAddRdv, onEditPassage, onEditRdv }) {
   const isMobile = useIsMobile();
   const moisCourant = MOIS_NOW;
   const saisonNow = getSaison(moisCourant);
@@ -2568,7 +2599,7 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
       )}
 
       {/* Mini calendar INTERACTIF */}
-      <CalendrierInteractif passages={passages} rdvs={rdvs} clients={clients} onClientClick={onClientClick}/>
+      <CalendrierInteractif passages={passages} rdvs={rdvs} clients={clients} onClientClick={onClientClick} onEditPassage={onEditPassage} onEditRdv={onEditRdv}/>
 
       {/* Alertes */}
       {(()=>{
@@ -2936,6 +2967,54 @@ function LoginScreen({ onLogin }) {
 }
 
 // APP ROOT
+const PRODUITS_DEFAUT = ["Chlore lent Galet","PH minus","Flocculant","Anti-calcaire","Anti-Algues","Anti-Phosphate","Éponge Magique","Filtre à cartouche","Tac+","Chlore granule","Hypochlorite","Anti-Algues moutarde","Sac de sel"];
+
+function ModalStock({ stock, onClose, onUpdateStock, onAddProduit, onDeleteProduit }) {
+  const [newProduit, setNewProduit] = useState("");
+  const produitsListe = Object.keys(stock);
+
+  return (
+    <Modal title="📦 Stock produits" onClose={onClose} wide>
+      <Section title="Ajouter un produit personnalisé">
+        <div style={{display:"flex",gap:8}}>
+          <input value={newProduit} onChange={e=>setNewProduit(e.target.value)} placeholder="Nom du produit..."
+            onKeyDown={e=>e.key==="Enter"&&newProduit.trim()&&(onAddProduit(newProduit.trim()),setNewProduit(""))}
+            style={{flex:1,padding:"11px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:14,outline:"none",fontFamily:"inherit",color:DS.dark}}/>
+          <BtnPrimary onClick={()=>{if(newProduit.trim()){onAddProduit(newProduit.trim());setNewProduit("");}}} icon={Ico.plus(14,"#fff")} bg={DS.blue}>Ajouter</BtnPrimary>
+        </div>
+      </Section>
+      <Section title="Quantités en stock">
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {produitsListe.map(p=>{
+            const qty = stock[p] ?? 0;
+            const low = qty <= 2;
+            return (
+              <div key={p} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:DS.radiusSm,background:low?DS.redSoft:DS.white,border:"1.5px solid "+(low?"#fca5a5":DS.border)}}>
+                <div style={{flex:1}}>
+                  <span style={{fontSize:13,fontWeight:600,color:DS.dark}}>{p}</span>
+                  {low&&<span style={{marginLeft:8,fontSize:10,fontWeight:700,color:DS.red}}>⚠️ Stock bas</span>}
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <button onClick={()=>onUpdateStock(p, Math.max(0, qty-1))} style={{width:28,height:28,borderRadius:8,border:"1px solid "+DS.border,background:DS.light,cursor:"pointer",fontSize:16,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                  <span style={{fontSize:16,fontWeight:900,color:low?DS.red:DS.dark,minWidth:28,textAlign:"center"}}>{qty}</span>
+                  <button onClick={()=>onUpdateStock(p, qty+1)} style={{width:28,height:28,borderRadius:8,border:"1px solid "+DS.blue,background:DS.blueSoft,cursor:"pointer",fontSize:16,fontWeight:700,color:DS.blue,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                </div>
+                {!PRODUITS_DEFAUT.includes(p) && (
+                  <button onClick={()=>{if(confirm(`Supprimer "${p}" du stock ?`))onDeleteProduit(p);}} style={{width:28,height:28,borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(12,DS.red)}</button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </Section>
+      <div style={{padding:"12px 16px",background:"linear-gradient(135deg,#0c1222,#1a365d)",borderRadius:DS.radiusSm,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <span style={{color:"rgba(255,255,255,0.7)",fontSize:12,fontWeight:600}}>Produits en stock bas (≤2)</span>
+        <span style={{color:"#fca5a5",fontSize:16,fontWeight:900}}>{Object.values(stock).filter(q=>q<=2).length}</span>
+      </div>
+    </Modal>
+  );
+}
+
 export default function App() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [page, setPage] = useState("dashboard");
@@ -2943,6 +3022,8 @@ export default function App() {
   const [passages, setPassages] = useState([]);
   const [livraisons, setLivraisons] = useState([]);
   const [rdvs, setRdvs] = useState([]);
+  const [stock, setStock] = useState({});
+  const [showStock, setShowStock] = useState(false);
   const [ready, setReady] = useState(false);
   const [ficheClient, setFicheClient] = useState(null);
   const [showFormClient, setShowFormClient] = useState(false);
@@ -2967,9 +3048,12 @@ export default function App() {
       const p = await load("bb_passages_v2", PASSAGES_INIT);
       const l = await load("bb_livraisons_v1", []);
       const r = await load("bb_rdvs_v1", []);
+      const s = await load("bb_stock_v1", Object.fromEntries(PRODUITS_DEFAUT.map(p=>[p,0])));
+      // Ensure all default products exist in stock
+      const sWithDefaults = {...Object.fromEntries(PRODUITS_DEFAUT.map(p=>[p, s[p]??0])), ...s};
 // Migrate saisons format for existing clients
       const cMigrated = c.map(cl => ({...cl, moisParMois: migrateMois(cl.moisParMois||cl.saisons), photoPiscine: cl.photoPiscine||"", prixPassageE: cl.prixPassageE||0, prixPassageC: cl.prixPassageC||0}));
-      setClients(cMigrated); setPassages(p); setLivraisons(l); setRdvs(r); setReady(true);
+      setClients(cMigrated); setPassages(p); setLivraisons(l); setRdvs(r); setStock(sWithDefaults); setReady(true);
     })();
   },[loggedIn]);
 
@@ -2977,6 +3061,7 @@ export default function App() {
   useEffect(()=>{ if(ready) save("bb_passages_v2", passages); },[passages,ready]);
   useEffect(()=>{ if(ready) save("bb_livraisons_v1", livraisons); },[livraisons,ready]);
   useEffect(()=>{ if(ready) save("bb_rdvs_v1", rdvs); },[rdvs,ready]);
+  useEffect(()=>{ if(ready) save("bb_stock_v1", stock); },[stock,ready]);
 
 // Notification sound when new tasks appear
   useEffect(()=>{
@@ -3003,9 +3088,23 @@ export default function App() {
   const deletePassage = useCallback(id=>setPassages(prev=>prev.filter(x=>x.id!==id)),[]);
   const openAddPassageFromClient = useCallback(cid=>{ setEditPassage(null);setDefaultClientId(cid);setShowFormPassage(true); },[]);
   const openEditPassage = useCallback(p=>{ setEditPassage(p);setDefaultClientId(p.clientId);setShowFormPassage(true); },[]);
-  const saveLivraison = useCallback(l=>{ setLivraisons(prev=>prev.find(x=>x.id===l.id)?prev.map(x=>x.id===l.id?l:x):[...prev,l]); },[]);
+  const saveLivraison = useCallback(l=>{ 
+    setLivraisons(prev=>prev.find(x=>x.id===l.id)?prev.map(x=>x.id===l.id?l:x):[...prev,l]);
+    // Déduire du stock les produits livrés
+    if (l.produits?.length > 0) {
+      setStock(prev => {
+        const next = {...prev};
+        l.produits.forEach(p => { if(next[p] !== undefined) next[p] = Math.max(0, (next[p]||0) - 1); });
+        return next;
+      });
+    }
+  },[]);
   const deleteLivraison = useCallback(id=>setLivraisons(prev=>prev.filter(x=>x.id!==id)),[]);
   const updateStatutLivraison = useCallback((id,statut)=>{ setLivraisons(prev=>prev.map(x=>x.id===id?{...x,statut}:x)); },[]);
+  const updateStock = useCallback((produit, qty) => setStock(prev=>({...prev,[produit]:qty})),[]);
+  const addProduitStock = useCallback((nom) => setStock(prev=>({...prev,[nom]: prev[nom]??0})),[]);
+  const deleteProduitStock = useCallback((nom) => setStock(prev=>{ const n={...prev}; delete n[nom]; return n; }),[]);
+  const nbStockBas = useMemo(()=>Object.values(stock).filter(q=>q<=2).length,[stock]);
   const saveRdv = useCallback(r=>{ setRdvs(prev=>prev.find(x=>x.id===r.id)?prev.map(x=>x.id===r.id?r:x):[...prev,r]); setShowFormRdv(false);setEditRdv(null); },[]);
   const deleteRdv = useCallback(id=>setRdvs(prev=>prev.filter(x=>x.id!==id)),[]);
 
@@ -3056,21 +3155,25 @@ export default function App() {
           </div>
         </button>
         <div style={{flex:1}} />
-        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+        <div style={{display:"flex",gap:4,alignItems:"center"}}>
+          <button onClick={()=>setShowStock(true)} className="btn-hover" style={{position:"relative",width:34,height:34,borderRadius:10,background:"rgba(5,150,105,0.2)",border:"1px solid rgba(5,150,105,0.35)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            {Ico.cart(17,"#6ee7b7")}
+            {nbStockBas>0&&<span style={{position:"absolute",top:-4,right:-4,width:16,height:16,borderRadius:8,background:DS.red,color:"#fff",fontSize:8,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid rgba(0,0,0,0.4)"}}>{nbStockBas}</span>}
+          </button>
           {nbAlertes>0&&(
-            <button onClick={()=>setShowModalAlertes(true)} className="btn-hover" style={{position:"relative",width:38,height:38,borderRadius:12,background:"rgba(239,68,68,0.15)",border:"1px solid rgba(239,68,68,0.3)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-              {Ico.alert(16,"#fca5a5")}
-              <span style={{position:"absolute",top:-4,right:-4,width:18,height:18,borderRadius:9,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid rgba(0,0,0,0.4)"}}>{nbAlertes}</span>
+            <button onClick={()=>setShowModalAlertes(true)} className="btn-hover" style={{position:"relative",width:34,height:34,borderRadius:10,background:"rgba(239,68,68,0.15)",border:"1px solid rgba(239,68,68,0.3)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              {Ico.alert(15,"#fca5a5")}
+              <span style={{position:"absolute",top:-4,right:-4,width:16,height:16,borderRadius:8,background:"#ef4444",color:"#fff",fontSize:8,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid rgba(0,0,0,0.4)"}}>{nbAlertes}</span>
             </button>
           )}
-          <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} className="btn-hover" style={{width:38,height:38,borderRadius:12,background:"rgba(14,165,233,0.2)",border:"1px solid rgba(14,165,233,0.35)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-            {Ico.clipboard(17,"#7dd3fc")}
+          <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} className="btn-hover" style={{width:34,height:34,borderRadius:10,background:"rgba(14,165,233,0.2)",border:"1px solid rgba(14,165,233,0.35)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            {Ico.clipboard(15,"#7dd3fc")}
           </button>
-          <button onClick={openAddClient} className="btn-hover" style={{width:38,height:38,borderRadius:12,background:"rgba(124,58,237,0.2)",border:"1px solid rgba(124,58,237,0.35)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-            {Ico.userPlus(17,"#c4b5fd")}
+          <button onClick={openAddClient} className="btn-hover" style={{width:34,height:34,borderRadius:10,background:"rgba(124,58,237,0.2)",border:"1px solid rgba(124,58,237,0.35)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            {Ico.userPlus(15,"#c4b5fd")}
           </button>
-          <button onClick={handleLogout} className="btn-hover" style={{width:38,height:38,borderRadius:12,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <button onClick={handleLogout} className="btn-hover" style={{width:34,height:34,borderRadius:10,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           </button>
         </div>
       </div>
@@ -3084,7 +3187,7 @@ export default function App() {
             {page==="dashboard"&&<p style={{margin:"2px 0 0",color:DS.mid,fontSize:12,fontWeight:500}}>Aujourd'hui tâchons de ne rien oublier ;)</p>}
           </div>
           <div style={{padding:"6px 16px 110px"}}>
-            {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}}/>}
+            {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}}/>}
             {page==="clients"&&<PageClients clients={clients} passages={passages} onClientClick={setFicheClient} onAdd={openAddClient}/>}
             {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus}/>}
             {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
@@ -3129,7 +3232,7 @@ export default function App() {
                 <h2 style={{margin:0,fontSize:24,fontWeight:900,color:DS.dark,letterSpacing:-0.5}}>{PAGE_LABELS[page]}</h2>
                 {page==="dashboard"&&<p style={{margin:"2px 0 0",color:DS.mid,fontSize:13,fontWeight:500}}>Aujourd'hui tâchons de ne rien oublier ;)</p>}
               </div>
-              {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}}/>}
+              {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}}/>}
               {page==="clients"&&<PageClients clients={clients} passages={passages} onClientClick={setFicheClient} onAdd={openAddClient}/>}
               {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus}/>}
               {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
@@ -3154,13 +3257,14 @@ export default function App() {
       {/* MODALS */}
       {ficheClient&&(()=>{
         const latest=clients.find(c=>c.id===ficheClient.id)||ficheClient;
-        return <FicheClient client={latest} passages={passages} livraisons={livraisons.filter(l=>l.clientId===latest.id)} rdvs={rdvs} onSaveLivraison={saveLivraison} onDeleteLivraison={deleteLivraison} onUpdateStatutLivraison={updateStatutLivraison} onClose={()=>setFicheClient(null)} onEdit={()=>{setEditClient(latest);setShowFormClient(true);setFicheClient(null);}} onDelete={()=>deleteClient(latest.id)} onAddPassage={()=>openAddPassageFromClient(latest.id)} onEditPassage={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddRdv={()=>{setEditRdv({clientId:latest.id});setShowFormRdv(true);}} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} onDeleteRdv={deleteRdv}/>;
+        return <FicheClient client={latest} passages={passages} livraisons={livraisons.filter(l=>l.clientId===latest.id)} rdvs={rdvs} produitsStock={Object.keys(stock)} onSaveLivraison={saveLivraison} onDeleteLivraison={deleteLivraison} onUpdateStatutLivraison={updateStatutLivraison} onClose={()=>setFicheClient(null)} onEdit={()=>{setEditClient(latest);setShowFormClient(true);setFicheClient(null);}} onDelete={()=>deleteClient(latest.id)} onAddPassage={()=>openAddPassageFromClient(latest.id)} onEditPassage={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddRdv={()=>{setEditRdv({clientId:latest.id});setShowFormRdv(true);}} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} onDeleteRdv={deleteRdv}/>;
       })()}
 
       {showFormClient&&<FormClient initial={editClient} clients={clients} onSave={saveClient} onClose={()=>{setShowFormClient(false);setEditClient(null);}}/>}
-      {showFormPassage&&<FormPassage clients={clients} defaultClientId={defaultClientId} initial={editPassage} onSave={p=>savePassage(p)} onSaveLivraison={saveLivraison} onClose={()=>{setShowFormPassage(false);setEditPassage(null);}}/>}
-      {showFormLivraison&&<FormLivraison clientId={defaultLivraisonClientId} clients={clients} onSave={l=>{saveLivraison(l);setShowFormLivraison(false);}} onClose={()=>setShowFormLivraison(false)}/>}
+      {showFormPassage&&<FormPassage clients={clients} defaultClientId={defaultClientId} initial={editPassage} onSave={p=>savePassage(p)} onSaveLivraison={saveLivraison} produitsStock={Object.keys(stock)} onClose={()=>{setShowFormPassage(false);setEditPassage(null);}}/>}
+      {showFormLivraison&&<FormLivraison clientId={defaultLivraisonClientId} clients={clients} produitsStock={Object.keys(stock)} onSave={l=>{saveLivraison(l);setShowFormLivraison(false);}} onClose={()=>setShowFormLivraison(false)}/>}
       {showFormRdv&&<FormRdv initial={editRdv} clients={clients} onSave={saveRdv} onClose={()=>{setShowFormRdv(false);setEditRdv(null);}}/>}
+      {showStock&&<ModalStock stock={stock} onClose={()=>setShowStock(false)} onUpdateStock={updateStock} onAddProduit={addProduitStock} onDeleteProduit={deleteProduitStock}/>}
 
       {/* MODAL ALERTES */}
       {showModalAlertes&&(()=>{
