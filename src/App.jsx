@@ -232,6 +232,20 @@ function uid() { return Date.now() + Math.random().toString(36).slice(2); }
 const TODAY = new Date().toISOString().split("T")[0];
 const MOIS_NOW = new Date().getMonth() + 1;
 const YEAR_NOW = new Date().getFullYear();
+const MAX_CLIENT_PHOTOS = 10;
+
+function normalizePhotoList(value) {
+  if (Array.isArray(value)) return value.filter(Boolean).slice(0, MAX_CLIENT_PHOTOS);
+  if (typeof value === "string" && value) return [value];
+  return [];
+}
+function getClientPhotos(client) {
+  if (!client) return [];
+  return normalizePhotoList(client.photosPiscine ?? client.photoPiscine);
+}
+function getClientCoverPhoto(client) {
+  return getClientPhotos(client)[0] || "";
+}
 
 
 // ICS EXPORT
@@ -491,44 +505,80 @@ function Select({ label, options, ...p }) {
 function PhotoPicker({ label, value, onChange, compact }) {
   const cameraRef = useRef(null);
   const galleryRef = useRef(null);
-  const handleFile = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => onChange(reader.result);
-    reader.readAsDataURL(file);
+  const photos = normalizePhotoList(value);
+  const canAddMore = photos.length < MAX_CLIENT_PHOTOS;
+
+  const readFiles = (files) => Promise.all(
+    files.map(file => new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    }))
+  );
+
+  const handleFiles = async (e) => {
+    const picked = Array.from(e.target.files || []);
+    if (!picked.length) return;
+    const slots = MAX_CLIENT_PHOTOS - photos.length;
+    if (slots <= 0) {
+      e.target.value = "";
+      alert(`Maximum ${MAX_CLIENT_PHOTOS} photos`);
+      return;
+    }
+    const images = (await readFiles(picked.slice(0, slots))).filter(Boolean);
+    onChange([...photos, ...images].slice(0, MAX_CLIENT_PHOTOS));
     e.target.value = "";
   };
+
+  const removePhoto = (index) => onChange(photos.filter((_, i) => i !== index));
 
   return (
     <div>
       {label && (
-        <span style={{fontSize:15,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:8}}>
-          {label}
-        </span>
-      )}
-      {value ? (
-        <div style={{position:"relative",borderRadius:DS.radius,overflow:"hidden",border:"2px solid "+DS.blue,background:"#000"}}>
-          <img src={value} alt="photo" style={{width:"100%",maxHeight:compact?120:220,objectFit:"cover",display:"block"}}/>
-          <button onClick={() => onChange("")} style={{position:"absolute",top:8,right:8,width:32,height:32,borderRadius:16,background:"rgba(0,0,0,0.6)",border:"2px solid rgba(255,255,255,0.4)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2}}>{Ico.close(14,"#fff")}</button>
-          <button onClick={() => cameraRef.current?.click()} style={{position:"absolute",bottom:8,right:8,padding:"6px 12px",borderRadius:10,background:"rgba(0,0,0,0.55)",border:"1px solid rgba(255,255,255,0.3)",cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontSize:15,fontWeight:600,color:"#fff",fontFamily:"inherit"}}>{Ico.camera(13,"#fff")} Reprendre</button>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+          <span style={{fontSize:15,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block"}}>
+            {label}
+          </span>
+          <Tag color={photos.length >= MAX_CLIENT_PHOTOS ? DS.orange : DS.blue} bg={photos.length >= MAX_CLIENT_PHOTOS ? DS.orangeSoft : DS.blueSoft}>
+            {photos.length}/{MAX_CLIENT_PHOTOS}
+          </Tag>
         </div>
-      ) : (
+      )}
+
+      {photos.length > 0 && (
+        <div style={{display:"grid",gridTemplateColumns:compact?"repeat(2, 1fr)":"repeat(auto-fill, minmax(140px, 1fr))",gap:10,marginBottom:12}}>
+          {photos.map((photo, index) => (
+            <div key={photo.slice(0, 40) + index} style={{position:"relative",borderRadius:DS.radius,overflow:"hidden",border:index===0?"2px solid "+DS.blue:"1px solid "+DS.border,background:"#000",minHeight:compact?110:140}}>
+              <img src={photo} alt={`photo ${index+1}`} style={{width:"100%",height:"100%",minHeight:compact?110:140,maxHeight:compact?120:180,objectFit:"cover",display:"block"}}/>
+              {index===0 && <div style={{position:"absolute",left:8,bottom:8,padding:"4px 8px",borderRadius:999,background:"rgba(3,105,161,0.9)",color:"#fff",fontSize:12,fontWeight:800}}>Photo principale</div>}
+              <button type="button" onClick={() => removePhoto(index)} style={{position:"absolute",top:8,right:8,width:32,height:32,borderRadius:16,background:"rgba(0,0,0,0.65)",border:"2px solid rgba(255,255,255,0.35)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2}}>{Ico.close(14,"#fff")}</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {canAddMore ? (
         <div style={{display:"flex",gap:10}}>
-          <button onClick={() => cameraRef.current?.click()} className="btn-hover" style={{flex:1,padding:"16px 10px",borderRadius:DS.radius,border:"2px dashed "+DS.blue,background:DS.blueSoft,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:8,fontFamily:"inherit"}}>
+          <button type="button" onClick={() => cameraRef.current?.click()} className="btn-hover" style={{flex:1,padding:"16px 10px",borderRadius:DS.radius,border:"2px dashed "+DS.blue,background:DS.blueSoft,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:8,fontFamily:"inherit"}}>
             {Ico.camera(24,DS.blue)}
-            <span style={{fontSize:15,fontWeight:700,color:DS.blue}}>Caméra</span>
-            <span style={{fontSize:15,color:DS.mid}}>Photo directe</span>
+            <span style={{fontSize:15,fontWeight:700,color:DS.blue}}>{photos.length ? "Ajouter une photo" : "Caméra"}</span>
+            <span style={{fontSize:15,color:DS.mid}}>{photos.length ? "Prendre une photo en plus" : "Photo directe"}</span>
           </button>
-          <button onClick={() => galleryRef.current?.click()} className="btn-hover" style={{flex:1,padding:"16px 10px",borderRadius:DS.radius,border:"2px dashed "+DS.border,background:DS.light,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:8,fontFamily:"inherit"}}>
+          <button type="button" onClick={() => galleryRef.current?.click()} className="btn-hover" style={{flex:1,padding:"16px 10px",borderRadius:DS.radius,border:"2px dashed "+DS.border,background:DS.light,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:8,fontFamily:"inherit"}}>
             {Ico.image(24,DS.mid)}
             <span style={{fontSize:15,fontWeight:700,color:DS.mid}}>Galerie</span>
-            <span style={{fontSize:15,color:"#94a3b8"}}>Depuis l'album</span>
+            <span style={{fontSize:15,color:"#94a3b8"}}>Jusqu'à {MAX_CLIENT_PHOTOS} photos</span>
           </button>
         </div>
+      ) : (
+        <div style={{padding:"12px 14px",borderRadius:DS.radius,border:"1px dashed "+DS.orange,background:DS.orangeSoft,color:DS.orange,fontSize:14,fontWeight:700}}>
+          Limite atteinte : maximum {MAX_CLIENT_PHOTOS} photos par client.
+        </div>
       )}
-      <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleFile}/>
-      <input ref={galleryRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleFile}/>
+
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleFiles}/>
+      <input ref={galleryRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={handleFiles}/>
     </div>
   );
 }
@@ -577,17 +627,22 @@ function FormClient({ initial, clients, onSave, onClose }) {
   const isMobile = useIsMobile();
   const [f, setF] = useState(() => {
     if (initial) {
-      return { ...initial, moisParMois: migrateMois(initial.moisParMois||initial.saisons), photoPiscine: initial.photoPiscine||"", prixPassageE: initial.prixPassageE||0, prixPassageC: initial.prixPassageC||0 };
+      const photosPiscine = getClientPhotos(initial);
+      return { ...initial, moisParMois: migrateMois(initial.moisParMois||initial.saisons), photosPiscine, photoPiscine: photosPiscine[0]||"", prixPassageE: initial.prixPassageE||0, prixPassageC: initial.prixPassageC||0 };
     }
     return {
       id: `C${String(clients.length+1).padStart(3,"0")}`,
       nom:"", tel:"", email:"", adresse:"", bassin:"Liner", volume:30,
-      formule:"VAC", prix:0, prixPassageE:0, prixPassageC:0, dateDebut:TODAY, photoPiscine:"",
+      formule:"VAC", prix:0, prixPassageE:0, prixPassageC:0, dateDebut:TODAY, photoPiscine:"", photosPiscine:[],
       dateFin: `${new Date().getFullYear()+1}-03-31`,
       moisParMois: {...MOIS_PAR_MOIS_DEF},
     };
   });
   const set = (k,v) => setF(p=>({...p,[k]:v}));
+  const setPhotos = (photos) => {
+    const cleanPhotos = normalizePhotoList(photos);
+    setF(p=>({...p, photosPiscine: cleanPhotos, photoPiscine: cleanPhotos[0] || ""}));
+  };
   const setMoisVal = (m,type,v) => setF(p=>({...p,moisParMois:{...p.moisParMois,[m]:{...p.moisParMois[m],[type]:Math.max(0,v)}}}));
   const totalE = totalAnnuel(f.moisParMois,"entretien");
   const totalC = totalAnnuel(f.moisParMois,"controle");
@@ -605,8 +660,8 @@ function FormClient({ initial, clients, onSave, onClose }) {
           <Input label="Volume (m³)" type="number" value={f.volume} onChange={e=>set("volume",+e.target.value)}/>
         </div>
       </Section>
-      <Section title="Photo de la piscine">
-        <PhotoPicker value={f.photoPiscine||""} onChange={v=>set("photoPiscine",v)} compact/>
+      <Section title="Photos de la piscine">
+        <PhotoPicker value={f.photosPiscine||[]} onChange={setPhotos} compact/>
       </Section>
       <Section title="Contrat">
         <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr 1fr",gap:12}}>
@@ -675,7 +730,7 @@ function FormClient({ initial, clients, onSave, onClose }) {
       </Section>
       <div style={{display:"flex",gap:10}}>
         <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
-        <BtnPrimary onClick={()=>{ if(!f.nom.trim()) return alert("Nom requis"); const prixCalc=totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0); onSave({...f, prix:prixCalc||f.prix||0}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
+        <BtnPrimary onClick={()=>{ if(!f.nom.trim()) return alert("Nom requis"); const prixCalc=totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0); const photosPiscine = normalizePhotoList(f.photosPiscine||f.photoPiscine); onSave({...f, photosPiscine, photoPiscine: photosPiscine[0]||"", prix:prixCalc||f.prix||0}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
       </div>
     </Modal>
   );
@@ -3326,7 +3381,10 @@ export default function App() {
       const ct = await load("bb_contrats_v1", {});
       const sWithDefaults = {...Object.fromEntries(PRODUITS_DEFAUT.map(nom=>[nom, s[nom]??0])), ...s};
 // Migrate saisons format for existing clients
-      const cMigrated = c.map(cl => ({...cl, moisParMois: migrateMois(cl.moisParMois||cl.saisons), photoPiscine: cl.photoPiscine||"", prixPassageE: cl.prixPassageE||0, prixPassageC: cl.prixPassageC||0}));
+      const cMigrated = c.map(cl => {
+        const photosPiscine = getClientPhotos(cl);
+        return {...cl, moisParMois: migrateMois(cl.moisParMois||cl.saisons), photosPiscine, photoPiscine: photosPiscine[0]||"", prixPassageE: cl.prixPassageE||0, prixPassageC: cl.prixPassageC||0};
+      });
       setClients(cMigrated); setPassages(passages_data); setLivraisons(l); setRdvs(r); setStock(sWithDefaults); setContrats(ct); setReady(true);
     })();
   },[loggedIn]);
