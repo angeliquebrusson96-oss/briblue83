@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+ import { createClient } from '@supabase/supabase-js'
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 
 const supabase = createClient(
@@ -1578,13 +1578,17 @@ function genererHTMLRapport(passage, client) {
   const sigTech = passage.signatureTech ? `<img src="${passage.signatureTech}" class="sig-img"/>` : `<div class="sig-empty">Non signée</div>`;
   const sigClient = passage.signatureClient ? `<img src="${passage.signatureClient}" class="sig-img"/>` : `<div class="sig-empty">Non signée</div>`;
 
-  const hasPhotos = passage.photoArrivee || passage.photoDepart;
+  const hasPhotos = passage.photoArrivee || passage.photoDepart || (passage.photos||[]).some(Boolean);
+  const allPhotos = [
+    passage.photoArrivee ? {src:passage.photoArrivee, label:"À l'arrivée"} : null,
+    passage.photoDepart ? {src:passage.photoDepart, label:"Au départ"} : null,
+    ...((passage.photos||[]).map((p,i)=>p?{src:p,label:`Photo ${i+3}`}:null)),
+  ].filter(Boolean);
   const sectionPhotos = hasPhotos ? `
 <div class="section">
   <div class="section-title"><span class="sec-icon">📸</span> Photos d'intervention</div>
-  <div class="section-body" style="display:grid;grid-template-columns:${passage.photoArrivee && passage.photoDepart ? "1fr 1fr" : "1fr"};gap:16px">
-    ${passage.photoArrivee ? `<div><div class="photo-label">À l'arrivée</div><img src="${passage.photoArrivee}" class="photo"/></div>` : ""}
-    ${passage.photoDepart ? `<div><div class="photo-label">Au départ</div><img src="${passage.photoDepart}" class="photo"/></div>` : ""}
+  <div class="section-body" style="display:grid;grid-template-columns:${allPhotos.length===1?"1fr":"1fr 1fr"};gap:16px">
+    ${allPhotos.map(p=>`<div><div class="photo-label">${p.label}</div><img src="${p.src}" class="photo"/></div>`).join("")}
   </div>
 </div>` : "";
 
@@ -1832,6 +1836,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
     signatureTech:"", signatureClient:"",
     photoArrivee:"",
     photoDepart:"",
+    photos:[],  // extra photos (up to 4 total)
     ok:false,
     rapportStatut:"saisie",
   };
@@ -1960,13 +1965,38 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
     <Modal title={isEdit ? "Modifier le passage" : "Fiche Entretien"} onClose={onClose} wide>
       {/* Bandeau client sélectionné */}
       {clientSel && (
-        <div style={{margin:"-24px -28px 16px",marginTop:isMobile?"-18px":"-24px",marginLeft:isMobile?"-20px":"-28px",marginRight:isMobile?"-20px":"-28px",background:"linear-gradient(135deg,#0c1222,#0f2a4a)",padding:"12px 20px",display:"flex",alignItems:"center",gap:12}}>
-          <Avatar nom={clientSel.nom} size={36}/>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontWeight:800,fontSize:13,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{clientSel.nom}</div>
-            <div style={{fontSize:11,color:"rgba(255,255,255,0.5)",marginTop:1}}>{clientSel.formule} · {clientSel.bassin} {clientSel.volume?clientSel.volume+"m³":""}</div>
+        <div style={{margin:"-24px -28px 16px",marginTop:isMobile?"-18px":"-24px",marginLeft:isMobile?"-20px":"-28px",marginRight:isMobile?"-20px":"-28px",position:"relative",overflow:"hidden"}}>
+          {/* Fond avec photo piscine si dispo */}
+          {clientSel.photoPiscine
+            ? <div style={{position:"absolute",inset:0,background:`url(${clientSel.photoPiscine}) center/cover`,filter:"brightness(0.35)"}}/>
+            : <div style={{position:"absolute",inset:0,background:"linear-gradient(135deg,#0c1222 0%,#0f2a4a 50%,#0369a1 100%)"}}/>
+          }
+          {/* Motif décoratif */}
+          <div style={{position:"absolute",top:-30,right:-30,width:140,height:140,borderRadius:70,background:"rgba(56,189,248,0.08)",pointerEvents:"none"}}/>
+          <div style={{position:"absolute",bottom:-20,left:-20,width:100,height:100,borderRadius:50,background:"rgba(14,165,233,0.06)",pointerEvents:"none"}}/>
+          <div style={{position:"relative",padding:"16px 20px",display:"flex",alignItems:"center",gap:14}}>
+            <div style={{position:"relative"}}>
+              <Avatar nom={clientSel.nom} size={48}/>
+              <div style={{position:"absolute",bottom:-3,right:-3,width:16,height:16,borderRadius:8,background:DS.green,border:"2px solid #0c1222",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                {Ico.check(8,"#fff")}
+              </div>
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:900,fontSize:15,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:-0.3}}>{clientSel.nom}</div>
+              <div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap"}}>
+                <span style={{background:"rgba(56,189,248,0.2)",color:"#7dd3fc",fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:6,border:"1px solid rgba(56,189,248,0.3)"}}>{clientSel.formule}</span>
+                {clientSel.bassin&&<span style={{background:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.7)",fontSize:10,fontWeight:600,padding:"2px 8px",borderRadius:6}}>{clientSel.bassin}{clientSel.volume?" "+clientSel.volume+"m³":""}</span>}
+                <span style={{background:"rgba(14,165,233,0.25)",color:"#38bdf8",fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:6,border:"1px solid rgba(14,165,233,0.3)"}}>{new Date(f.date).toLocaleDateString("fr",{weekday:"short",day:"2-digit",month:"short"})}</span>
+              </div>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
+              <div style={{background:"rgba(5,150,105,0.2)",border:"1px solid rgba(5,150,105,0.4)",borderRadius:8,padding:"4px 10px",display:"flex",alignItems:"center",gap:5}}>
+                {Ico.pool(13,"#6ee7b7")}
+                <span style={{fontSize:10,fontWeight:700,color:"#6ee7b7"}}>Entretien</span>
+              </div>
+              <div style={{fontSize:10,color:"rgba(255,255,255,0.4)",fontWeight:500}}>{clientSel.adresse?.split(",").pop()?.trim()||""}</div>
+            </div>
           </div>
-          <Tag color="#38bdf8" bg="rgba(56,189,248,0.15)">{new Date(f.date).toLocaleDateString("fr",{day:"2-digit",month:"short"})}</Tag>
         </div>
       )}
       <Stepper/>
@@ -2032,7 +2062,16 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
             </div>
           </div>
           <div style={{borderTop:"1px solid "+DS.border,paddingTop:16,marginTop:16}}>
-            <PhotoPicker label="Photo à l'arrivée" value={f.photoArrivee} onChange={v=>set("photoArrivee",v)}/>
+            <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:10}}>Photos ({[f.photoArrivee,f.photoDepart,...(f.photos||[])].filter(Boolean).length}/4)</span>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              {/* Photo arrivée */}
+              <PhotoPicker label="Arrivée" value={f.photoArrivee} onChange={v=>set("photoArrivee",v)} compact/>
+              {/* Photo départ */}
+              <PhotoPicker label="Départ" value={f.photoDepart} onChange={v=>set("photoDepart",v)} compact/>
+              {/* Photos supplémentaires 3 et 4 */}
+              <PhotoPicker label="Photo 3" value={(f.photos||[])[0]||""} onChange={v=>set("photos",[(v),(f.photos||[])[1]||""].filter((x,i)=>i>0||x))} compact/>
+              <PhotoPicker label="Photo 4" value={(f.photos||[])[1]||""} onChange={v=>set("photos",[(f.photos||[])[0]||"",(v)].filter((x,i)=>i>1||x))} compact/>
+            </div>
           </div>
         </div>
       )}
@@ -2243,9 +2282,6 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                 <StarRating value={f.ressenti} onChange={v=>set("ressenti",v)}/>
               </div>
               <OuiNon label="Présence du locataire / propriétaire ?" value={f.presenceClient} onChange={v=>set("presenceClient",v)}/>
-              <div style={{borderTop:"1px solid "+DS.border,paddingTop:14}}>
-                <PhotoPicker label="Photo au départ" value={f.photoDepart} onChange={v=>set("photoDepart",v)}/>
-              </div>
               <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",background:`linear-gradient(135deg,${DS.greenSoft},#bbf7d0)`,padding:"14px 16px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.green+"44",marginTop:4,transition:"all .2s"}}>
                 <input type="checkbox" checked={f.ok} onChange={e=>set("ok",e.target.checked)} style={{width:20,height:20,accentColor:DS.green}}/>
                 <span style={{fontWeight:800,color:"#16a34a",fontSize:14,display:"flex",alignItems:"center",gap:6}}>
@@ -2263,12 +2299,13 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
             <SignaturePad label="Signature du technicien" value={f.signatureTech} onChange={v=>set("signatureTech",v)}/>
             <SignaturePad label="Signature du client / propriétaire" value={f.signatureClient} onChange={v=>set("signatureClient",v)}/>
           </div>
-          {(f.photoArrivee||f.photoDepart) && (
+          {(f.photoArrivee||f.photoDepart||(f.photos||[]).some(Boolean)) && (
             <div style={{background:DS.light,borderRadius:DS.radiusSm,padding:14,border:"1px solid "+DS.border,marginBottom:16}}>
               <div style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Photos jointes au rapport</div>
-              <div style={{display:"grid",gridTemplateColumns:f.photoArrivee&&f.photoDepart?"1fr 1fr":"1fr",gap:10}}>
-                {f.photoArrivee && (<div style={{position:"relative"}}><img src={f.photoArrivee} alt="Arrivée" style={{width:"100%",height:100,objectFit:"cover",borderRadius:10,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:5,left:6,fontSize:10,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:5,padding:"2px 7px"}}>Arrivée</span></div>)}
-                {f.photoDepart && (<div style={{position:"relative"}}><img src={f.photoDepart} alt="Départ" style={{width:"100%",height:100,objectFit:"cover",borderRadius:10,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:5,left:6,fontSize:10,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:5,padding:"2px 7px"}}>Départ</span></div>)}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                {f.photoArrivee && (<div style={{position:"relative"}}><img src={f.photoArrivee} alt="Arrivée" style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Arrivée</span></div>)}
+                {f.photoDepart && (<div style={{position:"relative"}}><img src={f.photoDepart} alt="Départ" style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Départ</span></div>)}
+                {(f.photos||[]).map((ph,i)=>ph?(<div key={i} style={{position:"relative"}}><img src={ph} alt={`Photo ${i+3}`} style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Photo {i+3}</span></div>):null)}
               </div>
             </div>
           )}
