@@ -3045,15 +3045,15 @@ export default function App() {
     if(!loggedIn) return;
     (async()=>{
       const c = await load("bb_clients_v2", CLIENTS_INIT);
-      const p = await load("bb_passages_v2", PASSAGES_INIT);
+      const passages_data = await load("bb_passages_v2", PASSAGES_INIT);
       const l = await load("bb_livraisons_v1", []);
       const r = await load("bb_rdvs_v1", []);
-      const s = await load("bb_stock_v1", Object.fromEntries(PRODUITS_DEFAUT.map(p=>[p,0])));
+      const s = await load("bb_stock_v1", Object.fromEntries(PRODUITS_DEFAUT.map(nom=>[nom,0])));
       // Ensure all default products exist in stock
-      const sWithDefaults = {...Object.fromEntries(PRODUITS_DEFAUT.map(p=>[p, s[p]??0])), ...s};
+      const sWithDefaults = {...Object.fromEntries(PRODUITS_DEFAUT.map(nom=>[nom, s[nom]??0])), ...s};
 // Migrate saisons format for existing clients
       const cMigrated = c.map(cl => ({...cl, moisParMois: migrateMois(cl.moisParMois||cl.saisons), photoPiscine: cl.photoPiscine||"", prixPassageE: cl.prixPassageE||0, prixPassageC: cl.prixPassageC||0}));
-      setClients(cMigrated); setPassages(p); setLivraisons(l); setRdvs(r); setStock(sWithDefaults); setReady(true);
+      setClients(cMigrated); setPassages(passages_data); setLivraisons(l); setRdvs(r); setStock(sWithDefaults); setReady(true);
     })();
   },[loggedIn]);
 
