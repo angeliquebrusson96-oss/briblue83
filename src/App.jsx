@@ -1961,12 +1961,12 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
     (c="currentColor",s=16) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.85 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/><path d="M15 5l4 4"/></svg>,
   ];
   const STEP_INFO = [
-    {ic:STEP_ICONS[0],l:"Intervention",color:"#0369a1"},
-    {ic:STEP_ICONS[1],l:"Analyses eau",color:"#0891b2"},
-    {ic:STEP_ICONS[2],l:"État bassin",color:"#059669"},
+    {ic:STEP_ICONS[0],l:isMobile?"Interv.":"Intervention",color:"#0369a1"},
+    {ic:STEP_ICONS[1],l:isMobile?"Analyses":"Analyses eau",color:"#0891b2"},
+    {ic:STEP_ICONS[2],l:isMobile?"Bassin":"État bassin",color:"#059669"},
     {ic:STEP_ICONS[3],l:"Correctifs",color:"#7c3aed"},
     {ic:STEP_ICONS[4],l:"Clôture",color:"#ea580c"},
-    {ic:STEP_ICONS[5],l:"Signatures",color:"#be185d"},
+    {ic:STEP_ICONS[5],l:isMobile?"Sign.":"Signatures",color:"#be185d"},
   ];
 
   const Stepper = () => {
@@ -2017,9 +2017,11 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
       <div style={{display:"flex",marginBottom:14}}>
         {STEP_INFO.map((s,i)=>{
           const done=i+1<step, active=i+1===step;
+          const shortLabel = {Intervention:"Interv.",Analyses:"Analys.","Analyses eau":"Analyses","État bassin":"Bassin",Correctifs:"Correct.",Clôture:"Clôture",Signatures:"Signat."};
+          const label = shortLabel[s.l] || s.l;
           return (
             <div key={i} style={{flex:1,textAlign:"center"}}>
-              <span style={{fontSize:9,fontWeight:active?800:500,color:active?s.color:done?"#059669":DS.mid,letterSpacing:0.3,display:"block",lineHeight:1.2}}>{s.l}</span>
+              <span style={{fontSize:8,fontWeight:active?800:500,color:active?s.color:done?"#059669":DS.mid,letterSpacing:0,display:"block",lineHeight:1.2}}>{label}</span>
             </div>
           );
         })}
@@ -2806,18 +2808,18 @@ function PageClients({ clients, passages, onClientClick, onAdd }) {
           const pct=tot>0?Math.round(eff/tot*100):0;
           const rest=Math.max(0,tot-eff);
           return (
-            <div key={c.id} onClick={()=>onClientClick(c)} className="fade-in card-hover" style={{animationDelay:`${idx*0.03}s`,background:DS.white,borderRadius:DS.radius,overflow:"hidden",boxShadow:DS.shadow,border:"1px solid "+DS.border,cursor:"pointer"}}>
+            <div key={c.id} onClick={()=>onClientClick(c)} className="fade-in card-hover" style={{animationDelay:`${idx*0.03}s`,background:DS.white,borderRadius:DS.radius,overflow:"hidden",boxShadow:DS.shadow,border:"1px solid "+DS.border,cursor:"pointer",width:"100%",boxSizing:"border-box"}}>
               {/* Photo banner or gradient */}
               {c.photoPiscine
                 ? <div style={{height:56,background:`url(${c.photoPiscine}) center/cover`,position:"relative"}}><div style={{position:"absolute",inset:0,background:"linear-gradient(transparent 30%,rgba(0,0,0,0.5))"}}/></div>
                 : <div style={{height:6,background:`linear-gradient(90deg,${col.tx}44,${col.tx}11)`}}/>
               }
               <div style={{padding:"12px 16px"}}>
-                <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
-                  <Avatar nom={c.nom} size={42} photo={c.photoPiscine?null:undefined}/>
-                  <div style={{flex:1,minWidth:0}}>
+                <div style={{display:"flex",gap:10,alignItems:"flex-start",minWidth:0}}>
+                  <Avatar nom={c.nom} size={38} photo={c.photoPiscine?null:undefined}/>
+                  <div style={{flex:1,minWidth:0,overflow:"hidden"}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
-                      <div style={{fontWeight:800,fontSize:14,color:DS.dark,letterSpacing:-0.3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
+                      <div style={{fontWeight:800,fontSize:14,color:DS.dark,letterSpacing:-0.3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{c.nom}</div>
                       <Tag color={col.tx}>{col.lbl}</Tag>
                     </div>
                     <div style={{display:"flex",gap:8,marginTop:4,flexWrap:"wrap",fontSize:11,color:DS.mid}}>
@@ -2903,7 +2905,7 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                           {p.tech&&<><span>·</span>{Ico.user(10,DS.mid)}<span>{p.tech}</span></>}
                         </div>
                       </div>
-                      <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                      <div style={{display:"flex",gap:3,alignItems:"center"}}>
                         {p.ok?<IcoBubble ico={Ico.check(11,DS.green)} color={DS.green} size={24}/>:<IcoBubble ico={Ico.x(11,DS.red)} color={DS.red} size={24}/>}
                       </div>
                     </div>
@@ -3280,7 +3282,7 @@ export default function App() {
   return (
     <>
     <GlobalStyles/>
-    <div style={{minHeight:"100vh",background:DS.bg,fontFamily:"'Inter', -apple-system, system-ui, sans-serif",maxWidth:isMobile?640:1280,margin:"0 auto",position:"relative",display:"flex",flexDirection:"column"}}>
+    <div style={{minHeight:"100vh",background:DS.bg,fontFamily:"'Inter', -apple-system, system-ui, sans-serif",maxWidth:isMobile?640:1280,margin:"0 auto",position:"relative",display:"flex",flexDirection:"column",overflowX:"hidden",width:"100%"}}>
       {/* HEADER MODERNISÉ */}
       <div style={{background:"linear-gradient(135deg,#0c1222 0%,#0f2040 60%,#0369a1 100%)",padding:isMobile?"10px 16px":"12px 28px",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:50,boxShadow:"0 2px 20px rgba(3,105,161,0.35)",backdropFilter:"blur(16px)"}}>
         <button
@@ -3292,29 +3294,29 @@ export default function App() {
             {Ico.wave(isMobile?18:22,"white")}
           </div>
           <div style={{display:"flex",flexDirection:"column",lineHeight:1}}>
-            <span style={{fontWeight:900,fontSize:isMobile?14:18,color:"#fff",letterSpacing:2,fontFamily:"'Inter',sans-serif"}}>BRI<span style={{color:"#38bdf8"}}>'</span>BLUE</span>
+            <span style={{fontWeight:900,fontSize:isMobile?13:18,color:"#fff",letterSpacing:isMobile?1:2,fontFamily:"'Inter',sans-serif"}}>BRI<span style={{color:"#38bdf8"}}>'</span>BLUE</span>
             {!isMobile && <span style={{fontSize:9,color:"rgba(255,255,255,0.55)",fontWeight:500,letterSpacing:0.5,marginTop:1}}>Traitement · Piscines</span>}
           </div>
         </button>
         <div style={{flex:1}} />
-        <div style={{display:"flex",gap:4,alignItems:"center"}}>
-          <button onClick={()=>setShowStock(true)} className="btn-hover" style={{position:"relative",width:34,height:34,borderRadius:10,background:"rgba(5,150,105,0.2)",border:"1px solid rgba(5,150,105,0.35)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-            {Ico.cart(17,"#6ee7b7")}
+        <div style={{display:"flex",gap:isMobile?3:4,alignItems:"center",flexShrink:0}}>
+          <button onClick={()=>setShowStock(true)} className="btn-hover" style={{position:"relative",width:isMobile?32:34,height:isMobile?32:34,borderRadius:10,background:"rgba(5,150,105,0.2)",border:"1px solid rgba(5,150,105,0.35)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            {Ico.cart(isMobile?14:17,"#6ee7b7")}
             {nbStockBas>0&&<span style={{position:"absolute",top:-4,right:-4,width:16,height:16,borderRadius:8,background:DS.red,color:"#fff",fontSize:8,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid rgba(0,0,0,0.4)"}}>{nbStockBas}</span>}
           </button>
           {nbAlertes>0&&(
-            <button onClick={()=>setShowModalAlertes(true)} className="btn-hover" style={{position:"relative",width:34,height:34,borderRadius:10,background:"rgba(239,68,68,0.15)",border:"1px solid rgba(239,68,68,0.3)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-              {Ico.alert(15,"#fca5a5")}
+            <button onClick={()=>setShowModalAlertes(true)} className="btn-hover" style={{position:"relative",width:isMobile?32:34,height:isMobile?32:34,borderRadius:10,background:"rgba(239,68,68,0.15)",border:"1px solid rgba(239,68,68,0.3)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              {Ico.alert(isMobile?13:15,"#fca5a5")}
               <span style={{position:"absolute",top:-4,right:-4,width:16,height:16,borderRadius:8,background:"#ef4444",color:"#fff",fontSize:8,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid rgba(0,0,0,0.4)"}}>{nbAlertes}</span>
             </button>
           )}
-          <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} className="btn-hover" style={{width:34,height:34,borderRadius:10,background:"rgba(14,165,233,0.2)",border:"1px solid rgba(14,165,233,0.35)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-            {Ico.clipboard(15,"#7dd3fc")}
+          <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} className="btn-hover" style={{width:isMobile?32:34,height:isMobile?32:34,borderRadius:10,background:"rgba(14,165,233,0.2)",border:"1px solid rgba(14,165,233,0.35)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            {Ico.clipboard(isMobile?13:15,"#7dd3fc")}
           </button>
-          <button onClick={openAddClient} className="btn-hover" style={{width:34,height:34,borderRadius:10,background:"rgba(124,58,237,0.2)",border:"1px solid rgba(124,58,237,0.35)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          {!isMobile&&<button onClick={openAddClient} className="btn-hover" style={{width:34,height:34,borderRadius:10,background:"rgba(124,58,237,0.2)",border:"1px solid rgba(124,58,237,0.35)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
             {Ico.userPlus(15,"#c4b5fd")}
-          </button>
-          <button onClick={handleLogout} className="btn-hover" style={{width:34,height:34,borderRadius:10,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          </button>}
+          <button onClick={handleLogout} className="btn-hover" style={{width:isMobile?32:34,height:isMobile?32:34,borderRadius:10,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
             <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           </button>
         </div>
@@ -3328,7 +3330,7 @@ export default function App() {
             <h2 style={{margin:0,fontSize:20,fontWeight:900,color:DS.dark,letterSpacing:-0.5}}>{PAGE_LABELS[page]}</h2>
             {page==="dashboard"&&<p style={{margin:"2px 0 0",color:DS.mid,fontSize:12,fontWeight:500}}>Aujourd'hui tâchons de ne rien oublier ;)</p>}
           </div>
-          <div style={{padding:"6px 16px 110px"}}>
+          <div style={{padding:"6px 16px 110px",overflowX:"hidden"}}>
             {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}}/>}
             {page==="clients"&&<PageClients clients={clients} passages={passages} onClientClick={setFicheClient} onAdd={openAddClient}/>}
             {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus}/>}
