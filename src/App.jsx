@@ -739,7 +739,7 @@ async function envoyerEmailLivraison(livraison, client) {
   const b64 = btoa(unescape(encodeURIComponent(html)));
 
   const produits = (livraison.produits||[]).length > 0 ? (livraison.produits||[]).join(", ") : "voir document joint";
-  const corps = `Bonjour ${client?.nom||""},\n\nVous trouverez ci-joint votre bon de livraison du ${dateStr}.\n\nProduits livrés : ${produits}${livraison.montant?"\nMontant : "+Number(livraison.montant).toLocaleString("fr")+" €":""}\n\nJe reste à votre disposition pour toute question.\n\nCordialement,\n\nDorian Briaire\nTechnicien de Piscine — BRI BLUE\n🌐 www.briblue83.com\n📧 briblue83@hotmail.com\n📍 Hyères et alentours\n📞 +33 6 67 18 61 15`;
+  const corps = `Bonjour ${client?.nom||""},\n\nVous trouverez ci-joint votre bon de livraison du ${dateStr}.\n\nProduits livrés : ${produits}${livraison.montant?"\nMontant : "+Number(livraison.montant).toLocaleString("fr")+" €":""}\n\nJe reste à votre disposition pour toute question.\n\nCordialement,\n\nDorian Briaire\nTechnicien de Piscine — BRI BLUE`;
 
   try {
     const res = await fetch("/api/send-email", {
