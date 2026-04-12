@@ -907,7 +907,7 @@ function FormRdv({ initial, clients, onSave, onClose }) {
 }
 
 // FICHE CLIENT (avec diffrenciation Entretien/Contrle)
-function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[], onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
+function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[], contrats={}, onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
   const [tab, setTab] = useState("infos");
   const [showFormLiv, setShowFormLiv] = useState(false);
   const [editLiv, setEditLiv] = useState(null);
@@ -916,6 +916,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
   const col = AC[al];
   const rdvClient = rdvs.filter(r=>r.clientId===client.id).sort((a,b)=>a.date.localeCompare(b.date));
   const passC = passages.filter(p=>p.clientId===client.id).sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const contratClient = Object.values(contrats).find(c=>c.clientId===client.id) || null;
   const totalE = totalAnnuel(client.moisParMois||client.saisons,"entretien");
   const totalC = totalAnnuel(client.moisParMois||client.saisons,"controle");
   const total = totalE + totalC;
@@ -1218,16 +1219,32 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
       )}
 
       {/* Action buttons */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:8,marginTop:20,paddingTop:16,borderTop:"1px solid "+DS.border}}>
-        <button onClick={()=>ouvrirContrat(client)} className="btn-hover" style={{padding:"12px 8px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6,boxShadow:"0 2px 8px rgba(2,132,199,0.3)"}}>
-          {Ico.contract(14,"#fff")} Contrat
-        </button>
-        <button onClick={onEdit} className="btn-hover" style={{padding:"12px 8px",borderRadius:DS.radiusSm,background:DS.white,border:"1.5px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:12,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-          {Ico.edit(13,DS.dark)} Modifier
-        </button>
-        <button onClick={onDelete} className="btn-hover" style={{width:44,height:44,borderRadius:DS.radiusSm,background:DS.redSoft,border:"1px solid #fca5a5",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-          {Ico.trash(14,DS.red)}
-        </button>
+      <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:20,paddingTop:16,borderTop:"1px solid "+DS.border}}>
+        {/* Statut signature */}
+        {(() => {
+          const contrat = contratClient;
+          if (contrat?.statut==="signe") return (
+            <div style={{background:DS.greenSoft,border:"1px solid #6ee7b7",borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
+              {Ico.check(14,DS.green)}
+              <span style={{fontSize:12,fontWeight:700,color:DS.green}}>Contrat signé le {new Date(contrat.signedAt).toLocaleDateString("fr")}</span>
+            </div>
+          );
+          return null;
+        })()}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:8}}>
+          <button onClick={()=>ouvrirContrat(client, contratClient?.signaturePrestataire||"", contratClient?.signatureClient||"")} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:11,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,boxShadow:"0 2px 8px rgba(2,132,199,0.3)"}}>
+            {Ico.contract(13,"#fff")} Contrat
+          </button>
+          <button onClick={()=>envoyerContratSignature(client)} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:contratClient?.statut==="signe"?DS.greenSoft:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:700,fontSize:11,color:contratClient?.statut==="signe"?DS.green:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,boxShadow:contratClient?.statut==="signe"?"none":"0 2px 8px rgba(5,150,105,0.3)"}}>
+            {Ico.sign(13,contratClient?.statut==="signe"?DS.green:"#fff")} {contratClient?.statut==="signe"?"Signé":"Signer"}
+          </button>
+          <button onClick={onEdit} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:DS.white,border:"1.5px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:11,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
+            {Ico.edit(13,DS.dark)} Modifier
+          </button>
+          <button onClick={onDelete} className="btn-hover" style={{width:44,height:44,borderRadius:DS.radiusSm,background:DS.redSoft,border:"1px solid #fca5a5",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            {Ico.trash(14,DS.red)}
+          </button>
+        </div>
       </div>
     </Modal>
   );
@@ -1402,7 +1419,7 @@ function SignaturePad({ value, onChange, label }) {
 
 
 // CONTRAT PDF (HTML  print)
-function genererContratHTML(client) {
+function genererContratHTML(client, sigPrestataire="", sigClient="") {
   const mpm = migrateMois(client.moisParMois||client.saisons);
   const totalE = totalAnnuel(client.moisParMois||client.saisons,"entretien");
   const totalC = totalAnnuel(client.moisParMois||client.saisons,"controle");
@@ -1411,24 +1428,30 @@ function genererContratHTML(client) {
   const prixC = client.prixPassageC || 0;
   const totalPrixE = totalE * prixE;
   const totalPrixC = totalC * prixC;
+  const totalAnnuelPrix = totalPrixE + totalPrixC;
+  const mensualite = Math.round(totalAnnuelPrix / 12 * 100) / 100;
   const dateContrat = client.dateDebut ? new Date(client.dateDebut).toLocaleDateString("fr") : "—";
   const dateFin = client.dateFin ? new Date(client.dateFin).toLocaleDateString("fr") : "—";
-  
   let moisRows = "";
   for (let m=1;m<=12;m++) {
     const mv = mpm[m] || {entretien:0,controle:0};
     moisRows += `<tr><td>${MOIS_L[m]}</td><td class="center">${mv.entretien||"—"}</td><td class="center">${mv.controle||"—"}</td></tr>`;
   }
   moisRows += `<tr class="total-row"><td><strong>TOTAL DE PASSAGE</strong></td><td class="center"><strong>${totalE}</strong></td><td class="center"><strong>${totalC}</strong></td></tr>`;
+  const sigPrestaHTML = sigPrestataire
+    ? `<img src="${sigPrestataire}" style="max-height:70px;display:block;margin-top:8px;border-radius:6px;"/>`
+    : `<canvas id="sigPresta" width="300" height="80" style="border:1.5px dashed #cbd5e1;border-radius:8px;cursor:crosshair;display:block;margin-top:8px;width:100%;touch-action:none;"></canvas><p style="font-size:10px;color:#94a3b8;margin-top:4px;">Signez dans le cadre ci-dessus</p>`;
+  const sigClientHTML = sigClient
+    ? `<img src="${sigClient}" style="max-height:70px;display:block;margin-top:8px;border-radius:6px;"/>`
+    : `<canvas id="sigClient" width="300" height="80" style="border:1.5px dashed #cbd5e1;border-radius:8px;cursor:crosshair;display:block;margin-top:8px;width:100%;touch-action:none;"></canvas><p style="font-size:10px;color:#94a3b8;margin-top:4px;">Signez dans le cadre ci-dessus</p>`;
 
-  return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"/><title>Contrat BRIBLUE — ${client.nom}</title>
+  return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Contrat BRIBLUE — ${client.nom}</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Inter',system-ui,sans-serif;font-size:12px;color:#1e293b;background:#fff}
 .page{max-width:780px;margin:0 auto;padding:32px}
 h1{font-size:28px;font-weight:900;color:#0c1222;text-align:center;letter-spacing:2px;margin-bottom:4px}
-.subtitle{text-align:center;color:#0369a1;font-size:12px;font-weight:600;margin-bottom:24px}
 .section{margin-bottom:20px}
 .section-title{background:linear-gradient(135deg,#0c1222,#1a365d);color:#fff;padding:10px 18px;border-radius:10px 10px 0 0;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:1px}
 table{width:100%;border-collapse:collapse;border:1px solid #e2e8f0}
@@ -1441,7 +1464,10 @@ table td{padding:7px 12px;border:1px solid #e2e8f0;font-size:12px}
 .info-grid .value{padding:8px 14px;font-weight:700;font-size:13px;color:#0c1222;border-bottom:1px solid #e2e8f0}
 .recap{background:linear-gradient(135deg,#0c1222,#1a365d);color:#fff;border-radius:12px;padding:20px 24px;margin:20px 0}
 .recap h3{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.7);margin-bottom:8px}
-.recap .prix{font-size:24px;font-weight:900}
+.recap .prix{font-size:24px;font-weight:900;margin-bottom:12px}
+.mensualite{background:rgba(255,255,255,0.1);border-radius:10px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;border:1px solid rgba(255,255,255,0.15)}
+.mensualite .mlabel{font-size:11px;color:rgba(255,255,255,0.7);font-weight:600}
+.mensualite .montant{font-size:20px;font-weight:900;color:#22d3ee}
 .conditions{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:18px;margin-bottom:20px}
 .conditions h3{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:10px}
 .conditions li{margin-bottom:6px;font-size:11px;color:#475569;line-height:1.5}
@@ -1449,30 +1475,24 @@ table td{padding:7px 12px;border:1px solid #e2e8f0;font-size:12px}
 .detail h4{background:#f0f9ff;padding:10px 16px;font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e2e8f0}
 .detail ul{padding:12px 16px 12px 32px;font-size:11px;color:#475569;line-height:1.8}
 .signatures{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:30px}
-.sig-box{border:1px solid #e2e8f0;border-radius:12px;padding:16px;min-height:100px}
-.sig-box .sig-label{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.sig-box{border:1px solid #e2e8f0;border-radius:12px;padding:16px;}
+.sig-label{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.sig-date{font-size:11px;color:#64748b;margin-bottom:6px}
+.btn-clear{background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;padding:6px 14px;border-radius:8px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600;margin-top:6px}
 .footer{margin-top:24px;text-align:center;font-size:10px;color:#94a3b8;padding-top:16px;border-top:1px solid #e2e8f0}
-.no-print{margin-bottom:16px;display:flex;gap:8px}
-.btn-print{background:linear-gradient(135deg,#0c1222,#1a365d);color:#fff;border:none;padding:12px 24px;border-radius:12px;font-weight:700;cursor:pointer;font-size:14px;font-family:inherit}
-.btn-close{background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;padding:12px 24px;border-radius:12px;font-weight:700;cursor:pointer;font-size:14px;font-family:inherit}
-@media print{.page{padding:16px}.no-print{display:none!important}@page{margin:10mm}}
+.no-print{margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap}
+.btn-print{background:linear-gradient(135deg,#0c1222,#1a365d);color:#fff;border:none;padding:14px 28px;border-radius:12px;font-weight:700;cursor:pointer;font-size:15px;font-family:inherit}
+.btn-dl{background:linear-gradient(135deg,#0369a1,#0ea5e9);color:#fff;border:none;padding:14px 28px;border-radius:12px;font-weight:700;cursor:pointer;font-size:15px;font-family:inherit}
+@media print{.page{padding:16px}.no-print{display:none!important}canvas{border:1px solid #e2e8f0!important}.btn-clear{display:none!important}@page{margin:10mm}}
 </style></head><body>
 <div class="page">
 <div class="no-print">
-  <div style="display:flex;gap:10px;flex-wrap:wrap;">
-    <button onclick="window.print()" style="background:linear-gradient(135deg,#0c1222,#1a365d);color:#fff;border:none;padding:14px 28px;border-radius:12px;font-weight:700;cursor:pointer;font-size:15px;font-family:inherit;box-shadow:0 4px 12px rgba(12,18,34,0.3);">
-      🖨️ Imprimer / PDF
-    </button>
-    <button onclick="(function(){var a=document.createElement('a');a.href='data:text/html;charset=utf-8,'+encodeURIComponent(document.documentElement.outerHTML);a.download='Rapport_BRIBLUE.html';document.body.appendChild(a);a.click();document.body.removeChild(a);})()" style="background:linear-gradient(135deg,#0369a1,#0ea5e9);color:#fff;border:none;padding:14px 28px;border-radius:12px;font-weight:700;cursor:pointer;font-size:15px;font-family:inherit;box-shadow:0 4px 12px rgba(3,105,161,0.3);">
-      💾 Enregistrer
-    </button>
-  </div>
+  <button onclick="window.print()" class="btn-print">🖨️ Imprimer / PDF</button>
+  <button onclick="(function(){var a=document.createElement('a');a.href='data:text/html;charset=utf-8,'+encodeURIComponent(document.documentElement.outerHTML);a.download='Contrat_BRIBLUE_${client.nom.replace(/\s/g,'_')}.html';document.body.appendChild(a);a.click();document.body.removeChild(a);})()" class="btn-dl">💾 Enregistrer</button>
 </div>
-
-<div style="text-align:center;padding:0 0 14px"><span style="font-family:Inter,system-ui,sans-serif;font-size:40px;font-weight:900;color:#0c1222;letter-spacing:-2px">Bri<span style="color:#0369a1">&#x2019;</span>blue</span></div>
+<div style="text-align:center;padding:0 0 14px"><span style="font-size:40px;font-weight:900;color:#0c1222;letter-spacing:-2px">Bri<span style="color:#0369a1">&#x2019;</span>blue</span></div>
 <h1 style="margin-top:0">CONTRAT PISCINE</h1>
-<div class="subtitle" style="text-align:center;color:#0369a1;font-size:13px;font-weight:700;margin-bottom:20px;letter-spacing:0.5px">Création · Traitement de l'eau · Installation · Dépannage</div>
-
+<div style="text-align:center;color:#0369a1;font-size:13px;font-weight:700;margin-bottom:20px;">Création · Traitement de l'eau · Installation · Dépannage</div>
 <div class="section">
   <div class="section-title">Informations du contrat</div>
   <div class="info-grid">
@@ -1483,31 +1503,26 @@ table td{padding:7px 12px;border:1px solid #e2e8f0;font-size:12px}
     <div class="label">Total passages</div><div class="value">${total} passages annuels</div>
   </div>
 </div>
-
 <div class="section">
   <div class="section-title">Planning des interventions</div>
-  <table>
-    <thead><tr><th>Mois</th><th class="center">Nettoyage complet</th><th class="center">Contrôle de l'eau</th></tr></thead>
-    <tbody>${moisRows}</tbody>
-  </table>
+  <table><thead><tr><th>Mois</th><th class="center">Nettoyage complet</th><th class="center">Contrôle de l'eau</th></tr></thead><tbody>${moisRows}</tbody></table>
 </div>
-
 <div class="section">
   <div class="section-title">Tarifs des prestations</div>
-  <table>
-    <thead><tr><th>Type</th><th class="center">Passages</th><th class="center">Prix/passage</th><th class="center">Total</th></tr></thead>
-    <tbody>
-      <tr><td>Nettoyage complet</td><td class="center">${totalE}</td><td class="center">${prixE} €</td><td class="center"><strong>${totalPrixE} €</strong></td></tr>
-      <tr><td>Contrôle de l'eau</td><td class="center">${totalC||"—"}</td><td class="center">${prixC||"—"} €</td><td class="center"><strong>${totalPrixC||"—"} €</strong></td></tr>
-    </tbody>
-  </table>
+  <table><thead><tr><th>Type</th><th class="center">Passages</th><th class="center">Prix/passage</th><th class="center">Total</th></tr></thead>
+  <tbody>
+    <tr><td>Nettoyage complet</td><td class="center">${totalE}</td><td class="center">${prixE} €</td><td class="center"><strong>${totalPrixE} €</strong></td></tr>
+    <tr><td>Contrôle de l'eau</td><td class="center">${totalC||"—"}</td><td class="center">${prixC||"—"} €</td><td class="center"><strong>${totalPrixC||"—"} €</strong></td></tr>
+  </tbody></table>
 </div>
-
 <div class="recap">
-  <h3>Récapitulatif</h3>
-  <div class="prix">Prix annuel : ${(totalPrixE+totalPrixC).toLocaleString("fr")} €</div>
+  <h3>Récapitulatif financier</h3>
+  <div class="prix">Prix annuel : ${totalAnnuelPrix.toLocaleString("fr")} €</div>
+  <div class="mensualite">
+    <div><div class="mlabel">Mensualité indicative</div><div style="font-size:10px;color:rgba(255,255,255,0.5);margin-top:2px;">Prix annuel ÷ 12 mois</div></div>
+    <div class="montant">${mensualite.toLocaleString("fr",{minimumFractionDigits:2,maximumFractionDigits:2})} € / mois</div>
+  </div>
 </div>
-
 <div class="conditions">
   <h3>Conditions & Informations</h3>
   <ul>
@@ -1518,53 +1533,92 @@ table td{padding:7px 12px;border:1px solid #e2e8f0;font-size:12px}
     <li>Kit d'entretien fourni et facturé séparément (brosse, épuisette, manche, tuyau).</li>
   </ul>
 </div>
-
-<div class="detail">
-  <h4>Nettoyage complet du bassin</h4>
-  <ul>
-    <li>Passage épuisette si nécessaire</li>
-    <li>Nettoyage au balai aspirateur</li>
-    <li>Vérification et ajustement (chlore, pH)</li>
-    <li>Contrôle technique (filtre, pompe)</li>
-    <li>Livraison de produits si besoin</li>
-  </ul>
-</div>
-
-<div class="detail">
-  <h4>Contrôle de l'eau</h4>
-  <ul>
-    <li>Nettoyage rapide surface à l'épuisette</li>
-    <li>Vérification et ajustement (chlore, pH)</li>
-    <li>Contrôle technique</li>
-    <li>Livraison de produits si besoin</li>
-  </ul>
-</div>
-
+<div class="detail"><h4>Nettoyage complet du bassin</h4><ul><li>Passage épuisette si nécessaire</li><li>Nettoyage au balai aspirateur</li><li>Vérification et ajustement (chlore, pH)</li><li>Contrôle technique (filtre, pompe)</li><li>Livraison de produits si besoin</li></ul></div>
+<div class="detail"><h4>Contrôle de l'eau</h4><ul><li>Nettoyage rapide surface à l'épuisette</li><li>Vérification et ajustement (chlore, pH)</li><li>Contrôle technique</li><li>Livraison de produits si besoin</li></ul></div>
 <div class="signatures">
   <div class="sig-box">
     <div class="sig-label">Le prestataire — BRIBLUE</div>
-    <div style="font-size:11px;color:#94a3b8;margin-top:40px">Date et signature</div>
+    <div class="sig-date">Dorian Briaire · ${new Date().toLocaleDateString("fr")}</div>
+    ${sigPrestaHTML}
+    ${!sigPrestataire ? `<button class="btn-clear" onclick="clearSig('sigPresta')">Effacer</button>` : ""}
   </div>
   <div class="sig-box">
     <div class="sig-label">Le client — ${client.nom}</div>
-    <div style="font-size:11px;color:#94a3b8;margin-top:40px">Date et signature</div>
+    <div class="sig-date">Lu et approuvé · ${new Date().toLocaleDateString("fr")}</div>
+    ${sigClientHTML}
+    ${!sigClient ? `<button class="btn-clear" onclick="clearSig('sigClient')">Effacer</button>` : ""}
   </div>
 </div>
-
-<div class="footer">
-  BRIBLUE · SIRET 84345436400053 · La Seyne-sur-Mer · 06 67 18 61 15
+<div class="footer">BRIBLUE · SIRET 84345436400053 · La Seyne-sur-Mer · 06 67 18 61 15</div>
 </div>
-</div></body></html>`;
+<script>
+function setupCanvas(id){const c=document.getElementById(id);if(!c)return;const ctx=c.getContext('2d');let drawing=false;function pos(e){const r=c.getBoundingClientRect();const s=e.touches?e.touches[0]:e;return{x:(s.clientX-r.left)*(c.width/r.width),y:(s.clientY-r.top)*(c.height/r.height)};}
+c.addEventListener('mousedown',e=>{drawing=true;const p=pos(e);ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.strokeStyle='#1b3a5c';ctx.lineWidth=2;ctx.lineCap='round';});
+c.addEventListener('mousemove',e=>{if(!drawing)return;const p=pos(e);ctx.lineTo(p.x,p.y);ctx.stroke();});
+c.addEventListener('mouseup',()=>drawing=false);
+c.addEventListener('touchstart',e=>{e.preventDefault();drawing=true;const p=pos(e);ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.strokeStyle='#1b3a5c';ctx.lineWidth=2;ctx.lineCap='round';},{passive:false});
+c.addEventListener('touchmove',e=>{e.preventDefault();if(!drawing)return;const p=pos(e);ctx.lineTo(p.x,p.y);ctx.stroke();},{passive:false});
+c.addEventListener('touchend',()=>drawing=false);}
+function clearSig(id){const c=document.getElementById(id);if(c)c.getContext('2d').clearRect(0,0,c.width,c.height);}
+setupCanvas('sigPresta');setupCanvas('sigClient');
+</script>
+</body></html>`;
 }
 
-function ouvrirContrat(client) {
-  const html = genererContratHTML(client);
+function ouvrirContrat(client, sigPrestataire="", sigClient="") {
+  const html = genererContratHTML(client, sigPrestataire, sigClient);
   const blob = new Blob([html], {type:"text/html;charset=utf-8"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url; a.target = "_blank"; a.rel = "noopener";
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(()=>URL.revokeObjectURL(url), 5000);
+}
+
+async function envoyerContratSignature(client) {
+  if (!client?.email) { alert("Aucun email renseigné pour ce client."); return; }
+
+  const sigLink = `${window.location.origin}/sign.html?clientId=${client.id}&contractId=CT-${client.id}`;
+  const dateStr = new Date().toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"});
+
+  const htmlEmail = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head>
+<body style="font-family:Arial,sans-serif;background:#f8fafc;margin:0;padding:0;">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
+  <tr><td style="background:#0c1222;padding:20px 28px;border-radius:10px 10px 0 0;">
+    <span style="font-size:20px;font-weight:bold;color:#fff;letter-spacing:2px;">BRI BLUE</span>
+  </td></tr>
+  <tr><td style="background:#fff;padding:28px;border:1px solid #e2e8f0;border-top:none;">
+    <p style="font-size:15px;color:#1e293b;margin:0 0 12px;">Bonjour <strong>${client.nom}</strong>,</p>
+    <p style="font-size:14px;color:#475569;margin:0 0 20px;line-height:1.6;">Votre contrat d'entretien piscine est prêt. Veuillez le consulter et le signer en cliquant sur le bouton ci-dessous.</p>
+    <div style="text-align:center;margin:24px 0;">
+      <a href="${sigLink}" style="background:linear-gradient(135deg,#0369a1,#0ea5e9);color:#fff;text-decoration:none;padding:16px 32px;border-radius:12px;font-weight:700;font-size:16px;display:inline-block;">Signer mon contrat</a>
+    </div>
+    <p style="font-size:12px;color:#94a3b8;margin:0;">Ce lien est valable pour votre contrat BRIBLUE du ${dateStr}.</p>
+  </td></tr>
+  <tr><td style="background:#f8fafc;padding:14px 28px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px;">
+    <p style="margin:0;font-size:12px;color:#64748b;"><strong>Dorian Briaire</strong><br/>Technicien de Piscine - BRI BLUE</p>
+  </td></tr>
+</table>
+</body></html>`;
+
+  try {
+    const res = await fetch("/api/send-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: "rapport-piscine@briblue83.com",
+        to: [client.email],
+        subject: `Votre contrat BRIBLUE — À signer`,
+        html: htmlEmail,
+        text: `Bonjour ${client.nom},\n\nVotre contrat est prêt à signer :\n${sigLink}\n\nCordialement,\nDorian Briaire\nTechnicien de Piscine - BRI BLUE`,
+      }),
+    });
+    const data = await res.json();
+    if (res.ok) alert(`✅ Email de signature envoyé à ${client.email} !`);
+    else alert(`❌ Erreur : ${data?.message}`);
+  } catch(err) {
+    alert(`❌ Erreur réseau : ${err.message}`);
+  }
 }
 
 // RAPPORT HTML PREMIUM
@@ -3081,6 +3135,7 @@ export default function App() {
   const [rdvs, setRdvs] = useState([]);
   const [stock, setStock] = useState({});
   const [showStock, setShowStock] = useState(false);
+  const [contrats, setContrats] = useState({});
   const [ready, setReady] = useState(false);
   const [ficheClient, setFicheClient] = useState(null);
   const [showFormClient, setShowFormClient] = useState(false);
@@ -3106,11 +3161,11 @@ export default function App() {
       const l = await load("bb_livraisons_v1", []);
       const r = await load("bb_rdvs_v1", []);
       const s = await load("bb_stock_v1", Object.fromEntries(PRODUITS_DEFAUT.map(nom=>[nom,0])));
-      // Ensure all default products exist in stock
+      const ct = await load("bb_contrats_v1", {});
       const sWithDefaults = {...Object.fromEntries(PRODUITS_DEFAUT.map(nom=>[nom, s[nom]??0])), ...s};
 // Migrate saisons format for existing clients
       const cMigrated = c.map(cl => ({...cl, moisParMois: migrateMois(cl.moisParMois||cl.saisons), photoPiscine: cl.photoPiscine||"", prixPassageE: cl.prixPassageE||0, prixPassageC: cl.prixPassageC||0}));
-      setClients(cMigrated); setPassages(passages_data); setLivraisons(l); setRdvs(r); setStock(sWithDefaults); setReady(true);
+      setClients(cMigrated); setPassages(passages_data); setLivraisons(l); setRdvs(r); setStock(sWithDefaults); setContrats(ct); setReady(true);
     })();
   },[loggedIn]);
 
@@ -3119,6 +3174,17 @@ export default function App() {
   useEffect(()=>{ if(ready) save("bb_livraisons_v1", livraisons); },[livraisons,ready]);
   useEffect(()=>{ if(ready) save("bb_rdvs_v1", rdvs); },[rdvs,ready]);
   useEffect(()=>{ if(ready) save("bb_stock_v1", stock); },[stock,ready]);
+  useEffect(()=>{ if(ready) save("bb_contrats_v1", contrats); },[contrats,ready]);
+
+  // Polling toutes les 30s pour détecter nouvelles signatures
+  useEffect(()=>{
+    if(!ready) return;
+    const interval = setInterval(async()=>{
+      const ct = await load("bb_contrats_v1", {});
+      setContrats(ct);
+    }, 30000);
+    return ()=>clearInterval(interval);
+  },[ready]);
 
 // Notification sound when new tasks appear
   useEffect(()=>{
@@ -3314,7 +3380,7 @@ export default function App() {
       {/* MODALS */}
       {ficheClient&&(()=>{
         const latest=clients.find(c=>c.id===ficheClient.id)||ficheClient;
-        return <FicheClient client={latest} passages={passages} livraisons={livraisons.filter(l=>l.clientId===latest.id)} rdvs={rdvs} produitsStock={Object.keys(stock)} onSaveLivraison={saveLivraison} onDeleteLivraison={deleteLivraison} onUpdateStatutLivraison={updateStatutLivraison} onClose={()=>setFicheClient(null)} onEdit={()=>{setEditClient(latest);setShowFormClient(true);setFicheClient(null);}} onDelete={()=>deleteClient(latest.id)} onAddPassage={()=>openAddPassageFromClient(latest.id)} onEditPassage={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddRdv={()=>{setEditRdv({clientId:latest.id});setShowFormRdv(true);}} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} onDeleteRdv={deleteRdv}/>;
+        return <FicheClient client={latest} passages={passages} livraisons={livraisons.filter(l=>l.clientId===latest.id)} rdvs={rdvs} produitsStock={Object.keys(stock)} contrats={contrats} onSaveLivraison={saveLivraison} onDeleteLivraison={deleteLivraison} onUpdateStatutLivraison={updateStatutLivraison} onClose={()=>setFicheClient(null)} onEdit={()=>{setEditClient(latest);setShowFormClient(true);setFicheClient(null);}} onDelete={()=>deleteClient(latest.id)} onAddPassage={()=>openAddPassageFromClient(latest.id)} onEditPassage={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddRdv={()=>{setEditRdv({clientId:latest.id});setShowFormRdv(true);}} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} onDeleteRdv={deleteRdv}/>;
       })()}
 
       {showFormClient&&<FormClient initial={editClient} clients={clients} onSave={saveClient} onClose={()=>{setShowFormClient(false);setEditClient(null);}}/>}

@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>Signature contrat — BRIBLUE</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:#f8fafc;color:#1e293b;min-height:100vh}
+.header{background:linear-gradient(135deg,#0c1222,#0369a1);padding:20px 24px;display:flex;align-items:center;gap:14px}
+.header-logo{font-size:22px;font-weight:900;color:#fff;letter-spacing:1px}
+.header-sub{font-size:11px;color:rgba(255,255,255,0.6);margin-top:2px}
+.container{max-width:600px;margin:0 auto;padding:24px 16px 60px}
+.card{background:#fff;border-radius:16px;border:1px solid #e2e8f0;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,0.05)}
+.card-title{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+.info-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #f1f5f9;font-size:13px}
+.info-row:last-child{border-bottom:none}
+.info-label{color:#64748b;font-weight:500}
+.info-value{font-weight:700;color:#1e293b;text-align:right}
+.recap{background:linear-gradient(135deg,#0c1222,#1a365d);border-radius:14px;padding:18px 20px;margin-bottom:16px;color:#fff}
+.recap-title{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.6);margin-bottom:6px}
+.recap-prix{font-size:26px;font-weight:900;margin-bottom:10px}
+.recap-mensualite{background:rgba(255,255,255,0.1);border-radius:10px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;border:1px solid rgba(255,255,255,0.15)}
+.mensualite-label{font-size:11px;color:rgba(255,255,255,0.7)}
+.mensualite-val{font-size:18px;font-weight:900;color:#22d3ee}
+.sig-section{background:#fff;border-radius:16px;border:2px solid #0369a1;padding:20px;margin-bottom:16px}
+.sig-title{font-size:14px;font-weight:700;color:#0369a1;margin-bottom:4px}
+.sig-sub{font-size:12px;color:#64748b;margin-bottom:14px}
+canvas{border:2px dashed #cbd5e1;border-radius:10px;cursor:crosshair;display:block;width:100%;touch-action:none;background:#fafafa}
+.sig-actions{display:flex;gap:8px;margin-top:10px}
+.btn-clear{background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;padding:10px 18px;border-radius:10px;font-size:13px;cursor:pointer;font-family:inherit;font-weight:600}
+.btn-submit{background:linear-gradient(135deg,#059669,#34d399);color:#fff;border:none;padding:16px;border-radius:14px;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 16px rgba(5,150,105,0.35);margin-top:8px}
+.btn-submit:disabled{background:#cbd5e1;box-shadow:none;cursor:not-allowed}
+.success{background:#d1fae5;border:1.5px solid #6ee7b7;border-radius:16px;padding:28px;text-align:center}
+.success-icon{font-size:48px;margin-bottom:12px}
+.success-title{font-size:20px;font-weight:900;color:#059669;margin-bottom:6px}
+.success-sub{font-size:13px;color:#047857}
+.loading{text-align:center;padding:60px 20px;color:#64748b;font-size:15px}
+.error-box{background:#fee2e2;border:1px solid #fca5a5;border-radius:12px;padding:16px;color:#dc2626;font-size:13px;margin-bottom:16px}
+.conditions{background:#f8fafc;border-radius:12px;padding:14px 16px;margin-bottom:16px;font-size:11px;color:#475569;line-height:1.6}
+.conditions strong{color:#1e293b}
+.table-wrap{overflow-x:auto;margin-bottom:0}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{background:#f0f9ff;color:#0369a1;padding:6px 10px;text-align:left;border:1px solid #e2e8f0;font-weight:700;font-size:10px;text-transform:uppercase}
+td{padding:6px 10px;border:1px solid #e2e8f0}
+.center{text-align:center}
+.total-row{background:#f0f9ff;font-weight:700}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-logo">BRI'BLUE</div>
+    <div class="header-sub">Entretien & Traitement de piscines</div>
+  </div>
+</div>
+
+<div class="container">
+  <div id="loading" class="loading">Chargement du contrat...</div>
+  <div id="content" style="display:none"></div>
+  <div id="success" class="success" style="display:none">
+    <div class="success-icon">✅</div>
+    <div class="success-title">Contrat signé !</div>
+    <div class="success-sub">Votre signature a été enregistrée.<br/>Vous recevrez une copie par email.</div>
+  </div>
+</div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const clientId = params.get('clientId');
+const contractId = params.get('contractId') || ('CT-' + clientId);
+let clientData = null;
+let drawing = false;
+
+function setupCanvas(canvas) {
+  const ctx = canvas.getContext('2d');
+  function pos(e) {
+    const r = canvas.getBoundingClientRect();
+    const s = e.touches ? e.touches[0] : e;
+    return { x: (s.clientX - r.left) * (canvas.width / r.width), y: (s.clientY - r.top) * (canvas.height / r.height) };
+  }
+  canvas.addEventListener('mousedown', e => { drawing=true; const p=pos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.strokeStyle='#1b3a5c'; ctx.lineWidth=2.5; ctx.lineCap='round'; });
+  canvas.addEventListener('mousemove', e => { if(!drawing)return; const p=pos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); });
+  canvas.addEventListener('mouseup', () => drawing=false);
+  canvas.addEventListener('mouseleave', () => drawing=false);
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing=true; const p=pos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.strokeStyle='#1b3a5c'; ctx.lineWidth=2.5; ctx.lineCap='round'; }, {passive:false});
+  canvas.addEventListener('touchmove', e => { e.preventDefault(); if(!drawing)return; const p=pos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); }, {passive:false});
+  canvas.addEventListener('touchend', () => drawing=false);
+}
+
+function clearCanvas(id) {
+  const c = document.getElementById(id);
+  if (c) c.getContext('2d').clearRect(0, 0, c.width, c.height);
+}
+
+function isCanvasEmpty(canvas) {
+  const ctx = canvas.getContext('2d');
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  return !data.some(v => v !== 0);
+}
+
+function formatMois(mpm) {
+  const MOIS = ['','Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+  let rows = '';
+  let totE = 0, totC = 0;
+  for (let m = 1; m <= 12; m++) {
+    const v = mpm[m] || mpm[String(m)] || {entretien:0, controle:0};
+    totE += v.entretien||0; totC += v.controle||0;
+    rows += `<tr><td>${MOIS[m]}</td><td class="center">${v.entretien||'—'}</td><td class="center">${v.controle||'—'}</td></tr>`;
+  }
+  rows += `<tr class="total-row"><td><strong>TOTAL</strong></td><td class="center"><strong>${totE}</strong></td><td class="center"><strong>${totC}</strong></td></tr>`;
+  return rows;
+}
+
+async function loadContract() {
+  if (!clientId) {
+    document.getElementById('loading').innerHTML = '<div style="color:#dc2626">Lien invalide — clientId manquant.</div>';
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/get-contract?clientId=${clientId}`);
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error);
+
+    clientData = json.client;
+
+    if (json.dejaSigné) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('success').style.display = 'block';
+      document.getElementById('success').querySelector('.success-sub').innerHTML =
+        `Ce contrat a déjà été signé le ${new Date(json.signedAt).toLocaleDateString('fr')}.`;
+      return;
+    }
+
+    const c = clientData;
+    const prixE = c.prixPassageE || 0;
+    const prixC = c.prixPassageC || 0;
+    let totE = 0, totC = 0;
+    for (let m = 1; m <= 12; m++) {
+      const v = (c.moisParMois||{})[m] || (c.moisParMois||{})[String(m)] || {entretien:0,controle:0};
+      totE += v.entretien||0; totC += v.controle||0;
+    }
+    const totalAnnuel = totE * prixE + totC * prixC;
+    const mensualite = Math.round(totalAnnuel / 12 * 100) / 100;
+    const dateDebut = c.dateDebut ? new Date(c.dateDebut).toLocaleDateString('fr') : '—';
+    const dateFin = c.dateFin ? new Date(c.dateFin).toLocaleDateString('fr') : '—';
+
+    document.getElementById('content').innerHTML = `
+      <h2 style="font-size:22px;font-weight:900;color:#0c1222;margin-bottom:4px;letter-spacing:-0.5px">Contrat d'entretien piscine</h2>
+      <p style="font-size:13px;color:#64748b;margin-bottom:20px;">Veuillez lire et signer votre contrat BRIBLUE ci-dessous.</p>
+
+      <div class="card">
+        <div class="card-title">Informations du contrat</div>
+        <div class="info-row"><span class="info-label">Client</span><span class="info-value">${c.nom}</span></div>
+        <div class="info-row"><span class="info-label">Formule</span><span class="info-value">${c.formule||'—'}</span></div>
+        <div class="info-row"><span class="info-label">Bassin</span><span class="info-value">${c.bassin||'—'} ${c.volume?c.volume+'m³':''}</span></div>
+        <div class="info-row"><span class="info-label">Début</span><span class="info-value">${dateDebut}</span></div>
+        <div class="info-row"><span class="info-label">Fin</span><span class="info-value">${dateFin}</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Planning mensuel</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Mois</th><th class="center">Nettoyage</th><th class="center">Contrôle</th></tr></thead>
+            <tbody>${formatMois(c.moisParMois||{})}</tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="recap">
+        <div class="recap-title">Récapitulatif financier</div>
+        <div class="recap-prix">Prix annuel : ${totalAnnuel.toLocaleString('fr')} €</div>
+        <div class="recap-mensualite">
+          <div><div class="mensualite-label">Mensualité indicative</div><div style="font-size:10px;color:rgba(255,255,255,0.5)">÷ 12 mois</div></div>
+          <div class="mensualite-val">${mensualite.toLocaleString('fr',{minimumFractionDigits:2})} € / mois</div>
+        </div>
+      </div>
+
+      <div class="conditions">
+        <strong>Conditions :</strong> Utilisation exclusive des produits BRIBLUE. Produits non inclus dans le forfait. Interventions supplémentaires possibles en cas d'aléas climatiques. Cahier d'entretien mis à jour à chaque passage.
+      </div>
+
+      <div class="sig-section">
+        <div class="sig-title">Votre signature</div>
+        <div class="sig-sub">Signez avec votre doigt ou la souris dans le cadre ci-dessous.</div>
+        <canvas id="sigClient" width="500" height="120"></canvas>
+        <div class="sig-actions">
+          <button class="btn-clear" onclick="clearCanvas('sigClient')">Effacer</button>
+        </div>
+      </div>
+
+      <div id="error-msg"></div>
+
+      <button class="btn-submit" id="btn-submit" onclick="submitSignature()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        Signer et valider le contrat
+      </button>
+      <p style="font-size:11px;color:#94a3b8;text-align:center;margin-top:10px;">En signant, vous acceptez les conditions du contrat BRIBLUE.</p>
+    `;
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+
+    setupCanvas(document.getElementById('sigClient'));
+
+  } catch(err) {
+    document.getElementById('loading').innerHTML = `<div style="color:#dc2626">Erreur : ${err.message}</div>`;
+  }
+}
+
+async function submitSignature() {
+  const canvas = document.getElementById('sigClient');
+  if (isCanvasEmpty(canvas)) {
+    document.getElementById('error-msg').innerHTML = '<div class="error-box">Veuillez signer avant de valider.</div>';
+    return;
+  }
+
+  const btn = document.getElementById('btn-submit');
+  btn.disabled = true;
+  btn.textContent = 'Envoi en cours...';
+  document.getElementById('error-msg').innerHTML = '';
+
+  try {
+    const signatureClient = canvas.toDataURL('image/png');
+    const res = await fetch('/api/sign-contract', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contractId,
+        clientId,
+        signatureClient,
+        signedAt: new Date().toISOString(),
+      }),
+    });
+
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error);
+
+    document.getElementById('content').style.display = 'none';
+    document.getElementById('success').style.display = 'block';
+
+  } catch(err) {
+    document.getElementById('error-msg').innerHTML = `<div class="error-box">Erreur : ${err.message}</div>`;
+    btn.disabled = false;
+    btn.textContent = 'Signer et valider le contrat';
+  }
+}
+
+loadContract();
+</script>
+</body>
+</html>
