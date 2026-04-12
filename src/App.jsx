@@ -801,8 +801,10 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
   const isEdit = !!initial?.id;
   const isMobile = useIsMobile();
   const [f, setF] = useState(()=>initial || { id:uid(), clientId:clientId||"", date:TODAY, produits:[], description:"", montant:"", statut:"aFacturer", photos:[] });
+  const [step, setStep] = useState(1);
+  const STEPS = 3;
   const set = (k,v) => setF(p=>({...p,[k]:v}));
-  const PRODUITS_LIVRAISON = produitsStock.length > 0 ? produitsStock : PRODUITS_DEFAUT;
+  const PLIV = produitsStock.length > 0 ? produitsStock : PRODUITS_DEFAUT;
   const toggleProduit = (p) => { const arr = f.produits.includes(p) ? f.produits.filter(x=>x!==p) : [...f.produits,p]; set("produits",arr); };
   const selectedClient = clients.find(c=>c.id===f.clientId);
 
@@ -823,173 +825,220 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
     e.target.value="";
   };
 
+  const STEP_INFO = [
+    { l:"Client & Date",   color:"#0891b2" },
+    { l:"Produits",        color:"#059669" },
+    { l:"Photos & Envoi",  color:"#4f46e5" },
+  ];
+  const cur = STEP_INFO[step-1];
+  const pct = Math.round((step-1)/STEPS*100);
+
   return (
-    <Modal title={isEdit?"Modifier la livraison":"Nouvelle livraison"} onClose={onClose} wide>
-      <div style={{display:"flex",flexDirection:"column",gap:14}}>
+    <Modal title={isEdit?"Modifier la livraison":"📦 Nouvelle livraison"} onClose={onClose} wide>
+      {/* Stepper */}
+      <div style={{marginBottom:14}}>
+        <div style={{height:4,background:DS.light,borderRadius:99,marginBottom:10,overflow:"hidden"}}>
+          <div style={{height:"100%",width:`${pct}%`,background:`linear-gradient(90deg,#0891b2,${cur.color})`,borderRadius:99,transition:"width .4s"}}/>
+        </div>
+        <div style={{display:"flex",gap:4,marginBottom:10}}>
+          {STEP_INFO.map((s,i)=>{
+            const done=i+1<step, active=i+1===step;
+            return (
+              <button key={i} onClick={()=>setStep(i+1)}
+                style={{flex:1,padding:"8px 4px",borderRadius:10,border:"1.5px solid "+(active?s.color:done?"#059669":DS.border),
+                  background:active?s.color+"12":done?"#f0fdf4":DS.white,
+                  cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:700,
+                  color:active?s.color:done?"#059669":DS.mid,transition:"all .2s"}}>
+                {done?"✓ ":""}{s.l}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:8,background:cur.color+"0d",border:"1px solid "+cur.color+"22"}}>
+          <span style={{width:6,height:6,borderRadius:3,background:cur.color,flexShrink:0,display:"block"}}/>
+          <span style={{fontSize:13,fontWeight:700,color:cur.color}}>{cur.l}</span>
+          <span style={{fontSize:11,color:DS.mid,marginLeft:"auto"}}>Étape {step}/{STEPS}</span>
+        </div>
+      </div>
 
-        {/* Sélection client */}
-        {!isEdit && clients.length > 1 && (
-          <div>
-            <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:8}}>Client *</span>
-            {isMobile ? (
-              <select value={f.clientId} onChange={e=>set("clientId",e.target.value)}
-                style={{width:"100%",padding:"12px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,background:DS.white,fontSize:15,color:DS.dark,fontFamily:"inherit"}}>
-                <option value="">Choisir un client…</option>
-                {clients.map(c=><option key={c.id} value={c.id}>{c.nom}</option>)}
-              </select>
-            ) : (
-              <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight:180,overflowY:"auto"}}>
-                {clients.map(c=>{
-                  const sel=f.clientId===c.id;
-                  return (
-                    <button key={c.id} onClick={()=>set("clientId",c.id)} className="card-hover"
-                      style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:DS.radiusSm,
-                        border:"1.5px solid "+(sel?DS.blue:DS.border),background:sel?DS.blueSoft:DS.white,
-                        cursor:"pointer",textAlign:"left",fontFamily:"inherit"}}>
-                      <Avatar nom={c.nom} size={34}/>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontWeight:700,fontSize:14,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
-                        <div style={{fontSize:12,color:DS.mid}}>{c.formule}</div>
-                      </div>
-                      {sel && <div style={{width:22,height:22,borderRadius:11,background:DS.blue,display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.check(11,"#fff")}</div>}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Client sélectionné — recap */}
-        {selectedClient && (
-          <div style={{background:"linear-gradient(135deg,#0e7490,#06b6d4)",borderRadius:DS.radiusSm,padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
-            <Avatar nom={selectedClient.nom} size={40}/>
-            <div style={{flex:1}}>
-              <div style={{fontWeight:800,fontSize:15,color:"#fff"}}>{selectedClient.nom}</div>
-              <div style={{fontSize:12,color:"rgba(255,255,255,0.65)",marginTop:2}}>{selectedClient.formule} · {selectedClient.adresse?.split(",").pop()?.trim()||""}</div>
+      {/* ÉTAPE 1 — Client & Date */}
+      {step===1 && (
+        <div className="fade-in" style={{display:"flex",flexDirection:"column",gap:12}}>
+          {clients.length>1 && (
+            <div>
+              <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:8}}>Client *</span>
+              {isMobile
+                ? <select value={f.clientId} onChange={e=>set("clientId",e.target.value)}
+                    style={{width:"100%",padding:"12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,background:DS.white,fontSize:14,color:DS.dark,fontFamily:"inherit"}}>
+                    <option value="">Choisir…</option>
+                    {clients.map(c=><option key={c.id} value={c.id}>{c.nom}</option>)}
+                  </select>
+                : <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight:160,overflowY:"auto"}}>
+                    {clients.map(c=>{
+                      const sel=f.clientId===c.id;
+                      return (
+                        <button key={c.id} onClick={()=>set("clientId",c.id)}
+                          style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:10,
+                            border:"1.5px solid "+(sel?"#0891b2":DS.border),background:sel?"#f0f9ff":DS.white,
+                            cursor:"pointer",textAlign:"left",fontFamily:"inherit"}}>
+                          <Avatar nom={c.nom} size={32}/>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontWeight:700,fontSize:13,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
+                            <div style={{fontSize:11,color:DS.mid}}>{c.formule}</div>
+                          </div>
+                          {sel&&<div style={{width:20,height:20,borderRadius:10,background:"#0891b2",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.check(10,"#fff")}</div>}
+                        </button>
+                      );
+                    })}
+                  </div>
+              }
+            </div>
+          )}
+          {selectedClient && (
+            <div style={{background:"#f0f9ff",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10,border:"1px solid #bae6fd"}}>
+              <Avatar nom={selectedClient.nom} size={36}/>
+              <div><div style={{fontWeight:700,fontSize:13,color:DS.dark}}>{selectedClient.nom}</div><div style={{fontSize:11,color:DS.mid}}>{selectedClient.formule}</div></div>
+            </div>
+          )}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <div>
+              <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>Date *</span>
+              <input type="date" value={f.date} onChange={e=>set("date",e.target.value)}
+                style={{width:"100%",padding:"11px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:14,outline:"none",boxSizing:"border-box",color:DS.dark,fontFamily:"inherit"}}/>
+            </div>
+            <div>
+              <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>Montant €</span>
+              <input type="number" value={f.montant} onChange={e=>set("montant",e.target.value)} placeholder="0.00"
+                style={{width:"100%",padding:"11px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:14,outline:"none",boxSizing:"border-box",color:DS.dark,fontFamily:"inherit"}}/>
             </div>
           </div>
-        )}
-
-        {/* Date + Montant */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
           <div>
-            <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>Date *</span>
-            <input type="date" value={f.date} onChange={e=>set("date",e.target.value)}
-              style={{width:"100%",padding:"12px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:14,outline:"none",boxSizing:"border-box",color:DS.dark,fontFamily:"inherit"}}/>
-          </div>
-          <div>
-            <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>Montant (€)</span>
-            <input type="number" value={f.montant} onChange={e=>set("montant",e.target.value)} placeholder="0.00"
-              style={{width:"100%",padding:"12px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:14,outline:"none",boxSizing:"border-box",color:DS.dark,fontFamily:"inherit"}}/>
+            <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:8}}>Statut</span>
+            <div style={{display:"flex",gap:6}}>
+              {Object.entries(STATUT_LIV).map(([k,s])=>(
+                <button key={k} onClick={()=>set("statut",k)}
+                  style={{flex:1,padding:"9px 4px",borderRadius:10,border:"1.5px solid "+(f.statut===k?s.color:DS.border),
+                    background:f.statut===k?s.bg:DS.white,cursor:"pointer",fontSize:12,fontWeight:700,
+                    color:f.statut===k?s.color:DS.mid,fontFamily:"inherit",transition:"all .15s"}}>
+                  {s.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
+      )}
 
-        {/* Produits */}
-        <div>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-            <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>Produits livrés</span>
-            {f.produits.length>0&&<span style={{background:DS.blue,color:"#fff",fontSize:11,fontWeight:800,borderRadius:10,padding:"1px 8px"}}>{f.produits.length}</span>}
+      {/* ÉTAPE 2 — Produits */}
+      {step===2 && (
+        <div className="fade-in" style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <span style={{fontSize:13,color:DS.mid,fontWeight:600}}>{f.produits.length} sélectionné{f.produits.length!==1?"s":""}</span>
+            {f.produits.length>0&&<button onClick={()=>set("produits",[])} style={{fontSize:12,color:DS.red,background:"none",border:"none",cursor:"pointer",fontWeight:600}}>Effacer</button>}
           </div>
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(3,1fr)",gap:5}}>
-            {PRODUITS_LIVRAISON.map(p=>{
+            {PLIV.map(p=>{
               const sel=f.produits.includes(p);
               return (
-                <label key={p} style={{display:"flex",alignItems:"center",gap:7,padding:"9px 10px",borderRadius:10,cursor:"pointer",
-                  background:sel?DS.blueSoft:DS.light,border:"1.5px solid "+(sel?DS.blue:DS.border),transition:"all .15s"}}>
-                  <input type="checkbox" checked={sel} onChange={()=>toggleProduit(p)} style={{accentColor:DS.blue,width:14,height:14,flexShrink:0}}/>
-                  <span style={{fontSize:13,fontWeight:sel?700:400,color:sel?DS.dark:DS.mid,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p}</span>
-                </label>
+                <button key={p} onClick={()=>toggleProduit(p)}
+                  style={{display:"flex",alignItems:"center",gap:7,padding:"9px 10px",borderRadius:10,cursor:"pointer",
+                    background:sel?"#f0fdf4":DS.white,border:"1.5px solid "+(sel?"#059669":DS.border),
+                    fontFamily:"inherit",textAlign:"left",transition:"all .15s"}}>
+                  <div style={{width:16,height:16,borderRadius:4,border:"2px solid "+(sel?"#059669":DS.border),background:sel?"#059669":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    {sel&&<svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                  </div>
+                  <span style={{fontSize:12,fontWeight:sel?700:400,color:sel?"#065f46":DS.mid,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p}</span>
+                </button>
               );
             })}
           </div>
-        </div>
-
-        {/* Description */}
-        <div>
-          <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>Notes / Quantités</span>
-          <textarea value={f.description} onChange={e=>set("description",e.target.value)}
-            placeholder="Quantités, marques, détails supplémentaires..."
-            style={{width:"100%",padding:"11px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:14,minHeight:72,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,outline:"none"}}/>
-        </div>
-
-        {/* Photos */}
-        <div>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-            <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>
-              Photos {(f.photos||[]).length>0&&`(${(f.photos||[]).length}/10)`}
-            </span>
-            {(f.photos||[]).length < 10 && (
-              <label style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:8,background:DS.blueSoft,border:"1px solid "+DS.blue+"33",cursor:"pointer",fontSize:12,fontWeight:700,color:DS.blue}}>
-                {Ico.plus(12,DS.blue)} Ajouter
-                <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={addPhotos}/>
-              </label>
-            )}
+          <div>
+            <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>Notes / Quantités</span>
+            <textarea value={f.description} onChange={e=>set("description",e.target.value)}
+              placeholder="Ex : 2 sacs chlore lent, 1 bidon pH+..."
+              style={{width:"100%",padding:"10px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:13,minHeight:60,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,outline:"none"}}/>
           </div>
-          {(f.photos||[]).length === 0
-            ? <label style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8,padding:18,borderRadius:12,border:"2px dashed "+DS.border,background:DS.light,cursor:"pointer"}}>
-                {Ico.camera(26,DS.mid)}
-                <span style={{fontSize:13,color:DS.mid,fontWeight:600}}>Ajouter des photos de la livraison</span>
-                <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={addPhotos}/>
-              </label>
-            : <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-                {(f.photos||[]).map((ph,i)=>(
-                  <div key={i} style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid "+DS.border}}>
-                    <img src={ph} alt={`Photo ${i+1}`} style={{width:"100%",height:80,objectFit:"cover",display:"block"}}/>
-                    <button onClick={()=>set("photos",(f.photos||[]).filter((_,j)=>j!==i))}
-                      style={{position:"absolute",top:4,right:4,width:24,height:24,borderRadius:12,background:"rgba(0,0,0,0.65)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      {Ico.close(10,"#fff")}
-                    </button>
-                  </div>
-                ))}
-              </div>
-          }
         </div>
+      )}
 
-        {/* Statut */}
-        <div>
-          <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:8}}>Statut</span>
-          <div style={{display:"flex",gap:8}}>
-            {Object.entries(STATUT_LIV).map(([k,s])=>(
-              <button key={k} onClick={()=>set("statut",k)} className="btn-hover"
-                style={{flex:1,padding:"11px 6px",borderRadius:10,border:"1.5px solid "+(f.statut===k?s.color:DS.border),
-                  background:f.statut===k?s.bg:DS.white,cursor:"pointer",fontSize:13,fontWeight:700,
-                  color:f.statut===k?s.color:DS.mid,fontFamily:"inherit"}}>
-                {s.label}
-              </button>
+      {/* ÉTAPE 3 — Photos & Envoi */}
+      {step===3 && (
+        <div className="fade-in" style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+              <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>Photos {(f.photos||[]).length>0&&`(${(f.photos||[]).length}/10)`}</span>
+              {(f.photos||[]).length<10&&(
+                <label style={{display:"flex",alignItems:"center",gap:5,padding:"5px 10px",borderRadius:8,background:"#f0f9ff",border:"1px solid #bae6fd",cursor:"pointer",fontSize:12,fontWeight:700,color:"#0891b2"}}>
+                  {Ico.plus(11,"#0891b2")} Ajouter
+                  <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={addPhotos}/>
+                </label>
+              )}
+            </div>
+            {(f.photos||[]).length===0
+              ? <label style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8,padding:18,borderRadius:12,border:"2px dashed "+DS.border,background:DS.light,cursor:"pointer"}}>
+                  {Ico.camera(26,DS.mid)}
+                  <span style={{fontSize:13,color:DS.mid,fontWeight:600}}>Ajouter des photos</span>
+                  <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={addPhotos}/>
+                </label>
+              : <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                  {(f.photos||[]).map((ph,i)=>(
+                    <div key={i} style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid "+DS.border}}>
+                      <img src={ph} alt={`Photo ${i+1}`} style={{width:"100%",height:80,objectFit:"cover",display:"block"}}/>
+                      <button onClick={()=>set("photos",(f.photos||[]).filter((_,j)=>j!==i))}
+                        style={{position:"absolute",top:4,right:4,width:22,height:22,borderRadius:11,background:"rgba(0,0,0,0.65)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                        {Ico.close(9,"#fff")}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+            }
+          </div>
+          {/* Récap */}
+          <div style={{background:"#f8fafc",borderRadius:10,padding:"12px 14px",border:"1px solid "+DS.border}}>
+            <div style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>Récapitulatif</div>
+            {[
+              ["Client", selectedClient?.nom||"—"],
+              ["Date", f.date?new Date(f.date).toLocaleDateString("fr"):"—"],
+              ["Produits", f.produits.length+" article"+(f.produits.length!==1?"s":"")],
+              f.montant?["Montant", f.montant+" €"]:null,
+            ].filter(Boolean).map(([l,v])=>(
+              <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"3px 0"}}>
+                <span style={{color:DS.mid}}>{l}</span>
+                <span style={{fontWeight:700,color:DS.dark}}>{v}</span>
+              </div>
             ))}
           </div>
+          {selectedClient?.email&&(
+            <button onClick={()=>envoyerEmailLivraison({...f,id:isEdit?f.id:uid()}, selectedClient)}
+              style={{padding:"11px",borderRadius:DS.radiusSm,background:"#f0f9ff",border:"1px solid #bae6fd",cursor:"pointer",fontWeight:700,fontSize:13,color:"#0891b2",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              {Ico.send(13,"#0891b2")} Envoyer par email à {selectedClient.email}
+            </button>
+          )}
         </div>
+      )}
 
-        {/* Email */}
-        {selectedClient && (
-          selectedClient.email
-            ? <button onClick={()=>{ if(!f.clientId||!f.date) return alert("Client et date requis"); envoyerEmailLivraison({...f,id:isEdit?f.id:uid()}, selectedClient); }}
-                className="btn-hover" style={{padding:"13px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#0ea5e9,#0369a1)",border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 16px rgba(14,165,233,.3)"}}>
-                {Ico.send(15,"#fff")} Envoyer par email à {selectedClient.email}
-              </button>
-            : <div style={{padding:"10px 14px",borderRadius:DS.radiusSm,background:DS.orangeSoft,border:"1px solid "+DS.orange+"33",fontSize:13,color:DS.orange,display:"flex",alignItems:"center",gap:7,fontWeight:600}}>
-                {Ico.alert(13,DS.orange)} Aucun email renseigné pour ce client
-              </div>
-        )}
-
-        {/* Boutons */}
-        <div style={{display:"flex",gap:10,paddingTop:4,borderTop:"1px solid "+DS.border}}>
-          <button onClick={onClose} className="btn-hover"
-            style={{flex:1,padding:"13px",borderRadius:DS.radiusSm,background:DS.light,border:"1.5px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:14,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-            {Ico.close(14,DS.mid)} Annuler
-          </button>
-          <BtnPrimary onClick={()=>{ if(!f.clientId) return alert("Veuillez sélectionner un client"); if(!f.date) return alert("Date requise"); onSave({...f,id:isEdit?f.id:uid()}); }}
-            icon={Ico.save(15,"#fff")} style={{flex:2,padding:"13px"}}>
-            Enregistrer
-          </BtnPrimary>
-        </div>
+      {/* Navigation */}
+      <div style={{display:"flex",gap:8,marginTop:16,paddingTop:12,borderTop:"1px solid "+DS.border}}>
+        <button onClick={step===1?onClose:()=>setStep(s=>s-1)}
+          style={{padding:"11px 16px",borderRadius:DS.radiusSm,background:DS.light,border:"1px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:13,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",gap:6}}>
+          {step===1?<>{Ico.close(12,DS.mid)} Annuler</>:<>{Ico.back(12,DS.mid)} Retour</>}
+        </button>
+        <div style={{flex:1}}/>
+        {step<STEPS
+          ? <button onClick={()=>setStep(s=>s+1)}
+              style={{padding:"11px 20px",borderRadius:DS.radiusSm,background:STEP_INFO[step].color,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,boxShadow:`0 3px 10px ${STEP_INFO[step].color}33`}}>
+              {STEP_INFO[step].l} {Ico.next(13,"#fff")}
+            </button>
+          : <button onClick={()=>{if(!f.clientId)return alert("Client requis");if(!f.date)return alert("Date requise");onSave({...f,id:isEdit?f.id:uid()});}}
+              style={{padding:"11px 20px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#059669,#0d9488)",border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,boxShadow:"0 3px 10px rgba(5,150,105,0.3)"}}>
+              {Ico.save(14,"#fff")} Enregistrer
+            </button>
+        }
       </div>
     </Modal>
   );
 }
 
-// FORMULAIRE RDV
+
 function FormRdv({ initial, clients, onSave, onClose }) {
   const isEdit = !!initial?.id;
   const [f, setF] = useState(()=> initial || {
@@ -1413,7 +1462,6 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
 }
 
 // COMPOSANTS FORMULAIRE PASSAGE
-const PRODUITS_LIVRAISON = PRODUITS_DEFAUT;
 const ETAT_LOCAL_OPTIONS = ["Nettoyage du sol","Trace d'eau au sol","Trace d'eau au mur","Fuite plomberie","Fuite moteur","Sur filtre ?"];
 
 function MultiCheck({ label, options, values, onChange }) {
