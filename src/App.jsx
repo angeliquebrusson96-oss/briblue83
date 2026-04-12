@@ -679,6 +679,97 @@ function FormClient({ initial, clients, onSave, onClose }) {
 }
 
 // FORMULAIRE LIVRAISON
+function genererHTMLLivraison(livraison, client) {
+  const dateStr = new Date(livraison.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"});
+  const produitsList = (livraison.produits||[]).length > 0
+    ? (livraison.produits||[]).map(p=>`<li style="padding:4px 0;border-bottom:1px solid #f0f4f8;font-size:13px;color:#1e293b;">${p}</li>`).join("")
+    : "<li style='color:#94a3b8;font-size:13px;'>Aucun produit listé</li>";
+  return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"/><title>Bon de livraison BRIBLUE</title>
+<style>
+  body{font-family:Inter,Arial,sans-serif;background:#f8fafc;margin:0;padding:24px;color:#1e293b;}
+  .wrapper{max-width:600px;margin:0 auto;background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(14,165,233,.1);overflow:hidden;}
+  .header{background:linear-gradient(135deg,#0ea5e9,#0369a1);padding:28px 32px;color:#fff;}
+  .header h1{margin:0 0 4px;font-size:22px;font-weight:900;}
+  .header p{margin:0;opacity:.85;font-size:13px;}
+  .body{padding:28px 32px;}
+  .section{margin-bottom:22px;}
+  .section-title{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#64748b;margin-bottom:10px;}
+  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .info-box{background:#f8fafc;border-radius:10px;padding:12px 14px;border:1px solid #e2e8f0;}
+  .info-label{font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:3px;}
+  .info-value{font-size:13px;font-weight:700;color:#1e293b;}
+  ul{margin:0;padding:0 0 0 0;list-style:none;}
+  .montant{font-size:22px;font-weight:900;color:#0369a1;margin-top:4px;}
+  .footer{background:#f0f9ff;padding:16px 32px;border-top:1px solid #e0f2fe;font-size:11px;color:#64748b;text-align:center;}
+  .badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;}
+</style></head><body><div class="wrapper">
+<div class="header">
+  <h1>📦 Bon de livraison</h1>
+  <p>BRIBLUE — Entretien & Traitement de piscines</p>
+</div>
+<div class="body">
+  <div class="section">
+    <div class="section-title">Informations</div>
+    <div class="info-grid">
+      <div class="info-box"><div class="info-label">Client</div><div class="info-value">${client?.nom||"—"}</div></div>
+      <div class="info-box"><div class="info-label">Date</div><div class="info-value">${dateStr}</div></div>
+      ${client?.adresse?`<div class="info-box" style="grid-column:1/-1"><div class="info-label">Adresse</div><div class="info-value">${client.adresse}</div></div>`:""}
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-title">Produits livrés</div>
+    <ul>${produitsList}</ul>
+    ${livraison.description?`<div style="margin-top:10px;background:#f8fafc;border-radius:10px;padding:12px 14px;border:1px solid #e2e8f0;font-size:13px;color:#475569;">${livraison.description}</div>`:""}
+  </div>
+  ${livraison.montant?`<div class="section"><div class="section-title">Montant</div><div class="montant">${Number(livraison.montant).toLocaleString("fr")} €</div></div>`:""}
+</div>
+<div class="footer">Document généré le ${new Date().toLocaleDateString("fr")} · <strong>BRIBLUE</strong> · 06 67 18 61 15 · briblue83@hotmail.com</div>
+</div></body></html>`;
+}
+
+async function envoyerEmailLivraison(livraison, client) {
+  const RESEND_API_KEY = "V3zPy-6YfKBLIzIDqZQFJ6p_X4UxrcwP6gWo8VByIg1pUqdM9D0VWj096FOfPvG2kgg8LfvCgTLClanpcXU2Mw";
+  const FROM = "rapport-piscine@briblue83.icu";
+
+  if (!client?.email) { alert("Aucun email renseigné pour ce client."); return; }
+
+  const dateStr = new Date(livraison.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"});
+  const filename = `BonLivraison_BRIBLUE_${client?.nom?.replace(/\s/g,"_")||"client"}_${livraison.date}.html`;
+  const html = genererHTMLLivraison(livraison, client);
+  const b64 = btoa(unescape(encodeURIComponent(html)));
+
+  const produits = (livraison.produits||[]).length > 0 ? (livraison.produits||[]).join(", ") : "voir document joint";
+  const corps = `Bonjour ${client?.nom||""},\n\nVous trouverez ci-joint votre bon de livraison du ${dateStr}.\n\nProduits livrés : ${produits}${livraison.montant?"\nMontant : "+Number(livraison.montant).toLocaleString("fr")+" €":""}\n\nJe reste à votre disposition pour toute question.\n\nCordialement,\n\nDorian Briaire\nTechnicien de Piscine — BRI BLUE\n🌐 www.briblue83.com\n📧 briblue83@hotmail.com\n📍 Hyères et alentours\n📞 +33 6 67 18 61 15`;
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: `BRIBLUE <${FROM}>`,
+        to: [client.email],
+        subject: `Bon de livraison BRIBLUE — ${dateStr}`,
+        text: corps,
+        attachments: [{ filename, content: b64 }],
+      }),
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      alert(`✅ Email envoyé avec succès à ${client.email} !\n\nLe bon de livraison est en pièce jointe.`);
+    } else {
+      console.error("Resend error:", data);
+      alert(`❌ Erreur envoi : ${data?.message || JSON.stringify(data)}`);
+    }
+  } catch(err) {
+    alert(`❌ Erreur réseau : ${err.message}`);
+  }
+}
+
 function FormLivraison({ initial, clientId, clients=[], onSave, onClose }) {
   const isEdit = !!initial?.id;
   const [f, setF] = useState(()=>initial || { id:uid(), clientId:clientId||"", date:TODAY, produits:[], description:"", montant:"", statut:"aFacturer" });
@@ -730,6 +821,22 @@ function FormLivraison({ initial, clientId, clients=[], onSave, onClose }) {
           ))}
         </div>
       </Section>
+      {(() => {
+        const selectedClient = clients.find(c=>c.id===f.clientId);
+        if (!selectedClient) return null;
+        return (
+          <div style={{marginBottom:10}}>
+            {selectedClient.email
+              ? <button onClick={()=>{ if(!f.clientId) return alert("Veuillez sélectionner un client"); if(!f.date) return alert("Date requise"); envoyerEmailLivraison({...f,id:isEdit?f.id:uid()}, selectedClient); }} className="btn-hover" style={{width:"100%",padding:"12px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#0ea5e9,#0369a1)",border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 16px rgba(14,165,233,.35)"}}>
+                  {Ico.send(15,"#fff")} Envoyer par email à {selectedClient.email}
+                </button>
+              : <div style={{padding:"10px 14px",borderRadius:DS.radiusSm,background:DS.light,border:"1.5px solid "+DS.border,fontSize:12,color:DS.mid,display:"flex",alignItems:"center",gap:7,fontWeight:600}}>
+                  {Ico.alert(13,DS.orange)} Aucun email renseigné pour ce client
+                </div>
+            }
+          </div>
+        );
+      })()}
       <div style={{display:"flex",gap:10}}>
         <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
         <BtnPrimary onClick={()=>{ if(!f.clientId) return alert("Veuillez sélectionner un client"); if(!f.date) return alert("Date requise"); onSave({...f,id:isEdit?f.id:uid()}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
@@ -1088,6 +1195,10 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], onSaveLivraison
                   </div>
                   <div style={{display:"flex",gap:6,paddingTop:8,borderTop:"1px solid "+DS.border}}>
                     <button onClick={()=>{setEditLiv(l);setShowFormLiv(true);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(12,DS.mid)} Modifier</button>
+                    {client.email
+                      ? <button onClick={()=>envoyerEmailLivraison(l, client)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,color:DS.green,fontFamily:"inherit",fontWeight:700}}>{Ico.send(12,DS.green)} Email</button>
+                      : <div style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:DS.mid,fontWeight:500,gap:4}}>{Ico.mail(11,DS.mid)} Pas d'email</div>
+                    }
                     <button onClick={()=>{if(confirm("Supprimer cette livraison ?"))onDeleteLivraison(l.id);}} style={{width:32,borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(12,DS.red)}</button>
                   </div>
                 </Card>
@@ -1098,7 +1209,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], onSaveLivraison
       )}
 
       {showFormLiv && (
-        <FormLivraison initial={editLiv} clientId={client.id} onSave={l=>{onSaveLivraison(l);setShowFormLiv(false);setEditLiv(null);}} onClose={()=>{setShowFormLiv(false);setEditLiv(null);}}/>
+        <FormLivraison initial={editLiv} clientId={client.id} clients={[client]} onSave={l=>{onSaveLivraison(l);setShowFormLiv(false);setEditLiv(null);}} onClose={()=>{setShowFormLiv(false);setEditLiv(null);}}/>
       )}
 
       {/* Action buttons */}
@@ -1622,46 +1733,53 @@ function ouvrirRapport(passage, client) {
   setTimeout(()=>URL.revokeObjectURL(url), 5000);
 }
 
-function envoyerEmail(passage, client, onSent) {
-  const html = genererHTMLRapport(passage, client);
-  const blob = new Blob([html], {type:"text/html;charset=utf-8"});
-  const url = URL.createObjectURL(blob);
+async function envoyerEmail(passage, client, onSent) {
+  const RESEND_API_KEY = "re_MRGhNzwp40Osgm-4UaxqM00A5rB2alApNKKNXIoE6-bTRGTDI8JIAT1FPYoQqJQGvgR3yDtTxBXT5rgywCvWfQ";
+  const FROM = "rapport-piscine@briblue83.icu";
+
+  if (!client?.email) { alert("Aucun email renseigné pour ce client."); return; }
+
   const dateStr = new Date(passage.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"});
   const filename = `Rapport_BRIBLUE_${client?.nom?.replace(/\s/g,"_")||"client"}_${passage.date}.html`;
+  const html = genererHTMLRapport(passage, client);
 
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(()=>URL.revokeObjectURL(url), 3000);
+  // Encode HTML rapport en base64
+  const b64 = btoa(unescape(encodeURIComponent(html)));
 
-  const sujet = encodeURIComponent(`Rapport entretien piscine — ${dateStr}`);
-  const corps = encodeURIComponent(
-`Bonjour ${client?.nom||""},
+  const corps = `Bonjour ${client?.nom||""},\n\nVous trouverez ci-joint votre rapport d'entretien piscine du ${dateStr}.\n\nJe reste à votre disposition pour toute question.\n\nCordialement,\n\nDorian Briaire\nTechnicien de Piscine — BRI BLUE\n🌐 www.briblue83.com\n📧 briblue83@hotmail.com\n📍 Hyères et alentours\n📞 +33 6 67 18 61 15`;
 
-Veuillez trouver ci-joint votre rapport d'entretien piscine du ${dateStr}.
-
-N'hésitez pas à me contacter si vous avez des questions.
-
-Cordialement,
-Dorian — BRIBLUE
-Entretien & Traitement de piscines
-T. 06 67 18 61 15`
-  );
-
-  if (onSent) {
-    onSent({
-      ...passage,
-      rapportStatut: "envoye",
-      rapportEnvoyeAt: new Date().toISOString(),
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: `BRIBLUE <${FROM}>`,
+        to: [client.email],
+        subject: `Rapport entretien piscine — ${dateStr}`,
+        text: corps,
+        attachments: [{
+          filename,
+          content: b64,
+        }],
+      }),
     });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      if (onSent) onSent({ ...passage, rapportStatut: "envoye", rapportEnvoyeAt: new Date().toISOString() });
+      alert(`✅ Email envoyé avec succès à ${client.email} !\n\nLe rapport est en pièce jointe.`);
+    } else {
+      console.error("Resend error:", data);
+      alert(`❌ Erreur envoi : ${data?.message || JSON.stringify(data)}\n\nVérifiez la console.`);
+    }
+  } catch(err) {
+    console.error("Fetch error:", err);
+    alert(`❌ Erreur réseau : ${err.message}`);
   }
-
-  setTimeout(()=>{ window.location.href = `mailto:${client?.email||""}?subject=${sujet}&body=${corps}`; }, 800);
-
-  alert(`Le rapport a été téléchargé.\n\nVotre messagerie va s'ouvrir.\nPensez à joindre le fichier "${filename}" en pièce jointe.`);
 }
 
 // FORMULAIRE PASSAGE (avec Alcafix + types Entretien/Contrle)
