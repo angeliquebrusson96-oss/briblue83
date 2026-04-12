@@ -2957,6 +2957,7 @@ function AlertesBlock({ alertes, passages, onClientClick }) {
 
 // DASHBOARD  Bannire tches + RDV
 function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, onAddLivraison, onAddClient, onAddRdv, onEditPassage, onEditRdv }) {
+  const [showAllTaches, setShowAllTaches] = useState(false);
   const isMobile = useIsMobile();
   const moisCourant = MOIS_NOW;
   const saisonNow = getSaison(moisCourant);
@@ -2983,31 +2984,43 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
   return (
     <div>
       {/* Bannière tâches du mois */}
-      <Card style={{marginBottom:14,border:"none",background:totalTaches>0?"linear-gradient(135deg,#0c1222,#1a365d)":DS.greenGrad,padding:"18px 20px"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-          <div>
-            <div style={{fontWeight:900,fontSize:18,color:"#fff",letterSpacing:-0.3}}>{MOIS_L[moisCourant]}</div>
-            <div style={{fontSize:12,color:"rgba(255,255,255,0.7)",marginTop:2}}>
+      <Card style={{marginBottom:14,border:"none",background:totalTaches>0?"linear-gradient(135deg,#0c1222,#1a365d)":DS.greenGrad,padding:"14px 16px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,gap:10}}>
+          <div style={{minWidth:0}}>
+            <div style={{fontWeight:900,fontSize:16,color:"#fff",letterSpacing:-0.3}}>{MOIS_L[moisCourant]}</div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.72)",marginTop:2}}>
               {totalTaches>0 ? `${totalTaches} passage${totalTaches>1?"s":""} restant${totalTaches>1?"s":""}` : "Tout est à jour !"}
             </div>
           </div>
-          <Tag color={sMeta.color} bg={sMeta.bg}><span style={{display:"flex",alignItems:"center",gap:4}}>{Ico[sMeta.icon]&&Ico[sMeta.icon](12,sMeta.color)} {sMeta.label}</span></Tag>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+            <Tag color={sMeta.color} bg={sMeta.bg}><span style={{display:"flex",alignItems:"center",gap:4}}>{Ico[sMeta.icon]&&Ico[sMeta.icon](12,sMeta.color)} {sMeta.label}</span></Tag>
+            {totalTaches>3 && (
+              <button onClick={()=>setShowAllTaches(v=>!v)} className="btn-hover" style={{width:34,height:34,borderRadius:12,border:"1px solid rgba(255,255,255,0.14)",background:"rgba(255,255,255,0.1)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:20,fontWeight:800,lineHeight:1,fontFamily:"inherit"}}>
+                {showAllTaches ? "−" : "+"}
+              </button>
+            )}
+          </div>
         </div>
         {totalTaches > 0 && (
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            {tachesMois.filter(t=>t.total>0).map(({client,restE,restC,effE,prevE,effC,prevC})=>(
-              <div key={client.id} onClick={()=>onClientClick(client)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:"rgba(255,255,255,0.08)",borderRadius:DS.radiusSm,cursor:"pointer",border:"1px solid rgba(255,255,255,0.08)"}}>
-                <Avatar nom={client.nom} size={34} photo={client.photoPiscine}/>
+            {tachesMois.filter(t=>t.total>0).slice(0, showAllTaches ? tachesMois.filter(t=>t.total>0).length : 3).map(({client,restE,restC,effE,prevE,effC,prevC})=>(
+              <div key={client.id} onClick={()=>onClientClick(client)} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:"rgba(255,255,255,0.08)",borderRadius:DS.radiusSm,cursor:"pointer",border:"1px solid rgba(255,255,255,0.08)"}}>
+                <Avatar nom={client.nom} size={32} photo={client.photoPiscine}/>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontWeight:700,fontSize:13,color:"#fff"}}>{client.nom}</div>
-                  <div style={{display:"flex",gap:8,marginTop:3}}>
-                    {prevE>0&&<span style={{fontSize:11,fontWeight:700,color:restE>0?"#fbbf24":"#86efac"}}>🔧 {effE}/{prevE}</span>}
-                    {prevC>0&&<span style={{fontSize:11,fontWeight:700,color:restC>0?"#fbbf24":"#86efac"}}>💧 {effC}/{prevC}</span>}
+                  <div style={{fontWeight:700,fontSize:12,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{client.nom}</div>
+                  <div style={{display:"flex",gap:8,marginTop:2,flexWrap:"wrap"}}>
+                    {prevE>0&&<span style={{fontSize:10,fontWeight:700,color:restE>0?"#fbbf24":"#86efac"}}>🔧 {effE}/{prevE}</span>}
+                    {prevC>0&&<span style={{fontSize:10,fontWeight:700,color:restC>0?"#fbbf24":"#86efac"}}>💧 {effC}/{prevC}</span>}
                   </div>
                 </div>
-                {(restE+restC)>0 && <Tag color="#fff" bg="rgba(251,191,36,0.25)">{restE+restC} rest.</Tag>}
+                {(restE+restC)>0 && <Tag color="#fff" bg="rgba(251,191,36,0.25)" style={{fontSize:11,padding:"2px 8px"}}>{restE+restC}</Tag>}
               </div>
             ))}
+            {!showAllTaches && tachesMois.filter(t=>t.total>0).length>3 && (
+              <div style={{fontSize:11,color:"rgba(255,255,255,0.72)",textAlign:"center",paddingTop:2}}>
+                {tachesMois.filter(t=>t.total>0).length-3} autre{tachesMois.filter(t=>t.total>0).length-3>1?"s":""}
+              </div>
+            )}
           </div>
         )}
       </Card>
@@ -3176,9 +3189,77 @@ function PageClients({ clients, passages, onClientClick, onAdd }) {
   );
 }
 
+
+function PassageDetailModal({ passage, client, onClose }) {
+  const isMobile = useIsMobile();
+  if (!passage) return null;
+  const infoRows = [
+    ["Date", passage.date ? new Date(passage.date).toLocaleDateString("fr-FR",{weekday:"long", day:"2-digit", month:"long", year:"numeric"}) : "-"],
+    ["Client", client?.nom || passage.clientId || "-"],
+    ["Technicien", passage.tech || "-"],
+    ["Type", passage.type || "-"],
+    ["pH", passage.ph || passage.tPH || "-"],
+    ["Chlore", passage.chlore || passage.tChlore || "-"],
+    ["Sel", passage.tSel || "-"],
+    ["Phosphate", passage.tPhosphate || "-"],
+    ["Stabilisant", passage.tStabilisant || passage.stabilisant || "-"],
+    ["Qualité de l'eau", passage.qualiteEau || "-"],
+  ];
+  const longRows = [
+    ["Actions", passage.actions || ""],
+    ["Observations", passage.obs || passage.commentaires || ""],
+    ["État du fond", Array.isArray(passage.etatFond) ? passage.etatFond.join(", ") : (passage.etatFond || "")],
+    ["État des parois", Array.isArray(passage.etatParois) ? passage.etatParois.join(", ") : (passage.etatParois || "")],
+    ["État local technique", Array.isArray(passage.etatLocal) ? passage.etatLocal.join(", ") : (passage.etatLocal || "")],
+    ["Bac tampon", Array.isArray(passage.etatBacTampon) ? passage.etatBacTampon.join(", ") : (passage.etatBacTampon || "")],
+    ["Volet / bac", Array.isArray(passage.etatVoletBac) ? passage.etatVoletBac.join(", ") : (passage.etatVoletBac || "")],
+  ].filter(([,val])=>String(val||"").trim());
+  const photos = [
+    passage.photoArrivee ? {src:passage.photoArrivee, label:"Arrivée"} : null,
+    ...(passage.photos||[]).filter(Boolean).map((src,i)=>({src,label:`Arrivée ${i+2}`})),
+    passage.photoDepart ? {src:passage.photoDepart, label:"Départ"} : null,
+    ...(passage.photosDepart||[]).filter(Boolean).map((src,i)=>({src,label:`Départ ${i+2}`})),
+  ].filter(Boolean);
+
+  return (
+    <Modal title="Détail du passage" onClose={onClose} wide>
+      <div style={{display:"flex",flexDirection:"column",gap:14}}>
+        <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:10}}>
+          {infoRows.map(([label,val])=>(
+            <div key={label} style={{padding:"12px 14px",borderRadius:12,border:"1px solid "+DS.border,background:DS.white}}>
+              <div style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,marginBottom:5}}>{label}</div>
+              <div style={{fontSize:14,fontWeight:700,color:DS.dark,wordBreak:"break-word"}}>{val || "-"}</div>
+            </div>
+          ))}
+        </div>
+        {longRows.map(([label,val])=>(
+          <div key={label} style={{padding:"12px 14px",borderRadius:12,border:"1px solid "+DS.border,background:DS.white}}>
+            <div style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,marginBottom:6}}>{label}</div>
+            <div style={{fontSize:14,color:DS.dark,whiteSpace:"pre-wrap",lineHeight:1.45,wordBreak:"break-word"}}>{val}</div>
+          </div>
+        ))}
+        {photos.length>0 && (
+          <div style={{padding:"12px 14px",borderRadius:12,border:"1px solid "+DS.border,background:DS.white}}>
+            <div style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>Photos</div>
+            <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(3, 1fr)",gap:8}}>
+              {photos.map((ph, idx)=>(
+                <div key={idx} style={{position:"relative"}}>
+                  <img src={ph.src} alt={ph.label} style={{width:"100%",height:isMobile?110:130,objectFit:"cover",borderRadius:10,border:"1px solid "+DS.border,display:"block"}} />
+                  <span style={{position:"absolute",left:6,bottom:6,fontSize:10,fontWeight:800,color:"#fff",background:"rgba(0,0,0,0.58)",borderRadius:6,padding:"3px 6px"}}>{ph.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
 // PAGE PASSAGES
 function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePassageStatus }) {
   const [filter,setFilter]=useState("mois");
+  const [detailPassage, setDetailPassage] = useState(null);
   const now=new Date();
   const filtered=useMemo(()=>{
     return passages.filter(p=>{
@@ -3262,6 +3343,9 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                           </button>
                         : <div style={{borderRadius:10,background:DS.light,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:DS.mid,fontWeight:500}}>{Ico.mail(12,DS.mid)} Pas d'email</div>
                       }
+                      <button onClick={()=>setDetailPassage(p)} className="btn-hover" style={{padding:"10px 12px",borderRadius:10,background:DS.light,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:12,color:DS.dark,fontFamily:"inherit",fontWeight:700}}>
+                        {Ico.search(13,DS.mid)} Voir
+                      </button>
                       <button onClick={()=>onEdit(p)} className="btn-hover" style={{padding:"10px 12px",borderRadius:10,background:DS.white,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:12,color:DS.dark,fontFamily:"inherit",fontWeight:700,boxShadow:DS.shadow}}>
                         {Ico.edit(13,DS.mid)} Modifier
                       </button>
@@ -3276,6 +3360,7 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
           })}
         </div>
       }
+      {detailPassage && <PassageDetailModal passage={detailPassage} client={clients.find(x=>x.id===detailPassage.clientId)} onClose={()=>setDetailPassage(null)} />}
     </div>
   );
 }
