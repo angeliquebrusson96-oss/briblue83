@@ -728,7 +728,7 @@ function genererHTMLLivraison(livraison, client) {
 }
 
 async function envoyerEmailLivraison(livraison, client) {
-  const RESEND_API_KEY = "V3zPy-6YfKBLIzIDqZQFJ6p_X4UxrcwP6gWo8VByIg1pUqdM9D0VWj096FOfPvG2kgg8LfvCgTLClanpcXU2Mw";
+  const RESEND_API_KEY = "re_MRGhNzwp40Osgm-4UaxqM00A5rB2alApNKKNXIoE6-bTRGTDI8JIAT1FPYoQqJQGvgR3yDtTxBXT5rgywCvWfQ";
   const FROM = "rapport-piscine@briblue83.icu";
 
   if (!client?.email) { alert("Aucun email renseigné pour ce client."); return; }
