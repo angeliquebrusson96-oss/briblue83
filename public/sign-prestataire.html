@@ -155,14 +155,17 @@ async function loadContract() {
   }
 }
 
+let submitting = false;
 async function submitSignature() {
+  if (submitting) return;
   const canvas = document.getElementById('sigPresta');
   if (isCanvasEmpty(canvas)) {
     document.getElementById('error-msg').innerHTML='<div class="error-box">Veuillez signer avant de valider.</div>';
     return;
   }
+  submitting = true;
   const btn = document.getElementById('btn-submit');
-  btn.disabled=true; btn.textContent='Envoi...';
+  btn.disabled=true; btn.textContent='Envoi en cours...';
   document.getElementById('error-msg').innerHTML='';
   try {
     const res = await fetch('/api/sign-contract', {
@@ -183,7 +186,7 @@ async function submitSignature() {
     document.getElementById('success').style.display='block';
   } catch(err) {
     document.getElementById('error-msg').innerHTML=`<div class="error-box">Erreur : ${err.message}</div>`;
-    btn.disabled=false; btn.textContent='Co-signer le contrat';
+    submitting = false; btn.disabled=false; btn.textContent='Co-signer le contrat';
   }
 }
 

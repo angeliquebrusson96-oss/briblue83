@@ -244,6 +244,7 @@ async function submitSignature() {
 
   } catch(err) {
     document.getElementById('error-msg').innerHTML = `<div class="error-box">Erreur : ${err.message}</div>`;
+    submitting = false;
     btn.disabled = false;
     btn.textContent = 'Signer et valider le contrat';
   }
