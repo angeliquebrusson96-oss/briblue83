@@ -1,4 +1,4 @@
- import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js'
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 
 const supabase = createClient(
@@ -1581,8 +1581,8 @@ function genererHTMLRapport(passage, client) {
   const hasPhotos = passage.photoArrivee || passage.photoDepart || (passage.photos||[]).some(Boolean);
   const allPhotos = [
     passage.photoArrivee ? {src:passage.photoArrivee, label:"À l'arrivée"} : null,
+    ...((passage.photos||[]).map((p,i)=>p?{src:p,label:`Photo ${i+2}`}:null)),
     passage.photoDepart ? {src:passage.photoDepart, label:"Au départ"} : null,
-    ...((passage.photos||[]).map((p,i)=>p?{src:p,label:`Photo ${i+3}`}:null)),
   ].filter(Boolean);
   const sectionPhotos = hasPhotos ? `
 <div class="section">
@@ -2062,15 +2062,12 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
             </div>
           </div>
           <div style={{borderTop:"1px solid "+DS.border,paddingTop:16,marginTop:16}}>
-            <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:10}}>Photos ({[f.photoArrivee,f.photoDepart,...(f.photos||[])].filter(Boolean).length}/4)</span>
+            <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:10}}>Photos ({[f.photoArrivee,...(f.photos||[])].filter(Boolean).length}/3 à l'arrivée)</span>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-              {/* Photo arrivée */}
               <PhotoPicker label="Arrivée" value={f.photoArrivee} onChange={v=>set("photoArrivee",v)} compact/>
-              {/* Photo départ */}
-              <PhotoPicker label="Départ" value={f.photoDepart} onChange={v=>set("photoDepart",v)} compact/>
-              {/* Photos supplémentaires 3 et 4 */}
-              <PhotoPicker label="Photo 3" value={(f.photos||[])[0]||""} onChange={v=>set("photos",[(v),(f.photos||[])[1]||""].filter((x,i)=>i>0||x))} compact/>
-              <PhotoPicker label="Photo 4" value={(f.photos||[])[1]||""} onChange={v=>set("photos",[(f.photos||[])[0]||"",(v)].filter((x,i)=>i>1||x))} compact/>
+              <PhotoPicker label="Photo 2" value={(f.photos||[])[0]||""} onChange={v=>{ const p=[...(f.photos||[])]; p[0]=v; set("photos",p); }} compact/>
+              <PhotoPicker label="Photo 3" value={(f.photos||[])[1]||""} onChange={v=>{ const p=[...(f.photos||[])]; p[1]=v; set("photos",p); }} compact/>
+              <PhotoPicker label="Photo 4" value={(f.photos||[])[2]||""} onChange={v=>{ const p=[...(f.photos||[])]; p[2]=v; set("photos",p); }} compact/>
             </div>
           </div>
         </div>
@@ -2282,6 +2279,9 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                 <StarRating value={f.ressenti} onChange={v=>set("ressenti",v)}/>
               </div>
               <OuiNon label="Présence du locataire / propriétaire ?" value={f.presenceClient} onChange={v=>set("presenceClient",v)}/>
+              <div style={{borderTop:"1px solid "+DS.border,paddingTop:14}}>
+                <PhotoPicker label="📸 Photo au départ" value={f.photoDepart} onChange={v=>set("photoDepart",v)} compact/>
+              </div>
               <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",background:`linear-gradient(135deg,${DS.greenSoft},#bbf7d0)`,padding:"14px 16px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.green+"44",marginTop:4,transition:"all .2s"}}>
                 <input type="checkbox" checked={f.ok} onChange={e=>set("ok",e.target.checked)} style={{width:20,height:20,accentColor:DS.green}}/>
                 <span style={{fontWeight:800,color:"#16a34a",fontSize:14,display:"flex",alignItems:"center",gap:6}}>
@@ -2301,11 +2301,13 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
           </div>
           {(f.photoArrivee||f.photoDepart||(f.photos||[]).some(Boolean)) && (
             <div style={{background:DS.light,borderRadius:DS.radiusSm,padding:14,border:"1px solid "+DS.border,marginBottom:16}}>
-              <div style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Photos jointes au rapport</div>
+              <div style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>
+                Photos jointes ({[f.photoArrivee,f.photoDepart,...(f.photos||[])].filter(Boolean).length}/5)
+              </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                 {f.photoArrivee && (<div style={{position:"relative"}}><img src={f.photoArrivee} alt="Arrivée" style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Arrivée</span></div>)}
+                {(f.photos||[]).map((ph,i)=>ph?(<div key={i} style={{position:"relative"}}><img src={ph} alt={`Photo ${i+2}`} style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Photo {i+2}</span></div>):null)}
                 {f.photoDepart && (<div style={{position:"relative"}}><img src={f.photoDepart} alt="Départ" style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Départ</span></div>)}
-                {(f.photos||[]).map((ph,i)=>ph?(<div key={i} style={{position:"relative"}}><img src={ph} alt={`Photo ${i+3}`} style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Photo {i+3}</span></div>):null)}
               </div>
             </div>
           )}
