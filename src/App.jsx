@@ -2927,14 +2927,14 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
       {/* Widget passages du mois — redesigné */}
       <div style={{marginBottom:14,borderRadius:DS.radius,overflow:"hidden",boxShadow:DS.shadowMd,border:"1px solid "+(totalTaches>0?DS.border:"#86efac")}}>
         {/* Header */}
-        <div style={{background:totalTaches>0?"linear-gradient(135deg,#0f2040,#174a6e)":"linear-gradient(135deg,#065f46,#059669)",padding:"14px 16px"}}>
+        <div style={{background:totalTaches>0?"linear-gradient(135deg,#ecfeff,#f0fdfe)":"linear-gradient(135deg,#ecfdf5,#f0fdf4)",padding:"14px 16px",borderBottom:"1px solid "+(totalTaches>0?"#a5f3fc":"#6ee7b7")}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div>
-              <div style={{fontWeight:900,fontSize:16,color:"#fff",letterSpacing:-0.3}}>{MOIS_L[moisCourant]} {YEAR_NOW}</div>
+              <div style={{fontWeight:900,fontSize:16,color:DS.dark,letterSpacing:-0.3}}>{MOIS_L[moisCourant]} {YEAR_NOW}</div>
               <div style={{fontSize:12,color:"rgba(255,255,255,0.7)",marginTop:2}}>
                 {totalTaches>0
-                  ? <span style={{display:"flex",alignItems:"center",gap:6}}><span style={{background:"rgba(251,191,36,0.25)",color:"#fbbf24",padding:"1px 8px",borderRadius:20,fontWeight:700}}>{totalTaches}</span> passage{totalTaches>1?"s":""} restant{totalTaches>1?"s":""}</span>
-                  : "✅ Tous les passages effectués"}
+                  ? <span style={{display:"flex",alignItems:"center",gap:6}}><span style={{background:"#fef3c7",color:"#b45309",padding:"1px 8px",borderRadius:20,fontWeight:700,border:"1px solid #fcd34d"}}>{totalTaches}</span> passage{totalTaches>1?"s":""} restant{totalTaches>1?"s":""}</span>
+                  : "✅ Tous les passages effectués sont faits !"}
               </div>
             </div>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -2954,8 +2954,8 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
             return (
               <div style={{marginTop:10}}>
                 <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                  <span style={{fontSize:11,color:"rgba(255,255,255,0.6)"}}>Avancement global</span>
-                  <span style={{fontSize:12,fontWeight:800,color:pct>=100?"#86efac":"#fbbf24"}}>{pct}%</span>
+                  <span style={{fontSize:11,color:DS.mid,fontWeight:600}}>Avancement global</span>
+                  <span style={{fontSize:12,fontWeight:800,color:pct>=100?DS.green:"#b45309"}}>{pct}%</span>
                 </div>
                 <div style={{height:4,background:"rgba(255,255,255,0.15)",borderRadius:99,overflow:"hidden"}}>
                   <div style={{height:"100%",width:`${pct}%`,background:pct>=100?"#34d399":"linear-gradient(90deg,#fbbf24,#f59e0b)",borderRadius:99,transition:"width .5s"}}/>
@@ -2975,7 +2975,7 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
                   style={{display:"flex",alignItems:"center",gap:10,padding:"11px 16px",
                     borderBottom:i<Math.min(tachesRestantes.length,showAllTaches?999:PREVIEW)-1?"1px solid "+DS.border:"none",
                     cursor:"pointer",background:"#fff",transition:"background .15s"}}
-                  onMouseEnter={e=>e.currentTarget.style.background=DS.light}
+                  onMouseEnter={e=>e.currentTarget.style.background="#ecfeff"}
                   onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
                   <Avatar nom={client.nom} size={36} photo={client.photoPiscine}/>
                   <div style={{flex:1,minWidth:0}}>
@@ -2988,7 +2988,7 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
                       </div>
                     </div>
                   </div>
-                  <div style={{background:DS.orangeSoft,color:DS.orange,fontSize:12,fontWeight:800,padding:"3px 10px",borderRadius:20,border:"1px solid "+DS.orange+"33",flexShrink:0}}>
+                  <div style={{background:"#fef3c7",color:"#b45309",fontSize:12,fontWeight:800,padding:"3px 10px",borderRadius:20,border:"1px solid #fcd34d",flexShrink:0}}>
                     {restE+restC} rest.
                   </div>
                 </div>
@@ -3021,9 +3021,9 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
 
       {/* Action buttons */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>
-        <BtnPrimary onClick={onAddPassage} bg={DS.dark} icon={Ico.clipboard(15,"#fff")} style={{width:"100%",fontSize:12,padding:"11px 8px"}}>Passage</BtnPrimary>
-        <BtnPrimary onClick={()=>onAddLivraison()} bg={DS.blue} icon={Ico.truck(15,"#fff")} style={{width:"100%",fontSize:12,padding:"11px 8px"}}>Livraison</BtnPrimary>
-        <BtnPrimary onClick={onAddRdv} bg={DS.purple} icon={Ico.rdv(15,"#fff")} style={{width:"100%",fontSize:12,padding:"11px 8px"}}>RDV</BtnPrimary>
+        <BtnPrimary onClick={onAddPassage} bg="linear-gradient(135deg,#0891b2,#06b6d4)" icon={Ico.clipboard(15,"#fff")} style={{width:"100%",fontSize:13,padding:"12px 8px",boxShadow:"0 4px 12px rgba(8,145,178,0.25)"}}>Passage</BtnPrimary>
+        <BtnPrimary onClick={()=>onAddLivraison()} bg="linear-gradient(135deg,#059669,#0d9488)" icon={Ico.truck(15,"#fff")} style={{width:"100%",fontSize:13,padding:"12px 8px",boxShadow:"0 4px 12px rgba(5,150,105,0.25)"}}>Livraison</BtnPrimary>
+        <BtnPrimary onClick={onAddRdv} bg="linear-gradient(135deg,#4f46e5,#6366f1)" icon={Ico.rdv(15,"#fff")} style={{width:"100%",fontSize:13,padding:"12px 8px",boxShadow:"0 4px 12px rgba(79,70,229,0.25)"}}>RDV</BtnPrimary>
       </div>
 
       {/* RDVs Aujourd'hui */}
@@ -3842,9 +3842,9 @@ export default function App() {
         /* LAYOUT DESKTOP : sidebar gauche + contenu principal */
         <div style={{display:"flex",flex:1,minHeight:0}}>
           {/* Sidebar navigation desktop */}
-          <div style={{width:220,flexShrink:0,background:"#0e7490",borderRight:"1px solid rgba(255,255,255,0.1)",display:"flex",flexDirection:"column",padding:"24px 12px",gap:4,position:"sticky",top:62,height:"calc(100vh - 62px)",overflowY:"auto"}}>
+          <div style={{width:220,flexShrink:0,background:"linear-gradient(180deg,#0e7490 0%,#0891b2 100%)",borderRight:"1px solid rgba(255,255,255,0.08)",display:"flex",flexDirection:"column",padding:"24px 12px",gap:4,position:"sticky",top:62,height:"calc(100vh - 62px)",overflowY:"auto"}}>
             {/* Stats rapides */}
-            <div style={{padding:"12px 14px",borderRadius:12,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.06)",marginBottom:16}}>
+            <div style={{padding:"12px 14px",borderRadius:12,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",marginBottom:16}}>
               <div style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Aperçu</div>
               <div style={{display:"flex",flexDirection:"column",gap:6}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>Clients</span><span style={{fontSize:13,fontWeight:800,color:"#fff"}}>{clients.length}</span></div>
@@ -3854,9 +3854,9 @@ export default function App() {
             </div>
             {/* Nav links */}
             {NAV.map(n=>(
-              <button key={n.id} onClick={()=>setPage(n.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",borderRadius:12,border:"none",cursor:"pointer",background:page===n.id?"rgba(56,189,248,0.12)":"transparent",textAlign:"left",fontFamily:"inherit",transition:"all .2s",width:"100%"}}>
+              <button key={n.id} onClick={()=>setPage(n.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",borderRadius:12,border:"none",cursor:"pointer",background:page===n.id?"rgba(255,255,255,0.15)":"transparent",textAlign:"left",fontFamily:"inherit",transition:"all .2s",width:"100%"}}>
                 {n.icon(page===n.id)}
-                <span style={{fontSize:13,fontWeight:page===n.id?800:500,color:page===n.id?"#38bdf8":"rgba(255,255,255,0.5)"}}>{n.l}</span>
+                <span style={{fontSize:13,fontWeight:page===n.id?800:500,color:page===n.id?"#fff":"rgba(255,255,255,0.6)"}}>{n.l}</span>
                 {page===n.id&&<div style={{marginLeft:"auto",width:4,height:16,borderRadius:2,background:"#38bdf8"}}/>}
               </button>
             ))}
