@@ -2993,7 +2993,7 @@ export default function App() {
     { id:"rdv", l:"RDV", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#a78bfa":"rgba(255,255,255,0.35)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="12" cy="15" r="2.5" fill={a?"#a78bfa":"none"}/></svg> },
   ];
 
-  const PAGE_LABELS = { dashboard:`Bonjour Dorian 👋`, clients:"Clients", passages:"Passages", interventions:"Passages", rdv:"Rendez-vous" };
+  const PAGE_LABELS = { dashboard:`Bonjour Dorian 👋 Aujourd'hui tâchons de ne rien oublier !`, clients:"Clients", passages:"Passages", interventions:"Passages", rdv:"Rendez-vous" };
 
   return (
     <>
