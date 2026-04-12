@@ -1909,55 +1909,78 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
     {ic:STEP_ICONS[5],l:"Signatures",color:"#be185d"},
   ];
 
-  const Stepper = () => (
-    <div style={{marginBottom:18}}>
-      {/* Stepper circulaire moderne */}
-      <div style={{display:"flex",alignItems:"center",gap:0,marginBottom:14}}>
+  const Stepper = () => {
+    const pct = Math.round((step-1)/STEPS*100);
+    return (
+    <div style={{marginBottom:16}}>
+      {/* Barre de progression globale */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+        <span style={{fontSize:12,color:DS.mid,fontWeight:600}}>Progression</span>
+        <span style={{fontSize:12,fontWeight:700,color:DS.dark}}>{step-1} / {STEPS} étapes — {pct}%</span>
+      </div>
+      <div style={{height:5,background:DS.light,borderRadius:99,marginBottom:16,overflow:"hidden"}}>
+        <div style={{height:"100%",width:`${pct}%`,background:"linear-gradient(90deg,#059669,#0ea5e9)",borderRadius:99,transition:"width .4s cubic-bezier(.22,1,.36,1)"}}/>
+      </div>
+
+      {/* Ronds étapes */}
+      <div style={{display:"flex",alignItems:"center",gap:0,marginBottom:14,position:"relative"}}>
+        {/* Ligne fond */}
+        <div style={{position:"absolute",top:"50%",left:"4%",right:"4%",height:2,background:DS.light,transform:"translateY(-50%)",zIndex:0}}/>
+        {/* Ligne progression */}
+        <div style={{position:"absolute",top:"50%",left:"4%",height:2,width:`${Math.max(0,(step-1.5)/STEPS*92)}%`,background:"linear-gradient(90deg,#059669,#0ea5e9)",transform:"translateY(-50%)",transition:"width .4s",zIndex:1}}/>
         {STEP_INFO.map((s,i)=>{
           const done=i+1<step, active=i+1===step;
           return (
-            <div key={i} style={{display:"flex",alignItems:"center",flex:i<STEPS-1?1:"none"}}>
+            <div key={i} style={{flex:1,display:"flex",justifyContent:"center",zIndex:2}}>
               <button onClick={()=>setStep(i+1)} title={s.l} style={{
-                width:active?42:32, height:active?42:32,
+                width:active?44:36, height:active?44:36,
                 borderRadius:"50%", border:"none", cursor:"pointer",
-                background:active?s.color:done?"#059669":"#f1f5f9",
+                background:active?s.color:done?"#059669":DS.white,
+                border:done||active?"none":`2px solid ${DS.border}`,
                 display:"flex",alignItems:"center",justifyContent:"center",
-                flexShrink:0, position:"relative", transition:"all .3s cubic-bezier(.22,1,.36,1)",
-                boxShadow:active?`0 4px 16px ${s.color}55`:"none",
-                zIndex:1,
+                flexShrink:0, position:"relative",
+                transition:"all .3s cubic-bezier(.22,1,.36,1)",
+                boxShadow:active?`0 4px 16px ${s.color}44`:done?"0 2px 8px rgba(5,150,105,0.25)":"none",
               }}>
                 {done
-                  ? <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  : (typeof s.ic==="function" ? s.ic(active?"#fff":done?"#fff":"#94a3b8", active?17:13) : <span style={{fontSize:active?14:11}}>{s.ic}</span>)
+                  ? <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  : (typeof s.ic==="function" ? s.ic(active?"#fff":"#94a3b8", active?17:14) : <span style={{fontSize:active?14:11}}>{s.ic}</span>)
                 }
-                {active && <div style={{position:"absolute",inset:-3,borderRadius:"50%",border:`2px solid ${s.color}44`,pointerEvents:"none"}}/>}
+                {active && <div style={{position:"absolute",inset:-4,borderRadius:"50%",border:`2px solid ${s.color}44`,pointerEvents:"none"}}/>}
               </button>
-              {i<STEPS-1 && (
-                <div style={{flex:1,height:2,background:i+1<step?"#059669":"#e2e8f0",marginLeft:-1,marginRight:-1,transition:"background .4s",borderRadius:1}}/>
-              )}
             </div>
           );
         })}
       </div>
-      {/* Label étape active */}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",borderRadius:12,background:`linear-gradient(135deg,${STEP_INFO[step-1].color}10,${STEP_INFO[step-1].color}18)`,border:`1.5px solid ${STEP_INFO[step-1].color}28`}}>
+
+      {/* Labels sous les ronds */}
+      <div style={{display:"flex",marginBottom:14}}>
+        {STEP_INFO.map((s,i)=>{
+          const done=i+1<step, active=i+1===step;
+          return (
+            <div key={i} style={{flex:1,textAlign:"center"}}>
+              <span style={{fontSize:9,fontWeight:active?800:500,color:active?s.color:done?"#059669":DS.mid,letterSpacing:0.3,display:"block",lineHeight:1.2}}>{s.l}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Bandeau étape active */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",borderRadius:14,background:`${STEP_INFO[step-1].color}10`,border:`1.5px solid ${STEP_INFO[step-1].color}30`}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:32,height:32,borderRadius:10,background:STEP_INFO[step-1].color,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 2px 8px ${STEP_INFO[step-1].color}44`}}>
+          <div style={{width:34,height:34,borderRadius:10,background:STEP_INFO[step-1].color,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:`0 3px 10px ${STEP_INFO[step-1].color}44`}}>
             {typeof STEP_INFO[step-1].ic==="function" ? STEP_INFO[step-1].ic("#fff",16) : <span style={{fontSize:15}}>{STEP_INFO[step-1].ic}</span>}
           </div>
           <div>
-            <div style={{fontSize:13,fontWeight:800,color:STEP_INFO[step-1].color}}>{STEP_INFO[step-1].l}</div>
-            <div style={{fontSize:10,color:"#94a3b8",fontWeight:500}}>Étape {step} sur {STEPS}</div>
+            <div style={{fontSize:14,fontWeight:800,color:STEP_INFO[step-1].color,letterSpacing:-0.2}}>{STEP_INFO[step-1].l}</div>
+            <div style={{fontSize:11,color:DS.mid,marginTop:1}}>Étape {step} sur {STEPS}</div>
           </div>
         </div>
-        <div style={{display:"flex",gap:2}}>
-          {STEP_INFO.map((_,i)=>(
-            <div key={i} style={{width:i+1===step?20:6,height:6,borderRadius:3,background:i+1<step?"#059669":i+1===step?STEP_INFO[step-1].color:"#e2e8f0",transition:"all .3s"}}/>
-          ))}
-        </div>
+        <div style={{fontSize:22,fontWeight:900,color:STEP_INFO[step-1].color,opacity:0.8}}>{pct}<span style={{fontSize:12,fontWeight:600}}>%</span></div>
       </div>
     </div>
-  );
+  );};
+
 
   const clientSel = clients.find(c=>c.id===f.clientId);
 
@@ -2335,26 +2358,21 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
         </div>
       )}
 
-      {/* Navigation modernisée */}
-      <div style={{display:"flex",gap:10,marginTop:24,paddingTop:16,borderTop:"1px solid "+DS.border,alignItems:"center"}}>
-        <button onClick={step===1?onClose:()=>setStep(s=>s-1)} className="btn-hover" style={{padding:"13px 18px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+      {/* Navigation */}
+      <div style={{display:"flex",gap:10,marginTop:20,paddingTop:14,borderTop:"1px solid "+DS.border,alignItems:"center"}}>
+        <button onClick={step===1?onClose:()=>setStep(s=>s-1)} className="btn-hover" style={{minHeight:52,padding:"14px 20px",borderRadius:DS.radiusSm,background:DS.light,border:"1.5px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:14,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
           {step===1
-            ? <><svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Annuler</>
-            : <><svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg> Retour</>
+            ? <><svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Annuler</>
+            : <><svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg> Retour</>
           }
         </button>
-        {/* Dots progression */}
-        <div style={{flex:1,display:"flex",justifyContent:"center",gap:5}}>
-          {STEP_INFO.map((_,i)=>(
-            <button key={i} onClick={()=>setStep(i+1)} style={{width:i+1===step?20:7,height:7,borderRadius:4,border:"none",cursor:"pointer",background:i+1<step?"#059669":i+1===step?STEP_INFO[step-1].color:"#e2e8f0",transition:"all .3s",padding:0}}/>
-          ))}
-        </div>
+        <div style={{flex:1}}/>
         {step<STEPS
-          ? <button onClick={()=>setStep(s=>s+1)} className="btn-hover" style={{padding:"13px 22px",borderRadius:DS.radiusSm,background:STEP_INFO[step].color,border:"none",cursor:"pointer",fontWeight:800,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:7,boxShadow:`0 4px 16px ${STEP_INFO[step].color}44`,flexShrink:0}}>
-              {STEP_INFO[step].l} <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          ? <button onClick={()=>setStep(s=>s+1)} className="btn-hover" style={{minHeight:52,padding:"14px 24px",borderRadius:DS.radiusSm,background:STEP_INFO[step].color,border:"none",cursor:"pointer",fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:8,boxShadow:`0 4px 16px ${STEP_INFO[step].color}44`,flexShrink:0}}>
+              {STEP_INFO[step].l} <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
-          : <button onClick={handleSave} className="btn-hover" style={{padding:"13px 22px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:800,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:7,boxShadow:"0 4px 16px #05996944",flexShrink:0}}>
-              <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Enregistrer
+          : <button onClick={handleSave} className="btn-hover" style={{minHeight:52,padding:"14px 24px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:8,boxShadow:"0 4px 16px #05996944",flexShrink:0}}>
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Enregistrer
             </button>
         }
       </div>
