@@ -3122,7 +3122,7 @@ function PageClients({ clients, passages, onClientClick, onAdd }) {
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher…"
             style={{width:"100%",padding:"12px 14px 12px 40px",borderRadius:DS.radius,border:"1.5px solid "+DS.border,fontSize:13,outline:"none",boxSizing:"border-box",background:DS.white,color:DS.dark,fontFamily:"inherit"}}/>
         </div>
-        <BtnPrimary onClick={onAdd} bg={DS.purple} icon={Ico.userPlus(16,"#fff")} style={{flexShrink:0}}>
+        <BtnPrimary onClick={onAdd} bg={DS.blue} icon={Ico.userPlus(14,"#fff")} style={{flexShrink:0,padding:"10px 16px",fontSize:13,borderRadius:DS.radiusSm}}>
           {!isMobile && "Nouveau"}
         </BtnPrimary>
       </div>
@@ -3144,7 +3144,7 @@ function PageClients({ clients, passages, onClientClick, onAdd }) {
             <div key={c.id} onClick={()=>onClientClick(c)} className="fade-in card-hover"
               style={{animationDelay:`${idx*0.03}s`,background:DS.white,borderRadius:DS.radius,
                 overflow:"hidden",boxShadow:"0 1px 8px rgba(19,34,53,0.06), 0 4px 16px rgba(19,34,53,0.04)",
-                border:"1px solid "+DS.border,borderTop:"3px solid "+accentColor,
+                border:"1px solid "+DS.border,borderTop:"2px solid "+accentColor,
                 cursor:"pointer",width:"100%",boxSizing:"border-box"}}>
               {/* Photo banner */}
               {c.photoPiscine && (
@@ -3159,7 +3159,7 @@ function PageClients({ clients, passages, onClientClick, onAdd }) {
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontWeight:800,fontSize:15,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:-0.3}}>{c.nom}</div>
                     <div style={{display:"flex",gap:6,marginTop:5,alignItems:"center",flexWrap:"wrap"}}>
-                      <span style={{background:DS.blueSoft,color:DS.blue,padding:"3px 10px",borderRadius:20,fontWeight:700,fontSize:12}}>{c.formule}</span>
+                      <span style={{background:"#f1f5f9",color:DS.mid,padding:"3px 10px",borderRadius:20,fontWeight:600,fontSize:12,border:"1px solid "+DS.border}}>{c.formule}</span>
                       {c.bassin&&<span style={{background:DS.light,color:DS.mid,padding:"3px 8px",borderRadius:20,fontWeight:600,fontSize:11}}>{c.bassin}{c.volume?" · "+c.volume+"m³":""}</span>}
                     </div>
                   </div>
@@ -3171,17 +3171,17 @@ function PageClients({ clients, passages, onClientClick, onAdd }) {
                 </div>}
                 {/* Stats */}
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:tot>0?10:0}}>
-                  <div style={{textAlign:"center",padding:"8px 4px",borderRadius:10,background:DS.blueSoft}}>
+                  <div style={{textAlign:"center",padding:"7px 4px",borderRadius:8,background:"#f8fafc",border:"1px solid "+DS.border}}>
                     <div style={{fontSize:17,fontWeight:900,color:DS.blue,lineHeight:1}}>{eE}<span style={{fontSize:10,fontWeight:500,color:DS.mid}}>/{tE}</span></div>
-                    <div style={{fontSize:10,fontWeight:700,color:DS.blue,marginTop:3}}>🔧 Entretien</div>
+                    <div style={{fontSize:10,fontWeight:500,color:DS.mid,marginTop:2}}>Entretiens</div>
                   </div>
-                  <div style={{textAlign:"center",padding:"8px 4px",borderRadius:10,background:DS.tealSoft}}>
+                  <div style={{textAlign:"center",padding:"7px 4px",borderRadius:8,background:"#f8fafc",border:"1px solid "+DS.border}}>
                     <div style={{fontSize:17,fontWeight:900,color:DS.teal,lineHeight:1}}>{eC}<span style={{fontSize:10,fontWeight:500,color:DS.mid}}>/{tC}</span></div>
-                    <div style={{fontSize:10,fontWeight:700,color:DS.teal,marginTop:3}}>💧 Contrôle</div>
+                    <div style={{fontSize:10,fontWeight:500,color:DS.mid,marginTop:2}}>Contrôles</div>
                   </div>
-                  <div style={{textAlign:"center",padding:"8px 4px",borderRadius:10,background:rest>0?DS.orangeSoft:DS.greenSoft}}>
-                    <div style={{fontSize:17,fontWeight:900,color:rest>0?DS.orange:DS.green,lineHeight:1}}>{rest}</div>
-                    <div style={{fontSize:10,fontWeight:700,color:rest>0?DS.orange:DS.green,marginTop:3}}>{rest>0?"⏳ Restants":"✅ À jour"}</div>
+                  <div style={{textAlign:"center",padding:"7px 4px",borderRadius:8,background:"#f8fafc",border:"1px solid "+DS.border}}>
+                    <div style={{fontSize:16,fontWeight:800,color:rest>0?"#b45309":DS.green,lineHeight:1}}>{rest}</div>
+                    <div style={{fontSize:10,fontWeight:500,color:DS.mid,marginTop:2}}>Restants</div>
                   </div>
                 </div>
                 {/* Progress bar */}
@@ -3469,11 +3469,11 @@ function PageRdv({ clients, rdvs, onAdd, onEdit, onDelete }) {
     <div>
       <div style={{display:"flex",gap:8,marginBottom:14}}>
         {[["avenir","À venir"],["passe","Passés"],["tout","Tous"]].map(([v,l])=>(
-          <button key={v} onClick={()=>setFilter(v)} className="btn-hover" style={{padding:"7px 16px",borderRadius:20,border:filter===v?"none":"1px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:12,fontFamily:"inherit",background:filter===v?DS.purpleGrad:DS.white,color:filter===v?"#fff":DS.mid,boxShadow:filter===v?"0 2px 8px #7c3aed44":"none"}}>{l}</button>
+          <button key={v} onClick={()=>setFilter(v)} className="btn-hover" style={{padding:"7px 16px",borderRadius:20,border:filter===v?"none":"1px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:12,fontFamily:"inherit",background:filter===v?DS.blue:DS.white,color:filter===v?"#fff":DS.mid,boxShadow:"none",border:filter===v?"none":"1px solid "+DS.border}}>{l}</button>
         ))}
         <span style={{marginLeft:"auto",fontSize:12,color:DS.mid,alignSelf:"center",fontWeight:600}}>{filtered.length} RDV</span>
       </div>
-      <BtnPrimary onClick={onAdd} bg={DS.purple} icon={Ico.plus(14,"#fff")} style={{width:"100%",marginBottom:14}}>Nouveau rendez-vous</BtnPrimary>
+      <BtnPrimary onClick={onAdd} bg={DS.blue} icon={Ico.plus(13,"#fff")} style={{width:"100%",marginBottom:14,borderRadius:DS.radiusSm}}>Nouveau rendez-vous</BtnPrimary>
       {filtered.length===0
         ? <div style={{textAlign:"center",color:DS.mid,padding:40,fontSize:13}}>Aucun rendez-vous</div>
         : <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -3800,25 +3800,28 @@ export default function App() {
           </div>
         </button>
         <div style={{flex:1}} />
-        <div style={{display:"flex",gap:isMobile?3:4,alignItems:"center",flexShrink:0}}>
-          <button onClick={()=>setShowStock(true)} className="btn-hover" style={{position:"relative",width:isMobile?32:34,height:isMobile?32:34,borderRadius:10,background:"rgba(5,150,105,0.2)",border:"1px solid rgba(5,150,105,0.35)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-            {Ico.cart(isMobile?14:17,"#6ee7b7")}
-            {nbStockBas>0&&<span style={{position:"absolute",top:-4,right:-4,width:16,height:16,borderRadius:8,background:DS.red,color:"#fff",fontSize:8,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid rgba(0,0,0,0.4)"}}>{nbStockBas}</span>}
+        <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+          {/* Stock */}
+          <button onClick={()=>setShowStock(true)} className="btn-hover" title="Stock produits" style={{position:"relative",width:34,height:34,borderRadius:8,background:"rgba(255,255,255,0.15)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            {Ico.cart(16,"rgba(255,255,255,0.85)")}
+            {nbStockBas>0&&<span style={{position:"absolute",top:-3,right:-3,minWidth:16,height:16,borderRadius:8,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px"}}>{nbStockBas}</span>}
           </button>
+          {/* Alertes */}
           {nbAlertes>0&&(
-            <button onClick={()=>setShowModalAlertes(true)} className="btn-hover" style={{position:"relative",width:isMobile?32:34,height:isMobile?32:34,borderRadius:10,background:"rgba(239,68,68,0.15)",border:"1px solid rgba(239,68,68,0.3)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              {Ico.alert(isMobile?13:15,"#fda4af")}
-              <span style={{position:"absolute",top:-4,right:-4,width:16,height:16,borderRadius:8,background:"#ef4444",color:"#fff",fontSize:8,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid rgba(0,0,0,0.4)"}}>{nbAlertes}</span>
+            <button onClick={()=>setShowModalAlertes(true)} className="btn-hover" title="Alertes" style={{position:"relative",width:34,height:34,borderRadius:8,background:"rgba(255,255,255,0.15)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              {Ico.alert(16,"rgba(255,255,255,0.85)")}
+              <span style={{position:"absolute",top:-3,right:-3,minWidth:16,height:16,borderRadius:8,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px"}}>{nbAlertes}</span>
             </button>
           )}
-          <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} className="btn-hover" style={{width:isMobile?32:34,height:isMobile?32:34,borderRadius:10,background:"rgba(14,165,233,0.2)",border:"1px solid rgba(14,165,233,0.35)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-            {Ico.clipboard(isMobile?13:15,"#7dd3fc")}
+          {/* Nouveau passage */}
+          <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} className="btn-hover" title="Nouveau passage" style={{width:34,height:34,borderRadius:8,background:"rgba(255,255,255,0.15)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            {Ico.clipboard(16,"rgba(255,255,255,0.85)")}
           </button>
-          {!isMobile&&<button onClick={openAddClient} className="btn-hover" style={{width:34,height:34,borderRadius:10,background:"rgba(124,58,237,0.2)",border:"1px solid rgba(124,58,237,0.35)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-            {Ico.userPlus(15,"#a5b4fc")}
-          </button>}
-          <button onClick={handleLogout} className="btn-hover" style={{width:isMobile?32:34,height:isMobile?32:34,borderRadius:10,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          {/* Séparateur vertical */}
+          <div style={{width:1,height:20,background:"rgba(255,255,255,0.2)",flexShrink:0}}/>
+          {/* Déconnexion */}
+          <button onClick={handleLogout} className="btn-hover" title="Déconnexion" style={{width:34,height:34,borderRadius:8,background:"rgba(255,255,255,0.08)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           </button>
         </div>
       </div>
