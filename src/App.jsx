@@ -36,7 +36,7 @@ const Ico = {
   chemicals: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v5l3 9a3 3 0 01-3 3H9a3 3 0 01-3-3l3-9V3z"/><line x1="9" y1="3" x2="15" y2="3"/><path d="M7.5 15h9"/></svg>,
   edit: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
   trash: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>,
-  close: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  close: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.8" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
   plus: (s=14,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
   save: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
   search: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
@@ -364,19 +364,19 @@ function setupPWA() {
 
 // DESIGN SYSTEM V2  MODERNE
 const DS = {
-  blue:"#0369a1", blueSoft:"#e0f2fe", blueGrad:"linear-gradient(135deg,#0284c7,#0ea5e9)",
-  dark:"#0c1222", mid:"#64748b",
-  light:"#f1f5f9", bg:"#f8fafc", border:"#e2e8f0", white:"#ffffff",
-  green:"#059669", greenSoft:"#d1fae5", greenGrad:"linear-gradient(135deg,#059669,#34d399)",
-  red:"#dc2626", redSoft:"#fee2e2",
-  orange:"#ea580c", orangeSoft:"#ffedd5",
-  yellow:"#d97706", yellowSoft:"#fef3c7",
-  purple:"#7c3aed", purpleSoft:"#ede9fe", purpleGrad:"linear-gradient(135deg,#7c3aed,#a78bfa)",
-  teal:"#0891b2", tealSoft:"#e0f7fa",
+  blue:"#1b6b96", blueSoft:"#edf6fb", blueGrad:"linear-gradient(135deg,#2b7eab,#63b3d9)",
+  dark:"#132235", mid:"#64788b",
+  light:"#eef3f7", bg:"#f5f8fb", border:"#dbe5ee", white:"#ffffff",
+  green:"#1f8f6b", greenSoft:"#e8f7f0", greenGrad:"linear-gradient(135deg,#1f8f6b,#57c49e)",
+  red:"#c84a4a", redSoft:"#fdeeee",
+  orange:"#d9773b", orangeSoft:"#fff3e8",
+  yellow:"#c6922b", yellowSoft:"#fff8df",
+  purple:"#7b6fd6", purpleSoft:"#f2efff", purpleGrad:"linear-gradient(135deg,#7b6fd6,#a8a2ea)",
+  teal:"#237e90", tealSoft:"#e8f7f8",
   radius: 16, radiusSm: 12, radiusLg: 22,
-  shadow: "0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)",
-  shadowMd: "0 4px 24px rgba(0,0,0,0.08)",
-  shadowLg: "0 8px 40px rgba(0,0,0,0.12)",
+  shadow: "0 2px 10px rgba(19,34,53,0.05), 0 8px 24px rgba(19,34,53,0.04)",
+  shadowMd: "0 8px 28px rgba(19,34,53,0.08)",
+  shadowLg: "0 18px 48px rgba(19,34,53,0.14)",
   font: "'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
 };
 
@@ -410,12 +410,12 @@ const GlobalStyles = () => (
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     html { scroll-behavior: smooth; }
-    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: ${DS.bg}; overflow-x: hidden; color-scheme: light; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: linear-gradient(180deg, ${DS.bg} 0%, #f8fbfd 100%); overflow-x: hidden; color-scheme: light; }
     input, select, textarea, button { font-family: inherit; }
     input, select, textarea { background: ${DS.white}; color: ${DS.dark}; }
     textarea { caret-color: ${DS.dark}; }
     input::placeholder, textarea::placeholder { color: #94a3b8; opacity: 1; }
-    input:focus, select:focus, textarea:focus { outline: none; border-color: ${DS.blue} !important; box-shadow: 0 0 0 3px ${DS.blue}22 !important; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: ${DS.blue} !important; box-shadow: 0 0 0 4px ${DS.blue}1f !important; }
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 99px; }
     ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 99px; border: 2px solid #f1f5f9; }
@@ -489,7 +489,7 @@ function Modal({ title, onClose, children, wide }) {
         {isMobile && <div style={{display:"flex",justifyContent:"center",padding:"12px 0 4px"}}><div style={{width:36,height:4,borderRadius:2,background:DS.border}}/></div>}
         <div style={{padding:isMobile?"8px 20px 16px":"16px 28px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid "+DS.border}}>
           <span style={{color:DS.dark,fontWeight:800,fontSize:17,letterSpacing:-0.3}}>{title}</span>
-          <button onClick={onClose} className="btn-hover" style={{width:34,height:34,borderRadius:17,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.close(14,DS.mid)}</button>
+          <button onClick={onClose} className="btn-hover" style={{width:44,height:44,borderRadius:22,background:DS.white,border:"1.5px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:DS.shadow}}>{Ico.close(18,DS.dark)}</button>
         </div>
         <div style={{padding:isMobile?"18px 20px 32px":"24px 28px 28px"}}>{children}</div>
       </div>
@@ -592,7 +592,7 @@ function PhotoPicker({ label, value, onChange, compact }) {
             <div key={photo.slice(0, 40) + index} style={{position:"relative",borderRadius:DS.radius,overflow:"hidden",border:index===0?"2px solid "+DS.blue:"1px solid "+DS.border,background:"#000",minHeight:compact?110:140}}>
               <img src={photo} alt={`photo ${index+1}`} style={{width:"100%",height:"100%",minHeight:compact?110:140,maxHeight:compact?120:180,objectFit:"cover",display:"block"}}/>
               {index===0 && <div style={{position:"absolute",left:8,bottom:8,padding:"4px 8px",borderRadius:999,background:"rgba(3,105,161,0.9)",color:"#fff",fontSize:12,fontWeight:800}}>Photo principale</div>}
-              <button type="button" onClick={() => removePhoto(index)} style={{position:"absolute",top:8,right:8,width:32,height:32,borderRadius:16,background:"rgba(0,0,0,0.65)",border:"2px solid rgba(255,255,255,0.35)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2}}>{Ico.close(14,"#fff")}</button>
+              <button type="button" onClick={() => removePhoto(index)} style={{position:"absolute",top:8,right:8,width:40,height:40,borderRadius:20,background:"rgba(19,34,53,0.78)",border:"2px solid rgba(255,255,255,0.5)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2,boxShadow:"0 6px 18px rgba(0,0,0,0.2)"}}>{Ico.close(18,"#fff")}</button>
             </div>
           ))}
         </div>
@@ -771,7 +771,7 @@ function FormClient({ initial, clients, onSave, onClose }) {
         </div>
       </Section>
       <div style={{display:"flex",gap:10}}>
-        <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
+        <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"13px 14px",borderRadius:DS.radiusSm,background:DS.white,border:"1.5px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:15,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:DS.shadow}}>{Ico.close(16,DS.dark)} Annuler</button>
         <BtnPrimary onClick={()=>{ if(!f.nom.trim()) return alert("Nom requis"); const prixCalc=totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0); const photosPiscine = normalizePhotoList(f.photosPiscine||f.photoPiscine); onSave({ ...normalizeClientRecord(f), photosPiscine, photoPiscine: photosPiscine[0]||"", prix:prixCalc||f.prix||0 }); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
       </div>
     </Modal>
@@ -935,7 +935,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
         );
       })()}
       <div style={{display:"flex",gap:10}}>
-        <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
+        <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"13px 14px",borderRadius:DS.radiusSm,background:DS.white,border:"1.5px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:15,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:DS.shadow}}>{Ico.close(16,DS.dark)} Annuler</button>
         <BtnPrimary onClick={()=>{ if(!f.clientId) return alert("Veuillez sélectionner un client"); if(!f.date) return alert("Date requise"); onSave({...f,id:isEdit?f.id:uid()}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
       </div>
     </Modal>
@@ -996,7 +996,7 @@ function FormRdv({ initial, clients, onSave, onClose }) {
           style={{width:"100%",padding:"10px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:15,minHeight:64,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,background:DS.white,caretColor:DS.dark,outline:"none"}}/>
       </Section>
       <div style={{display:"flex",gap:10}}>
-        <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
+        <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"13px 14px",borderRadius:DS.radiusSm,background:DS.white,border:"1.5px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:15,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:DS.shadow}}>{Ico.close(16,DS.dark)} Annuler</button>
         <BtnPrimary onClick={()=>{ if(!f.date) return alert("Date requise"); onSave({...f,id:isEdit?f.id:uid()}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
       </div>
     </Modal>
@@ -1044,7 +1044,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                 </div>
               </div>
             </div>
-          : <div style={{background:"linear-gradient(135deg,#0c1222,#1a365d,#0369a1)",padding:"22px 20px 18px",position:"relative",overflow:"hidden"}}>
+          : <div style={{background:"linear-gradient(135deg,#17324a,#24597d,#4f97bf)",padding:"22px 20px 18px",position:"relative",overflow:"hidden"}}>
               <div style={{position:"absolute",top:"-20%",right:"-10%",width:120,height:120,borderRadius:60,background:"rgba(255,255,255,0.05)"}}/>
               <div style={{display:"flex",gap:14,alignItems:"center",position:"relative"}}>
                 <Avatar nom={client.nom} size={52} photo={null}/>
@@ -1063,14 +1063,14 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
 
       {/* Stats ring */}
       <div style={{display:"flex",gap:8,marginTop:16,marginBottom:14}}>
-        <div style={{flex:1,background:`linear-gradient(135deg,${DS.blue}08,${DS.blue}15)`,borderRadius:DS.radiusSm,padding:"12px",border:"1px solid "+DS.blue+"18"}}>
+        <div style={{flex:1,background:`linear-gradient(135deg,${DS.blue}08,#ffffff)`,borderRadius:DS.radiusSm,padding:"12px",border:"1px solid "+DS.blue+"18"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
             <span style={{fontSize:15,fontWeight:700,color:DS.blue,textTransform:"uppercase",letterSpacing:.5}}>🔧 Entretiens</span>
             <span style={{fontSize:15,fontWeight:900,color:DS.blue}}>{effE}<span style={{fontWeight:500,color:DS.mid}}>/{totalE}</span></span>
           </div>
           <ProgressBar value={effE} max={totalE} height={5}/>
         </div>
-        <div style={{flex:1,background:`linear-gradient(135deg,${DS.teal}08,${DS.teal}15)`,borderRadius:DS.radiusSm,padding:"12px",border:"1px solid "+DS.teal+"18"}}>
+        <div style={{flex:1,background:`linear-gradient(135deg,${DS.teal}08,#ffffff)`,borderRadius:DS.radiusSm,padding:"12px",border:"1px solid "+DS.teal+"18"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
             <span style={{fontSize:15,fontWeight:700,color:DS.teal,textTransform:"uppercase",letterSpacing:.5}}>💧 Contrôles</span>
             <span style={{fontSize:15,fontWeight:900,color:DS.teal}}>{effC}<span style={{fontWeight:500,color:DS.mid}}>/{totalC}</span></span>
@@ -1089,16 +1089,16 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           <div style={{fontSize:20,fontWeight:900,color:rest>0?DS.orange:DS.green}}>{rest}</div>
           <div style={{fontSize:9,color:rest>0?DS.orange:DS.green,fontWeight:600,marginTop:1}}>Restants</div>
         </div>
-        <div style={{flex:1,background:"linear-gradient(135deg,#7c3aed08,#7c3aed15)",borderRadius:10,padding:"10px 8px",textAlign:"center",border:"1px solid #7c3aed18"}}>
+        <div style={{flex:1,background:`linear-gradient(135deg,${DS.purpleSoft},#ffffff)`,borderRadius:10,padding:"10px 8px",textAlign:"center",border:"1px solid #7c3aed18"}}>
           <div style={{fontSize:16,fontWeight:900,color:DS.purple}}>{client.prix?client.prix.toLocaleString("fr"):"—"}<span style={{fontSize:15}}>€</span></div>
           <div style={{fontSize:9,color:DS.purple,fontWeight:600,marginTop:1}}>Prix annuel</div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div style={{display:"flex",gap:0,marginBottom:16,background:DS.light,borderRadius:DS.radiusSm,padding:3}}>
+      <div style={{display:"flex",gap:0,marginBottom:16,background:"rgba(255,255,255,0.9)",border:"1px solid "+DS.border,borderRadius:DS.radiusSm,padding:4,boxShadow:DS.shadow}}>
         {[["infos","Infos"],["saisons","Planning"],["passages","Passages"],["rdvs","RDV"],["livraisons","Livr."]].map(([id,l])=>(
-          <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"9px 4px",borderRadius:10,border:"none",cursor:"pointer",fontWeight:tab===id?800:600,fontSize:15,fontFamily:"inherit",background:tab===id?DS.white:"transparent",color:tab===id?DS.dark:DS.mid,boxShadow:tab===id?"0 1px 4px rgba(0,0,0,0.08)":"none",transition:"all .25s"}}>{l}</button>
+          <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"9px 4px",borderRadius:10,cursor:"pointer",fontWeight:tab===id?800:600,fontSize:15,fontFamily:"inherit",background:tab===id?DS.white:"transparent",color:tab===id?DS.dark:DS.mid,boxShadow:tab===id?DS.shadow:"none",border:tab===id?"1px solid "+DS.border:"1px solid transparent",transition:"all .25s"}}>{l}</button>
         ))}
       </div>
 
@@ -1208,9 +1208,9 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                         })}
                       />
                     </div>
-                    <button onClick={()=>onEditPassage&&onEditPassage(p)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(12,DS.mid)} Modifier</button>
-                    <button onClick={(e)=>{e.stopPropagation();ouvrirRapport(p,client);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.blueSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.blue,fontFamily:"inherit",fontWeight:700}}>{Ico.pdf(12,DS.blue)} Rapport</button>
-                    {client.email&&<button onClick={(e)=>{e.stopPropagation();envoyerEmail(p,client,onUpdatePassageStatus);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.green,fontFamily:"inherit",fontWeight:700}}>{Ico.send(12,DS.green)} Email</button>}
+                    <button onClick={()=>onEditPassage&&onEditPassage(p)} className="btn-hover" style={{flex:1,padding:"10px 12px",borderRadius:10,background:DS.white,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:14,color:DS.dark,fontFamily:"inherit",fontWeight:700,boxShadow:DS.shadow}}>{Ico.edit(14,DS.dark)} Modifier</button>
+                    <button onClick={(e)=>{e.stopPropagation();ouvrirRapport(p,client);}} className="btn-hover" style={{flex:1,padding:"10px 12px",borderRadius:10,background:DS.blueSoft,border:"1px solid "+DS.blue+"22",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:14,color:DS.blue,fontFamily:"inherit",fontWeight:700,boxShadow:"0 4px 14px "+DS.blue+"12"}}>{Ico.pdf(14,DS.blue)} Rapport</button>
+                    {client.email&&<button onClick={(e)=>{e.stopPropagation();envoyerEmail(p,client,onUpdatePassageStatus);}} className="btn-hover" style={{flex:1,padding:"10px 12px",borderRadius:10,background:DS.greenSoft,border:"1px solid "+DS.green+"22",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:14,color:DS.green,fontFamily:"inherit",fontWeight:700,boxShadow:"0 4px 14px "+DS.green+"12"}}>{Ico.send(14,DS.green)} Email</button>}
                   </div>
                 </Card>
               );
@@ -1249,7 +1249,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                     </div>
                   </div>
                   <div style={{display:"flex",gap:6,marginTop:10,paddingTop:8,borderTop:"1px solid "+DS.border}}>
-                    <button onClick={()=>onEditRdv&&onEditRdv(r)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(12,DS.mid)} Modifier</button>
+                    <button onClick={()=>onEditRdv&&onEditRdv(r)} className="btn-hover" style={{flex:1,padding:"10px 12px",borderRadius:10,background:DS.white,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:14,color:DS.dark,fontFamily:"inherit",fontWeight:700,boxShadow:DS.shadow}}>{Ico.edit(14,DS.dark)} Modifier</button>
                     <button onClick={()=>exportRdvToICS(r,client)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.purpleSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.purple,fontFamily:"inherit",fontWeight:700}}>{Ico.download(12,DS.purple)} Calendrier</button>
                     <button onClick={()=>{if(confirm("Supprimer ce RDV ?"))onDeleteRdv&&onDeleteRdv(r.id);}} style={{width:32,borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(12,DS.red)}</button>
                   </div>
@@ -1297,9 +1297,9 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                     ))}
                   </div>
                   <div style={{display:"flex",gap:6,paddingTop:8,borderTop:"1px solid "+DS.border}}>
-                    <button onClick={()=>{setEditLiv(l);setShowFormLiv(true);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(12,DS.mid)} Modifier</button>
+                    <button onClick={()=>{setEditLiv(l);setShowFormLiv(true);}} className="btn-hover" style={{flex:1,padding:"10px 12px",borderRadius:10,background:DS.white,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:14,color:DS.dark,fontFamily:"inherit",fontWeight:700,boxShadow:DS.shadow}}>{Ico.edit(14,DS.dark)} Modifier</button>
                     {client.email
-                      ? <button onClick={()=>envoyerEmailLivraison(l, client)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.green,fontFamily:"inherit",fontWeight:700}}>{Ico.send(12,DS.green)} Email</button>
+                      ? <button onClick={()=>envoyerEmailLivraison(l, client)} className="btn-hover" style={{flex:1,padding:"10px 12px",borderRadius:10,background:DS.greenSoft,border:"1px solid "+DS.green+"22",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:14,color:DS.green,fontFamily:"inherit",fontWeight:700,boxShadow:"0 4px 14px "+DS.green+"12"}}>{Ico.send(14,DS.green)} Email</button>
                       : <div style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:DS.mid,fontWeight:500,gap:4}}>{Ico.mail(11,DS.mid)} Pas d'email</div>
                     }
                     <button onClick={()=>{if(confirm("Supprimer cette livraison ?"))onDeleteLivraison(l.id);}} style={{width:32,borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(12,DS.red)}</button>
@@ -2033,24 +2033,24 @@ async function envoyerEmail(passage, client, onSent) {
 function MRow({label,unit,value,onChange,ideal,okFn,icon,color="#0891b2"}) {
   const hasVal = value!==""&&value!==null&&value!==undefined&&value!==false;
   const ok = hasVal&&okFn ? okFn(+value) : true;
-  const statusColor = !hasVal?"#e2e8f0":ok?"#22c55e":"#ef4444";
+  const statusColor = !hasVal?DS.border:ok?"#4caf80":"#d96b6b";
   return (
-    <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:12,background:hasVal?(ok?"#f0fdf4":"#fef2f2"):DS.white,border:`1px solid ${hasVal?(ok?"#bbf7d0":"#fecaca"):"#f1f5f9"}`,transition:"all .25s"}}>
-      <div style={{width:34,height:34,borderRadius:10,background:color+"15",border:`1px solid ${color}22`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+    <div style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:14,background:hasVal?(ok?DS.greenSoft:DS.redSoft):"#fbfdff",border:`1.5px solid ${hasVal?(ok?"#bfe7d6":"#f4c8c8"):DS.border}`,transition:"all .25s",boxShadow:hasVal?"inset 0 1px 0 rgba(255,255,255,0.7)":"none"}}>
+      <div style={{width:40,height:40,borderRadius:12,background:color+"12",border:`1px solid ${color}20`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
         {icon}
       </div>
       <div style={{flex:1,minWidth:0}}>
-        <div style={{fontSize:13,fontWeight:600,color:DS.dark,lineHeight:1.2}}>{label}{unit&&<span style={{fontSize:11,color:"#94a3b8",fontWeight:400}}> ({unit})</span>}</div>
-        {ideal&&<div style={{fontSize:10,color:"#94a3b8",marginTop:2,fontWeight:500}}>idéal {ideal}</div>}
+        <div style={{fontSize:13,fontWeight:700,color:DS.dark,lineHeight:1.2}}>{label}{unit&&<span style={{fontSize:11,color:"#8ca0b3",fontWeight:500}}> ({unit})</span>}</div>
+        {ideal&&<div style={{fontSize:10,color:"#8ca0b3",marginTop:2,fontWeight:600}}>idéal {ideal}</div>}
       </div>
       <input type="number" step="0.1" value={value===""||value===null||value===undefined?"":value} onChange={e=>onChange(e.target.value===""?"":+e.target.value)}
-        style={{width:72,padding:"8px 10px",borderRadius:9,border:`2px solid ${statusColor}`,fontSize:15,fontWeight:800,boxSizing:"border-box",color:hasVal?(ok?"#16a34a":"#dc2626"):DS.dark,background:"#fff",textAlign:"center",outline:"none",fontFamily:"inherit",flexShrink:0,transition:"all .2s"}}/>
-      <div style={{width:28,height:28,borderRadius:14,background:!hasVal?"#f1f5f9":ok?"#22c55e":"#ef4444",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .3s",boxShadow:hasVal?`0 2px 6px ${ok?"#22c55e":"#ef4444"}44`:"none"}}>
+        style={{width:82,padding:"10px 12px",borderRadius:11,border:`2px solid ${statusColor}`,fontSize:16,fontWeight:800,boxSizing:"border-box",color:hasVal?(ok?DS.green:DS.red):DS.dark,background:"#fff",textAlign:"center",outline:"none",fontFamily:"inherit",flexShrink:0,transition:"all .2s",boxShadow:"0 1px 0 rgba(255,255,255,0.8) inset"}}/>
+      <div style={{width:32,height:32,borderRadius:16,background:!hasVal?DS.light:ok?DS.green:DS.red,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .3s",boxShadow:hasVal?`0 4px 10px ${ok?DS.green:DS.red}33`:"none"}}>
         {!hasVal
-          ? <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          ? <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#b4c2cf" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           : ok
-            ? <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            : <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            ? <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            : <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         }
       </div>
     </div>
@@ -2081,6 +2081,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
   const isMobile = useIsMobile();
   const [f,setF]=useState(isEdit ? {...EMPTY,...initial, rapportStatut:getRapportStatus(initial)} : EMPTY);
   const [step,setStep]=useState(1);
+  const [showComplementaryMeasures, setShowComplementaryMeasures] = useState(!!(initial?.chloreLibre || initial?.ph || initial?.alcalinite || initial?.stabilisant || initial?.stabilisantHaut));
   const STEPS=6;
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
 
@@ -2177,7 +2178,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
             <div key={i} style={{flex:1,display:"flex",justifyContent:"center",zIndex:2}}>
               <button onClick={()=>setStep(i+1)} title={s.l} style={{
                 width:active?44:36, height:active?44:36,
-                borderRadius:"50%", border:"none", cursor:"pointer",
+                borderRadius:"50%", cursor:"pointer",
                 background:active?s.color:done?"#059669":DS.white,
                 border:done||active?"none":`2px solid ${DS.border}`,
                 display:"flex",alignItems:"center",justifyContent:"center",
@@ -2236,8 +2237,8 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
         <div style={{margin:"-24px -28px 16px",marginTop:isMobile?"-18px":"-24px",marginLeft:isMobile?"-20px":"-28px",marginRight:isMobile?"-20px":"-28px",position:"relative",overflow:"hidden"}}>
           {/* Fond avec photo piscine si dispo */}
           {clientSel.photoPiscine
-            ? <div style={{position:"absolute",inset:0,background:`url(${clientSel.photoPiscine}) center/cover`,filter:"brightness(0.35)"}}/>
-            : <div style={{position:"absolute",inset:0,background:"linear-gradient(135deg,#0c1222 0%,#0f2a4a 50%,#0369a1 100%)"}}/>
+            ? <div style={{position:"absolute",inset:0,background:`url(${clientSel.photoPiscine}) center/cover`,filter:"brightness(0.52)"}}/>
+            : <div style={{position:"absolute",inset:0,background:"linear-gradient(135deg,#17324a 0%,#285c7d 55%,#67a7cb 100%)"}}/>
           }
           {/* Motif décoratif */}
           <div style={{position:"absolute",top:-30,right:-30,width:140,height:140,borderRadius:70,background:"rgba(56,189,248,0.08)",pointerEvents:"none"}}/>
@@ -2387,8 +2388,8 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                           <div key={p.key} style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid "+DS.border}}>
                             <img src={p.val} alt={p.label} style={{width:"100%",height:90,objectFit:"cover",display:"block"}}/>
                             <span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:4,padding:"1px 6px"}}>{p.label}</span>
-                            <button onClick={()=>removePhoto(p.key,p.idx)} style={{position:"absolute",top:4,right:4,width:24,height:24,borderRadius:12,background:"rgba(0,0,0,0.65)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                              {Ico.close(10,"#fff")}
+                            <button onClick={()=>removePhoto(p.key,p.idx)} style={{position:"absolute",top:6,right:6,width:34,height:34,borderRadius:17,background:"rgba(19,34,53,0.78)",border:"2px solid rgba(255,255,255,0.45)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 6px 16px rgba(0,0,0,0.18)"}}>
+                              {Ico.close(16,"#fff")}
                             </button>
                           </div>
                         ))}
@@ -2404,66 +2405,76 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
       {step===2 && (
         <div className="fade-in">
           {(()=>{
-            const okCount = [
-              f.chloreLibre!==undefined&&f.chloreLibre!==""&&+f.chloreLibre>=1&&+f.chloreLibre<=3,
-              f.ph!==undefined&&f.ph!==""&&+f.ph>=7.2&&+f.ph<=7.8,
-              f.alcalinite!==undefined&&f.alcalinite!==""&&+f.alcalinite>=80&&+f.alcalinite<=120,
-              f.stabilisant!==undefined&&f.stabilisant!==""&&+f.stabilisant>=30&&+f.stabilisant<=50,
-            ].filter(Boolean).length;
-            const filledCount = [f.chloreLibre,f.ph,f.alcalinite,f.stabilisant].filter(v=>v!==""&&v!==null&&v!==undefined).length;
+            const electronicRules = [
+              { value:f.tSel, okFn:v=>v>=3&&v<=5 },
+              { value:f.tPhosphate, okFn:v=>v<=0.1 },
+              { value:f.tStabilisant, okFn:v=>v>=20&&v<=50 },
+              { value:f.tChlore, okFn:v=>v>=0.5&&v<=3 },
+              { value:f.tPH, okFn:v=>v>=7.0&&v<=7.6 },
+            ];
+            const electronicFilled = electronicRules.filter(x=>x.value!==""&&x.value!==null&&x.value!==undefined).length;
+            const electronicOk = electronicRules.filter(x=>x.value!==""&&x.value!==null&&x.value!==undefined && x.okFn(+x.value)).length;
             return (
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
-            <div style={{borderRadius:DS.radius,overflow:"hidden",border:"1px solid "+DS.border,boxShadow:DS.shadow}}>
-              <div style={{background:"linear-gradient(135deg,#0891b2,#06b6d4)",padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div style={{borderRadius:DS.radius,overflow:"hidden",border:"1px solid "+DS.border,boxShadow:DS.shadowMd,background:DS.white}}>
+              <div style={{background:"linear-gradient(135deg,#3c7ea2,#76b7d4)",padding:"14px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <div style={{width:32,height:32,borderRadius:10,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.phTest(16,"#fff")}</div>
+                  <div style={{width:36,height:36,borderRadius:12,background:"rgba(255,255,255,0.18)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.chart(18,"#fff")}</div>
                   <div>
-                    <div style={{fontSize:13,fontWeight:800,color:"#fff",letterSpacing:.3}}>Test Bandelette</div>
-                    <div style={{fontSize:10,color:"rgba(255,255,255,0.75)",marginTop:1}}>Analyse chimique de l'eau</div>
+                    <div style={{fontSize:14,fontWeight:800,color:"#fff",letterSpacing:.2}}>Analyse appareil</div>
+                    <div style={{fontSize:11,color:"rgba(255,255,255,0.8)",marginTop:1}}>Mesures principales utilisées au quotidien</div>
                   </div>
                 </div>
-                <div style={{background:"rgba(255,255,255,0.2)",borderRadius:20,padding:"4px 12px",display:"flex",alignItems:"center",gap:5}}>
-                  <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  <span style={{fontSize:11,fontWeight:800,color:"#fff"}}>{okCount}/{filledCount||4} OK</span>
+                <div style={{background:"rgba(255,255,255,0.18)",borderRadius:20,padding:"5px 12px",display:"flex",alignItems:"center",gap:6}}>
+                  <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span style={{fontSize:11,fontWeight:800,color:"#fff"}}>{electronicOk}/{electronicFilled||5} OK</span>
                 </div>
               </div>
-              <div style={{background:DS.white,padding:"10px 12px",display:"flex",flexDirection:"column",gap:6}}>
-                <MRow label="Chlore libre" unit="ppm" value={f.chloreLibre} onChange={v=>set("chloreLibre",v)} ideal="1 – 3" okFn={v=>v>=1&&v<=3} color="#0891b2"
-                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>}/>
-                <MRow label="pH" value={f.ph} onChange={v=>set("ph",v)} ideal="7.2 – 7.8" okFn={v=>v>=7.2&&v<=7.8} color="#0369a1"
-                  icon={<span style={{fontSize:13,fontWeight:900,color:"#0369a1",letterSpacing:-1}}>pH</span>}/>
-                <MRow label="Alcalinité totale" unit="ppm" value={f.alcalinite} onChange={v=>set("alcalinite",v)} ideal="80 – 120" okFn={v=>v>=80&&v<=120} color="#0284c7"
-                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="1.8" strokeLinecap="round"><path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/><path d="M2 16c2.5 3 5 3 7.5 0S14 13 16.5 16s5 3 7.5 0"/></svg>}/>
-                <div>
-                  <MRow label="Stabilisant" unit="ppm" value={f.stabilisant} onChange={v=>set("stabilisant",v)} ideal="30 – 50" okFn={v=>v>=30&&v<=50} color="#0891b2"
-                    icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}/>
-                  <label style={{display:"flex",alignItems:"center",gap:8,marginTop:6,padding:"6px 10px",borderRadius:8,background:f.stabilisantHaut?"#fff7ed":"#f8fafc",border:"1px solid "+(f.stabilisantHaut?"#fdba74":"#e2e8f0"),cursor:"pointer",width:"fit-content"}}>
-                    <input type="checkbox" checked={!!f.stabilisantHaut} onChange={e=>set("stabilisantHaut",e.target.checked)} style={{width:16,height:16,accentColor:"#ea580c"}}/>
-                    <span style={{fontSize:12,fontWeight:700,color:f.stabilisantHaut?"#ea580c":"#64748b"}}>⚠️ Stabilisant HAUT</span>
-                  </label>
-                </div>
+              <div style={{background:DS.white,padding:"12px",display:"flex",flexDirection:"column",gap:8}}>
+                <MRow label="Taux de sel" unit="g/L" value={f.tSel} onChange={v=>set("tSel",v)} ideal="3 – 5" okFn={v=>v>=3&&v<=5} color={DS.purple}
+                  icon={<span style={{fontSize:16}}>🧂</span>}/>
+                <MRow label="Taux de phosphate" unit="ppm" value={f.tPhosphate} onChange={v=>set("tPhosphate",v)} ideal="≤ 0.1" okFn={v=>v<=0.1} color={DS.purple}
+                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={DS.purple} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v5l3 9a3 3 0 01-3 3H9a3 3 0 01-3-3l3-9V3z"/><path d="M6.5 15h11"/></svg>}/>
+                <MRow label="Taux de stabilisant" unit="ppm" value={f.tStabilisant} onChange={v=>set("tStabilisant",v)} ideal="20 – 50" okFn={v=>v>=20&&v<=50} color={DS.teal}
+                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={DS.teal} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}/>
+                <MRow label="Taux de chlore" unit="ppm" value={f.tChlore} onChange={v=>set("tChlore",v)} ideal="0.5 – 3" okFn={v=>v>=0.5&&v<=3} color={DS.blue}
+                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={DS.blue} strokeWidth="1.8" strokeLinecap="round"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>}/>
+                <MRow label="Taux de pH" value={f.tPH} onChange={v=>set("tPH",v)} ideal="7.0 – 7.6" okFn={v=>v>=7.0&&v<=7.6} color={DS.orange}
+                  icon={<span style={{fontSize:13,fontWeight:900,color:DS.orange,letterSpacing:-1}}>pH</span>}/>
               </div>
             </div>
-            <div style={{borderRadius:DS.radius,overflow:"hidden",border:"1px solid "+DS.border,boxShadow:DS.shadow}}>
-              <div style={{background:"linear-gradient(135deg,#7c3aed,#a78bfa)",padding:"12px 16px",display:"flex",alignItems:"center",gap:10}}>
-                <div style={{width:32,height:32,borderRadius:10,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.chart(16,"#fff")}</div>
-                <div>
-                  <div style={{fontSize:13,fontWeight:800,color:"#fff",letterSpacing:.3}}>Mesures Électroniques</div>
-                  <div style={{fontSize:10,color:"rgba(255,255,255,0.75)",marginTop:1}}>Relevés appareils de mesure</div>
+
+            <div style={{borderRadius:DS.radius,overflow:"hidden",border:"1px solid "+DS.border,boxShadow:DS.shadow,background:"#fbfdff"}}>
+              <button type="button" onClick={()=>setShowComplementaryMeasures(v=>!v)} className="btn-hover" style={{width:"100%",padding:"14px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,background:"transparent",border:"none",cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{width:36,height:36,borderRadius:12,background:DS.blueSoft,display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.phTest(18,DS.blue)}</div>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:800,color:DS.dark}}>Mesures complémentaires</div>
+                    <div style={{fontSize:11,color:DS.mid,marginTop:1}}>Bandelette / saisie secondaire, conservée sans suppression</div>
+                  </div>
                 </div>
-              </div>
-              <div style={{background:DS.white,padding:"10px 12px",display:"flex",flexDirection:"column",gap:6}}>
-                <MRow label="Taux de sel" value={f.tSel} onChange={v=>set("tSel",v)} color="#7c3aed"
-                  icon={<span style={{fontSize:16}}>🧂</span>}/>
-                <MRow label="Taux de phosphate" value={f.tPhosphate} onChange={v=>set("tPhosphate",v)} color="#7c3aed"
-                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v5l3 9a3 3 0 01-3 3H9a3 3 0 01-3-3l3-9V3z"/><path d="M6.5 15h11"/></svg>}/>
-                <MRow label="Taux de chlore" value={f.tChlore} onChange={v=>set("tChlore",v)} ideal="1 – 1.5" okFn={v=>v>=0.5&&v<=3} color="#0891b2"
-                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>}/>
-                <MRow label="Taux de pH" value={f.tPH} onChange={v=>set("tPH",v)} ideal="7.2 – 7.4" okFn={v=>v>=7.0&&v<=7.6} color="#0369a1"
-                  icon={<span style={{fontSize:13,fontWeight:900,color:"#7c3aed",letterSpacing:-1}}>pH</span>}/>
-                <MRow label="Taux stabilisant" value={f.tStabilisant} onChange={v=>set("tStabilisant",v)} color="#7c3aed"
-                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}/>
-              </div>
+                <div style={{width:32,height:32,borderRadius:16,background:DS.white,border:"1px solid "+DS.border,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:DS.shadow}}>
+                  {showComplementaryMeasures ? Ico.back(16,DS.dark) : Ico.next(16,DS.dark)}
+                </div>
+              </button>
+              {showComplementaryMeasures && (
+                <div style={{padding:"0 12px 12px",display:"flex",flexDirection:"column",gap:8}}>
+                  <MRow label="Chlore libre" unit="ppm" value={f.chloreLibre} onChange={v=>set("chloreLibre",v)} ideal="1 – 3" okFn={v=>v>=1&&v<=3} color={DS.blue}
+                    icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={DS.blue} strokeWidth="1.8" strokeLinecap="round"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>}/>
+                  <MRow label="pH bandelette" value={f.ph} onChange={v=>set("ph",v)} ideal="7.2 – 7.8" okFn={v=>v>=7.2&&v<=7.8} color={DS.teal}
+                    icon={<span style={{fontSize:13,fontWeight:900,color:DS.teal,letterSpacing:-1}}>pH</span>}/>
+                  <MRow label="Alcalinité totale" unit="ppm" value={f.alcalinite} onChange={v=>set("alcalinite",v)} ideal="80 – 120" okFn={v=>v>=80&&v<=120} color={DS.blue}
+                    icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={DS.blue} strokeWidth="1.8" strokeLinecap="round"><path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/><path d="M2 16c2.5 3 5 3 7.5 0S14 13 16.5 16s5 3 7.5 0"/></svg>}/>
+                  <div>
+                    <MRow label="Stabilisant" unit="ppm" value={f.stabilisant} onChange={v=>set("stabilisant",v)} ideal="30 – 50" okFn={v=>v>=30&&v<=50} color={DS.teal}
+                      icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={DS.teal} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}/>
+                    <label style={{display:"flex",alignItems:"center",gap:8,marginTop:8,padding:"8px 10px",borderRadius:10,background:f.stabilisantHaut?DS.orangeSoft:"#f8fbfe",border:"1px solid "+(f.stabilisantHaut?"#efc29c":DS.border),cursor:"pointer",width:"fit-content"}}>
+                      <input type="checkbox" checked={!!f.stabilisantHaut} onChange={e=>set("stabilisantHaut",e.target.checked)} style={{width:16,height:16,accentColor:DS.orange}}/>
+                      <span style={{fontSize:12,fontWeight:700,color:f.stabilisantHaut?DS.orange:DS.mid}}>⚠️ Stabilisant haut</span>
+                    </label>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
             );
@@ -2636,8 +2647,8 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                               <div key={p.key} style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid "+DS.border}}>
                                 <img src={p.val} alt={p.label} style={{width:"100%",height:90,objectFit:"cover",display:"block"}}/>
                                 <span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:4,padding:"1px 6px"}}>{p.label}</span>
-                                <button onClick={()=>removeDepartPhoto(p.key,p.idx)} style={{position:"absolute",top:4,right:4,width:24,height:24,borderRadius:12,background:"rgba(0,0,0,0.65)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                                  {Ico.close(10,"#fff")}
+                                <button onClick={()=>removeDepartPhoto(p.key,p.idx)} style={{position:"absolute",top:6,right:6,width:34,height:34,borderRadius:17,background:"rgba(19,34,53,0.78)",border:"2px solid rgba(255,255,255,0.45)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 6px 16px rgba(0,0,0,0.18)"}}>
+                                  {Ico.close(16,"#fff")}
                                 </button>
                               </div>
                             ))}
@@ -3186,11 +3197,11 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
 
   return (
     <div>
-      <div style={{display:"flex",gap:6,marginBottom:14,background:DS.light,borderRadius:DS.radius,padding:4}}>
+      <div style={{display:"flex",gap:6,marginBottom:14,background:"rgba(255,255,255,0.9)",border:"1px solid "+DS.border,borderRadius:DS.radius,padding:5,boxShadow:DS.shadow}}>
         {[["semaine","7 jours",Ico.clock],[" mois","Ce mois",Ico.calendar],["tout","Tout",Ico.clipboard]].map(([v,l,ico])=>{
           const key=v.trim(); const active=filter===key;
           return (
-            <button key={key} onClick={()=>setFilter(key)} className="btn-hover" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"8px 4px",borderRadius:DS.radiusSm,border:"none",cursor:"pointer",fontFamily:"inherit",background:active?DS.white:"transparent",color:active?DS.dark:DS.mid,boxShadow:active?"0 1px 4px rgba(0,0,0,0.08)":"none",transition:"all .2s"}}>
+            <button key={key} onClick={()=>setFilter(key)} className="btn-hover" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"8px 4px",borderRadius:DS.radiusSm,cursor:"pointer",fontFamily:"inherit",background:active?DS.white:"transparent",color:active?DS.dark:DS.mid,boxShadow:active?DS.shadow:"none",border:active?"1px solid "+DS.border:"1px solid transparent",transition:"all .2s"}}>
               <span style={{fontWeight:800,fontSize:16,color:active?DS.blue:DS.mid}}>{counts[key]}</span>
               <span style={{fontSize:10,fontWeight:active?700:500}}>{l}</span>
             </button>
@@ -3251,10 +3262,10 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                           </button>
                         : <div style={{borderRadius:10,background:DS.light,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:DS.mid,fontWeight:500}}>{Ico.mail(12,DS.mid)} Pas d'email</div>
                       }
-                      <button onClick={()=>onEdit(p)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>
+                      <button onClick={()=>onEdit(p)} className="btn-hover" style={{padding:"10px 12px",borderRadius:10,background:DS.white,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:12,color:DS.dark,fontFamily:"inherit",fontWeight:700,boxShadow:DS.shadow}}>
                         {Ico.edit(13,DS.mid)} Modifier
                       </button>
-                      <button onClick={()=>{if(confirm("Supprimer ce passage ?"))onDelete(p.id)}} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.red,fontFamily:"inherit",fontWeight:700}}>
+                      <button onClick={()=>{if(confirm("Supprimer ce passage ?"))onDelete(p.id)}} className="btn-hover" style={{padding:"10px 12px",borderRadius:10,background:DS.redSoft,border:"1px solid "+DS.red+"22",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:12,color:DS.red,fontFamily:"inherit",fontWeight:700,boxShadow:"0 4px 14px "+DS.red+"10"}}>
                         {Ico.trash(13,DS.red)} Supprimer
                       </button>
                     </div>
