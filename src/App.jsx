@@ -165,28 +165,35 @@ async function load(key, fallback) {
   }
 }
 
+let saveChain = Promise.resolve();
+
 async function save(key, val) {
-  try {
-    const { data, error } = await supabase
-      .from("app_data")
-      .select("data")
-      .eq("id", 1)
-      .single();
+  saveChain = saveChain
+    .catch(() => {})
+    .then(async () => {
+      try {
+        const { data, error } = await supabase
+          .from("app_data")
+          .select("data")
+          .eq("id", 1)
+          .single();
 
-    const currentData = !error && data?.data ? data.data : {};
+        const currentData = !error && data?.data ? data.data : {};
+        const updatedData = {
+          ...currentData,
+          [key]: val,
+        };
 
-    const updatedData = {
-      ...currentData,
-      [key]: val
-    };
+        await supabase
+          .from("app_data")
+          .upsert({
+            id: 1,
+            data: updatedData,
+          });
+      } catch {}
+    });
 
-    await supabase
-      .from("app_data")
-      .upsert({
-        id: 1,
-        data: updatedData
-      });
-  } catch {}
+  return saveChain;
 }
 
 
@@ -247,6 +254,35 @@ function getClientPhotos(client) {
 function getClientCoverPhoto(client) {
   return getClientPhotos(client)[0] || "";
 }
+
+function normalizeClientRecord(client = {}) {
+  return {
+    ...client,
+    nom: client.nom || "",
+    tel: client.tel || "",
+    email: client.email || "",
+    adresse: client.adresse || "",
+    bassin: client.bassin || "Liner",
+    volume: Number.isFinite(Number(client.volume)) ? Number(client.volume) : 0,
+    formule: client.formule || "VAC",
+    prix: Number(client.prix) || 0,
+    prixPassageE: Number(client.prixPassageE) || 0,
+    prixPassageC: Number(client.prixPassageC) || 0,
+    dateDebut: client.dateDebut || TODAY,
+    dateFin: client.dateFin || `${new Date().getFullYear()+1}-03-31`,
+    photoPiscine: getClientCoverPhoto(client),
+    photosPiscine: getClientPhotos(client),
+    moisParMois: migrateMois(client.moisParMois || client.saisons),
+  };
+}
+
+const LINE_CLAMP_2 = {
+  overflow: "hidden",
+  display: "-webkit-box",
+  WebkitBoxOrient: "vertical",
+  WebkitLineClamp: 2,
+  wordBreak: "break-word",
+};
 
 
 // ICS EXPORT
@@ -374,8 +410,11 @@ const GlobalStyles = () => (
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     html { scroll-behavior: smooth; }
-    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: ${DS.bg}; overflow-x: hidden; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: ${DS.bg}; overflow-x: hidden; color-scheme: light; }
     input, select, textarea, button { font-family: inherit; }
+    input, select, textarea { background: ${DS.white}; color: ${DS.dark}; }
+    textarea { caret-color: ${DS.dark}; }
+    input::placeholder, textarea::placeholder { color: #94a3b8; opacity: 1; }
     input:focus, select:focus, textarea:focus { outline: none; border-color: ${DS.blue} !important; box-shadow: 0 0 0 3px ${DS.blue}22 !important; }
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 99px; }
@@ -628,15 +667,17 @@ function FormClient({ initial, clients, onSave, onClose }) {
   const isMobile = useIsMobile();
   const [f, setF] = useState(() => {
     if (initial) {
-      const photosPiscine = getClientPhotos(initial);
-      return { ...initial, moisParMois: migrateMois(initial.moisParMois||initial.saisons), photosPiscine, photoPiscine: photosPiscine[0]||"", prixPassageE: initial.prixPassageE||0, prixPassageC: initial.prixPassageC||0 };
+      return normalizeClientRecord(initial);
     }
     return {
-      id: `C${String(clients.length+1).padStart(3,"0")}`,
-      nom:"", tel:"", email:"", adresse:"", bassin:"Liner", volume:30,
-      formule:"VAC", prix:0, prixPassageE:0, prixPassageC:0, dateDebut:TODAY, photoPiscine:"", photosPiscine:[],
-      dateFin: `${new Date().getFullYear()+1}-03-31`,
-      moisParMois: {...MOIS_PAR_MOIS_DEF},
+      ...normalizeClientRecord({
+        id: `C${String(clients.length+1).padStart(3,"0")}`,
+        nom:"", tel:"", email:"", adresse:"", bassin:"Liner", volume:30,
+        formule:"VAC", prix:0, prixPassageE:0, prixPassageC:0, dateDebut:TODAY, photoPiscine:"",
+        dateFin: `${new Date().getFullYear()+1}-03-31`,
+        moisParMois: {...MOIS_PAR_MOIS_DEF},
+      }),
+      photosPiscine: [],
     };
   });
   const set = (k,v) => setF(p=>({...p,[k]:v}));
@@ -731,7 +772,7 @@ function FormClient({ initial, clients, onSave, onClose }) {
       </Section>
       <div style={{display:"flex",gap:10}}>
         <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
-        <BtnPrimary onClick={()=>{ if(!f.nom.trim()) return alert("Nom requis"); const prixCalc=totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0); const photosPiscine = normalizePhotoList(f.photosPiscine||f.photoPiscine); onSave({...f, photosPiscine, photoPiscine: photosPiscine[0]||"", prix:prixCalc||f.prix||0}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
+        <BtnPrimary onClick={()=>{ if(!f.nom.trim()) return alert("Nom requis"); const prixCalc=totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0); const photosPiscine = normalizePhotoList(f.photosPiscine||f.photoPiscine); onSave({ ...normalizeClientRecord(f), photosPiscine, photoPiscine: photosPiscine[0]||"", prix:prixCalc||f.prix||0 }); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
       </div>
     </Modal>
   );
@@ -868,7 +909,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
         </div>
       </Section>
       <Section title="Description / notes">
-        <textarea value={f.description} onChange={e=>set("description",e.target.value)} placeholder="Quantités, marques, détails..." style={{width:"100%",padding:"10px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:15,minHeight:64,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,outline:"none",transition:"all .2s"}}/>
+        <textarea value={f.description} onChange={e=>set("description",e.target.value)} placeholder="Quantités, marques, détails..." style={{width:"100%",padding:"10px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:15,minHeight:64,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,background:DS.white,caretColor:DS.dark,outline:"none",transition:"all .2s"}}/>
       </Section>
       <Section title="Statut">
         <div style={{display:"flex",gap:8}}>
@@ -952,7 +993,7 @@ function FormRdv({ initial, clients, onSave, onClose }) {
       </Section>
       <Section title="Description">
         <textarea value={f.description} onChange={e=>set("description",e.target.value)} placeholder="Détails, adresse, notes..."
-          style={{width:"100%",padding:"10px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:15,minHeight:64,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,outline:"none"}}/>
+          style={{width:"100%",padding:"10px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:15,minHeight:64,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,background:DS.white,caretColor:DS.dark,outline:"none"}}/>
       </Section>
       <div style={{display:"flex",gap:10}}>
         <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
@@ -1153,8 +1194,8 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                       {p.photoDepart && (<div style={{flex:1,position:"relative"}}><img src={p.photoDepart} alt="Départ" style={{width:"100%",height:60,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border}}/><span style={{position:"absolute",bottom:3,left:4,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.5)",borderRadius:4,padding:"1px 5px"}}>Départ</span></div>)}
                     </div>
                   )}
-                  {p.actions&&<div style={{fontSize:15,color:DS.mid,marginBottom:4}}>{p.actions}</div>}
-                  {p.obs&&<div style={{fontSize:15,color:DS.orange,display:"flex",alignItems:"center",gap:4,marginBottom:8}}>{Ico.note(11,DS.orange)} {p.obs}</div>}
+                  {p.actions&&<div title={p.actions} style={{fontSize:15,color:DS.mid,marginBottom:4,...LINE_CLAMP_2}}>{p.actions}</div>}
+                  {p.obs&&<div style={{fontSize:15,color:DS.orange,display:"flex",alignItems:"flex-start",gap:4,marginBottom:8}}><span style={{flexShrink:0,marginTop:2}}>{Ico.note(11,DS.orange)}</span><span title={p.obs} style={LINE_CLAMP_2}>{p.obs}</span></div>}
                   <div style={{display:"flex",gap:6,paddingTop:8,borderTop:"1px solid "+DS.border,flexWrap:"wrap"}}>
                     <div onClick={(e)=>e.stopPropagation()} style={{flex:"1 1 160px"}}>
                       <RapportStatusPicker
@@ -2512,7 +2553,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
               <div>
                 <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:4}}>Commentaires</span>
                 <textarea value={f.commentaires} onChange={e=>set("commentaires",e.target.value)} placeholder="Anomalies, recommandations..."
-                  style={{width:"100%",padding:"11px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:13,minHeight:100,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,transition:"all .2s"}}/>
+                  style={{width:"100%",padding:"11px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:13,minHeight:100,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,background:DS.white,caretColor:DS.dark,transition:"all .2s"}}/>
               </div>
               <OuiNon label="Livraison de produits ?" value={f.livraisonProduits} onChange={v=>set("livraisonProduits",v)}/>
               {f.livraisonProduits && (
@@ -2521,7 +2562,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                   <div>
                     <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:4}}>Autre (quantités, marques…)</span>
                     <textarea value={f.livraisonAutre} onChange={e=>set("livraisonAutre",e.target.value)}
-                      style={{width:"100%",padding:"9px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:13,minHeight:56,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark}}/>
+                      style={{width:"100%",padding:"9px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:13,minHeight:56,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,background:DS.white,caretColor:DS.dark}}/>
                   </div>
                 </>
               )}
@@ -3198,8 +3239,8 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                         {p.photoDepart && (<div style={{position:"relative"}}><img src={p.photoDepart} alt="Départ" style={{height:48,width:72,objectFit:"cover",borderRadius:7,border:"1px solid "+DS.border}}/><span style={{position:"absolute",bottom:2,left:3,fontSize:8,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:3,padding:"1px 4px"}}>Dép.</span></div>)}
                       </div>
                     )}
-                    {p.actions&&<div style={{fontSize:12,color:DS.mid,marginBottom:4}}>{p.actions}</div>}
-                    {p.obs&&<div style={{fontSize:11,color:DS.orange,display:"flex",alignItems:"center",gap:4}}>{Ico.note(11,DS.orange)} {p.obs}</div>}
+                    {p.actions&&<div title={p.actions} style={{fontSize:12,color:DS.mid,marginBottom:4,...LINE_CLAMP_2}}>{p.actions}</div>}
+                    {p.obs&&<div style={{fontSize:11,color:DS.orange,display:"flex",alignItems:"flex-start",gap:4}}><span style={{flexShrink:0,marginTop:2}}>{Ico.note(11,DS.orange)}</span><span title={p.obs} style={LINE_CLAMP_2}>{p.obs}</span></div>}
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginTop:10,paddingTop:10,borderTop:"1px solid "+DS.border}}>
                       <button onClick={()=>ouvrirRapport(p,c)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.blueSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.blue,fontFamily:"inherit",fontWeight:700,boxShadow:"0 1px 4px "+DS.blue+"22"}}>
                         {Ico.pdf(14,DS.blue)} Rapport PDF
@@ -3445,10 +3486,7 @@ export default function App() {
       const ct = await load("bb_contrats_v1", {});
       const sWithDefaults = {...Object.fromEntries(PRODUITS_DEFAUT.map(nom=>[nom, s[nom]??0])), ...s};
 // Migrate saisons format for existing clients
-      const cMigrated = c.map(cl => {
-        const photosPiscine = getClientPhotos(cl);
-        return {...cl, moisParMois: migrateMois(cl.moisParMois||cl.saisons), photosPiscine, photoPiscine: photosPiscine[0]||"", prixPassageE: cl.prixPassageE||0, prixPassageC: cl.prixPassageC||0};
-      });
+      const cMigrated = c.map(cl => normalizeClientRecord(cl));
       setClients(cMigrated); setPassages(passages_data); setLivraisons(l); setRdvs(r); setStock(sWithDefaults); setContrats(ct); setReady(true);
     })();
   },[loggedIn]);
@@ -3500,7 +3538,7 @@ export default function App() {
   const handleLogin = useCallback(()=>{ try{sessionStorage.setItem("bb_auth","1");}catch{} setLoggedIn(true); },[]);
   const handleLogout = useCallback(()=>{ try{sessionStorage.removeItem("bb_auth");}catch{} setLoggedIn(false);setReady(false);setClients([]);setPassages([]);setLivraisons([]);setRdvs([]); },[]);
 
-  const saveClient = useCallback(c=>{ setClients(prev=>prev.find(x=>x.id===c.id)?prev.map(x=>x.id===c.id?c:x):[...prev,c]); setShowFormClient(false);setEditClient(null);setFicheClient(c); },[]);
+  const saveClient = useCallback(c=>{ const existing = clients.find(x=>x.id===c.id); const merged = normalizeClientRecord(existing ? { ...existing, ...c, moisParMois: c.moisParMois ?? existing.moisParMois ?? existing.saisons, photosPiscine: c.photosPiscine ?? existing.photosPiscine, photoPiscine: c.photoPiscine ?? existing.photoPiscine } : c); setClients(prev=>prev.find(x=>x.id===merged.id)?prev.map(x=>x.id===merged.id?merged:x):[...prev,merged]); setShowFormClient(false);setEditClient(null);setFicheClient(merged); },[clients]);
   const deleteClient = useCallback(id=>{ if(!confirm("Supprimer ce client ?"))return; setClients(prev=>prev.filter(x=>x.id!==id)); setPassages(prev=>prev.filter(x=>x.clientId!==id)); setFicheClient(null); },[]);
   const savePassage = useCallback(p=>{ setPassages(prev=>prev.find(x=>x.id===p.id)?prev.map(x=>x.id===p.id?p:x):[...prev,p]); setShowFormPassage(false);setEditPassage(null); },[]);
   const updatePassageRapportStatus = useCallback((passageMaj) => {
