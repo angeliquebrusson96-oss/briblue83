@@ -723,7 +723,7 @@ function genererHTMLLivraison(livraison, client) {
   </div>
   ${livraison.montant?`<div class="section"><div class="section-title">Montant</div><div class="montant">${Number(livraison.montant).toLocaleString("fr")} €</div></div>`:""}
 </div>
-<div class="footer">Document généré le ${new Date().toLocaleDateString("fr")} · <strong>BRIBLUE</strong> · 06 67 18 61 15 · briblue83@hotmail.com</div>
+<div class="footer">Document généré le ${new Date().toLocaleDateString("fr")} · <strong>BRIBLUE</strong> · 06 67 18 61 15</div>
 </div></body></html>`;
 }
 
@@ -1538,7 +1538,7 @@ table td{padding:7px 12px;border:1px solid #e2e8f0;font-size:12px}
 </div>
 
 <div class="footer">
-  BRIBLUE · SIRET 84345436400053 · La Seyne-sur-Mer · 06 67 18 61 15 · briblue83@hotmail.com
+  BRIBLUE · SIRET 84345436400053 · La Seyne-sur-Mer · 06 67 18 61 15
 </div>
 </div></body></html>`;
 }
@@ -1714,7 +1714,7 @@ ${sectionPhotos}
   </div>
 </div>
 
-<div class="footer">Document généré le ${new Date().toLocaleDateString("fr")} · <strong>BRIBLUE</strong> · 06 67 18 61 15 · briblue83@hotmail.com</div>
+<div class="footer">Document généré le ${new Date().toLocaleDateString("fr")} · <strong>BRIBLUE</strong> · 06 67 18 61 15</div>
 
 </div>
 </body></html>`;
