@@ -114,23 +114,32 @@ export default async function handler(req, res) {
     const allData = freshData?.data || {};
     const contrats = allData["bb_contrats_v1"] || {};
     const isPrestataire = req.body.isPrestataire === true;
+    const statutOverride = req.body.statut_override;
     const existing = contrats[contractId] || {};
-    contrats[contractId] = {
-      ...existing,
-      clientId,
-      signatureClient: isPrestataire ? (existing.signatureClient || "") : signatureClient,
-      signaturePrestataire: isPrestataire ? signaturePrestataire : (existing.signaturePrestataire || ""),
-      signedAt: existing.signedAt || signedAt || new Date().toISOString(),
-      signedByPrestaAt: isPrestataire ? (signedAt || new Date().toISOString()) : existing.signedByPrestaAt,
-      statut: isPrestataire ? "signe_complet" : "signe_client",
-    };
+
+    if (statutOverride) {
+      // Juste marquer le statut sans toucher aux signatures
+      contrats[contractId] = { ...existing, clientId, statut: statutOverride };
+    } else {
+      contrats[contractId] = {
+        ...existing,
+        clientId,
+        signatureClient: isPrestataire ? (existing.signatureClient || "") : signatureClient,
+        signaturePrestataire: isPrestataire ? signaturePrestataire : (existing.signaturePrestataire || ""),
+        signedAt: existing.signedAt || signedAt || new Date().toISOString(),
+        signedByPrestaAt: isPrestataire ? (signedAt || new Date().toISOString()) : existing.signedByPrestaAt,
+        statut: isPrestataire ? "signe_complet" : "signe_client",
+      };
+    }
 
     await supabase.from("app_data").upsert({
       id: 1,
       data: { ...allData, "bb_contrats_v1": contrats }
     });
 
-    await sendEmails(client || { nom: clientId, email: null, formule: "—", id: clientId }, contractId, signedAt || new Date().toISOString(), baseUrl);
+    if (!statutOverride) {
+      await sendEmails(client || { nom: clientId, email: null, formule: "—", id: clientId }, contractId, signedAt || new Date().toISOString(), baseUrl);
+    }
 
     return res.status(200).json({ success: true, contractId });
   } catch (err) {

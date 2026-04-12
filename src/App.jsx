@@ -1220,23 +1220,54 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
 
       {/* Action buttons */}
       <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:20,paddingTop:16,borderTop:"1px solid "+DS.border}}>
-        {/* Statut signature */}
+        {/* Suivi statut signature */}
         {(() => {
           const contrat = contratClient;
-          if (contrat?.statut==="signe") return (
-            <div style={{background:DS.greenSoft,border:"1px solid #6ee7b7",borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
-              {Ico.check(14,DS.green)}
-              <span style={{fontSize:12,fontWeight:700,color:DS.green}}>Contrat signé le {new Date(contrat.signedAt).toLocaleDateString("fr")}</span>
+          if (!contrat) return (
+            <div style={{background:DS.light,border:"1px solid "+DS.border,borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
+              {Ico.contract(13,DS.mid)}
+              <span style={{fontSize:12,fontWeight:600,color:DS.mid}}>Aucun contrat envoyé</span>
             </div>
           );
-          return null;
+          if (contrat.statut==="signe_complet") return (
+            <div style={{background:DS.greenSoft,border:"1px solid #6ee7b7",borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
+              {Ico.check(14,DS.green)}
+              <div>
+                <div style={{fontSize:12,fontWeight:800,color:DS.green}}>✅ Contrat co-signé — Terminé</div>
+                <div style={{fontSize:11,color:"#047857",marginTop:2}}>Signé le {new Date(contrat.signedAt).toLocaleDateString("fr")}</div>
+              </div>
+            </div>
+          );
+          if (contrat.statut==="signe_client") return (
+            <div style={{background:DS.blueSoft,border:"1px solid "+DS.blue+"44",borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
+              {Ico.clock(13,DS.blue)}
+              <div>
+                <div style={{fontSize:12,fontWeight:800,color:DS.blue}}>📝 Client signé — En attente de votre signature</div>
+                <div style={{fontSize:11,color:DS.mid,marginTop:2}}>Signé par le client le {new Date(contrat.signedAt).toLocaleDateString("fr")}</div>
+              </div>
+            </div>
+          );
+          if (contrat.statut==="signe") return (
+            <div style={{background:DS.greenSoft,border:"1px solid #6ee7b7",borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
+              {Ico.check(14,DS.green)}
+              <div style={{fontSize:12,fontWeight:800,color:DS.green}}>✅ Contrat signé le {new Date(contrat.signedAt).toLocaleDateString("fr")}</div>
+            </div>
+          );
+          // Demande envoyée mais pas encore signée
+          return (
+            <div style={{background:DS.orangeSoft,border:"1px solid "+DS.orange+"44",borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
+              {Ico.send(13,DS.orange)}
+              <div style={{fontSize:12,fontWeight:700,color:DS.orange}}>📨 Demande envoyée — En attente de signature</div>
+            </div>
+          );
         })()}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:8}}>
           <button onClick={()=>ouvrirContrat(client, contratClient?.signaturePrestataire||"", contratClient?.signatureClient||"")} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:11,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,boxShadow:"0 2px 8px rgba(2,132,199,0.3)"}}>
             {Ico.contract(13,"#fff")} Contrat
           </button>
-          <button onClick={()=>envoyerContratSignature(client)} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:contratClient?.statut==="signe"?DS.greenSoft:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:700,fontSize:11,color:contratClient?.statut==="signe"?DS.green:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,boxShadow:contratClient?.statut==="signe"?"none":"0 2px 8px rgba(5,150,105,0.3)"}}>
-            {Ico.sign(13,contratClient?.statut==="signe"?DS.green:"#fff")} {contratClient?.statut==="signe"?"Signé":"Signer"}
+          <button onClick={()=>envoyerContratSignature(client)} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:contratClient?.statut==="signe_complet"?DS.greenSoft:contratClient?.statut==="signe_client"?DS.blueSoft:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:700,fontSize:11,color:contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
+            {Ico.sign(13,contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff")}
+            {contratClient?.statut==="signe_complet"?"Signé":contratClient?.statut==="signe_client"?"En attente":"Envoyer"}
           </button>
           <button onClick={onEdit} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:DS.white,border:"1.5px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:11,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
             {Ico.edit(13,DS.dark)} Modifier
@@ -1620,7 +1651,25 @@ async function envoyerContratSignature(client) {
       }),
     });
     const data = await res.json();
-    if (res.ok) alert(`✅ Email envoyé à ${client.email} !\n\nLe client recevra un lien pour signer son contrat.`);
+    if (res.ok) {
+      // Marquer "demande_envoyee" dans Supabase
+      try {
+        const { createClient } = await import("@supabase/supabase-js").catch(()=>({createClient:null}));
+        // Sauvegarde locale dans l'état contrats via un appel à l'API
+        await fetch("/api/sign-contract", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contractId: "CT-" + client.id,
+            clientId: client.id,
+            signatureClient: "pending",
+            signedAt: new Date().toISOString(),
+            statut_override: "demande_envoyee",
+          }),
+        });
+      } catch(e) {}
+      alert(`✅ Email envoyé à ${client.email} !\n\nLe client recevra un lien pour signer son contrat.`);
+    }
     else alert(`❌ Erreur : ${data?.message}`);
   } catch(err) {
     alert(`❌ Erreur réseau : ${err.message}`);
@@ -3192,14 +3241,15 @@ export default function App() {
       setContrats(prev => {
         // Détecter nouvelle signature
         const newSig = Object.values(ct).find(c =>
-          c.statut === "signe" &&
+          (c.statut === "signe_client" || c.statut === "signe_complet") &&
           (!prev[Object.keys(ct).find(k => ct[k] === c)] ||
-           prev[Object.keys(ct).find(k => ct[k] === c)]?.statut !== "signe")
+           prev[Object.keys(ct).find(k => ct[k] === c)]?.statut !== c.statut)
         );
         if (newSig) {
           playNotifSound();
-          const cli = clients.find(c => c.id === newSig.clientId);
-          if (cli) alert(`✅ Contrat signé par ${cli.nom} !`);
+          const cli = clients.find(cl => cl.id === newSig.clientId);
+          const msg = newSig.statut === "signe_complet" ? `✅ Contrat co-signé par ${cli?.nom||newSig.clientId} !` : `📝 ${cli?.nom||newSig.clientId} a signé son contrat — votre signature est requise.`;
+          if (cli) alert(msg);
         }
         return ct;
       });
