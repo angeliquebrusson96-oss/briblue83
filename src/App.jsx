@@ -2894,8 +2894,9 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
   const moisCourant = MOIS_NOW;
   const saisonNow = getSaison(moisCourant);
   const sMeta = SAISONS_META[saisonNow];
+  const [showAllTaches, setShowAllTaches] = useState(false);
 
-// Tches  effectuer ce mois
+  // Tâches à effectuer ce mois
   const tachesMois = clients.map(c=>{
     const prevE = getEntretienMois(c.moisParMois||c.saisons, moisCourant);
     const prevC = getControleMois(c.moisParMois||c.saisons, moisCourant);
@@ -2907,43 +2908,111 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
   }).filter(x=>(x.prevE+x.prevC)>0).sort((a,b)=>b.total-a.total);
 
   const totalTaches = tachesMois.reduce((a,t)=>a+t.total,0);
+  const tachesRestantes = tachesMois.filter(t=>t.total>0);
+  const tachesOk = tachesMois.filter(t=>t.total===0);
+  const PREVIEW = 3;
 
-// RDVs  venir (aujourd'hui et futur)
-  const rdvsFuturs = rdvs.filter(r=>r.date>=TODAY).sort((a,b)=>a.date===b.date ? (a.heure||"").localeCompare(b.heure||"") : a.date.localeCompare(b.date));
+  // RDVs à venir
+  const rdvsFuturs = rdvs.filter(r=>r.date>=TODAY).sort((a,b)=>a.date===b.date?(a.heure||"").localeCompare(b.heure||""):a.date.localeCompare(b.date));
   const rdvsToday = rdvsFuturs.filter(r=>r.date===TODAY);
   const rdvsProchains = rdvsFuturs.filter(r=>r.date>TODAY).slice(0,5);
 
   return (
     <div>
-      {/* Bannière tâches du mois */}
-      <Card style={{marginBottom:14,border:"none",background:totalTaches>0?"linear-gradient(135deg,#0c1222,#1a365d)":DS.greenGrad,padding:"18px 20px"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-          <div>
-            <div style={{fontWeight:900,fontSize:18,color:"#fff",letterSpacing:-0.3}}>{MOIS_L[moisCourant]}</div>
-            <div style={{fontSize:12,color:"rgba(255,255,255,0.7)",marginTop:2}}>
-              {totalTaches>0 ? `${totalTaches} passage${totalTaches>1?"s":""} restant${totalTaches>1?"s":""}` : "Tout est à jour !"}
+      {/* Widget passages du mois — redesigné */}
+      <div style={{marginBottom:14,borderRadius:DS.radius,overflow:"hidden",boxShadow:DS.shadowMd,border:"1px solid "+(totalTaches>0?DS.border:"#86efac")}}>
+        {/* Header */}
+        <div style={{background:totalTaches>0?"linear-gradient(135deg,#0f2040,#174a6e)":"linear-gradient(135deg,#065f46,#059669)",padding:"14px 16px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div>
+              <div style={{fontWeight:900,fontSize:16,color:"#fff",letterSpacing:-0.3}}>{MOIS_L[moisCourant]} {YEAR_NOW}</div>
+              <div style={{fontSize:12,color:"rgba(255,255,255,0.7)",marginTop:2}}>
+                {totalTaches>0
+                  ? <span style={{display:"flex",alignItems:"center",gap:6}}><span style={{background:"rgba(251,191,36,0.25)",color:"#fbbf24",padding:"1px 8px",borderRadius:20,fontWeight:700}}>{totalTaches}</span> passage{totalTaches>1?"s":""} restant{totalTaches>1?"s":""}</span>
+                  : "✅ Tous les passages effectués"}
+              </div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <Tag color={sMeta.color} bg={sMeta.bg}>{sMeta.label}</Tag>
+              {tachesRestantes.length>PREVIEW&&(
+                <button onClick={()=>setShowAllTaches(v=>!v)} style={{width:32,height:32,borderRadius:10,border:"1px solid rgba(255,255,255,0.2)",background:"rgba(255,255,255,0.1)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:18,fontWeight:900,fontFamily:"inherit"}}>
+                  {showAllTaches?"−":"+"}
+                </button>
+              )}
             </div>
           </div>
-          <Tag color={sMeta.color} bg={sMeta.bg}><span style={{display:"flex",alignItems:"center",gap:4}}>{Ico[sMeta.icon]&&Ico[sMeta.icon](12,sMeta.color)} {sMeta.label}</span></Tag>
+          {/* Barre de progression globale */}
+          {tachesMois.length>0&&(()=>{
+            const total = tachesMois.reduce((a,t)=>a+t.prevE+t.prevC,0);
+            const done = tachesMois.reduce((a,t)=>a+t.effE+t.effC,0);
+            const pct = total>0?Math.round(done/total*100):100;
+            return (
+              <div style={{marginTop:10}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                  <span style={{fontSize:11,color:"rgba(255,255,255,0.6)"}}>Avancement global</span>
+                  <span style={{fontSize:12,fontWeight:800,color:pct>=100?"#86efac":"#fbbf24"}}>{pct}%</span>
+                </div>
+                <div style={{height:4,background:"rgba(255,255,255,0.15)",borderRadius:99,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${pct}%`,background:pct>=100?"#34d399":"linear-gradient(90deg,#fbbf24,#f59e0b)",borderRadius:99,transition:"width .5s"}}/>
+                </div>
+              </div>
+            );
+          })()}
         </div>
-        {totalTaches > 0 && (
-          <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            {tachesMois.filter(t=>t.total>0).map(({client,restE,restC,effE,prevE,effC,prevC})=>(
-              <div key={client.id} onClick={()=>onClientClick(client)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:"rgba(255,255,255,0.08)",borderRadius:DS.radiusSm,cursor:"pointer",border:"1px solid rgba(255,255,255,0.08)"}}>
-                <Avatar nom={client.nom} size={34} photo={client.photoPiscine}/>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontWeight:700,fontSize:13,color:"#fff"}}>{client.nom}</div>
-                  <div style={{display:"flex",gap:8,marginTop:3}}>
-                    {prevE>0&&<span style={{fontSize:11,fontWeight:700,color:restE>0?"#fbbf24":"#86efac"}}>🔧 {effE}/{prevE}</span>}
-                    {prevC>0&&<span style={{fontSize:11,fontWeight:700,color:restC>0?"#fbbf24":"#86efac"}}>💧 {effC}/{prevC}</span>}
+
+        {/* Liste passages restants */}
+        {tachesRestantes.length>0&&(
+          <div style={{background:DS.white}}>
+            {tachesRestantes.slice(0, showAllTaches?999:PREVIEW).map(({client,restE,restC,effE,prevE,effC,prevC},i)=>{
+              const pct2 = (prevE+prevC)>0?Math.round((effE+effC)/(prevE+prevC)*100):0;
+              return (
+                <div key={client.id} onClick={()=>onClientClick(client)}
+                  style={{display:"flex",alignItems:"center",gap:10,padding:"11px 16px",
+                    borderBottom:i<Math.min(tachesRestantes.length,showAllTaches?999:PREVIEW)-1?"1px solid "+DS.border:"none",
+                    cursor:"pointer",background:"#fff",transition:"background .15s"}}
+                  onMouseEnter={e=>e.currentTarget.style.background=DS.light}
+                  onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
+                  <Avatar nom={client.nom} size={36} photo={client.photoPiscine}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontWeight:700,fontSize:13,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{client.nom}</div>
+                    <div style={{display:"flex",gap:8,marginTop:3,alignItems:"center"}}>
+                      {prevE>0&&<span style={{fontSize:11,fontWeight:700,color:restE>0?DS.orange:DS.green}}>🔧 {effE}/{prevE}</span>}
+                      {prevC>0&&<span style={{fontSize:11,fontWeight:700,color:restC>0?DS.teal:DS.green}}>💧 {effC}/{prevC}</span>}
+                      <div style={{flex:1,height:3,background:DS.light,borderRadius:99,overflow:"hidden",maxWidth:60}}>
+                        <div style={{height:"100%",width:`${pct2}%`,background:pct2>=100?DS.green:"#f59e0b",borderRadius:99}}/>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{background:DS.orangeSoft,color:DS.orange,fontSize:12,fontWeight:800,padding:"3px 10px",borderRadius:20,border:"1px solid "+DS.orange+"33",flexShrink:0}}>
+                    {restE+restC} rest.
                   </div>
                 </div>
-                {(restE+restC)>0 && <Tag color="#fff" bg="rgba(251,191,36,0.25)">{restE+restC} rest.</Tag>}
-              </div>
-            ))}
+              );
+            })}
+            {/* Bouton voir tout */}
+            {!showAllTaches&&tachesRestantes.length>PREVIEW&&(
+              <button onClick={()=>setShowAllTaches(true)}
+                style={{width:"100%",padding:"10px",border:"none",borderTop:"1px solid "+DS.border,background:DS.light,cursor:"pointer",fontSize:13,fontWeight:700,color:DS.blue,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Voir {tachesRestantes.length-PREVIEW} autres clients
+              </button>
+            )}
+            {showAllTaches&&tachesRestantes.length>PREVIEW&&(
+              <button onClick={()=>setShowAllTaches(false)}
+                style={{width:"100%",padding:"10px",border:"none",borderTop:"1px solid "+DS.border,background:DS.light,cursor:"pointer",fontSize:13,fontWeight:700,color:DS.mid,fontFamily:"inherit"}}>
+                Réduire
+              </button>
+            )}
           </div>
         )}
-      </Card>
+
+        {/* Clients à jour */}
+        {tachesRestantes.length===0&&tachesOk.length>0&&(
+          <div style={{padding:"12px 16px",background:DS.greenSoft}}>
+            <div style={{fontSize:13,fontWeight:600,color:DS.green}}>Tous les {tachesOk.length} clients sont à jour ce mois-ci 🎉</div>
+          </div>
+        )}
+      </div>
 
       {/* Action buttons */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>
