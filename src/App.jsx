@@ -1931,6 +1931,34 @@ async function envoyerEmail(passage, client, onSent) {
   }
 }
 
+// COMPOSANT MROW - défini en dehors pour éviter re-render à chaque frappe
+function MRow({label,unit,value,onChange,ideal,okFn,icon,color="#0891b2"}) {
+  const hasVal = value!==""&&value!==null&&value!==undefined&&value!==false;
+  const ok = hasVal&&okFn ? okFn(+value) : true;
+  const statusColor = !hasVal?"#e2e8f0":ok?"#22c55e":"#ef4444";
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:12,background:hasVal?(ok?"#f0fdf4":"#fef2f2"):DS.white,border:`1px solid ${hasVal?(ok?"#bbf7d0":"#fecaca"):"#f1f5f9"}`,transition:"all .25s"}}>
+      <div style={{width:34,height:34,borderRadius:10,background:color+"15",border:`1px solid ${color}22`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+        {icon}
+      </div>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:13,fontWeight:600,color:DS.dark,lineHeight:1.2}}>{label}{unit&&<span style={{fontSize:11,color:"#94a3b8",fontWeight:400}}> ({unit})</span>}</div>
+        {ideal&&<div style={{fontSize:10,color:"#94a3b8",marginTop:2,fontWeight:500}}>idéal {ideal}</div>}
+      </div>
+      <input type="number" step="0.1" value={value===""||value===null||value===undefined?"":value} onChange={e=>onChange(e.target.value===""?"":+e.target.value)}
+        style={{width:72,padding:"8px 10px",borderRadius:9,border:`2px solid ${statusColor}`,fontSize:15,fontWeight:800,boxSizing:"border-box",color:hasVal?(ok?"#16a34a":"#dc2626"):DS.dark,background:"#fff",textAlign:"center",outline:"none",fontFamily:"inherit",flexShrink:0,transition:"all .2s"}}/>
+      <div style={{width:28,height:28,borderRadius:14,background:!hasVal?"#f1f5f9":ok?"#22c55e":"#ef4444",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .3s",boxShadow:hasVal?`0 2px 6px ${ok?"#22c55e":"#ef4444"}44`:"none"}}>
+        {!hasVal
+          ? <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          : ok
+            ? <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            : <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        }
+      </div>
+    </div>
+  );
+}
+
 // FORMULAIRE PASSAGE (avec Alcafix + types Entretien/Contrle)
 function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraison, produitsStock=[], onClose }) {
   const EMPTY = {
@@ -2210,109 +2238,69 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
 
       {step===2 && (
         <div className="fade-in">
-          {/* Composant ligne mesure inline */}
           {(()=>{
-            const MRow = ({label,unit,value,onChange,ideal,okFn,icon,color="#0891b2"}) => {
-              const hasVal = value!==""&&value!==null&&value!==undefined&&value!==false;
-              const ok = hasVal&&okFn ? okFn(+value) : true;
-              const statusColor = !hasVal?"#e2e8f0":ok?"#22c55e":"#ef4444";
-              return (
-                <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:12,background:hasVal?(ok?"#f0fdf4":"#fef2f2"):DS.white,border:`1px solid ${hasVal?(ok?"#bbf7d0":"#fecaca"):"#f1f5f9"}`,transition:"all .25s"}}>
-                  {/* Icon */}
-                  <div style={{width:34,height:34,borderRadius:10,background:color+"15",border:`1px solid ${color}22`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    {icon}
-                  </div>
-                  {/* Label + idéal */}
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:13,fontWeight:600,color:DS.dark,lineHeight:1.2}}>{label}{unit&&<span style={{fontSize:11,color:"#94a3b8",fontWeight:400}}> ({unit})</span>}</div>
-                    {ideal&&<div style={{fontSize:10,color:"#94a3b8",marginTop:2,fontWeight:500}}>idéal {ideal}</div>}
-                  </div>
-                  {/* Input compact */}
-                  <input type="number" step="0.1" value={value===""||value===null||value===undefined?"":value} onChange={e=>onChange(e.target.value===""?"":+e.target.value)}
-                    style={{width:72,padding:"8px 10px",borderRadius:9,border:`2px solid ${statusColor}`,fontSize:15,fontWeight:800,boxSizing:"border-box",color:hasVal?(ok?"#16a34a":"#dc2626"):DS.dark,background:"#fff",textAlign:"center",outline:"none",fontFamily:"inherit",flexShrink:0,transition:"all .2s"}}/>
-                  {/* Status pill */}
-                  <div style={{width:28,height:28,borderRadius:14,background:!hasVal?"#f1f5f9":ok?"#22c55e":"#ef4444",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .3s",boxShadow:hasVal?`0 2px 6px ${ok?"#22c55e":"#ef4444"}44`:"none"}}>
-                    {!hasVal
-                      ? <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                      : ok
-                        ? <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                        : <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    }
-                  </div>
-                </div>
-              );
-            };
-
             const okCount = [
-              f.chloreLibre!==undefined&&f.chloreLibre!==""&&f.chloreLibre>=1&&f.chloreLibre<=3,
-              f.ph!==undefined&&f.ph!==""&&f.ph>=7.2&&f.ph<=7.8,
-              f.alcalinite!==undefined&&f.alcalinite!==""&&f.alcalinite>=80&&f.alcalinite<=120,
-              f.stabilisant!==undefined&&f.stabilisant!==""&&f.stabilisant>=30&&f.stabilisant<=50,
+              f.chloreLibre!==undefined&&f.chloreLibre!==""&&+f.chloreLibre>=1&&+f.chloreLibre<=3,
+              f.ph!==undefined&&f.ph!==""&&+f.ph>=7.2&&+f.ph<=7.8,
+              f.alcalinite!==undefined&&f.alcalinite!==""&&+f.alcalinite>=80&&+f.alcalinite<=120,
+              f.stabilisant!==undefined&&f.stabilisant!==""&&+f.stabilisant>=30&&+f.stabilisant<=50,
             ].filter(Boolean).length;
             const filledCount = [f.chloreLibre,f.ph,f.alcalinite,f.stabilisant].filter(v=>v!==""&&v!==null&&v!==undefined).length;
-
             return (
-              <div style={{display:"flex",flexDirection:"column",gap:12}}>
-                {/* Section 1 — Test Bandelette */}
-                <div style={{borderRadius:DS.radius,overflow:"hidden",border:"1px solid "+DS.border,boxShadow:DS.shadow}}>
-                  <div style={{background:"linear-gradient(135deg,#0891b2,#06b6d4)",padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                    <div style={{display:"flex",alignItems:"center",gap:10}}>
-                      <div style={{width:32,height:32,borderRadius:10,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                        {Ico.phTest(16,"#fff")}
-                      </div>
-                      <div>
-                        <div style={{fontSize:13,fontWeight:800,color:"#fff",letterSpacing:.3}}>Test Bandelette</div>
-                        <div style={{fontSize:10,color:"rgba(255,255,255,0.75)",marginTop:1}}>Analyse chimique de l'eau</div>
-                      </div>
-                    </div>
-                    <div style={{background:"rgba(255,255,255,0.2)",borderRadius:20,padding:"4px 12px",display:"flex",alignItems:"center",gap:5}}>
-                      <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                      <span style={{fontSize:11,fontWeight:800,color:"#fff"}}>{okCount}/{filledCount||4} OK</span>
-                    </div>
-                  </div>
-                  <div style={{background:DS.white,padding:"10px 12px",display:"flex",flexDirection:"column",gap:6}}>
-                    <MRow label="Chlore libre" unit="ppm" value={f.chloreLibre} onChange={v=>set("chloreLibre",v)} ideal="1 – 3" okFn={v=>v>=1&&v<=3} color="#0891b2"
-                      icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>}/>
-                    <MRow label="pH" value={f.ph} onChange={v=>set("ph",v)} ideal="7.2 – 7.8" okFn={v=>v>=7.2&&v<=7.8} color="#0369a1"
-                      icon={<span style={{fontSize:13,fontWeight:900,color:"#0369a1",letterSpacing:-1}}>pH</span>}/>
-                    <MRow label="Alcalinité totale" unit="ppm" value={f.alcalinite} onChange={v=>set("alcalinite",v)} ideal="80 – 120" okFn={v=>v>=80&&v<=120} color="#0284c7"
-                      icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="1.8" strokeLinecap="round"><path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/><path d="M2 16c2.5 3 5 3 7.5 0S14 13 16.5 16s5 3 7.5 0"/></svg>}/>
-                    <div>
-                      <MRow label="Stabilisant" unit="ppm" value={f.stabilisant} onChange={v=>set("stabilisant",v)} ideal="30 – 50" okFn={v=>v>=30&&v<=50} color="#0891b2"
-                        icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}/>
-                      <label style={{display:"flex",alignItems:"center",gap:8,marginTop:6,padding:"6px 10px",borderRadius:8,background:f.stabilisantHaut?"#fff7ed":"#f8fafc",border:"1px solid "+(f.stabilisantHaut?"#fdba74":"#e2e8f0"),cursor:"pointer",width:"fit-content"}}>
-                        <input type="checkbox" checked={!!f.stabilisantHaut} onChange={e=>set("stabilisantHaut",e.target.checked)} style={{width:16,height:16,accentColor:"#ea580c"}}/>
-                        <span style={{fontSize:12,fontWeight:700,color:f.stabilisantHaut?"#ea580c":"#64748b"}}>⚠️ Stabilisant HAUT</span>
-                      </label>
-                    </div>
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            <div style={{borderRadius:DS.radius,overflow:"hidden",border:"1px solid "+DS.border,boxShadow:DS.shadow}}>
+              <div style={{background:"linear-gradient(135deg,#0891b2,#06b6d4)",padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{width:32,height:32,borderRadius:10,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.phTest(16,"#fff")}</div>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:800,color:"#fff",letterSpacing:.3}}>Test Bandelette</div>
+                    <div style={{fontSize:10,color:"rgba(255,255,255,0.75)",marginTop:1}}>Analyse chimique de l'eau</div>
                   </div>
                 </div>
-
-                {/* Section 2 — Mesures électroniques */}
-                <div style={{borderRadius:DS.radius,overflow:"hidden",border:"1px solid "+DS.border,boxShadow:DS.shadow}}>
-                  <div style={{background:"linear-gradient(135deg,#7c3aed,#a78bfa)",padding:"12px 16px",display:"flex",alignItems:"center",gap:10}}>
-                    <div style={{width:32,height:32,borderRadius:10,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      {Ico.chart(16,"#fff")}
-                    </div>
-                    <div>
-                      <div style={{fontSize:13,fontWeight:800,color:"#fff",letterSpacing:.3}}>Mesures Électroniques</div>
-                      <div style={{fontSize:10,color:"rgba(255,255,255,0.75)",marginTop:1}}>Relevés appareils de mesure</div>
-                    </div>
-                  </div>
-                  <div style={{background:DS.white,padding:"10px 12px",display:"flex",flexDirection:"column",gap:6}}>
-                    <MRow label="Taux de sel" value={f.tSel} onChange={v=>set("tSel",v)} color="#7c3aed"
-                      icon={<span style={{fontSize:16}}>🧂</span>}/>
-                    <MRow label="Taux de phosphate" value={f.tPhosphate} onChange={v=>set("tPhosphate",v)} color="#7c3aed"
-                      icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v5l3 9a3 3 0 01-3 3H9a3 3 0 01-3-3l3-9V3z"/><path d="M6.5 15h11"/></svg>}/>
-                    <MRow label="Taux de chlore" value={f.tChlore} onChange={v=>set("tChlore",v)} ideal="1 – 1.5" okFn={v=>v>=0.5&&v<=3} color="#0891b2"
-                      icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>}/>
-                    <MRow label="Taux de pH" value={f.tPH} onChange={v=>set("tPH",v)} ideal="7.2 – 7.4" okFn={v=>v>=7.0&&v<=7.6} color="#0369a1"
-                      icon={<span style={{fontSize:13,fontWeight:900,color:"#7c3aed",letterSpacing:-1}}>pH</span>}/>
-                    <MRow label="Taux stabilisant" value={f.tStabilisant} onChange={v=>set("tStabilisant",v)} color="#7c3aed"
-                      icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}/>
-                  </div>
+                <div style={{background:"rgba(255,255,255,0.2)",borderRadius:20,padding:"4px 12px",display:"flex",alignItems:"center",gap:5}}>
+                  <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span style={{fontSize:11,fontWeight:800,color:"#fff"}}>{okCount}/{filledCount||4} OK</span>
                 </div>
               </div>
+              <div style={{background:DS.white,padding:"10px 12px",display:"flex",flexDirection:"column",gap:6}}>
+                <MRow label="Chlore libre" unit="ppm" value={f.chloreLibre} onChange={v=>set("chloreLibre",v)} ideal="1 – 3" okFn={v=>v>=1&&v<=3} color="#0891b2"
+                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>}/>
+                <MRow label="pH" value={f.ph} onChange={v=>set("ph",v)} ideal="7.2 – 7.8" okFn={v=>v>=7.2&&v<=7.8} color="#0369a1"
+                  icon={<span style={{fontSize:13,fontWeight:900,color:"#0369a1",letterSpacing:-1}}>pH</span>}/>
+                <MRow label="Alcalinité totale" unit="ppm" value={f.alcalinite} onChange={v=>set("alcalinite",v)} ideal="80 – 120" okFn={v=>v>=80&&v<=120} color="#0284c7"
+                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="1.8" strokeLinecap="round"><path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/><path d="M2 16c2.5 3 5 3 7.5 0S14 13 16.5 16s5 3 7.5 0"/></svg>}/>
+                <div>
+                  <MRow label="Stabilisant" unit="ppm" value={f.stabilisant} onChange={v=>set("stabilisant",v)} ideal="30 – 50" okFn={v=>v>=30&&v<=50} color="#0891b2"
+                    icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}/>
+                  <label style={{display:"flex",alignItems:"center",gap:8,marginTop:6,padding:"6px 10px",borderRadius:8,background:f.stabilisantHaut?"#fff7ed":"#f8fafc",border:"1px solid "+(f.stabilisantHaut?"#fdba74":"#e2e8f0"),cursor:"pointer",width:"fit-content"}}>
+                    <input type="checkbox" checked={!!f.stabilisantHaut} onChange={e=>set("stabilisantHaut",e.target.checked)} style={{width:16,height:16,accentColor:"#ea580c"}}/>
+                    <span style={{fontSize:12,fontWeight:700,color:f.stabilisantHaut?"#ea580c":"#64748b"}}>⚠️ Stabilisant HAUT</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div style={{borderRadius:DS.radius,overflow:"hidden",border:"1px solid "+DS.border,boxShadow:DS.shadow}}>
+              <div style={{background:"linear-gradient(135deg,#7c3aed,#a78bfa)",padding:"12px 16px",display:"flex",alignItems:"center",gap:10}}>
+                <div style={{width:32,height:32,borderRadius:10,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.chart(16,"#fff")}</div>
+                <div>
+                  <div style={{fontSize:13,fontWeight:800,color:"#fff",letterSpacing:.3}}>Mesures Électroniques</div>
+                  <div style={{fontSize:10,color:"rgba(255,255,255,0.75)",marginTop:1}}>Relevés appareils de mesure</div>
+                </div>
+              </div>
+              <div style={{background:DS.white,padding:"10px 12px",display:"flex",flexDirection:"column",gap:6}}>
+                <MRow label="Taux de sel" value={f.tSel} onChange={v=>set("tSel",v)} color="#7c3aed"
+                  icon={<span style={{fontSize:16}}>🧂</span>}/>
+                <MRow label="Taux de phosphate" value={f.tPhosphate} onChange={v=>set("tPhosphate",v)} color="#7c3aed"
+                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v5l3 9a3 3 0 01-3 3H9a3 3 0 01-3-3l3-9V3z"/><path d="M6.5 15h11"/></svg>}/>
+                <MRow label="Taux de chlore" value={f.tChlore} onChange={v=>set("tChlore",v)} ideal="1 – 1.5" okFn={v=>v>=0.5&&v<=3} color="#0891b2"
+                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>}/>
+                <MRow label="Taux de pH" value={f.tPH} onChange={v=>set("tPH",v)} ideal="7.2 – 7.4" okFn={v=>v>=7.0&&v<=7.6} color="#0369a1"
+                  icon={<span style={{fontSize:13,fontWeight:900,color:"#7c3aed",letterSpacing:-1}}>pH</span>}/>
+                <MRow label="Taux stabilisant" value={f.tStabilisant} onChange={v=>set("tStabilisant",v)} color="#7c3aed"
+                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}/>
+              </div>
+            </div>
+          </div>
             );
           })()}
         </div>
