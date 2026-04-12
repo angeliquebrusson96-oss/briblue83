@@ -60,13 +60,22 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { data, error } = await supabase.from("app_data").select("data").eq("id", 1).single();
-    if (error) return res.status(500).json({ error: error.message });
+    // Lecture initiale pour trouver le client
+    const { data: readData, error: readError } = await supabase
+      .from("app_data").select("data").eq("id", 1).single();
+    if (readError) return res.status(500).json({ error: readError.message });
 
-    const allData = data?.data || {};
-    const clients = allData["bb_clients_v2"] || [];
+    const clients = readData?.data?.["bb_clients_v2"] || [];
     const client = clients.find(c => c.id === clientId);
 
+    // Re-fetch juste avant écriture pour éviter d'écraser des données récentes
+    const { data: freshData, error: freshError } = await supabase
+      .from("app_data").select("data").eq("id", 1).single();
+    if (freshError) return res.status(500).json({ error: freshError.message });
+
+    const allData = freshData?.data || {};
+
+    // Mise à jour UNIQUEMENT de bb_contrats_v1 — ne touche pas aux autres clés
     const contrats = allData["bb_contrats_v1"] || {};
     contrats[contractId] = {
       ...(contrats[contractId] || {}),
@@ -77,9 +86,12 @@ export default async function handler(req, res) {
       statut: "signe",
     };
 
-    await supabase.from("app_data").upsert({ id: 1, data: { ...allData, "bb_contrats_v1": contrats } });
+    await supabase.from("app_data").upsert({
+      id: 1,
+      data: { ...allData, "bb_contrats_v1": contrats }
+    });
 
-    // Envoyer email de confirmation au client ET à Dorian
+    // Email de confirmation
     if (client?.email) {
       await sendConfirmationEmail(client, signedAt || new Date().toISOString());
     }
