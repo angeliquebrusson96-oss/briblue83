@@ -1758,9 +1758,8 @@ async function envoyerEmail(passage, client, onSent) {
   </div>
   <div style="background:#f0f9ff;border:1px solid #e0f2fe;border-top:none;border-radius:0 0 12px 12px;padding:16px 28px;">
     <p style="margin:0;font-size:12px;color:#64748b;">
-      <strong style="color:#0369a1;">Dorian Briaire</strong> — Technicien de Piscine<br/>
-      🌐 www.briblue83.com &nbsp;|&nbsp; 📞 +33 6 67 18 61 15<br/>
-      📍 Hyères et alentours &nbsp;|&nbsp; 📧 briblue83@hotmail.com
+      <strong style="color:#0369a1;">Dorian Briaire</strong><br/>
+      Technicien de Piscine — BRI BLUE
     </p>
   </div>
 </div>
@@ -1775,7 +1774,7 @@ async function envoyerEmail(passage, client, onSent) {
         to: [client.email],
         subject: `Rapport entretien piscine — ${dateStr}`,
         html: htmlEmail,
-        text: `Bonjour ${client?.nom||""},\n\nVotre rapport d'entretien piscine du ${dateStr} est disponible.\n\nCordialement,\nDorian Briaire — BRIBLUE\nwww.briblue83.com | +33 6 67 18 61 15`,
+        text: `Bonjour ${client?.nom||""},\n\nVotre rapport d'entretien piscine du ${dateStr} est disponible.\n\nCordialement,\nDorian Briaire\nTechnicien de Piscine — BRI BLUE`,
       }),
     });
 
