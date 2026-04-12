@@ -909,6 +909,7 @@ function FormRdv({ initial, clients, onSave, onClose }) {
 // FICHE CLIENT (avec diffrenciation Entretien/Contrle)
 function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[], contrats={}, onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
   const [tab, setTab] = useState("infos");
+  const [detailPassageFiche, setDetailPassageFiche] = useState(null);
   const [showFormLiv, setShowFormLiv] = useState(false);
   const [editLiv, setEditLiv] = useState(null);
   const isMobile = useIsMobile();
@@ -1095,6 +1096,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                         })}
                       />
                     </div>
+                    <button onClick={(e)=>{e.stopPropagation();setDetailPassageFiche(p);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.dark,fontFamily:"inherit",fontWeight:700}}>{Ico.search(12,DS.mid)} Aperçu</button>
                     <button onClick={()=>onEditPassage&&onEditPassage(p)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(12,DS.mid)} Modifier</button>
                     <button onClick={(e)=>{e.stopPropagation();ouvrirRapport(p,client);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.blueSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.blue,fontFamily:"inherit",fontWeight:700}}>{Ico.pdf(12,DS.blue)} Rapport</button>
                     {client.email&&<button onClick={(e)=>{e.stopPropagation();envoyerEmail(p,client,onUpdatePassageStatus);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.green,fontFamily:"inherit",fontWeight:700}}>{Ico.send(12,DS.green)} Email</button>}
@@ -1201,6 +1203,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
       {showFormLiv && (
         <FormLivraison initial={editLiv} clientId={client.id} clients={[client]} produitsStock={produitsStock} onSave={l=>{onSaveLivraison(l);setShowFormLiv(false);setEditLiv(null);}} onClose={()=>{setShowFormLiv(false);setEditLiv(null);}}/>
       )}
+      {detailPassageFiche && <PassageDetailModal passage={detailPassageFiche} client={client} onClose={()=>setDetailPassageFiche(null)}/>}
 
       {/* Action buttons */}
       <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:20,paddingTop:16,borderTop:"1px solid "+DS.border}}>
@@ -3009,9 +3012,155 @@ function PageClients({ clients, passages, onClientClick, onAdd }) {
   );
 }
 
+// MODAL APERCU PASSAGE
+function PassageDetailModal({ passage, client, onClose }) {
+  const isMobile = useIsMobile();
+  if (!passage) return null;
+
+  const val = (v, u="") => (v!==""&&v!==null&&v!==undefined) ? `${v}${u?" "+u:""}` : "—";
+  const ouiNon = (v) => v===true ? "✅ Oui" : v===false ? "❌ Non" : "—";
+  const liste = (arr) => Array.isArray(arr)&&arr.length ? arr.join(", ") : (arr||"—");
+  const etoiles = (n) => n>0 ? "★".repeat(n)+"☆".repeat(5-n)+" "+n+"/5" : "—";
+
+  const photos = [
+    passage.photoArrivee ? {src:passage.photoArrivee, label:"Arrivée"} : null,
+    ...((passage.photos||[]).filter(Boolean).map((src,i)=>({src, label:`Arrivée ${i+2}`}))),
+    passage.photoDepart ? {src:passage.photoDepart, label:"Départ"} : null,
+    ...((passage.photosDepart||[]).filter(Boolean).map((src,i)=>({src, label:`Départ ${i+2}`}))),
+  ].filter(Boolean);
+
+  const rapportStatus = getRapportStatus(passage);
+  const rapportMeta = RAPPORT_STATUS[rapportStatus];
+  const isCtrl = isControleType(passage.type);
+
+  const Block = ({title, icon, color=DS.blue, children}) => (
+    <div style={{borderRadius:DS.radiusSm,overflow:"hidden",border:"1px solid "+DS.border,marginBottom:12}}>
+      <div style={{background:color+"12",borderBottom:"1px solid "+color+"22",padding:"9px 14px",display:"flex",alignItems:"center",gap:8}}>
+        <span style={{fontSize:14}}>{icon}</span>
+        <span style={{fontSize:12,fontWeight:800,color,textTransform:"uppercase",letterSpacing:.7}}>{title}</span>
+      </div>
+      <div style={{padding:"12px 14px",background:DS.white}}>{children}</div>
+    </div>
+  );
+
+  const Row = ({label, value, color}) => (
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:"1px solid "+DS.light}}>
+      <span style={{fontSize:13,color:DS.mid,fontWeight:500}}>{label}</span>
+      <span style={{fontSize:13,fontWeight:700,color:color||DS.dark}}>{value}</span>
+    </div>
+  );
+
+  return (
+    <Modal title="Aperçu du passage" onClose={onClose} wide>
+      {/* Header */}
+      <div style={{background:"linear-gradient(135deg,#0f2040,#0369a1)",borderRadius:DS.radiusSm,padding:"14px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:12}}>
+        <div style={{width:44,height:44,borderRadius:12,background:isCtrl?"rgba(6,182,212,0.25)":"rgba(14,165,233,0.25)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+          {isCtrl ? Ico.drop(22,"#67e8f9") : Ico.wrench(22,"#7dd3fc")}
+        </div>
+        <div style={{flex:1}}>
+          <div style={{fontWeight:900,fontSize:16,color:"#fff",letterSpacing:-0.3}}>{client?.nom||passage.clientId}</div>
+          <div style={{display:"flex",gap:8,marginTop:5,flexWrap:"wrap"}}>
+            <span style={{background:"rgba(255,255,255,0.15)",color:"rgba(255,255,255,0.9)",fontSize:12,fontWeight:600,padding:"2px 10px",borderRadius:20}}>{new Date(passage.date).toLocaleDateString("fr",{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}</span>
+            <span style={{background:rapportMeta.bg,color:rapportMeta.color,fontSize:12,fontWeight:700,padding:"2px 10px",borderRadius:20}}>{rapportMeta.label}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Intervention */}
+      <Block title="Intervention" icon="🔧" color={DS.blue}>
+        <Row label="Type" value={passage.type||"—"}/>
+        <Row label="Technicien" value={passage.tech||"—"}/>
+        {passage.actions&&<Row label="Actions" value={passage.actions}/>}
+        {passage.obs&&<Row label="Observations" value={passage.obs} color={DS.orange}/>}
+      </Block>
+
+      {/* Analyses */}
+      {(passage.chloreLibre||passage.ph||passage.alcalinite||passage.stabilisant||passage.tChlore||passage.tPH||passage.tSel||passage.tPhosphate||passage.tStabilisant) && (
+        <Block title="Analyses eau" icon="💧" color={DS.teal}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0}}>
+            {passage.tChlore!==""&&passage.tChlore!==null&&passage.tChlore!==undefined&&<Row label="Chlore (appareil)" value={val(passage.tChlore,"ppm")} color={+passage.tChlore>=0.5&&+passage.tChlore<=3?DS.green:DS.red}/>}
+            {passage.tPH!==""&&passage.tPH!==null&&passage.tPH!==undefined&&<Row label="pH (appareil)" value={val(passage.tPH)} color={+passage.tPH>=7.0&&+passage.tPH<=7.6?DS.green:DS.red}/>}
+            {passage.tSel!==""&&passage.tSel!==null&&passage.tSel!==undefined&&<Row label="Sel" value={val(passage.tSel,"g/L")}/>}
+            {passage.tPhosphate!==""&&passage.tPhosphate!==null&&passage.tPhosphate!==undefined&&<Row label="Phosphate" value={val(passage.tPhosphate,"ppm")}/>}
+            {passage.tStabilisant!==""&&passage.tStabilisant!==null&&passage.tStabilisant!==undefined&&<Row label="Stabilisant" value={val(passage.tStabilisant,"ppm")}/>}
+            {passage.chloreLibre!==""&&passage.chloreLibre!==null&&passage.chloreLibre!==undefined&&<Row label="Chlore libre" value={val(passage.chloreLibre,"ppm")}/>}
+            {passage.ph!==""&&passage.ph!==null&&passage.ph!==undefined&&<Row label="pH bandelette" value={val(passage.ph)}/>}
+            {passage.alcalinite!==""&&passage.alcalinite!==null&&passage.alcalinite!==undefined&&<Row label="Alcalinité" value={val(passage.alcalinite,"ppm")}/>}
+            {passage.stabilisant!==""&&passage.stabilisant!==null&&passage.stabilisant!==undefined&&<Row label="Stabilisant (band.)" value={val(passage.stabilisant,"ppm")}/>}
+          </div>
+          {passage.stabilisantHaut&&<div style={{marginTop:8,background:DS.orangeSoft,borderRadius:8,padding:"6px 10px",fontSize:12,fontWeight:700,color:DS.orange}}>⚠️ Stabilisant HAUT signalé</div>}
+        </Block>
+      )}
+
+      {/* État bassin */}
+      {(passage.qualiteEau||(passage.etatFond||[]).length||(passage.etatParois||[]).length) && (
+        <Block title="État bassin" icon="🏊" color={DS.green}>
+          {passage.qualiteEau&&<Row label="Qualité eau" value={passage.qualiteEau}/>}
+          {(passage.etatFond||[]).length>0&&<Row label="Fond" value={liste(passage.etatFond)}/>}
+          {(passage.etatParois||[]).length>0&&<Row label="Parois" value={liste(passage.etatParois)}/>}
+          {(passage.etatLocal||[]).length>0&&<Row label="Local" value={liste(passage.etatLocal)}/>}
+        </Block>
+      )}
+
+      {/* Correctifs */}
+      {(passage.corrChlore||passage.corrPH||passage.corrSel||passage.corrAlgicide||passage.corrAlcafix||passage.corrAutre) && (
+        <Block title="Correctifs apportés" icon="⚗️" color={DS.purple}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0}}>
+            {passage.corrChlore&&<Row label="Chlore" value={passage.corrChlore}/>}
+            {passage.corrPH&&<Row label="pH" value={passage.corrPH}/>}
+            {passage.corrSel&&<Row label="Sel" value={passage.corrSel}/>}
+            {passage.corrAlgicide&&<Row label="Algicide" value={passage.corrAlgicide}/>}
+            {passage.corrPeroxyde&&<Row label="Peroxyde" value={passage.corrPeroxyde}/>}
+            {passage.corrChloreChoc&&<Row label="Chlore choc" value={passage.corrChloreChoc}/>}
+            {passage.corrPhosphate&&<Row label="Phosphate" value={passage.corrPhosphate}/>}
+            {passage.corrAlcafix&&<Row label="Alcafix" value={passage.corrAlcafix}/>}
+            {passage.corrAutre&&<Row label="Autre" value={passage.corrAutre}/>}
+          </div>
+        </Block>
+      )}
+
+      {/* Clôture */}
+      <Block title="Clôture" icon="✅" color={DS.orange}>
+        <Row label="Devis à faire" value={ouiNon(passage.devis)}/>
+        <Row label="Prise d'échantillon" value={ouiNon(passage.priseEchantillon)}/>
+        <Row label="Présence client" value={ouiNon(passage.presenceClient)}/>
+        <Row label="Ressenti" value={etoiles(passage.ressenti)}/>
+        {passage.livraisonProduits&&<Row label="Livraison produits" value={ouiNon(passage.livraisonProduits)}/>}
+        {(passage.produitsLivres||[]).length>0&&<Row label="Produits livrés" value={liste(passage.produitsLivres)}/>}
+        {passage.commentaires&&<div style={{marginTop:8,padding:"8px 10px",background:DS.light,borderRadius:8,fontSize:13,color:DS.dark}}>{passage.commentaires}</div>}
+      </Block>
+
+      {/* Photos */}
+      {photos.length>0&&(
+        <Block title={`Photos (${photos.length})`} icon="📸" color={DS.mid}>
+          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(3,1fr)",gap:8}}>
+            {photos.map((ph,i)=>(
+              <div key={i} style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid "+DS.border}}>
+                <img src={ph.src} alt={ph.label} style={{width:"100%",height:isMobile?90:110,objectFit:"cover",display:"block"}}/>
+                <span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>{ph.label}</span>
+              </div>
+            ))}
+          </div>
+        </Block>
+      )}
+
+      {/* Signatures */}
+      {(passage.signatureTech||passage.signatureClient)&&(
+        <Block title="Signatures" icon="✍️" color={DS.mid}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+            {passage.signatureTech&&<div><div style={{fontSize:10,fontWeight:700,color:DS.mid,marginBottom:6}}>TECHNICIEN</div><img src={passage.signatureTech} style={{width:"100%",maxHeight:60,objectFit:"contain",borderRadius:8,border:"1px solid "+DS.border,background:"#fafafa"}}/></div>}
+            {passage.signatureClient&&<div><div style={{fontSize:10,fontWeight:700,color:DS.mid,marginBottom:6}}>CLIENT</div><img src={passage.signatureClient} style={{width:"100%",maxHeight:60,objectFit:"contain",borderRadius:8,border:"1px solid "+DS.border,background:"#fafafa"}}/></div>}
+          </div>
+        </Block>
+      )}
+    </Modal>
+  );
+}
+
 // PAGE PASSAGES
 function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePassageStatus }) {
   const [filter,setFilter]=useState("mois");
+  const [detailPassage, setDetailPassage] = useState(null);
   const now=new Date();
   const filtered=useMemo(()=>{
     return passages.filter(p=>{
@@ -3086,6 +3235,9 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                     {p.actions&&<div style={{fontSize:12,color:DS.mid,marginBottom:4}}>{p.actions}</div>}
                     {p.obs&&<div style={{fontSize:11,color:DS.orange,display:"flex",alignItems:"center",gap:4}}>{Ico.note(11,DS.orange)} {p.obs}</div>}
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginTop:10,paddingTop:10,borderTop:"1px solid "+DS.border}}>
+                      <button onClick={()=>setDetailPassage(p)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.light,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.dark,fontFamily:"inherit",fontWeight:700}}>
+                        {Ico.search(13,DS.mid)} Aperçu
+                      </button>
                       <button onClick={()=>ouvrirRapport(p,c)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.blueSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.blue,fontFamily:"inherit",fontWeight:700,boxShadow:"0 1px 4px "+DS.blue+"22"}}>
                         {Ico.pdf(14,DS.blue)} Rapport PDF
                       </button>
@@ -3109,11 +3261,10 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
           })}
         </div>
       }
+      {detailPassage && <PassageDetailModal passage={detailPassage} client={clients.find(x=>x.id===detailPassage.clientId)} onClose={()=>setDetailPassage(null)}/>}
     </div>
   );
 }
-
-// PAGE RDV
 function PageRdv({ clients, rdvs, onAdd, onEdit, onDelete }) {
   const [filter,setFilter]=useState("avenir");
   const filtered=useMemo(()=>{
