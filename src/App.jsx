@@ -434,15 +434,37 @@ function Tag({ children, color=DS.blue, bg, style={} }) {
 
 function Modal({ title, onClose, children, wide }) {
   const isMobile = useIsMobile();
+  useEffect(()=>{
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return ()=>{ document.body.style.overflow = prev; };
+  },[]);
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(8px)",zIndex:200,display:"flex",alignItems:isMobile?"flex-end":"center",justifyContent:"center"}}>
-      <div className="slide-up" style={{background:DS.white,borderRadius:isMobile?"24px 24px 0 0":DS.radiusLg,width:"100%",maxWidth:wide?720:560,maxHeight:isMobile?"93vh":"88vh",overflowY:"auto",boxShadow:DS.shadowLg}} onClick={e=>e.stopPropagation()}>
-        {isMobile && <div style={{display:"flex",justifyContent:"center",padding:"12px 0 4px"}}><div style={{width:36,height:4,borderRadius:2,background:DS.border}}/></div>}
-        <div style={{padding:isMobile?"8px 20px 16px":"16px 28px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid "+DS.border}}>
-          <span style={{color:DS.dark,fontWeight:800,fontSize:17,letterSpacing:-0.3}}>{title}</span>
-          <button onClick={onClose} className="btn-hover" style={{width:34,height:34,borderRadius:17,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.close(14,DS.mid)}</button>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:200,display:"flex",alignItems:isMobile?"flex-end":"center",justifyContent:"center"}}
+      onClick={onClose}>
+      <div className={isMobile?"slide-up":"scale-in"}
+        style={{background:DS.white,borderRadius:isMobile?"20px 20px 0 0":DS.radiusLg,
+          width:"100%",maxWidth:wide?720:560,
+          maxHeight:isMobile?"92dvh":"88vh",
+          display:"flex",flexDirection:"column",
+          boxShadow:DS.shadowLg,overflowY:"hidden",
+          paddingBottom:"env(safe-area-inset-bottom,0px)"}}
+        onClick={e=>e.stopPropagation()}>
+        {/* Handle bar mobile */}
+        {isMobile && <div style={{flexShrink:0,display:"flex",justifyContent:"center",paddingTop:10,paddingBottom:2}}>
+          <div style={{width:36,height:4,borderRadius:2,background:"#d1d5db"}}/>
+        </div>}
+        {/* Titre sticky */}
+        <div style={{flexShrink:0,padding:isMobile?"8px 18px 12px":"14px 24px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid "+DS.border}}>
+          <span style={{color:DS.dark,fontWeight:700,fontSize:16}}>{title}</span>
+          <button onClick={onClose} style={{width:30,height:30,borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            {Ico.close(13,DS.mid)}
+          </button>
         </div>
-        <div style={{padding:isMobile?"18px 20px 32px":"24px 28px 28px"}}>{children}</div>
+        {/* Contenu scrollable */}
+        <div style={{flex:1,overflowY:"auto",padding:isMobile?"14px 18px 24px":"20px 24px 24px",WebkitOverflowScrolling:"touch"}}>
+          {children}
+        </div>
       </div>
     </div>
   );
