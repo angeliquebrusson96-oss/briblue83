@@ -128,6 +128,8 @@ const PASSAGES_INIT = [
   { id:3, clientId:"C001", date:"2026-04-07", type:"Contrôle d'eau",    ph:7.1, chlore:1.8, actions:"Contrôle mesures",          obs:"RAS",                      tech:"Dorian", ok:true },
 ];
 
+const PRODUITS_DEFAUT = ["Chlore lent Galet","PH minus","Flocculant","Anti-calcaire","Anti-Algues","Anti-Phosphate","Éponge Magique","Filtre à cartouche","Tac+","Chlore granule","Hypochlorite","Anti-Algues moutarde","Sac de sel"];
+
 const STATUT_LIV = {
   aFacturer: { label:"À facturer", color:"#ea580c", bg:"#ffedd5" },
   facture:   { label:"Facturé",    color:"#0284c7", bg:"#e0f2fe" },
@@ -2967,8 +2969,6 @@ function LoginScreen({ onLogin }) {
 }
 
 // APP ROOT
-const PRODUITS_DEFAUT = ["Chlore lent Galet","PH minus","Flocculant","Anti-calcaire","Anti-Algues","Anti-Phosphate","Éponge Magique","Filtre à cartouche","Tac+","Chlore granule","Hypochlorite","Anti-Algues moutarde","Sac de sel"];
-
 function ModalStock({ stock, onClose, onUpdateStock, onAddProduit, onDeleteProduit }) {
   const [newProduit, setNewProduit] = useState("");
   const produitsListe = Object.keys(stock);
