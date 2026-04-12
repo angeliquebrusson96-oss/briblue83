@@ -131,7 +131,7 @@ const PASSAGES_INIT = [
 const PRODUITS_DEFAUT = ["Chlore lent Galet","PH minus","Flocculant","Anti-calcaire","Anti-Algues","Anti-Phosphate","Éponge Magique","Filtre à cartouche","Tac+","Chlore granule","Hypochlorite","Anti-Algues moutarde","Sac de sel"];
 
 const STATUT_LIV = {
-  aFacturer: { label:"À facturer", color:"#b45309", bg:"#fef3c7" },
+  aFacturer: { label:"À facturer", color:"#0369a1", bg:"#f0f9ff" },
   facture:   { label:"Facturé",    color:"#0284c7", bg:"#e0f2fe" },
   paye:      { label:"Payé",       color:"#059669", bg:"#d1fae5" },
 };
@@ -331,7 +331,7 @@ const DS = {
   shadow: "0 1px 4px rgba(8,145,178,0.06), 0 4px 16px rgba(8,145,178,0.06)",
   shadowMd: "0 4px 24px rgba(8,145,178,0.10)",
   shadowLg: "0 8px 40px rgba(8,145,178,0.14)",
-  font: "'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
+  font: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
 };
 
 const AC = {
@@ -342,7 +342,7 @@ const AC = {
 };
 
 const RAPPORT_STATUS = {
-  saisie: { label:"En cours de saisie", color:"#b45309", bg:"#fef3c7" },
+  saisie: { label:"En cours de saisie", color:DS.mid, bg:"#f3f4f6" },
   cree:   { label:"Créé", color:DS.blue, bg:DS.blueSoft },
   envoye: { label:"Envoyé", color:DS.green, bg:DS.greenSoft },
 };
@@ -364,7 +364,7 @@ const GlobalStyles = () => (
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     html { scroll-behavior: smooth; }
-    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f9fafb; overflow-x: hidden; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f8fafc; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
     input, select, textarea, button { font-family: inherit; }
     input:focus, select:focus, textarea:focus { outline: none; border-color: ${DS.blue} !important; box-shadow: 0 0 0 3px ${DS.blue}22 !important; }
     ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -1063,7 +1063,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           </div>
         )}
         {/* Bloc infos client */}
-        <div style={{background:client.photoPiscine?"#0c1222":"linear-gradient(135deg,#0f2040,#0369a1)",padding:"16px 20px 14px"}}>
+        <div style={{background:"#1e2937",padding:"14px 18px"}}>
           <div style={{display:"flex",alignItems:"center",gap:14}}>
             <Avatar nom={client.nom} size={54} photo={null}/>
             <div style={{flex:1,minWidth:0}}>
@@ -1077,37 +1077,37 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
               <div style={{background:col.bg,color:col.tx,fontSize:12,fontWeight:800,padding:"6px 12px",borderRadius:20,border:"1px solid "+col.bd+"55",textAlign:"center"}}>
                 {col.lbl}
               </div>
-              {jours!==null&&<div style={{fontSize:11,color:"rgba(255,255,255,0.55)",textAlign:"center",marginTop:3}}>{jours>=0?jours+"j restants":"Expiré"}</div>}
+              {jours!==null&&<div style={{fontSize:11,color:"rgba(255,255,255,0.55)",textAlign:"center",marginTop:3}}>{jours>=0?jours+"j restants":"Expiré !"}</div>}
             </div>
           </div>
         </div>
       </div>
 
       {/* Stats row */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginTop:16,marginBottom:14}}>
-        <div style={{textAlign:"center",padding:"10px 4px",borderRadius:12,background:DS.blueSoft,border:"1px solid "+DS.blue+"18"}}>
-          <div style={{fontSize:19,fontWeight:900,color:DS.blue,lineHeight:1}}>{effE}<span style={{fontSize:11,color:DS.mid,fontWeight:500}}>/{totalE}</span></div>
-          <div style={{fontSize:10,fontWeight:700,color:DS.blue,marginTop:3}}>🔧 Entretiens</div>
-          <div style={{height:3,background:DS.white,borderRadius:99,overflow:"hidden",marginTop:6,marginInline:4}}><div style={{height:"100%",width:`${totalE>0?Math.min(100,effE/totalE*100):0}%`,background:DS.blue,borderRadius:99}}/></div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginTop:14,marginBottom:12}}>
+        <div style={{textAlign:"center",padding:"8px 4px",borderRadius:8,background:"#f8fafc",border:"1px solid #e5e7eb"}}>
+          <div style={{fontSize:16,fontWeight:800,color:DS.blue,lineHeight:1}}>{effE}<span style={{fontSize:10,color:DS.mid,fontWeight:400}}>/{totalE}</span></div>
+          <div style={{fontSize:10,fontWeight:600,color:DS.mid,marginTop:2}}>Entretiens</div>
+          <div style={{height:2,background:"#e5e7eb",borderRadius:99,overflow:"hidden",marginTop:5,marginInline:4}}><div style={{height:"100%",width:`${totalE>0?Math.min(100,effE/totalE*100):0}%`,background:DS.blue,borderRadius:99}}/></div>
         </div>
-        <div style={{textAlign:"center",padding:"10px 4px",borderRadius:12,background:DS.tealSoft,border:"1px solid "+DS.teal+"18"}}>
-          <div style={{fontSize:19,fontWeight:900,color:DS.teal,lineHeight:1}}>{effC}<span style={{fontSize:11,color:DS.mid,fontWeight:500}}>/{totalC}</span></div>
-          <div style={{fontSize:10,fontWeight:700,color:DS.teal,marginTop:3}}>💧 Contrôles</div>
-          <div style={{height:3,background:DS.white,borderRadius:99,overflow:"hidden",marginTop:6,marginInline:4}}><div style={{height:"100%",width:`${totalC>0?Math.min(100,effC/totalC*100):0}%`,background:DS.teal,borderRadius:99}}/></div>
+        <div style={{textAlign:"center",padding:"8px 4px",borderRadius:8,background:"#f8fafc",border:"1px solid #e5e7eb"}}>
+          <div style={{fontSize:16,fontWeight:800,color:DS.blue,lineHeight:1}}>{effC}<span style={{fontSize:10,color:DS.mid,fontWeight:400}}>/{totalC}</span></div>
+          <div style={{fontSize:10,fontWeight:600,color:DS.mid,marginTop:2}}>Contrôles</div>
+          <div style={{height:2,background:"#e5e7eb",borderRadius:99,overflow:"hidden",marginTop:5,marginInline:4}}><div style={{height:"100%",width:`${totalC>0?Math.min(100,effC/totalC*100):0}%`,background:DS.blue,borderRadius:99}}/></div>
         </div>
-        <div style={{textAlign:"center",padding:"10px 4px",borderRadius:12,background:rest>0?DS.orangeSoft:DS.greenSoft,border:"1px solid "+(rest>0?DS.orange:DS.green)+"18"}}>
-          <div style={{fontSize:19,fontWeight:900,color:rest>0?DS.orange:DS.green,lineHeight:1}}>{pct}<span style={{fontSize:11,fontWeight:500}}>%</span></div>
-          <div style={{fontSize:10,fontWeight:700,color:rest>0?DS.orange:DS.green,marginTop:3}}>{rest>0?"⏳ "+rest+" restants":"✅ À jour"}</div>
+        <div style={{textAlign:"center",padding:"8px 4px",borderRadius:8,background:"#f8fafc",border:"1px solid #e5e7eb"}}>
+          <div style={{fontSize:16,fontWeight:800,color:pct>=100?DS.green:DS.dark,lineHeight:1}}>{pct}<span style={{fontSize:10,fontWeight:400}}>%</span></div>
+          <div style={{fontSize:10,fontWeight:600,color:DS.mid,marginTop:2}}>{rest>0?rest+" restants":"À jour"}</div>
         </div>
-        <div style={{textAlign:"center",padding:"10px 4px",borderRadius:12,background:DS.purpleSoft,border:"1px solid "+DS.purple+"18"}}>
-          <div style={{fontSize:14,fontWeight:900,color:DS.purple,lineHeight:1}}>{client.prix?client.prix.toLocaleString("fr"):"—"}<span style={{fontSize:9}}>€</span></div>
-          <div style={{fontSize:10,fontWeight:700,color:DS.purple,marginTop:3}}>💰 Contrat</div>
+        <div style={{textAlign:"center",padding:"8px 4px",borderRadius:8,background:"#f8fafc",border:"1px solid #e5e7eb"}}>
+          <div style={{fontSize:13,fontWeight:800,color:DS.dark,lineHeight:1}}>{client.prix?client.prix.toLocaleString("fr"):"—"}<span style={{fontSize:9}}>€</span></div>
+          <div style={{fontSize:10,fontWeight:600,color:DS.mid,marginTop:2}}>Contrat/an</div>
         </div>
       </div>
 
       {/* Tabs */}
       <div style={{display:"flex",gap:0,marginBottom:16,background:DS.light,borderRadius:DS.radiusSm,padding:3}}>
-        {[["infos","Infos"],["saisons","Planning"],["passages","Passages"],["rdvs","RDV"],["livraisons","Livr."]].map(([id,l])=>(
+        {[["infos","Infos"],["saisons","Planning"],["passages","Passages"],["rdvs","RDV"],["livraisons","Livraisons"]].map(([id,l])=>(
           <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"9px 4px",borderRadius:10,border:"none",cursor:"pointer",fontWeight:tab===id?800:600,fontSize:15,fontFamily:"inherit",background:tab===id?DS.white:"transparent",color:tab===id?DS.dark:DS.mid,boxShadow:tab===id?"0 1px 4px rgba(0,0,0,0.08)":"none",transition:"all .25s"}}>{l}</button>
         ))}
       </div>
