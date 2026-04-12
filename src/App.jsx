@@ -423,7 +423,7 @@ function IcoBubble({ ico, color=DS.blue, bg, size=38 }) {
 function Tag({ children, color=DS.blue, bg, style={} }) {
   const bgCol = bg || color+"14";
   return (
-    <span style={{background:bgCol,color,borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700,whiteSpace:"nowrap",display:"inline-flex",alignItems:"center",gap:4,letterSpacing:-0.2,...style}}>{children}</span>
+    <span style={{background:bgCol,color,borderRadius:20,padding:"3px 10px",fontSize:15,fontWeight:700,whiteSpace:"nowrap",display:"inline-flex",alignItems:"center",gap:4,letterSpacing:-0.2,...style}}>{children}</span>
   );
 }
 
@@ -446,7 +446,7 @@ function Modal({ title, onClose, children, wide }) {
 function Section({ title, children, style={} }) {
   return (
     <div style={{marginBottom:22,...style}}>
-      {title && <div style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:12}}>{title}</div>}
+      {title && <div style={{fontSize:15,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:12}}>{title}</div>}
       {children}
     </div>
   );
@@ -470,8 +470,8 @@ function Card({ children, style={}, onClick, className="", id }) {
 function Input({ label, ...p }) {
   return (
     <div style={{display:"flex",flexDirection:"column",gap:5}}>
-      {label && <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>{label}</span>}
-      <input style={{padding:"11px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:14,outline:"none",background:DS.white,boxSizing:"border-box",width:"100%",color:DS.dark,fontFamily:"inherit",transition:"all .2s",...(p.style||{})}} {...p}/>
+      {label && <span style={{fontSize:15,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>{label}</span>}
+      <input style={{padding:"11px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:15,outline:"none",background:DS.white,boxSizing:"border-box",width:"100%",color:DS.dark,fontFamily:"inherit",transition:"all .2s",...(p.style||{})}} {...p}/>
     </div>
   );
 }
@@ -479,8 +479,8 @@ function Input({ label, ...p }) {
 function Select({ label, options, ...p }) {
   return (
     <div style={{display:"flex",flexDirection:"column",gap:5}}>
-      {label && <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>{label}</span>}
-      <select style={{padding:"11px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:14,outline:"none",background:DS.white,color:DS.dark,fontFamily:"inherit",cursor:"pointer",appearance:"none",backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,backgroundRepeat:"no-repeat",backgroundPosition:"right 12px center",paddingRight:36,transition:"all .2s"}} {...p}>
+      {label && <span style={{fontSize:15,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>{label}</span>}
+      <select style={{padding:"11px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:15,outline:"none",background:DS.white,color:DS.dark,fontFamily:"inherit",cursor:"pointer",appearance:"none",backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,backgroundRepeat:"no-repeat",backgroundPosition:"right 12px center",paddingRight:36,transition:"all .2s"}} {...p}>
         {options.map(o=><option key={o} value={o}>{o}</option>)}
       </select>
     </div>
@@ -503,7 +503,7 @@ function PhotoPicker({ label, value, onChange, compact }) {
   return (
     <div>
       {label && (
-        <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:8}}>
+        <span style={{fontSize:15,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:8}}>
           {label}
         </span>
       )}
@@ -511,19 +511,19 @@ function PhotoPicker({ label, value, onChange, compact }) {
         <div style={{position:"relative",borderRadius:DS.radius,overflow:"hidden",border:"2px solid "+DS.blue,background:"#000"}}>
           <img src={value} alt="photo" style={{width:"100%",maxHeight:compact?120:220,objectFit:"cover",display:"block"}}/>
           <button onClick={() => onChange("")} style={{position:"absolute",top:8,right:8,width:32,height:32,borderRadius:16,background:"rgba(0,0,0,0.6)",border:"2px solid rgba(255,255,255,0.4)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2}}>{Ico.close(14,"#fff")}</button>
-          <button onClick={() => cameraRef.current?.click()} style={{position:"absolute",bottom:8,right:8,padding:"6px 12px",borderRadius:10,background:"rgba(0,0,0,0.55)",border:"1px solid rgba(255,255,255,0.3)",cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontSize:11,fontWeight:600,color:"#fff",fontFamily:"inherit"}}>{Ico.camera(13,"#fff")} Reprendre</button>
+          <button onClick={() => cameraRef.current?.click()} style={{position:"absolute",bottom:8,right:8,padding:"6px 12px",borderRadius:10,background:"rgba(0,0,0,0.55)",border:"1px solid rgba(255,255,255,0.3)",cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontSize:15,fontWeight:600,color:"#fff",fontFamily:"inherit"}}>{Ico.camera(13,"#fff")} Reprendre</button>
         </div>
       ) : (
         <div style={{display:"flex",gap:10}}>
           <button onClick={() => cameraRef.current?.click()} className="btn-hover" style={{flex:1,padding:"16px 10px",borderRadius:DS.radius,border:"2px dashed "+DS.blue,background:DS.blueSoft,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:8,fontFamily:"inherit"}}>
             {Ico.camera(24,DS.blue)}
-            <span style={{fontSize:13,fontWeight:700,color:DS.blue}}>Caméra</span>
-            <span style={{fontSize:10,color:DS.mid}}>Photo directe</span>
+            <span style={{fontSize:15,fontWeight:700,color:DS.blue}}>Caméra</span>
+            <span style={{fontSize:15,color:DS.mid}}>Photo directe</span>
           </button>
           <button onClick={() => galleryRef.current?.click()} className="btn-hover" style={{flex:1,padding:"16px 10px",borderRadius:DS.radius,border:"2px dashed "+DS.border,background:DS.light,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:8,fontFamily:"inherit"}}>
             {Ico.image(24,DS.mid)}
-            <span style={{fontSize:13,fontWeight:700,color:DS.mid}}>Galerie</span>
-            <span style={{fontSize:10,color:"#94a3b8"}}>Depuis l'album</span>
+            <span style={{fontSize:15,fontWeight:700,color:DS.mid}}>Galerie</span>
+            <span style={{fontSize:15,color:"#94a3b8"}}>Depuis l'album</span>
           </button>
         </div>
       )}
@@ -536,7 +536,7 @@ function PhotoPicker({ label, value, onChange, compact }) {
 // BOUTON PRIMAIRE
 function BtnPrimary({ children, onClick, bg=DS.dark, color="#fff", icon, style={} }) {
   return (
-    <button onClick={onClick} className="btn-hover" style={{padding:"12px 20px",borderRadius:DS.radiusSm,background:bg,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 2px 8px rgba(0,0,0,0.15)",transition:"all .2s",...style}}>
+    <button onClick={onClick} className="btn-hover" style={{padding:"12px 20px",borderRadius:DS.radiusSm,background:bg,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 2px 8px rgba(0,0,0,0.15)",transition:"all .2s",...style}}>
       {icon}{children}
     </button>
   );
@@ -619,8 +619,8 @@ function FormClient({ initial, clients, onSave, onClose }) {
       </Section>
       <Section title="Passages par mois">
         <div style={{background:DS.dark,padding:"8px 14px",borderRadius:"12px 12px 0 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <span style={{color:"rgba(255,255,255,0.8)",fontSize:11,fontWeight:700}}>Planning mensuel</span>
-          <span style={{color:"#fff",fontSize:11,fontWeight:800}}>🔧 {totalE}  ·  💧 {totalC}  ·  Total {totalE+totalC}</span>
+          <span style={{color:"rgba(255,255,255,0.8)",fontSize:15,fontWeight:700}}>Planning mensuel</span>
+          <span style={{color:"#fff",fontSize:15,fontWeight:800}}>🔧 {totalE}  ·  💧 {totalC}  ·  Total {totalE+totalC}</span>
         </div>
         <div style={{border:"1px solid "+DS.border,borderTop:"none",borderRadius:"0 0 12px 12px",overflow:"hidden"}}>
           {[...Array(12)].map((_,i)=>{
@@ -629,23 +629,23 @@ function FormClient({ initial, clients, onSave, onClose }) {
               <div key={m} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderBottom:i<11?"1px solid "+DS.border:"none",background:i%2===0?DS.white:DS.light}}>
                 <div style={{width:36,display:"flex",alignItems:"center",gap:4}}>
                   <div style={{width:4,height:24,borderRadius:2,background:sc.color}}/>
-                  <span style={{fontSize:12,fontWeight:700,color:sc.color}}>{MOIS[m]}</span>
+                  <span style={{fontSize:15,fontWeight:700,color:sc.color}}>{MOIS[m]}</span>
                 </div>
                 <div style={{flex:1,display:"flex",alignItems:"center",gap:12}}>
                   <div style={{display:"flex",alignItems:"center",gap:4}}>
-                    <span style={{fontSize:10,color:DS.blue}}>🔧</span>
-                    <button onClick={()=>setMoisVal(m,"entretien",mv.entretien-1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.border,background:DS.white,cursor:"pointer",fontSize:14,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                    <span style={{fontSize:15,color:DS.blue}}>🔧</span>
+                    <button onClick={()=>setMoisVal(m,"entretien",mv.entretien-1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.border,background:DS.white,cursor:"pointer",fontSize:15,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
                     <span style={{fontSize:16,fontWeight:900,color:DS.blue,minWidth:16,textAlign:"center"}}>{mv.entretien}</span>
-                    <button onClick={()=>setMoisVal(m,"entretien",mv.entretien+1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.blue,background:DS.blueSoft,cursor:"pointer",fontSize:14,fontWeight:700,color:DS.blue,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                    <button onClick={()=>setMoisVal(m,"entretien",mv.entretien+1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.blue,background:DS.blueSoft,cursor:"pointer",fontSize:15,fontWeight:700,color:DS.blue,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:4}}>
-                    <span style={{fontSize:10,color:DS.teal}}>💧</span>
-                    <button onClick={()=>setMoisVal(m,"controle",mv.controle-1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.border,background:DS.white,cursor:"pointer",fontSize:14,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                    <span style={{fontSize:15,color:DS.teal}}>💧</span>
+                    <button onClick={()=>setMoisVal(m,"controle",mv.controle-1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.border,background:DS.white,cursor:"pointer",fontSize:15,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
                     <span style={{fontSize:16,fontWeight:900,color:DS.teal,minWidth:16,textAlign:"center"}}>{mv.controle}</span>
-                    <button onClick={()=>setMoisVal(m,"controle",mv.controle+1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.teal,background:DS.tealSoft,cursor:"pointer",fontSize:14,fontWeight:700,color:DS.teal,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                    <button onClick={()=>setMoisVal(m,"controle",mv.controle+1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.teal,background:DS.tealSoft,cursor:"pointer",fontSize:15,fontWeight:700,color:DS.teal,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
                   </div>
                 </div>
-                <div style={{fontSize:11,fontWeight:700,color:mv.entretien+mv.controle>0?DS.dark:DS.border,minWidth:20,textAlign:"right"}}>{mv.entretien+mv.controle>0?mv.entretien+mv.controle:"—"}</div>
+                <div style={{fontSize:15,fontWeight:700,color:mv.entretien+mv.controle>0?DS.dark:DS.border,minWidth:20,textAlign:"right"}}>{mv.entretien+mv.controle>0?mv.entretien+mv.controle:"—"}</div>
               </div>
             );
           })}
@@ -656,25 +656,25 @@ function FormClient({ initial, clients, onSave, onClose }) {
         </div>
         {/* Récap tarification auto */}
         <div style={{marginTop:12,background:"linear-gradient(135deg,#0c1222,#1a365d)",borderRadius:DS.radiusSm,padding:"14px 16px",color:"#fff"}}>
-          <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:1,color:"rgba(255,255,255,0.5)",marginBottom:10}}>Tarification</div>
+          <div style={{fontSize:15,fontWeight:700,textTransform:"uppercase",letterSpacing:1,color:"rgba(255,255,255,0.5)",marginBottom:10}}>Tarification</div>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{fontSize:12,color:"rgba(255,255,255,0.7)"}}>🔧 {totalE} entretiens × {f.prixPassageE||0}€</span>
-              <span style={{fontSize:14,fontWeight:800}}>{totalE*(f.prixPassageE||0)} €</span>
+              <span style={{fontSize:15,color:"rgba(255,255,255,0.7)"}}>🔧 {totalE} entretiens × {f.prixPassageE||0}€</span>
+              <span style={{fontSize:15,fontWeight:800}}>{totalE*(f.prixPassageE||0)} €</span>
             </div>
             {totalC>0&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{fontSize:12,color:"rgba(255,255,255,0.7)"}}>💧 {totalC} contrôles × {f.prixPassageC||0}€</span>
-              <span style={{fontSize:14,fontWeight:800}}>{totalC*(f.prixPassageC||0)} €</span>
+              <span style={{fontSize:15,color:"rgba(255,255,255,0.7)"}}>💧 {totalC} contrôles × {f.prixPassageC||0}€</span>
+              <span style={{fontSize:15,fontWeight:800}}>{totalC*(f.prixPassageC||0)} €</span>
             </div>}
             <div style={{borderTop:"1px solid rgba(255,255,255,0.15)",paddingTop:8,marginTop:4,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{fontSize:13,fontWeight:700}}>Prix annuel</span>
+              <span style={{fontSize:15,fontWeight:700}}>Prix annuel</span>
               <span style={{fontSize:22,fontWeight:900,color:"#22d3ee"}}>{(totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0)).toLocaleString("fr")} €</span>
             </div>
           </div>
         </div>
       </Section>
       <div style={{display:"flex",gap:10}}>
-        <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
+        <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
         <BtnPrimary onClick={()=>{ if(!f.nom.trim()) return alert("Nom requis"); const prixCalc=totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0); onSave({...f, prix:prixCalc||f.prix||0}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
       </div>
     </Modal>
@@ -787,7 +787,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
               return (
                 <button key={c.id} onClick={()=>set("clientId",c.id)} className="card-hover" style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+(sel?DS.blue:DS.border),background:sel?DS.blueSoft:DS.white,cursor:"pointer",textAlign:"left",fontFamily:"inherit"}}>
                   <Avatar nom={c.nom} size={34}/>
-                  <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13,color:DS.dark}}>{c.nom}</div><div style={{fontSize:11,color:DS.mid}}>{c.formule} · {c.adresse}</div></div>
+                  <div style={{flex:1}}><div style={{fontWeight:700,fontSize:15,color:DS.dark}}>{c.nom}</div><div style={{fontSize:15,color:DS.mid}}>{c.formule} · {c.adresse}</div></div>
                   {sel && <div style={{width:20,height:20,borderRadius:10,background:DS.blue,display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.check(11,"#fff")}</div>}
                 </button>
               );
@@ -806,18 +806,18 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
           {PRODUITS_LIVRAISON.map(p=>(
             <label key={p} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:10,cursor:"pointer",background:f.produits.includes(p)?DS.blueSoft:DS.light,border:"1.5px solid "+(f.produits.includes(p)?DS.blue:DS.border),transition:"all .15s"}}>
               <input type="checkbox" checked={f.produits.includes(p)} onChange={()=>toggleProduit(p)} style={{accentColor:DS.blue,width:15,height:15}}/>
-              <span style={{fontSize:13,fontWeight:f.produits.includes(p)?600:400,color:f.produits.includes(p)?DS.dark:DS.mid}}>{p}</span>
+              <span style={{fontSize:15,fontWeight:f.produits.includes(p)?600:400,color:f.produits.includes(p)?DS.dark:DS.mid}}>{p}</span>
             </label>
           ))}
         </div>
       </Section>
       <Section title="Description / notes">
-        <textarea value={f.description} onChange={e=>set("description",e.target.value)} placeholder="Quantités, marques, détails..." style={{width:"100%",padding:"10px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:13,minHeight:64,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,outline:"none",transition:"all .2s"}}/>
+        <textarea value={f.description} onChange={e=>set("description",e.target.value)} placeholder="Quantités, marques, détails..." style={{width:"100%",padding:"10px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:15,minHeight:64,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,outline:"none",transition:"all .2s"}}/>
       </Section>
       <Section title="Statut">
         <div style={{display:"flex",gap:8}}>
           {Object.entries(STATUT_LIV).map(([k,s])=>(
-            <button key={k} onClick={()=>set("statut",k)} className="btn-hover" style={{flex:1,padding:"10px 6px",borderRadius:10,border:"1.5px solid "+(f.statut===k?s.color:DS.border),background:f.statut===k?s.bg:DS.white,cursor:"pointer",fontSize:12,fontWeight:700,color:f.statut===k?s.color:DS.mid,fontFamily:"inherit"}}>{s.label}</button>
+            <button key={k} onClick={()=>set("statut",k)} className="btn-hover" style={{flex:1,padding:"10px 6px",borderRadius:10,border:"1.5px solid "+(f.statut===k?s.color:DS.border),background:f.statut===k?s.bg:DS.white,cursor:"pointer",fontSize:15,fontWeight:700,color:f.statut===k?s.color:DS.mid,fontFamily:"inherit"}}>{s.label}</button>
           ))}
         </div>
       </Section>
@@ -827,10 +827,10 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
         return (
           <div style={{marginBottom:10}}>
             {selectedClient.email
-              ? <button onClick={()=>{ if(!f.clientId) return alert("Veuillez sélectionner un client"); if(!f.date) return alert("Date requise"); envoyerEmailLivraison({...f,id:isEdit?f.id:uid()}, selectedClient); }} className="btn-hover" style={{width:"100%",padding:"12px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#0ea5e9,#0369a1)",border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 16px rgba(14,165,233,.35)"}}>
+              ? <button onClick={()=>{ if(!f.clientId) return alert("Veuillez sélectionner un client"); if(!f.date) return alert("Date requise"); envoyerEmailLivraison({...f,id:isEdit?f.id:uid()}, selectedClient); }} className="btn-hover" style={{width:"100%",padding:"12px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#0ea5e9,#0369a1)",border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 16px rgba(14,165,233,.35)"}}>
                   {Ico.send(15,"#fff")} Envoyer par email à {selectedClient.email}
                 </button>
-              : <div style={{padding:"10px 14px",borderRadius:DS.radiusSm,background:DS.light,border:"1.5px solid "+DS.border,fontSize:12,color:DS.mid,display:"flex",alignItems:"center",gap:7,fontWeight:600}}>
+              : <div style={{padding:"10px 14px",borderRadius:DS.radiusSm,background:DS.light,border:"1.5px solid "+DS.border,fontSize:15,color:DS.mid,display:"flex",alignItems:"center",gap:7,fontWeight:600}}>
                   {Ico.alert(13,DS.orange)} Aucun email renseigné pour ce client
                 </div>
             }
@@ -838,7 +838,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
         );
       })()}
       <div style={{display:"flex",gap:10}}>
-        <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
+        <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
         <BtnPrimary onClick={()=>{ if(!f.clientId) return alert("Veuillez sélectionner un client"); if(!f.date) return alert("Date requise"); onSave({...f,id:isEdit?f.id:uid()}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
       </div>
     </Modal>
@@ -858,13 +858,13 @@ function FormRdv({ initial, clients, onSave, onClose }) {
     <Modal title={isEdit ? "Modifier le RDV" : "Nouveau rendez-vous"} onClose={onClose}>
       <Section title="Client (optionnel)">
         <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:180,overflowY:"auto"}}>
-          <button onClick={()=>set("clientId","")} style={{padding:"8px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+(f.clientId===""?DS.blue:DS.border),background:f.clientId===""?DS.blueSoft:DS.white,cursor:"pointer",textAlign:"left",fontFamily:"inherit",fontSize:13,fontWeight:f.clientId===""?700:400,color:f.clientId===""?DS.blue:DS.mid}}>— Aucun client —</button>
+          <button onClick={()=>set("clientId","")} style={{padding:"8px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+(f.clientId===""?DS.blue:DS.border),background:f.clientId===""?DS.blueSoft:DS.white,cursor:"pointer",textAlign:"left",fontFamily:"inherit",fontSize:15,fontWeight:f.clientId===""?700:400,color:f.clientId===""?DS.blue:DS.mid}}>— Aucun client —</button>
           {clients.map(c=>{
             const sel = f.clientId===c.id;
             return (
               <button key={c.id} onClick={()=>set("clientId",c.id)} className="card-hover" style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+(sel?DS.blue:DS.border),background:sel?DS.blueSoft:DS.white,cursor:"pointer",textAlign:"left",fontFamily:"inherit"}}>
                 <Avatar nom={c.nom} size={30}/>
-                <span style={{fontWeight:sel?700:400,fontSize:13,color:sel?DS.dark:DS.mid}}>{c.nom}</span>
+                <span style={{fontWeight:sel?700:400,fontSize:15,color:sel?DS.dark:DS.mid}}>{c.nom}</span>
               </button>
             );
           })}
@@ -887,7 +887,7 @@ function FormRdv({ initial, clients, onSave, onClose }) {
             return (
               <button key={v} onClick={()=>set("type",v)} className="btn-hover" style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",borderRadius:12,border:`1.5px solid ${sel?DS.purple:DS.border}`,background:sel?DS.purpleSoft:DS.white,cursor:"pointer",textAlign:"left",fontFamily:"inherit",transition:"all .2s"}}>
                 <span style={{fontSize:16}}>{ico}</span>
-                <span style={{fontSize:13,fontWeight:sel?700:400,color:sel?DS.purple:DS.mid,flex:1}}>{v}</span>
+                <span style={{fontSize:15,fontWeight:sel?700:400,color:sel?DS.purple:DS.mid,flex:1}}>{v}</span>
                 {sel && <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={DS.purple} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
               </button>
             );
@@ -896,10 +896,10 @@ function FormRdv({ initial, clients, onSave, onClose }) {
       </Section>
       <Section title="Description">
         <textarea value={f.description} onChange={e=>set("description",e.target.value)} placeholder="Détails, adresse, notes..."
-          style={{width:"100%",padding:"10px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:13,minHeight:64,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,outline:"none"}}/>
+          style={{width:"100%",padding:"10px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:15,minHeight:64,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,outline:"none"}}/>
       </Section>
       <div style={{display:"flex",gap:10}}>
-        <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
+        <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
         <BtnPrimary onClick={()=>{ if(!f.date) return alert("Date requise"); onSave({...f,id:isEdit?f.id:uid()}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
       </div>
     </Modal>
@@ -968,15 +968,15 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
       <div style={{display:"flex",gap:8,marginTop:16,marginBottom:14}}>
         <div style={{flex:1,background:`linear-gradient(135deg,${DS.blue}08,${DS.blue}15)`,borderRadius:DS.radiusSm,padding:"12px",border:"1px solid "+DS.blue+"18"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-            <span style={{fontSize:10,fontWeight:700,color:DS.blue,textTransform:"uppercase",letterSpacing:.5}}>🔧 Entretiens</span>
-            <span style={{fontSize:13,fontWeight:900,color:DS.blue}}>{effE}<span style={{fontWeight:500,color:DS.mid}}>/{totalE}</span></span>
+            <span style={{fontSize:15,fontWeight:700,color:DS.blue,textTransform:"uppercase",letterSpacing:.5}}>🔧 Entretiens</span>
+            <span style={{fontSize:15,fontWeight:900,color:DS.blue}}>{effE}<span style={{fontWeight:500,color:DS.mid}}>/{totalE}</span></span>
           </div>
           <ProgressBar value={effE} max={totalE} height={5}/>
         </div>
         <div style={{flex:1,background:`linear-gradient(135deg,${DS.teal}08,${DS.teal}15)`,borderRadius:DS.radiusSm,padding:"12px",border:"1px solid "+DS.teal+"18"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-            <span style={{fontSize:10,fontWeight:700,color:DS.teal,textTransform:"uppercase",letterSpacing:.5}}>💧 Contrôles</span>
-            <span style={{fontSize:13,fontWeight:900,color:DS.teal}}>{effC}<span style={{fontWeight:500,color:DS.mid}}>/{totalC}</span></span>
+            <span style={{fontSize:15,fontWeight:700,color:DS.teal,textTransform:"uppercase",letterSpacing:.5}}>💧 Contrôles</span>
+            <span style={{fontSize:15,fontWeight:900,color:DS.teal}}>{effC}<span style={{fontWeight:500,color:DS.mid}}>/{totalC}</span></span>
           </div>
           <ProgressBar value={effC} max={totalC} height={5}/>
         </div>
@@ -985,7 +985,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
       {/* Summary bar */}
       <div style={{display:"flex",gap:6,marginBottom:16}}>
         <div style={{flex:1,background:DS.light,borderRadius:10,padding:"10px 8px",textAlign:"center"}}>
-          <div style={{fontSize:20,fontWeight:900,color:pct>=100?DS.green:DS.dark}}>{pct}<span style={{fontSize:12,fontWeight:600}}>%</span></div>
+          <div style={{fontSize:20,fontWeight:900,color:pct>=100?DS.green:DS.dark}}>{pct}<span style={{fontSize:15,fontWeight:600}}>%</span></div>
           <div style={{fontSize:9,color:DS.mid,fontWeight:600,marginTop:1}}>Avancement</div>
         </div>
         <div style={{flex:1,background:rest>0?DS.orangeSoft:DS.greenSoft,borderRadius:10,padding:"10px 8px",textAlign:"center",border:"1px solid "+(rest>0?DS.orange:DS.green)+"22"}}>
@@ -993,7 +993,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           <div style={{fontSize:9,color:rest>0?DS.orange:DS.green,fontWeight:600,marginTop:1}}>Restants</div>
         </div>
         <div style={{flex:1,background:"linear-gradient(135deg,#7c3aed08,#7c3aed15)",borderRadius:10,padding:"10px 8px",textAlign:"center",border:"1px solid #7c3aed18"}}>
-          <div style={{fontSize:16,fontWeight:900,color:DS.purple}}>{client.prix?client.prix.toLocaleString("fr"):"—"}<span style={{fontSize:10}}>€</span></div>
+          <div style={{fontSize:16,fontWeight:900,color:DS.purple}}>{client.prix?client.prix.toLocaleString("fr"):"—"}<span style={{fontSize:15}}>€</span></div>
           <div style={{fontSize:9,color:DS.purple,fontWeight:600,marginTop:1}}>Prix annuel</div>
         </div>
       </div>
@@ -1001,7 +1001,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
       {/* Tabs */}
       <div style={{display:"flex",gap:0,marginBottom:16,background:DS.light,borderRadius:DS.radiusSm,padding:3}}>
         {[["infos","Infos"],["saisons","Planning"],["passages","Passages"],["rdvs","RDV"],["livraisons","Livr."]].map(([id,l])=>(
-          <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"9px 4px",borderRadius:10,border:"none",cursor:"pointer",fontWeight:tab===id?800:600,fontSize:11,fontFamily:"inherit",background:tab===id?DS.white:"transparent",color:tab===id?DS.dark:DS.mid,boxShadow:tab===id?"0 1px 4px rgba(0,0,0,0.08)":"none",transition:"all .25s"}}>{l}</button>
+          <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"9px 4px",borderRadius:10,border:"none",cursor:"pointer",fontWeight:tab===id?800:600,fontSize:15,fontFamily:"inherit",background:tab===id?DS.white:"transparent",color:tab===id?DS.dark:DS.mid,boxShadow:tab===id?"0 1px 4px rgba(0,0,0,0.08)":"none",transition:"all .25s"}}>{l}</button>
         ))}
       </div>
 
@@ -1019,8 +1019,8 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
             <div key={r.l} style={{display:"flex",gap:12,padding:"10px 14px",background:DS.white,borderRadius:10,alignItems:"center",border:"1px solid "+DS.border}}>
               <div style={{width:32,height:32,borderRadius:8,background:DS.blueSoft,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{r.ico}</div>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:10,color:DS.mid,fontWeight:600,textTransform:"uppercase",letterSpacing:.5}}>{r.l}</div>
-                {r.href ? <a href={r.href} style={{fontSize:13,color:DS.blue,fontWeight:700,textDecoration:"none"}}>{r.v}</a> : <div style={{fontSize:13,color:DS.dark,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis"}}>{r.v}</div>}
+                <div style={{fontSize:15,color:DS.mid,fontWeight:600,textTransform:"uppercase",letterSpacing:.5}}>{r.l}</div>
+                {r.href ? <a href={r.href} style={{fontSize:15,color:DS.blue,fontWeight:700,textDecoration:"none"}}>{r.v}</a> : <div style={{fontSize:15,color:DS.dark,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis"}}>{r.v}</div>}
               </div>
             </div>
           ))}
@@ -1028,7 +1028,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
       )}
 
       {tab==="saisons" && <div className="fade-in">
-        <div style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Calendrier — {MOIS_L[moisCourant]}</div>
+        <div style={{fontSize:15,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Calendrier — {MOIS_L[moisCourant]}</div>
         <div style={{border:"1px solid "+DS.border,borderRadius:DS.radiusSm,overflow:"hidden"}}>
           {[1,2,3,4,5,6,7,8,9,10,11,12].map((m,i)=>{
             const mpm = client.moisParMois || client.saisons || {};
@@ -1046,31 +1046,31 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
             const cur = m === MOIS_NOW;
             return <div key={m} style={{display:"flex",alignItems:"center",padding:"9px 12px",borderBottom:i<11?"1px solid "+DS.border:"none",background:cur?sc.bg:i%2===0?DS.white:"#f9fafb"}}>
               <div style={{width:4,height:22,borderRadius:2,background:sc.color,marginRight:8,flexShrink:0}}/>
-              <div style={{width:42,fontWeight:cur?800:600,fontSize:12,color:cur?sc.color:DS.mid}}>{MOIS[m]}</div>
+              <div style={{width:42,fontWeight:cur?800:600,fontSize:15,color:cur?sc.color:DS.mid}}>{MOIS[m]}</div>
               <div style={{flex:1,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                {prevE>0 ? <span style={{fontSize:12,fontWeight:700,color:doneE>=prevE?DS.green:DS.blue}}>🔧 {doneE}/{prevE}</span> : doneE>0 ? <span style={{fontSize:12,fontWeight:700,color:DS.blue}}>🔧 {doneE}/0</span> : null}
-                {prevC>0 ? <span style={{fontSize:12,fontWeight:700,color:doneC>=prevC?DS.green:DS.teal}}>💧 {doneC}/{prevC}</span> : doneC>0 ? <span style={{fontSize:12,fontWeight:700,color:DS.teal}}>💧 {doneC}/0</span> : null}
-                {prevT===0 && doneE===0 && doneC===0 ? <span style={{fontSize:12,color:"#d1d5db"}}>—</span> : null}
-                {hasExtra && <span title={`${extraE+extraC} passage${extraE+extraC>1?"s":""} non prévu${extraE+extraC>1?"s":""}`} style={{fontSize:14,lineHeight:1}}>⭐</span>}
+                {prevE>0 ? <span style={{fontSize:15,fontWeight:700,color:doneE>=prevE?DS.green:DS.blue}}>🔧 {doneE}/{prevE}</span> : doneE>0 ? <span style={{fontSize:15,fontWeight:700,color:DS.blue}}>🔧 {doneE}/0</span> : null}
+                {prevC>0 ? <span style={{fontSize:15,fontWeight:700,color:doneC>=prevC?DS.green:DS.teal}}>💧 {doneC}/{prevC}</span> : doneC>0 ? <span style={{fontSize:15,fontWeight:700,color:DS.teal}}>💧 {doneC}/0</span> : null}
+                {prevT===0 && doneE===0 && doneC===0 ? <span style={{fontSize:15,color:"#d1d5db"}}>—</span> : null}
+                {hasExtra && <span title={`${extraE+extraC} passage${extraE+extraC>1?"s":""} non prévu${extraE+extraC>1?"s":""}`} style={{fontSize:15,lineHeight:1}}>⭐</span>}
               </div>
-              {prevT>0 ? <div style={{fontSize:10,fontWeight:700,color:rest>0?DS.orange:DS.green,background:rest>0?DS.orangeSoft:DS.greenSoft,padding:"2px 8px",borderRadius:6}}>{rest>0?rest+" rest.":"✓"}</div> : null}
+              {prevT>0 ? <div style={{fontSize:15,fontWeight:700,color:rest>0?DS.orange:DS.green,background:rest>0?DS.orangeSoft:DS.greenSoft,padding:"2px 8px",borderRadius:6}}>{rest>0?rest+" rest.":"✓"}</div> : null}
             </div>;
           })}
         </div>
         <div style={{display:"flex",justifyContent:"space-between",marginTop:10,padding:"8px 12px",background:DS.dark,borderRadius:DS.radiusSm}}>
-          <span style={{color:"rgba(255,255,255,0.7)",fontSize:11,fontWeight:600}}>Total annuel</span>
-          <span style={{color:"#fff",fontSize:12,fontWeight:800}}>🔧 {totalE}  ·  💧 {totalC}  ·  {total} passages</span>
+          <span style={{color:"rgba(255,255,255,0.7)",fontSize:15,fontWeight:600}}>Total annuel</span>
+          <span style={{color:"#fff",fontSize:15,fontWeight:800}}>🔧 {totalE}  ·  💧 {totalC}  ·  {total} passages</span>
         </div>
-        <div style={{marginTop:8,fontSize:11,color:DS.mid,display:"flex",alignItems:"center",gap:5}}>⭐ = passage non prévu au planning</div>
+        <div style={{marginTop:8,fontSize:15,color:DS.mid,display:"flex",alignItems:"center",gap:5}}>⭐ = passage non prévu au planning</div>
       </div>}
 
       {tab==="passages" && (
         <div className="fade-in">
-          <button onClick={onAddPassage} className="btn-hover" style={{width:"100%",marginBottom:12,padding:"11px",borderRadius:DS.radiusSm,background:DS.blueSoft,color:DS.blue,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontFamily:"inherit"}}>
+          <button onClick={onAddPassage} className="btn-hover" style={{width:"100%",marginBottom:12,padding:"11px",borderRadius:DS.radiusSm,background:DS.blueSoft,color:DS.blue,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontFamily:"inherit"}}>
             {Ico.plus(13,DS.blue)} Saisir un passage
           </button>
           {passC.length===0
-            ? <div style={{textAlign:"center",color:DS.mid,padding:30,fontSize:13}}>Aucun passage enregistré</div>
+            ? <div style={{textAlign:"center",color:DS.mid,padding:30,fontSize:15}}>Aucun passage enregistré</div>
             : passC.map(p=>{
               const phOk=p.ph>=7.0&&p.ph<=7.6;
               const clOk=p.chlore>=0.5&&p.chlore<=3.0;
@@ -1081,7 +1081,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                 <Card key={p.id} style={{marginBottom:10}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                     <div>
-                      <div style={{fontWeight:700,fontSize:13,color:DS.dark}}>{new Date(p.date).toLocaleDateString("fr",{day:"2-digit",month:"long"})}</div>
+                      <div style={{fontWeight:700,fontSize:15,color:DS.dark}}>{new Date(p.date).toLocaleDateString("fr",{day:"2-digit",month:"long"})}</div>
                       <div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap"}}>
                         <Tag color={isCtrl?DS.teal:DS.blue}>{isCtrl?"💧":"🔧"} {p.type}</Tag>
                         {p.ph&&<Tag color={phOk?DS.green:DS.red}>pH {p.ph}</Tag>}
@@ -1089,7 +1089,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                         <Tag color={rapportMeta.color} bg={rapportMeta.bg}>{rapportMeta.label}</Tag>
                       </div>
                     </div>
-                    {p.tech&&<span style={{fontSize:11,color:DS.mid,display:"flex",alignItems:"center",gap:3}}>{Ico.user(10,DS.mid)} {p.tech}</span>}
+                    {p.tech&&<span style={{fontSize:15,color:DS.mid,display:"flex",alignItems:"center",gap:3}}>{Ico.user(10,DS.mid)} {p.tech}</span>}
                   </div>
                   {(p.photoArrivee||p.photoDepart) && (
                     <div style={{display:"flex",gap:6,marginBottom:8}}>
@@ -1097,8 +1097,8 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                       {p.photoDepart && (<div style={{flex:1,position:"relative"}}><img src={p.photoDepart} alt="Départ" style={{width:"100%",height:60,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border}}/><span style={{position:"absolute",bottom:3,left:4,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.5)",borderRadius:4,padding:"1px 5px"}}>Départ</span></div>)}
                     </div>
                   )}
-                  {p.actions&&<div style={{fontSize:12,color:DS.mid,marginBottom:4}}>{p.actions}</div>}
-                  {p.obs&&<div style={{fontSize:11,color:DS.orange,display:"flex",alignItems:"center",gap:4,marginBottom:8}}>{Ico.note(11,DS.orange)} {p.obs}</div>}
+                  {p.actions&&<div style={{fontSize:15,color:DS.mid,marginBottom:4}}>{p.actions}</div>}
+                  {p.obs&&<div style={{fontSize:15,color:DS.orange,display:"flex",alignItems:"center",gap:4,marginBottom:8}}>{Ico.note(11,DS.orange)} {p.obs}</div>}
                   <div style={{display:"flex",gap:6,paddingTop:8,borderTop:"1px solid "+DS.border,flexWrap:"wrap"}}>
                     <div onClick={(e)=>e.stopPropagation()} style={{flex:"1 1 160px"}}>
                       <RapportStatusPicker
@@ -1111,9 +1111,9 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                         })}
                       />
                     </div>
-                    <button onClick={()=>onEditPassage&&onEditPassage(p)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(12,DS.mid)} Modifier</button>
-                    <button onClick={(e)=>{e.stopPropagation();ouvrirRapport(p,client);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.blueSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,color:DS.blue,fontFamily:"inherit",fontWeight:700}}>{Ico.pdf(12,DS.blue)} Rapport</button>
-                    {client.email&&<button onClick={(e)=>{e.stopPropagation();envoyerEmail(p,client,onUpdatePassageStatus);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,color:DS.green,fontFamily:"inherit",fontWeight:700}}>{Ico.send(12,DS.green)} Email</button>}
+                    <button onClick={()=>onEditPassage&&onEditPassage(p)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(12,DS.mid)} Modifier</button>
+                    <button onClick={(e)=>{e.stopPropagation();ouvrirRapport(p,client);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.blueSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.blue,fontFamily:"inherit",fontWeight:700}}>{Ico.pdf(12,DS.blue)} Rapport</button>
+                    {client.email&&<button onClick={(e)=>{e.stopPropagation();envoyerEmail(p,client,onUpdatePassageStatus);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.green,fontFamily:"inherit",fontWeight:700}}>{Ico.send(12,DS.green)} Email</button>}
                   </div>
                 </Card>
               );
@@ -1124,11 +1124,11 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
 
       {tab==="rdvs" && (
         <div className="fade-in">
-          <button onClick={onAddRdv} className="btn-hover" style={{width:"100%",marginBottom:12,padding:"11px",borderRadius:DS.radiusSm,background:DS.purpleSoft,color:DS.purple,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontFamily:"inherit"}}>
+          <button onClick={onAddRdv} className="btn-hover" style={{width:"100%",marginBottom:12,padding:"11px",borderRadius:DS.radiusSm,background:DS.purpleSoft,color:DS.purple,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontFamily:"inherit"}}>
             {Ico.plus(13,DS.purple)} Ajouter un RDV
           </button>
           {rdvClient.length===0
-            ? <div style={{textAlign:"center",color:DS.mid,padding:32,fontSize:13}}>Aucun rendez-vous pour ce client</div>
+            ? <div style={{textAlign:"center",color:DS.mid,padding:32,fontSize:15}}>Aucun rendez-vous pour ce client</div>
             : rdvClient.map(r=>{
               const d = new Date(r.date);
               const isToday = r.date===TODAY;
@@ -1142,18 +1142,18 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                       <div style={{fontSize:9,color:DS.mid}}>{MOIS[d.getMonth()+1]}</div>
                     </div>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontWeight:800,fontSize:13,color:DS.dark}}>{r.type}</div>
-                      <div style={{fontSize:11,color:DS.mid,marginTop:2,display:"flex",gap:8}}>
+                      <div style={{fontWeight:800,fontSize:15,color:DS.dark}}>{r.type}</div>
+                      <div style={{fontSize:15,color:DS.mid,marginTop:2,display:"flex",gap:8}}>
                         {r.heure&&<span style={{fontWeight:600,color:DS.purple}}>{r.heure}</span>}
                         {r.duree&&<span>{r.duree} min</span>}
                       </div>
-                      {r.description&&<div style={{fontSize:12,color:DS.mid,marginTop:4}}>{r.description}</div>}
+                      {r.description&&<div style={{fontSize:15,color:DS.mid,marginTop:4}}>{r.description}</div>}
                       {isToday&&<div style={{marginTop:5}}><Tag color={DS.purple}>Aujourd'hui</Tag></div>}
                     </div>
                   </div>
                   <div style={{display:"flex",gap:6,marginTop:10,paddingTop:8,borderTop:"1px solid "+DS.border}}>
-                    <button onClick={()=>onEditRdv&&onEditRdv(r)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(12,DS.mid)} Modifier</button>
-                    <button onClick={()=>exportRdvToICS(r,client)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.purpleSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,color:DS.purple,fontFamily:"inherit",fontWeight:700}}>{Ico.download(12,DS.purple)} Calendrier</button>
+                    <button onClick={()=>onEditRdv&&onEditRdv(r)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(12,DS.mid)} Modifier</button>
+                    <button onClick={()=>exportRdvToICS(r,client)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.purpleSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.purple,fontFamily:"inherit",fontWeight:700}}>{Ico.download(12,DS.purple)} Calendrier</button>
                     <button onClick={()=>{if(confirm("Supprimer ce RDV ?"))onDeleteRdv&&onDeleteRdv(r.id);}} style={{width:32,borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(12,DS.red)}</button>
                   </div>
                 </div>
@@ -1171,39 +1171,39 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
               return (
                 <div key={k} style={{background:s.bg,borderRadius:DS.radiusSm,padding:"10px 8px",textAlign:"center",border:"1px solid "+s.color+"33"}}>
                   <div style={{fontSize:20,fontWeight:900,color:s.color}}>{n}</div>
-                  <div style={{fontSize:10,color:s.color,fontWeight:700,marginTop:2}}>{s.label}</div>
+                  <div style={{fontSize:15,color:s.color,fontWeight:700,marginTop:2}}>{s.label}</div>
                 </div>
               );
             })}
           </div>
-          <button onClick={()=>{setEditLiv(null);setShowFormLiv(true);}} className="btn-hover" style={{width:"100%",marginBottom:12,padding:"11px",borderRadius:DS.radiusSm,background:DS.blueSoft,color:DS.blue,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontFamily:"inherit"}}>
+          <button onClick={()=>{setEditLiv(null);setShowFormLiv(true);}} className="btn-hover" style={{width:"100%",marginBottom:12,padding:"11px",borderRadius:DS.radiusSm,background:DS.blueSoft,color:DS.blue,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontFamily:"inherit"}}>
             {Ico.plus(13,DS.blue)} Ajouter une livraison
           </button>
           {livraisons.length===0
-            ? <div style={{textAlign:"center",color:DS.mid,padding:24,fontSize:13}}>Aucune livraison enregistrée</div>
+            ? <div style={{textAlign:"center",color:DS.mid,padding:24,fontSize:15}}>Aucune livraison enregistrée</div>
             : livraisons.sort((a,b)=>new Date(b.date)-new Date(a.date)).map(l=>{
               const s = STATUT_LIV[l.statut]||STATUT_LIV.aFacturer;
               return (
                 <Card key={l.id} style={{marginBottom:10}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                     <div>
-                      <div style={{fontWeight:700,fontSize:13,color:DS.dark}}>{new Date(l.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"})}</div>
-                      {l.produits&&l.produits.length>0&&<div style={{fontSize:12,color:DS.mid,marginTop:3}}>{l.produits.join(", ")}</div>}
-                      {l.description&&<div style={{fontSize:12,color:DS.mid,marginTop:2}}>{l.description}</div>}
-                      {l.montant&&<div style={{fontSize:14,fontWeight:800,color:DS.dark,marginTop:4}}>{Number(l.montant).toLocaleString("fr")} €</div>}
+                      <div style={{fontWeight:700,fontSize:15,color:DS.dark}}>{new Date(l.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"})}</div>
+                      {l.produits&&l.produits.length>0&&<div style={{fontSize:15,color:DS.mid,marginTop:3}}>{l.produits.join(", ")}</div>}
+                      {l.description&&<div style={{fontSize:15,color:DS.mid,marginTop:2}}>{l.description}</div>}
+                      {l.montant&&<div style={{fontSize:15,fontWeight:800,color:DS.dark,marginTop:4}}>{Number(l.montant).toLocaleString("fr")} €</div>}
                     </div>
                     <Tag color={s.color}>{s.label}</Tag>
                   </div>
                   <div style={{display:"flex",gap:6,marginBottom:8}}>
                     {Object.entries(STATUT_LIV).map(([k,sv])=>(
-                      <button key={k} onClick={()=>onUpdateStatutLivraison(l.id,k)} style={{flex:1,padding:"6px 4px",borderRadius:8,border:"1.5px solid "+(l.statut===k?sv.color:DS.border),background:l.statut===k?sv.bg:DS.white,cursor:"pointer",fontSize:10,fontWeight:700,color:l.statut===k?sv.color:DS.mid,fontFamily:"inherit",transition:"all .15s"}}>{sv.label}</button>
+                      <button key={k} onClick={()=>onUpdateStatutLivraison(l.id,k)} style={{flex:1,padding:"6px 4px",borderRadius:8,border:"1.5px solid "+(l.statut===k?sv.color:DS.border),background:l.statut===k?sv.bg:DS.white,cursor:"pointer",fontSize:15,fontWeight:700,color:l.statut===k?sv.color:DS.mid,fontFamily:"inherit",transition:"all .15s"}}>{sv.label}</button>
                     ))}
                   </div>
                   <div style={{display:"flex",gap:6,paddingTop:8,borderTop:"1px solid "+DS.border}}>
-                    <button onClick={()=>{setEditLiv(l);setShowFormLiv(true);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(12,DS.mid)} Modifier</button>
+                    <button onClick={()=>{setEditLiv(l);setShowFormLiv(true);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(12,DS.mid)} Modifier</button>
                     {client.email
-                      ? <button onClick={()=>envoyerEmailLivraison(l, client)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,color:DS.green,fontFamily:"inherit",fontWeight:700}}>{Ico.send(12,DS.green)} Email</button>
-                      : <div style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:DS.mid,fontWeight:500,gap:4}}>{Ico.mail(11,DS.mid)} Pas d'email</div>
+                      ? <button onClick={()=>envoyerEmailLivraison(l, client)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.green,fontFamily:"inherit",fontWeight:700}}>{Ico.send(12,DS.green)} Email</button>
+                      : <div style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:DS.mid,fontWeight:500,gap:4}}>{Ico.mail(11,DS.mid)} Pas d'email</div>
                     }
                     <button onClick={()=>{if(confirm("Supprimer cette livraison ?"))onDeleteLivraison(l.id);}} style={{width:32,borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(12,DS.red)}</button>
                   </div>
@@ -1226,15 +1226,15 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           if (!contrat) return (
             <div style={{background:DS.light,border:"1px solid "+DS.border,borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
               {Ico.contract(13,DS.mid)}
-              <span style={{fontSize:12,fontWeight:600,color:DS.mid}}>Aucun contrat envoyé</span>
+              <span style={{fontSize:15,fontWeight:600,color:DS.mid}}>Aucun contrat envoyé</span>
             </div>
           );
           if (contrat.statut==="signe_complet") return (
             <div style={{background:DS.greenSoft,border:"1px solid #6ee7b7",borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
               {Ico.check(14,DS.green)}
               <div>
-                <div style={{fontSize:12,fontWeight:800,color:DS.green}}>✅ Contrat co-signé — Terminé</div>
-                <div style={{fontSize:11,color:"#047857",marginTop:2}}>Signé le {new Date(contrat.signedAt).toLocaleDateString("fr")}</div>
+                <div style={{fontSize:15,fontWeight:800,color:DS.green}}>✅ Contrat co-signé — Terminé</div>
+                <div style={{fontSize:15,color:"#047857",marginTop:2}}>Signé le {new Date(contrat.signedAt).toLocaleDateString("fr")}</div>
               </div>
             </div>
           );
@@ -1242,34 +1242,34 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
             <div style={{background:DS.blueSoft,border:"1px solid "+DS.blue+"44",borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
               {Ico.clock(13,DS.blue)}
               <div>
-                <div style={{fontSize:12,fontWeight:800,color:DS.blue}}>📝 Client signé — En attente de votre signature</div>
-                <div style={{fontSize:11,color:DS.mid,marginTop:2}}>Signé par le client le {new Date(contrat.signedAt).toLocaleDateString("fr")}</div>
+                <div style={{fontSize:15,fontWeight:800,color:DS.blue}}>📝 Client signé — En attente de votre signature</div>
+                <div style={{fontSize:15,color:DS.mid,marginTop:2}}>Signé par le client le {new Date(contrat.signedAt).toLocaleDateString("fr")}</div>
               </div>
             </div>
           );
           if (contrat.statut==="signe") return (
             <div style={{background:DS.greenSoft,border:"1px solid #6ee7b7",borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
               {Ico.check(14,DS.green)}
-              <div style={{fontSize:12,fontWeight:800,color:DS.green}}>✅ Contrat signé le {new Date(contrat.signedAt).toLocaleDateString("fr")}</div>
+              <div style={{fontSize:15,fontWeight:800,color:DS.green}}>✅ Contrat signé le {new Date(contrat.signedAt).toLocaleDateString("fr")}</div>
             </div>
           );
           // Demande envoyée mais pas encore signée
           return (
             <div style={{background:DS.orangeSoft,border:"1px solid "+DS.orange+"44",borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
               {Ico.send(13,DS.orange)}
-              <div style={{fontSize:12,fontWeight:700,color:DS.orange}}>📨 Demande envoyée — En attente de signature</div>
+              <div style={{fontSize:15,fontWeight:700,color:DS.orange}}>📨 Demande envoyée — En attente de signature</div>
             </div>
           );
         })()}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:8}}>
-          <button onClick={()=>ouvrirContrat(client, contratClient?.signaturePrestataire||"", contratClient?.signatureClient||"")} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:11,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,boxShadow:"0 2px 8px rgba(2,132,199,0.3)"}}>
+          <button onClick={()=>ouvrirContrat(client, contratClient?.signaturePrestataire||"", contratClient?.signatureClient||"")} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,boxShadow:"0 2px 8px rgba(2,132,199,0.3)"}}>
             {Ico.contract(13,"#fff")} Contrat
           </button>
-          <button onClick={()=>envoyerContratSignature(client)} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:contratClient?.statut==="signe_complet"?DS.greenSoft:contratClient?.statut==="signe_client"?DS.blueSoft:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:700,fontSize:11,color:contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
+          <button onClick={()=>envoyerContratSignature(client)} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:contratClient?.statut==="signe_complet"?DS.greenSoft:contratClient?.statut==="signe_client"?DS.blueSoft:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
             {Ico.sign(13,contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff")}
             {contratClient?.statut==="signe_complet"?"Signé":contratClient?.statut==="signe_client"?"En attente":"Envoyer"}
           </button>
-          <button onClick={onEdit} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:DS.white,border:"1.5px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:11,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
+          <button onClick={onEdit} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:DS.white,border:"1.5px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:15,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
             {Ico.edit(13,DS.dark)} Modifier
           </button>
           <button onClick={onDelete} className="btn-hover" style={{width:44,height:44,borderRadius:DS.radiusSm,background:DS.redSoft,border:"1px solid #fca5a5",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -1291,15 +1291,15 @@ function MultiCheck({ label, options, values, onChange }) {
     <div>
       {label && (
         <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
-          <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>{label}</span>
-          {values.length>0 && <span style={{background:DS.blue,color:"#fff",fontSize:10,fontWeight:800,borderRadius:10,padding:"1px 7px",minWidth:18,textAlign:"center"}}>{values.length}</span>}
+          <span style={{fontSize:15,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>{label}</span>
+          {values.length>0 && <span style={{background:DS.blue,color:"#fff",fontSize:15,fontWeight:800,borderRadius:10,padding:"1px 7px",minWidth:18,textAlign:"center"}}>{values.length}</span>}
         </div>
       )}
       <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
         {options.map(o=>{
           const sel=values.includes(o);
           return (
-            <button key={o} onClick={()=>toggle(o)} className="btn-hover" style={{display:"inline-flex",alignItems:"center",gap:5,padding:"7px 12px",borderRadius:20,border:`1.5px solid ${sel?DS.blue:DS.border}`,background:sel?DS.blueGrad:DS.white,cursor:"pointer",fontFamily:"inherit",fontWeight:sel?700:500,fontSize:12,color:sel?"#fff":DS.mid,boxShadow:sel?"0 2px 8px "+DS.blue+"33":"none",transition:"all .2s",WebkitTapHighlightColor:"transparent"}}>
+            <button key={o} onClick={()=>toggle(o)} className="btn-hover" style={{display:"inline-flex",alignItems:"center",gap:5,padding:"7px 12px",borderRadius:20,border:`1.5px solid ${sel?DS.blue:DS.border}`,background:sel?DS.blueGrad:DS.white,cursor:"pointer",fontFamily:"inherit",fontWeight:sel?700:500,fontSize:15,color:sel?"#fff":DS.mid,boxShadow:sel?"0 2px 8px "+DS.blue+"33":"none",transition:"all .2s",WebkitTapHighlightColor:"transparent"}}>
               {sel
                 ? <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                 : <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke={DS.border} strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -1318,7 +1318,7 @@ function RadioGroup({ label, options, value, onChange, color }) {
   const activeGrad = color ? `linear-gradient(135deg,${color},${color}cc)` : DS.blueGrad;
   return (
     <div>
-      {label && <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:8}}>{label}</span>}
+      {label && <span style={{fontSize:15,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:8}}>{label}</span>}
       <div style={{display:"flex",flexDirection:"column",gap:5}}>
         {options.map(o=>{
           const sel=value===o;
@@ -1327,7 +1327,7 @@ function RadioGroup({ label, options, value, onChange, color }) {
               <div style={{width:18,height:18,borderRadius:9,border:`2px solid ${sel?"transparent":DS.border}`,background:sel?"rgba(255,255,255,0.3)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .2s"}}>
                 {sel && <div style={{width:8,height:8,borderRadius:4,background:"#fff"}}/>}
               </div>
-              <span style={{fontSize:13,fontWeight:sel?700:400,color:sel?"#fff":DS.mid,flex:1}}>{o}</span>
+              <span style={{fontSize:15,fontWeight:sel?700:400,color:sel?"#fff":DS.mid,flex:1}}>{o}</span>
               {sel && <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.8)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
             </button>
           );
@@ -1340,12 +1340,12 @@ function RadioGroup({ label, options, value, onChange, color }) {
 function OuiNon({ label, value, onChange }) {
   return (
     <div>
-      {label && <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:7}}>{label}</span>}
+      {label && <span style={{fontSize:15,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:7}}>{label}</span>}
       <div style={{display:"flex",gap:8}}>
-        <button onClick={()=>onChange(true)} className="btn-hover" style={{flex:1,padding:"10px",borderRadius:10,border:`1.5px solid ${value===true?DS.green:DS.border}`,background:value===true?DS.greenSoft:DS.white,color:value===true?DS.green:DS.mid,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6,transition:"all .2s",boxShadow:value===true?"0 2px 8px "+DS.green+"33":"none"}}>
+        <button onClick={()=>onChange(true)} className="btn-hover" style={{flex:1,padding:"10px",borderRadius:10,border:`1.5px solid ${value===true?DS.green:DS.border}`,background:value===true?DS.greenSoft:DS.white,color:value===true?DS.green:DS.mid,fontWeight:700,fontSize:15,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6,transition:"all .2s",boxShadow:value===true?"0 2px 8px "+DS.green+"33":"none"}}>
           <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Oui
         </button>
-        <button onClick={()=>onChange(false)} className="btn-hover" style={{flex:1,padding:"10px",borderRadius:10,border:`1.5px solid ${value===false?DS.red:DS.border}`,background:value===false?DS.redSoft:DS.white,color:value===false?DS.red:DS.mid,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6,transition:"all .2s",boxShadow:value===false?"0 2px 8px "+DS.red+"33":"none"}}>
+        <button onClick={()=>onChange(false)} className="btn-hover" style={{flex:1,padding:"10px",borderRadius:10,border:`1.5px solid ${value===false?DS.red:DS.border}`,background:value===false?DS.redSoft:DS.white,color:value===false?DS.red:DS.mid,fontWeight:700,fontSize:15,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6,transition:"all .2s",boxShadow:value===false?"0 2px 8px "+DS.red+"33":"none"}}>
           <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Non
         </button>
       </div>
@@ -1366,8 +1366,8 @@ function StarRating({ value, onChange }) {
       </div>
       {value>0 && (
         <div style={{display:"inline-flex",alignItems:"center",gap:5,background:"#fffbeb",borderRadius:8,padding:"4px 10px",border:"1px solid #fcd34d"}}>
-          <span style={{fontSize:12,fontWeight:800,color:"#d97706"}}>{value}/5</span>
-          <span style={{fontSize:11,color:"#92400e",fontWeight:500}}>{labels[value]}</span>
+          <span style={{fontSize:15,fontWeight:800,color:"#d97706"}}>{value}/5</span>
+          <span style={{fontSize:15,color:"#92400e",fontWeight:500}}>{labels[value]}</span>
         </div>
       )}
     </div>
@@ -1383,7 +1383,7 @@ function NumField({ label, value, onChange, unit, ideal, okFn }) {
   return (
     <div style={{background:statusBg,borderRadius:10,padding:"10px 12px",border:`1.5px solid ${hasVal?(ok?"#86efac":"#fca5a5"):DS.border}`,transition:"all .2s"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
-        <div style={{fontSize:11,fontWeight:700,color:DS.mid}}>
+        <div style={{fontSize:15,fontWeight:700,color:DS.mid}}>
           {label}{unit && <span style={{color:"#94a3b8",fontWeight:400}}> ({unit})</span>}
         </div>
         {ideal && (
@@ -1434,16 +1434,16 @@ function SignaturePad({ value, onChange, label }) {
 
   return (
     <div>
-      {label && <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>{label}</span>}
+      {label && <span style={{fontSize:15,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>{label}</span>}
       <div style={{border:"1.5px solid "+DS.border,borderRadius:DS.radius,overflow:"hidden",background:DS.light,position:"relative"}}>
         <canvas ref={canvasRef} width={500} height={140} style={{display:"block",width:"100%",height:140,touchAction:"none",cursor:"crosshair"}}
           onMouseDown={start} onMouseMove={move} onMouseUp={end} onMouseLeave={end}
           onTouchStart={start} onTouchMove={move} onTouchEnd={end}/>
         {!hasSign && <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none"}}>
-          <span style={{color:DS.border,fontSize:13,display:"flex",alignItems:"center",gap:6}}>{Ico.sign(14,"#cbd5e1")} Signez ici</span>
+          <span style={{color:DS.border,fontSize:15,display:"flex",alignItems:"center",gap:6}}>{Ico.sign(14,"#cbd5e1")} Signez ici</span>
         </div>}
       </div>
-      {hasSign && <button onClick={clear} style={{marginTop:4,background:"none",border:"none",color:"#94a3b8",fontSize:12,cursor:"pointer",fontWeight:600}}>✕ Effacer</button>}
+      {hasSign && <button onClick={clear} style={{marginTop:4,background:"none",border:"none",color:"#94a3b8",fontSize:15,cursor:"pointer",fontWeight:600}}>✕ Effacer</button>}
     </div>
   );
 }
@@ -2230,10 +2230,10 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                 f.photoArrivee ? {key:"pa", label:"Arrivée", val:f.photoArrivee} : null,
                 ...((f.photos||[]).map((v,i)=>v?{key:`p${i}`,label:`Photo ${i+2}`,val:v,idx:i}:null)),
               ].filter(Boolean);
-              const canAdd = filledPhotos.length < 4;
+              const canAdd = filledPhotos.length < 10;
 
               const addPhotos = (e) => {
-                const files = Array.from(e.target.files||[]).slice(0, 4 - filledPhotos.length);
+                const files = Array.from(e.target.files||[]).slice(0, 10 - filledPhotos.length);
                 let newArrivee = f.photoArrivee||"";
                 let newPhotos = [...(f.photos||[])];
                 let readers = 0;
@@ -2245,7 +2245,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                     readers++;
                     if (readers === files.length) {
                       set("photoArrivee", newArrivee);
-                      set("photos", newPhotos.slice(0,3));
+                      set("photos", newPhotos.slice(0,9));
                     }
                   };
                   reader.readAsDataURL(file);
@@ -2262,7 +2262,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                 <div>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
                     <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>
-                      Photos arrivée {filledPhotos.length>0 && `(${filledPhotos.length}/4)`}
+                      Photos arrivée {filledPhotos.length>0 && `(${filledPhotos.length}/10)`}
                     </span>
                     {canAdd && (
                       <label style={{display:"flex",alignItems:"center",gap:5,padding:"7px 14px",borderRadius:8,background:DS.blueSoft,border:"1px solid "+DS.blue+"33",cursor:"pointer",fontSize:12,fontWeight:700,color:DS.blue}}>
@@ -2722,6 +2722,68 @@ function CalendrierInteractif({ passages, rdvs, clients, onClientClick, onEditPa
   );
 }
 
+// ALERTES COLLAPSIBLE
+function AlertesBlock({ alertes, passages, onClientClick }) {
+  const [open, setOpen] = React.useState(false);
+  const preview = alertes.slice(0, 2);
+  const isMobile = useIsMobile();
+  return (
+    <div style={{borderRadius:DS.radius,border:"1px solid "+DS.red+"33",background:DS.white,overflow:"hidden",boxShadow:DS.shadow,marginBottom:0}}>
+      {/* Header cliquable */}
+      <div onClick={()=>setOpen(o=>!o)} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 16px",cursor:"pointer",background:DS.redSoft}}>
+        <IcoBubble ico={Ico.alert(14,DS.red)} color={DS.red} size={30}/>
+        <span style={{flex:1,fontWeight:800,fontSize:15,color:DS.red}}>⚠️ {alertes.length} Alerte{alertes.length>1?"s":""}</span>
+        <div style={{width:28,height:28,borderRadius:8,background:DS.red+"18",display:"flex",alignItems:"center",justifyContent:"center",transition:"transform .2s",transform:open?"rotate(45deg)":"none"}}>
+          {open
+            ? <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={DS.red} strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            : <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={DS.red} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          }
+        </div>
+      </div>
+      {/* Aperçu 2 lignes quand fermé */}
+      {!open && (
+        <div style={{padding:"8px 16px 10px"}}>
+          {preview.map(c=>{
+            const al=alerteClient(c,passages); const col=AC[al];
+            return (
+              <div key={c.id} onClick={()=>onClientClick(c)} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 0",borderBottom:"1px solid "+DS.border,cursor:"pointer"}}>
+                <Avatar nom={c.nom} size={28} photo={c.photoPiscine}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:700,fontSize:13,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
+                </div>
+                <Tag color={col.tx}>{col.lbl}</Tag>
+              </div>
+            );
+          })}
+          {alertes.length > 2 && (
+            <div onClick={()=>setOpen(true)} style={{textAlign:"center",paddingTop:8,fontSize:12,fontWeight:700,color:DS.red,cursor:"pointer"}}>
+              + {alertes.length-2} autre{alertes.length-2>1?"s":""} — Voir tout
+            </div>
+          )}
+        </div>
+      )}
+      {/* Liste complète quand ouvert */}
+      {open && (
+        <div style={{padding:"4px 16px 12px"}}>
+          {alertes.map(c=>{
+            const al=alerteClient(c,passages); const col=AC[al]; const j=daysUntil(c.dateFin);
+            return (
+              <div key={c.id} onClick={()=>onClientClick(c)} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid "+DS.border,cursor:"pointer"}}>
+                <Avatar nom={c.nom} size={36} photo={c.photoPiscine}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:700,fontSize:14,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
+                  <div style={{fontSize:12,color:DS.mid,marginTop:2}}>{al==="rouge"||al==="jaune"?`Expire dans ${j} jours`:"Passages en retard"}</div>
+                </div>
+                <Tag color={col.tx}>{col.lbl}</Tag>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // DASHBOARD  Bannire tches + RDV
 function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, onAddLivraison, onAddClient, onAddRdv, onEditPassage, onEditRdv }) {
   const isMobile = useIsMobile();
@@ -2843,40 +2905,11 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
       {/* Mini calendar INTERACTIF */}
       <CalendrierInteractif passages={passages} rdvs={rdvs} clients={clients} onClientClick={onClientClick} onEditPassage={onEditPassage} onEditRdv={onEditRdv}/>
 
-      {/* Alertes */}
+      {/* Alertes collapsible */}
       {(()=>{
         const alertes = clients.filter(c=>alerteClient(c,passages)!=="ok");
         if (alertes.length===0) return null;
-        return (
-          <Card style={{border:"1px solid "+DS.red+"33"}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-              <IcoBubble ico={Ico.alert(14,DS.red)} color={DS.red} size={30}/>
-              <span style={{fontWeight:800,fontSize:14,color:DS.dark}}>Alertes ({alertes.length})</span>
-            </div>
-            {alertes.map(c=>{
-              const al=alerteClient(c,passages); const col=AC[al]; const j=daysUntil(c.dateFin);
-              return (
-                <div key={c.id} onClick={()=>onClientClick(c)} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid "+DS.border,cursor:"pointer"}}>
-                  <Avatar nom={c.nom} size={36} photo={c.photoPiscine}/>
-                  <div style={{flex:1}}>
-                    <div style={{fontWeight:700,fontSize:13,color:DS.dark}}>{c.nom}</div>
-                    <div style={{fontSize:11,color:DS.mid,marginTop:2}}>{al==="rouge"||al==="jaune"?`Expire dans ${j} jours`:"Passages en retard"}</div>
-                  </div>
-                  <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
-                    <Tag color={col.tx}>{col.lbl}</Tag>
-                    {(al==="orange")&&(()=>{
-                      const mpm2=c.moisParMois||c.saisons||{};
-                      const retards=[];
-                      for(let m=1;m<=MOIS_NOW;m++){const mv2=getMoisVal(mpm2,m);const pm=passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===m&&new Date(p.date).getFullYear()===YEAR_NOW);const rE=Math.max(0,mv2.entretien-pm.filter(p=>isEntretienType(p.type)).length);const rC=Math.max(0,mv2.controle-pm.filter(p=>isControleType(p.type)).length);if(rE>0||rC>0)retards.push({m,rE,rC});}
-                      if(retards.length===0)return null;
-                      return <div style={{fontSize:10,color:DS.orange,fontWeight:700}}>{retards.map(r=>MOIS[r.m]).join(", ")}</div>;
-                    })()}
-                  </div>
-                </div>
-              );
-            })}
-          </Card>
-        );
+        return <AlertesBlock alertes={alertes} passages={passages} onClientClick={onClientClick}/>;
       })()}
     </div>
   );
