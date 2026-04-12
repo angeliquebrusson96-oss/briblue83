@@ -16,22 +16,17 @@ export default async function handler(req, res) {
 
   try {
     const { data, error } = await supabase
-      .from("app_data")
-      .select("data")
-      .eq("id", 1)
-      .single();
-
+      .from("app_data").select("data").eq("id", 1).single();
     if (error) return res.status(500).json({ error: error.message });
 
     const allData = data?.data || {};
     const clients = allData["bb_clients_v2"] || [];
     const client = clients.find(c => c.id === clientId);
-
     if (!client) return res.status(404).json({ error: "Client introuvable" });
 
-    // Check existing signature
     const contrats = allData["bb_contrats_v1"] || {};
-    const contratExistant = Object.values(contrats).find(c => c.clientId === clientId);
+    const contractId = `CT-${clientId}`;
+    const contrat = contrats[contractId] || null;
 
     return res.status(200).json({
       client: {
@@ -46,9 +41,11 @@ export default async function handler(req, res) {
         dateDebut: client.dateDebut || "",
         dateFin: client.dateFin || "",
         moisParMois: client.moisParMois || {},
+        email: client.email || "",
       },
-      dejaSigné: contratExistant?.statut === "signe",
-      signedAt: contratExistant?.signedAt || null,
+      contrat,
+      dejaSigné: contrat?.statut === "signe_complet",
+      signedAt: contrat?.signedAt || null,
     });
   } catch (err) {
     return res.status(500).json({ error: err.message });
