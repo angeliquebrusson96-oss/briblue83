@@ -1204,8 +1204,8 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                       {p.photoDepart && (<div style={{flex:1,position:"relative"}}><img src={p.photoDepart} alt="Départ" style={{width:"100%",height:60,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border}}/><span style={{position:"absolute",bottom:3,left:4,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.5)",borderRadius:4,padding:"1px 5px"}}>Départ</span></div>)}
                     </div>
                   )}
-                  {p.actions&&<div style={{fontSize:15,color:DS.mid,marginBottom:4}}>{p.actions}</div>}
-                  {p.obs&&<div style={{fontSize:15,color:DS.orange,display:"flex",alignItems:"center",gap:4,marginBottom:8}}>{Ico.note(11,DS.orange)} {p.obs}</div>}
+                  
+                  
                   <div style={{display:"flex",gap:6,paddingTop:8,borderTop:"1px solid "+DS.border,flexWrap:"wrap"}}>
                     <div onClick={(e)=>e.stopPropagation()} style={{flex:"1 1 160px"}}>
                       <RapportStatusPicker
@@ -3235,9 +3235,9 @@ function PassageDetailModal({ passage, client, onClose }) {
   );
 
   const Row = ({label, value, color}) => (
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:"1px solid "+DS.light}}>
-      <span style={{fontSize:13,color:DS.mid,fontWeight:500}}>{label}</span>
-      <span style={{fontSize:13,fontWeight:700,color:color||DS.dark}}>{value}</span>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"6px 0",borderBottom:"1px solid "+DS.light,gap:12}}>
+      <span style={{fontSize:13,color:DS.mid,fontWeight:500,flexShrink:0}}>{label}</span>
+      <span style={{fontSize:13,fontWeight:600,color:color||DS.dark,textAlign:"right",wordBreak:"break-word",whiteSpace:"pre-wrap",lineHeight:1.5}}>{value}</span>
     </div>
   );
 
@@ -3318,7 +3318,7 @@ function PassageDetailModal({ passage, client, onClose }) {
         <Row label="Ressenti" value={etoiles(passage.ressenti)}/>
         {passage.livraisonProduits&&<Row label="Livraison produits" value={ouiNon(passage.livraisonProduits)}/>}
         {(passage.produitsLivres||[]).length>0&&<Row label="Produits livrés" value={liste(passage.produitsLivres)}/>}
-        {passage.commentaires&&<div style={{marginTop:8,padding:"8px 10px",background:DS.light,borderRadius:8,fontSize:13,color:DS.dark}}>{passage.commentaires}</div>}
+        {passage.commentaires&&<div style={{marginTop:8,padding:"10px 12px",background:DS.light,borderRadius:8,fontSize:13,color:DS.dark,lineHeight:1.6,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{passage.commentaires}</div>}
       </Block>
 
       {/* Photos */}
@@ -3423,8 +3423,8 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                         {p.photoDepart && (<div style={{position:"relative"}}><img src={p.photoDepart} alt="Départ" style={{height:48,width:72,objectFit:"cover",borderRadius:7,border:"1px solid "+DS.border}}/><span style={{position:"absolute",bottom:2,left:3,fontSize:8,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:3,padding:"1px 4px"}}>Dép.</span></div>)}
                       </div>
                     )}
-                    {p.actions&&<div style={{fontSize:12,color:DS.mid,marginBottom:4}}>{p.actions}</div>}
-                    {p.obs&&<div style={{fontSize:11,color:DS.orange,display:"flex",alignItems:"center",gap:4}}>{Ico.note(11,DS.orange)} {p.obs}</div>}
+                    
+                    
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginTop:10,paddingTop:10,borderTop:"1px solid "+DS.border}}>
                       <button onClick={()=>setDetailPassage(p)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.light,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.dark,fontFamily:"inherit",fontWeight:700}}>
                         {Ico.search(13,DS.mid)} Aperçu
