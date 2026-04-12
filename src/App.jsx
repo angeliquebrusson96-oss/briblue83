@@ -430,7 +430,7 @@ function Tag({ children, color=DS.blue, bg, style={} }) {
 function Modal({ title, onClose, children, wide }) {
   const isMobile = useIsMobile();
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(8px)",zIndex:200,display:"flex",alignItems:isMobile?"flex-end":"center",justifyContent:"center"}} onClick={onClose}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(8px)",zIndex:200,display:"flex",alignItems:isMobile?"flex-end":"center",justifyContent:"center"}}>
       <div className="slide-up" style={{background:DS.white,borderRadius:isMobile?"24px 24px 0 0":DS.radiusLg,width:"100%",maxWidth:wide?720:560,maxHeight:isMobile?"93vh":"88vh",overflowY:"auto",boxShadow:DS.shadowLg}} onClick={e=>e.stopPropagation()}>
         {isMobile && <div style={{display:"flex",justifyContent:"center",padding:"12px 0 4px"}}><div style={{width:36,height:4,borderRadius:2,background:DS.border}}/></div>}
         <div style={{padding:isMobile?"8px 20px 16px":"16px 28px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid "+DS.border}}>
