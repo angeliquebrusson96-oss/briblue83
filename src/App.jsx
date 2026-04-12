@@ -307,7 +307,7 @@ function setupPWA() {
     const link = document.createElement("link"); link.rel="manifest"; link.href=URL.createObjectURL(blob); document.head.appendChild(link);
   }
   if (!document.querySelector('meta[name="theme-color"]')) { const m=document.createElement("meta"); m.name="theme-color"; m.content="#0369a1"; document.head.appendChild(m); }
-  if (!document.querySelector('meta[name="apple-mobile-web-app-capable"]')) { const m1=document.createElement("meta"); m1.name="apple-mobile-web-app-capable"; m1.content="yes"; document.head.appendChild(m1); const m2=document.createElement("meta"); m2.name="apple-mobile-web-app-status-bar-style"; m2.content="black-translucent"; document.head.appendChild(m2); const m3=document.createElement("meta"); m3.name="apple-mobile-web-app-title"; m3.content="BRIBLUE"; document.head.appendChild(m3); }
+  if (!document.querySelector('meta[name="apple-mobile-web-app-capable"]')) { const m1=document.createElement("meta"); m1.name="apple-mobile-web-app-capable"; m1.content="yes"; document.head.appendChild(m1); } if (!document.querySelector('meta[name="mobile-web-app-capable"]')) { const m4=document.createElement("meta"); m4.name="mobile-web-app-capable"; m4.content="yes"; document.head.appendChild(m4); } const hasAppleStatus = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]'); if (!hasAppleStatus) { const m2=document.createElement("meta"); m2.name="apple-mobile-web-app-status-bar-style"; m2.content="black-translucent"; document.head.appendChild(m2); } const hasAppleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]'); if (!hasAppleTitle) { const m3=document.createElement("meta"); m3.name="apple-mobile-web-app-title"; m3.content="BRIBLUE"; document.head.appendChild(m3); }
   if ('serviceWorker' in navigator) { const swCode=`self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>self.clients.claim());self.addEventListener('fetch',e=>e.respondWith(fetch(e.request).catch(()=>new Response('Offline',{status:503}))));`; const swBlob=new Blob([swCode],{type:'application/javascript'}); navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(()=>{}); }
 }
 
@@ -2724,7 +2724,7 @@ function CalendrierInteractif({ passages, rdvs, clients, onClientClick, onEditPa
 
 // ALERTES COLLAPSIBLE
 function AlertesBlock({ alertes, passages, onClientClick }) {
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = useState(false);
   const preview = alertes.slice(0, 2);
   const isMobile = useIsMobile();
   return (
