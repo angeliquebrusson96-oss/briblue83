@@ -2225,13 +2225,73 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
             </div>
           </div>
           <div style={{borderTop:"1px solid "+DS.border,paddingTop:16,marginTop:16}}>
-            <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:10}}>Photos ({[f.photoArrivee,...(f.photos||[])].filter(Boolean).length}/3 à l'arrivée)</span>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-              <PhotoPicker label="Arrivée" value={f.photoArrivee} onChange={v=>set("photoArrivee",v)} compact/>
-              <PhotoPicker label="Photo 2" value={(f.photos||[])[0]||""} onChange={v=>{ const p=[...(f.photos||[])]; p[0]=v; set("photos",p); }} compact/>
-              <PhotoPicker label="Photo 3" value={(f.photos||[])[1]||""} onChange={v=>{ const p=[...(f.photos||[])]; p[1]=v; set("photos",p); }} compact/>
-              <PhotoPicker label="Photo 4" value={(f.photos||[])[2]||""} onChange={v=>{ const p=[...(f.photos||[])]; p[2]=v; set("photos",p); }} compact/>
-            </div>
+            {(() => {
+              const filledPhotos = [
+                f.photoArrivee ? {key:"pa", label:"Arrivée", val:f.photoArrivee} : null,
+                ...((f.photos||[]).map((v,i)=>v?{key:`p${i}`,label:`Photo ${i+2}`,val:v,idx:i}:null)),
+              ].filter(Boolean);
+              const canAdd = filledPhotos.length < 4;
+
+              const addPhotos = (e) => {
+                const files = Array.from(e.target.files||[]).slice(0, 4 - filledPhotos.length);
+                let newArrivee = f.photoArrivee||"";
+                let newPhotos = [...(f.photos||[])];
+                let readers = 0;
+                files.forEach(file => {
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    if (!newArrivee) { newArrivee = reader.result; }
+                    else { newPhotos = [...newPhotos, reader.result]; }
+                    readers++;
+                    if (readers === files.length) {
+                      set("photoArrivee", newArrivee);
+                      set("photos", newPhotos.slice(0,3));
+                    }
+                  };
+                  reader.readAsDataURL(file);
+                });
+                e.target.value="";
+              };
+
+              const removePhoto = (key, idx) => {
+                if (key==="pa") set("photoArrivee","");
+                else { const arr=[...(f.photos||[])]; arr.splice(idx,1); set("photos",arr); }
+              };
+
+              return (
+                <div>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                    <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>
+                      Photos arrivée {filledPhotos.length>0 && `(${filledPhotos.length}/4)`}
+                    </span>
+                    {canAdd && (
+                      <label style={{display:"flex",alignItems:"center",gap:5,padding:"7px 14px",borderRadius:8,background:DS.blueSoft,border:"1px solid "+DS.blue+"33",cursor:"pointer",fontSize:12,fontWeight:700,color:DS.blue}}>
+                        {Ico.plus(12,DS.blue)} Ajouter
+                        <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={addPhotos}/>
+                      </label>
+                    )}
+                  </div>
+                  {filledPhotos.length === 0
+                    ? <label style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8,padding:20,borderRadius:12,border:"2px dashed "+DS.border,background:DS.light,cursor:"pointer"}}>
+                        {Ico.camera(28,DS.mid)}
+                        <span style={{fontSize:13,color:DS.mid,fontWeight:600}}>Appuyez pour ajouter des photos</span>
+                        <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={addPhotos}/>
+                      </label>
+                    : <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                        {filledPhotos.map(p=>(
+                          <div key={p.key} style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid "+DS.border}}>
+                            <img src={p.val} alt={p.label} style={{width:"100%",height:90,objectFit:"cover",display:"block"}}/>
+                            <span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:4,padding:"1px 6px"}}>{p.label}</span>
+                            <button onClick={()=>removePhoto(p.key,p.idx)} style={{position:"absolute",top:4,right:4,width:24,height:24,borderRadius:12,background:"rgba(0,0,0,0.65)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                              {Ico.close(10,"#fff")}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                  }
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -2409,7 +2469,24 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
               </div>
               <OuiNon label="Présence du locataire / propriétaire ?" value={f.presenceClient} onChange={v=>set("presenceClient",v)}/>
               <div style={{borderTop:"1px solid "+DS.border,paddingTop:14}}>
-                <PhotoPicker label="📸 Photo au départ" value={f.photoDepart} onChange={v=>set("photoDepart",v)} compact/>
+                {f.photoDepart
+                  ? <div style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid "+DS.border}}>
+                      <img src={f.photoDepart} alt="Départ" style={{width:"100%",height:110,objectFit:"cover",display:"block"}}/>
+                      <span style={{position:"absolute",bottom:4,left:6,fontSize:10,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:4,padding:"2px 8px"}}>📸 Au départ</span>
+                      <button onClick={()=>set("photoDepart","")} style={{position:"absolute",top:6,right:6,width:26,height:26,borderRadius:13,background:"rgba(0,0,0,0.65)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                        {Ico.close(11,"#fff")}
+                      </button>
+                    </div>
+                  : <label style={{display:"flex",alignItems:"center",gap:8,padding:"12px 16px",borderRadius:10,border:"2px dashed "+DS.border,background:DS.light,cursor:"pointer"}}>
+                      {Ico.camera(18,DS.mid)}
+                      <span style={{fontSize:13,color:DS.mid,fontWeight:600}}>📸 Photo au départ</span>
+                      <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{
+                        const file=e.target.files?.[0]; if(!file) return;
+                        const r=new FileReader(); r.onload=()=>set("photoDepart",r.result); r.readAsDataURL(file);
+                        e.target.value="";
+                      }}/>
+                    </label>
+                }
               </div>
               <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",background:`linear-gradient(135deg,${DS.greenSoft},#bbf7d0)`,padding:"14px 16px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.green+"44",marginTop:4,transition:"all .2s"}}>
                 <input type="checkbox" checked={f.ok} onChange={e=>set("ok",e.target.checked)} style={{width:20,height:20,accentColor:DS.green}}/>
