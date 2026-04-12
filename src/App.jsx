@@ -739,7 +739,7 @@ async function envoyerEmailLivraison(livraison, client) {
   const b64 = btoa(unescape(encodeURIComponent(html)));
 
   const produits = (livraison.produits||[]).length > 0 ? (livraison.produits||[]).join(", ") : "voir document joint";
-  const corps = `Bonjour ${client?.nom||""},\n\nVous trouverez ci-joint votre bon de livraison du ${dateStr}.\n\nProduits livrés : ${produits}${livraison.montant?"\nMontant : "+Number(livraison.montant).toLocaleString("fr")+" €":""}\n\nJe reste à votre disposition pour toute question.\n\nCordialement,\n\nDorian Briaire\nTechnicien de Piscine — BRI BLUE`;
+  const corps = `Bonjour ${client?.nom||""},\n\nVotre bon de livraison du ${dateStr} est disponible.\n\nJe reste a votre disposition pour toute question.\n\nCordialement,\nDorian Briaire\nTechnicien de Piscine - BRI BLUE`;
 
   try {
     const res = await fetch("/api/send-email", {
@@ -1451,8 +1451,14 @@ table td{padding:7px 12px;border:1px solid #e2e8f0;font-size:12px}
 </style></head><body>
 <div class="page">
 <div class="no-print">
-  <button onclick="window.print()" class="btn-print">Enregistrer en PDF</button>
-  <button onclick="window.close()" class="btn-close">Fermer</button>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <button onclick="window.print()" style="background:linear-gradient(135deg,#0c1222,#1a365d);color:#fff;border:none;padding:14px 28px;border-radius:12px;font-weight:700;cursor:pointer;font-size:15px;font-family:inherit;box-shadow:0 4px 12px rgba(12,18,34,0.3);">
+      🖨️ Imprimer / PDF
+    </button>
+    <button onclick="(function(){var a=document.createElement('a');a.href='data:text/html;charset=utf-8,'+encodeURIComponent(document.documentElement.outerHTML);a.download='Rapport_BRIBLUE.html';document.body.appendChild(a);a.click();document.body.removeChild(a);})()" style="background:linear-gradient(135deg,#0369a1,#0ea5e9);color:#fff;border:none;padding:14px 28px;border-radius:12px;font-weight:700;cursor:pointer;font-size:15px;font-family:inherit;box-shadow:0 4px 12px rgba(3,105,161,0.3);">
+      💾 Enregistrer
+    </button>
+  </div>
 </div>
 
 <div style="text-align:center;padding:0 0 14px"><span style="font-family:Inter,system-ui,sans-serif;font-size:40px;font-weight:900;color:#0c1222;letter-spacing:-2px">Bri<span style="color:#0369a1">&#x2019;</span>blue</span></div>
@@ -1630,8 +1636,14 @@ function genererHTMLRapport(passage, client) {
 </div>
 
 <div class="no-print">
-  <button onclick="window.print()" class="btn-print">Enregistrer en PDF</button>
-  <button onclick="window.close()" class="btn-close">Fermer</button>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <button onclick="window.print()" style="background:linear-gradient(135deg,#0c1222,#1a365d);color:#fff;border:none;padding:14px 28px;border-radius:12px;font-weight:700;cursor:pointer;font-size:15px;font-family:inherit;box-shadow:0 4px 12px rgba(12,18,34,0.3);">
+      🖨️ Imprimer / PDF
+    </button>
+    <button onclick="(function(){var a=document.createElement('a');a.href='data:text/html;charset=utf-8,'+encodeURIComponent(document.documentElement.outerHTML);a.download='Rapport_BRIBLUE.html';document.body.appendChild(a);a.click();document.body.removeChild(a);})()" style="background:linear-gradient(135deg,#0369a1,#0ea5e9);color:#fff;border:none;padding:14px 28px;border-radius:12px;font-weight:700;cursor:pointer;font-size:15px;font-family:inherit;box-shadow:0 4px 12px rgba(3,105,161,0.3);">
+      💾 Enregistrer
+    </button>
+  </div>
 </div>
 
 <div class="section">
@@ -1775,7 +1787,11 @@ async function envoyerEmail(passage, client, onSent) {
         to: [client.email],
         subject: `Rapport entretien piscine — ${dateStr}`,
         html: htmlEmail,
-        text: `Bonjour ${client?.nom||""},\n\nVotre rapport d'entretien piscine du ${dateStr} est disponible.\n\nCordialement,\nDorian Briaire\nTechnicien de Piscine — BRI BLUE`,
+        text: `Bonjour ${client?.nom||""},\n\nVotre rapport d'entretien piscine du ${dateStr} est disponible.\n\nJe reste a votre disposition pour toute question.\n\nCordialement,\nDorian Briaire\nTechnicien de Piscine - BRI BLUE`,
+        attachments: [{
+          filename: `Rapport_BRIBLUE_${(client?.nom||"client").replace(/\s/g,"_")}_${passage.date}.html`,
+          content: btoa(unescape(encodeURIComponent(genererHTMLRapport(passage, client)))),
+        }],
       }),
     });
 
