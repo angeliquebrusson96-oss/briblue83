@@ -11,7 +11,7 @@ const BRAND_LOGO = `data:image/svg+xml;utf8,${encodeURIComponent(`
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#0ea5e9"/>
-      <stop offset="100%" stop-color="#0369a1"/>
+      <stop offset="100%" stop-color="#0891b2"/>
     </linearGradient>
   </defs>
   <rect width="420" height="96" rx="22" fill="white"/>
@@ -21,7 +21,7 @@ const BRAND_LOGO = `data:image/svg+xml;utf8,${encodeURIComponent(`
     <path d="M10 38c5 6 10 6 15 0s10-6 15 0 10 6 15 0" fill="none" stroke="white" stroke-width="4" stroke-linecap="round"/>
   </g>
   <text x="94" y="42" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="800" fill="#0c1222">BRIBLUE</text>
-  <text x="94" y="66" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="600" fill="#0369a1">Création - Traitement de l&apos;eau - Installation - Dépannage</text>
+  <text x="94" y="66" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="600" fill="#0891b2">Création - Traitement de l&apos;eau - Installation - Dépannage</text>
 </svg>`)}`;
 
 
@@ -302,30 +302,35 @@ function playNotifSound() {
 // PWA SETUP
 function setupPWA() {
   if (!document.querySelector('link[rel="manifest"]')) {
-    const manifest = {name:"BRIBLUE CRM",short_name:"BRIBLUE",description:"Gestion entretien piscines",start_url:window.location.href,display:"standalone",background_color:"#0c1222",theme_color:"#0369a1",orientation:"portrait",icons:[{src:"data:image/svg+xml,"+encodeURIComponent('<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 192 192\"><rect width=\"192\" height=\"192\" rx=\"40\" fill=\"#0c1222\"/><path d=\"M30 70c15 18 30 18 45 0s30-18 45 0 30 18 45 0\" fill=\"none\" stroke=\"white\" stroke-width=\"8\" stroke-linecap=\"round\"/><path d=\"M30 100c15 18 30 18 45 0s30-18 45 0 30 18 45 0\" fill=\"none\" stroke=\"white\" stroke-width=\"8\" stroke-linecap=\"round\"/></svg>'),sizes:"192x192",type:"image/svg+xml"},{src:"data:image/svg+xml,"+encodeURIComponent('<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 512 512\"><rect width=\"512\" height=\"512\" rx=\"100\" fill=\"#0c1222\"/><path d=\"M80 190c40 48 80 48 120 0s80-48 120 0 80 48 120 0\" fill=\"none\" stroke=\"white\" stroke-width=\"20\" stroke-linecap=\"round\"/><path d=\"M80 270c40 48 80 48 120 0s80-48 120 0 80 48 120 0\" fill=\"none\" stroke=\"white\" stroke-width=\"20\" stroke-linecap=\"round\"/></svg>'),sizes:"512x512",type:"image/svg+xml"}]};
+    const manifest = {name:"BRIBLUE CRM",short_name:"BRIBLUE",description:"Gestion entretien piscines",start_url:window.location.href,display:"standalone",background_color:"#0c1222",theme_color:"#0891b2",orientation:"portrait",icons:[{src:"data:image/svg+xml,"+encodeURIComponent('<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 192 192\"><rect width=\"192\" height=\"192\" rx=\"40\" fill=\"#0c1222\"/><path d=\"M30 70c15 18 30 18 45 0s30-18 45 0 30 18 45 0\" fill=\"none\" stroke=\"white\" stroke-width=\"8\" stroke-linecap=\"round\"/><path d=\"M30 100c15 18 30 18 45 0s30-18 45 0 30 18 45 0\" fill=\"none\" stroke=\"white\" stroke-width=\"8\" stroke-linecap=\"round\"/></svg>'),sizes:"192x192",type:"image/svg+xml"},{src:"data:image/svg+xml,"+encodeURIComponent('<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 512 512\"><rect width=\"512\" height=\"512\" rx=\"100\" fill=\"#0c1222\"/><path d=\"M80 190c40 48 80 48 120 0s80-48 120 0 80 48 120 0\" fill=\"none\" stroke=\"white\" stroke-width=\"20\" stroke-linecap=\"round\"/><path d=\"M80 270c40 48 80 48 120 0s80-48 120 0 80 48 120 0\" fill=\"none\" stroke=\"white\" stroke-width=\"20\" stroke-linecap=\"round\"/></svg>'),sizes:"512x512",type:"image/svg+xml"}]};
     const blob = new Blob([JSON.stringify(manifest)], {type:"application/json"});
     const link = document.createElement("link"); link.rel="manifest"; link.href=URL.createObjectURL(blob); document.head.appendChild(link);
   }
-  if (!document.querySelector('meta[name="theme-color"]')) { const m=document.createElement("meta"); m.name="theme-color"; m.content="#0369a1"; document.head.appendChild(m); }
+  if (!document.querySelector('meta[name="theme-color"]')) { const m=document.createElement("meta"); m.name="theme-color"; m.content="#0891b2"; document.head.appendChild(m); }
   if (!document.querySelector('meta[name="apple-mobile-web-app-capable"]')) { const m1=document.createElement("meta"); m1.name="apple-mobile-web-app-capable"; m1.content="yes"; document.head.appendChild(m1); const m2=document.createElement("meta"); m2.name="apple-mobile-web-app-status-bar-style"; m2.content="black-translucent"; document.head.appendChild(m2); const m3=document.createElement("meta"); m3.name="apple-mobile-web-app-title"; m3.content="BRIBLUE"; document.head.appendChild(m3); }
   if ('serviceWorker' in navigator) { const swCode=`self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>self.clients.claim());self.addEventListener('fetch',e=>e.respondWith(fetch(e.request).catch(()=>new Response('Offline',{status:503}))));`; const swBlob=new Blob([swCode],{type:'application/javascript'}); navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(()=>{}); }
 }
 
 // DESIGN SYSTEM V2  MODERNE
 const DS = {
-  blue:"#0369a1", blueSoft:"#e0f2fe", blueGrad:"linear-gradient(135deg,#0284c7,#0ea5e9)",
-  dark:"#0c1222", mid:"#64748b",
-  light:"#f1f5f9", bg:"#f8fafc", border:"#e2e8f0", white:"#ffffff",
+  // Accent principal — Cyan / Turquoise
+  blue:"#0891b2", blueSoft:"#ecfeff", blueGrad:"linear-gradient(135deg,#06b6d4,#0891b2)",
+  // Texte
+  dark:"#0f172a", mid:"#64748b",
+  // Fonds
+  light:"#f0fdfe", bg:"#f8fffe", border:"#cffafe", white:"#ffffff",
+  // Sémantiques
   green:"#059669", greenSoft:"#d1fae5", greenGrad:"linear-gradient(135deg,#059669,#34d399)",
-  red:"#dc2626", redSoft:"#fee2e2",
-  orange:"#ea580c", orangeSoft:"#ffedd5",
-  yellow:"#d97706", yellowSoft:"#fef3c7",
+  red:"#e11d48", redSoft:"#fff1f2",
+  orange:"#f59e0b", orangeSoft:"#fffbeb",
+  yellow:"#d97706", yellowSoft:"#fef9c3",
   purple:"#7c3aed", purpleSoft:"#ede9fe", purpleGrad:"linear-gradient(135deg,#7c3aed,#a78bfa)",
-  teal:"#0891b2", tealSoft:"#e0f7fa",
+  teal:"#0e7490", tealSoft:"#cffafe",
+  // Géométrie
   radius: 16, radiusSm: 12, radiusLg: 22,
-  shadow: "0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)",
-  shadowMd: "0 4px 24px rgba(0,0,0,0.08)",
-  shadowLg: "0 8px 40px rgba(0,0,0,0.12)",
+  shadow: "0 1px 4px rgba(8,145,178,0.06), 0 4px 16px rgba(8,145,178,0.06)",
+  shadowMd: "0 4px 24px rgba(8,145,178,0.10)",
+  shadowLg: "0 8px 40px rgba(8,145,178,0.14)",
   font: "'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
 };
 
@@ -359,13 +364,13 @@ const GlobalStyles = () => (
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     html { scroll-behavior: smooth; }
-    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: ${DS.bg}; overflow-x: hidden; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: linear-gradient(180deg,#f0fdfe 0%,#f8fffe 100%); overflow-x: hidden; }
     input, select, textarea, button { font-family: inherit; }
     input:focus, select:focus, textarea:focus { outline: none; border-color: ${DS.blue} !important; box-shadow: 0 0 0 3px ${DS.blue}22 !important; }
     ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 99px; }
-    ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 99px; border: 2px solid #f1f5f9; }
-    ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    ::-webkit-scrollbar-track { background: #ecfeff; border-radius: 99px; }
+    ::-webkit-scrollbar-thumb { background: #67e8f9; border-radius: 99px; border: 2px solid #ecfeff; }
+    ::-webkit-scrollbar-thumb:hover { background: #22d3ee; }
     @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
     @keyframes fadeInFast { from { opacity:0; } to { opacity:1; } }
     @keyframes slideUp { from { opacity:0; transform:translateY(100%); } to { opacity:1; transform:translateY(0); } }
@@ -380,7 +385,7 @@ const GlobalStyles = () => (
     .btn-hover:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,0.18); }
     .btn-hover:active { transform: translateY(0) scale(0.98); box-shadow: none; }
     .card-hover { transition: all .2s cubic-bezier(.22,1,.36,1); }
-    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(0,0,0,0.1); border-color: #c8d8e8 !important; }
+    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(6,182,212,0.12); border-color: #a5f3fc !important; }
     .card-hover:active { transform: translateY(0); }
     /* Desktop sidebar active link */
     @media (min-width: 768px) {
@@ -655,7 +660,7 @@ function FormClient({ initial, clients, onSave, onClose }) {
           <Input label="Prix/passage contrôle (€)" type="number" value={f.prixPassageC||""} onChange={e=>set("prixPassageC",+e.target.value||0)}/>
         </div>
         {/* Récap tarification auto */}
-        <div style={{marginTop:12,background:"linear-gradient(135deg,#0c1222,#1a365d)",borderRadius:DS.radiusSm,padding:"14px 16px",color:"#fff"}}>
+        <div style={{marginTop:12,background:"linear-gradient(135deg,#0e7490,#0891b2)",borderRadius:DS.radiusSm,padding:"14px 16px",color:"#fff"}}>
           <div style={{fontSize:15,fontWeight:700,textTransform:"uppercase",letterSpacing:1,color:"rgba(255,255,255,0.5)",marginBottom:10}}>Tarification</div>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -835,7 +840,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
 
         {/* Client sélectionné — recap */}
         {selectedClient && (
-          <div style={{background:"linear-gradient(135deg,#0f2040,#0369a1)",borderRadius:DS.radiusSm,padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
+          <div style={{background:"linear-gradient(135deg,#0e7490,#06b6d4)",borderRadius:DS.radiusSm,padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
             <Avatar nom={selectedClient.nom} size={40}/>
             <div style={{flex:1}}>
               <div style={{fontWeight:800,fontSize:15,color:"#fff"}}>{selectedClient.nom}</div>
@@ -2143,7 +2148,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
     (c="currentColor",s=16) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.85 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/><path d="M15 5l4 4"/></svg>,
   ];
   const STEP_INFO = [
-    {ic:STEP_ICONS[0],l:isMobile?"Interv.":"Intervention",color:"#0369a1"},
+    {ic:STEP_ICONS[0],l:isMobile?"Interv.":"Intervention",color:"#0891b2"},
     {ic:STEP_ICONS[1],l:isMobile?"Analyses":"Analyses eau",color:"#0891b2"},
     {ic:STEP_ICONS[2],l:isMobile?"Bassin":"État bassin",color:"#059669"},
     {ic:STEP_ICONS[3],l:"Correctifs",color:"#7c3aed"},
@@ -2429,8 +2434,8 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
               <div style={{background:DS.white,padding:"10px 12px",display:"flex",flexDirection:"column",gap:6}}>
                 <MRow label="Chlore libre" unit="ppm" value={f.chloreLibre} onChange={v=>set("chloreLibre",v)} ideal="1 – 3" okFn={v=>v>=1&&v<=3} color="#0891b2"
                   icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>}/>
-                <MRow label="pH" value={f.ph} onChange={v=>set("ph",v)} ideal="7.2 – 7.8" okFn={v=>v>=7.2&&v<=7.8} color="#0369a1"
-                  icon={<span style={{fontSize:13,fontWeight:900,color:"#0369a1",letterSpacing:-1}}>pH</span>}/>
+                <MRow label="pH" value={f.ph} onChange={v=>set("ph",v)} ideal="7.2 – 7.8" okFn={v=>v>=7.2&&v<=7.8} color="#0891b2"
+                  icon={<span style={{fontSize:13,fontWeight:900,color:"#0891b2",letterSpacing:-1}}>pH</span>}/>
                 <MRow label="Alcalinité totale" unit="ppm" value={f.alcalinite} onChange={v=>set("alcalinite",v)} ideal="80 – 120" okFn={v=>v>=80&&v<=120} color="#0284c7"
                   icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="1.8" strokeLinecap="round"><path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/><path d="M2 16c2.5 3 5 3 7.5 0S14 13 16.5 16s5 3 7.5 0"/></svg>}/>
                 <div>
@@ -2458,7 +2463,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                   icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v5l3 9a3 3 0 01-3 3H9a3 3 0 01-3-3l3-9V3z"/><path d="M6.5 15h11"/></svg>}/>
                 <MRow label="Taux de chlore" value={f.tChlore} onChange={v=>set("tChlore",v)} ideal="1 – 1.5" okFn={v=>v>=0.5&&v<=3} color="#0891b2"
                   icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>}/>
-                <MRow label="Taux de pH" value={f.tPH} onChange={v=>set("tPH",v)} ideal="7.2 – 7.4" okFn={v=>v>=7.0&&v<=7.6} color="#0369a1"
+                <MRow label="Taux de pH" value={f.tPH} onChange={v=>set("tPH",v)} ideal="7.2 – 7.4" okFn={v=>v>=7.0&&v<=7.6} color="#0891b2"
                   icon={<span style={{fontSize:13,fontWeight:900,color:"#7c3aed",letterSpacing:-1}}>pH</span>}/>
                 <MRow label="Taux stabilisant" value={f.tStabilisant} onChange={v=>set("tStabilisant",v)} color="#7c3aed"
                   icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}/>
@@ -3100,7 +3105,7 @@ function PageClients({ clients, passages, onClientClick, onAdd }) {
     <div>
       {/* Stats bar */}
       <div style={{display:"flex",gap:8,marginBottom:14}}>
-        <div style={{flex:1,background:"linear-gradient(135deg,#0c1222,#1e3a5f)",borderRadius:DS.radiusSm,padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
+        <div style={{flex:1,background:"linear-gradient(135deg,#0e7490,#0891b2)",borderRadius:DS.radiusSm,padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
           <div style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.12)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.clients(18,"#fff")}</div>
           <div><div style={{fontSize:20,fontWeight:900,color:"#fff"}}>{totalAll}</div><div style={{fontSize:10,color:"rgba(255,255,255,0.6)",fontWeight:600}}>Clients</div></div>
         </div>
@@ -3239,7 +3244,7 @@ function PassageDetailModal({ passage, client, onClose }) {
   return (
     <Modal title="Aperçu du passage" onClose={onClose} wide>
       {/* Header */}
-      <div style={{background:"linear-gradient(135deg,#0f2040,#0369a1)",borderRadius:DS.radiusSm,padding:"14px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:12}}>
+      <div style={{background:"linear-gradient(135deg,#0e7490,#06b6d4)",borderRadius:DS.radiusSm,padding:"14px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:12}}>
         <div style={{width:44,height:44,borderRadius:12,background:isCtrl?"rgba(6,182,212,0.25)":"rgba(14,165,233,0.25)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
           {isCtrl ? Ico.drop(22,"#67e8f9") : Ico.wrench(22,"#7dd3fc")}
         </div>
@@ -3541,7 +3546,7 @@ function LoginScreen({ onLogin }) {
       <div style={{position:"absolute",bottom:"-20%",left:"-15%",width:"50vw",height:"50vw",borderRadius:"50%",background:"radial-gradient(circle, #7c3aed15 0%, transparent 70%)",pointerEvents:"none"}}/>
 
       <div className="scale-in" style={{marginBottom:32,display:"flex",flexDirection:"column",alignItems:"center",gap:12,position:"relative"}}>
-        <div style={{width:80,height:80,borderRadius:24,background:"linear-gradient(135deg,#0c1222,#1e3a5f)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 12px 40px rgba(12,18,34,0.4)"}}>{Ico.wave(42,"white")}</div>
+        <div style={{width:80,height:80,borderRadius:24,background:"linear-gradient(135deg,#0e7490,#0891b2)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 12px 40px rgba(12,18,34,0.4)"}}>{Ico.wave(42,"white")}</div>
         <div style={{textAlign:"center"}}>
           <div style={{fontWeight:900,fontSize:28,color:DS.dark,letterSpacing:-1}}>BRIBLUE</div>
           <div style={{color:DS.mid,fontSize:12,marginTop:2,fontWeight:500}}>Création · Traitement de l'eau · Installation · Dépannage</div>
@@ -3621,7 +3626,7 @@ function ModalStock({ stock, onClose, onUpdateStock, onAddProduit, onDeleteProdu
           })}
         </div>
       </Section>
-      <div style={{padding:"12px 16px",background:"linear-gradient(135deg,#0c1222,#1a365d)",borderRadius:DS.radiusSm,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+      <div style={{padding:"12px 16px",background:"linear-gradient(135deg,#0e7490,#0891b2)",borderRadius:DS.radiusSm,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <span style={{color:"rgba(255,255,255,0.7)",fontSize:12,fontWeight:600}}>Produits en stock bas (≤2)</span>
         <span style={{color:"#fca5a5",fontSize:16,fontWeight:900}}>{Object.values(stock).filter(q=>q<=2).length}</span>
       </div>
@@ -3759,7 +3764,7 @@ export default function App() {
     <>
     <GlobalStyles/>
     <div style={{height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:DS.bg,gap:16,fontFamily:"'Inter', -apple-system, system-ui, sans-serif"}}>
-      <div className="scale-in" style={{width:80,height:80,borderRadius:24,background:"linear-gradient(135deg,#0c1222,#1e3a5f)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 12px 40px rgba(12,18,34,0.35)"}}>{Ico.wave(42,"white")}</div>
+      <div className="scale-in" style={{width:80,height:80,borderRadius:24,background:"linear-gradient(135deg,#0e7490,#0891b2)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 12px 40px rgba(12,18,34,0.35)"}}>{Ico.wave(42,"white")}</div>
       <div style={{fontWeight:900,fontSize:24,color:DS.blue,letterSpacing:-0.5}}>BRIBLUE</div>
       <div style={{color:DS.mid,fontSize:13}}>Chargement…</div>
     </div>
@@ -3780,7 +3785,7 @@ export default function App() {
     <GlobalStyles/>
     <div style={{minHeight:"100vh",background:DS.bg,fontFamily:"'Inter', -apple-system, system-ui, sans-serif",maxWidth:isMobile?640:1280,margin:"0 auto",position:"relative",display:"flex",flexDirection:"column",overflowX:"hidden",width:"100%"}}>
       {/* HEADER MODERNISÉ */}
-      <div style={{background:"linear-gradient(135deg,#0c1222 0%,#0f2040 60%,#0369a1 100%)",padding:isMobile?"10px 16px":"12px 28px",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:50,boxShadow:"0 2px 20px rgba(3,105,161,0.35)",backdropFilter:"blur(16px)"}}>
+      <div style={{background:"linear-gradient(135deg,#0e7490 0%,#0891b2 60%,#06b6d4 100%)",padding:isMobile?"10px 16px":"12px 28px",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:50,boxShadow:"0 2px 20px rgba(3,105,161,0.35)",backdropFilter:"blur(16px)"}}>
         <button
           onClick={()=>setPage("dashboard")}
           className="btn-hover"
@@ -3837,7 +3842,7 @@ export default function App() {
         /* LAYOUT DESKTOP : sidebar gauche + contenu principal */
         <div style={{display:"flex",flex:1,minHeight:0}}>
           {/* Sidebar navigation desktop */}
-          <div style={{width:220,flexShrink:0,background:"#0c1222",borderRight:"1px solid rgba(255,255,255,0.07)",display:"flex",flexDirection:"column",padding:"24px 12px",gap:4,position:"sticky",top:62,height:"calc(100vh - 62px)",overflowY:"auto"}}>
+          <div style={{width:220,flexShrink:0,background:"#0e7490",borderRight:"1px solid rgba(255,255,255,0.1)",display:"flex",flexDirection:"column",padding:"24px 12px",gap:4,position:"sticky",top:62,height:"calc(100vh - 62px)",overflowY:"auto"}}>
             {/* Stats rapides */}
             <div style={{padding:"12px 14px",borderRadius:12,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.06)",marginBottom:16}}>
               <div style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Aperçu</div>
@@ -3882,7 +3887,7 @@ export default function App() {
       )}
 
       {/* NAV BAS MODERNISÉ — mobile seulement */}
-      {isMobile && <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:640,background:"rgba(12,18,34,0.96)",backdropFilter:"blur(20px)",borderTop:"1px solid rgba(255,255,255,0.08)",display:"flex",alignItems:"flex-end",boxShadow:"0 -4px 24px rgba(0,0,0,0.3)",zIndex:50,paddingBottom:"env(safe-area-inset-bottom,4px)"}}>
+      {isMobile && <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:640,background:"rgba(14,116,144,0.97)",backdropFilter:"blur(20px)",borderTop:"1px solid rgba(255,255,255,0.08)",display:"flex",alignItems:"flex-end",boxShadow:"0 -4px 24px rgba(0,0,0,0.3)",zIndex:50,paddingBottom:"env(safe-area-inset-bottom,4px)"}}>
         {NAV.map(n=>(
           <button key={n.id} onClick={()=>setPage(n.id)} style={{flex:1,padding:"10px 4px 12px",border:"none",cursor:"pointer",background:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:3,transition:"all .15s",position:"relative"}}>
             {page===n.id && <div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",width:32,height:2,borderRadius:"0 0 2px 2px",background:n.id==="rdv"?"linear-gradient(90deg,#7c3aed,#a78bfa)":"linear-gradient(90deg,#0369a1,#0ea5e9)"}}/>}
