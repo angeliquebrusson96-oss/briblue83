@@ -364,13 +364,13 @@ const GlobalStyles = () => (
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     html { scroll-behavior: smooth; }
-    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: linear-gradient(180deg,#f0fdfe 0%,#f8fffe 100%); overflow-x: hidden; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f9fafb; overflow-x: hidden; }
     input, select, textarea, button { font-family: inherit; }
     input:focus, select:focus, textarea:focus { outline: none; border-color: ${DS.blue} !important; box-shadow: 0 0 0 3px ${DS.blue}22 !important; }
     ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-track { background: #ecfeff; border-radius: 99px; }
-    ::-webkit-scrollbar-thumb { background: #67e8f9; border-radius: 99px; border: 2px solid #ecfeff; }
-    ::-webkit-scrollbar-thumb:hover { background: #22d3ee; }
+    ::-webkit-scrollbar-track { background: #f3f4f6; border-radius: 99px; }
+    ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 99px; border: 2px solid #f3f4f6; }
+    ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
     @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
     @keyframes fadeInFast { from { opacity:0; } to { opacity:1; } }
     @keyframes slideUp { from { opacity:0; transform:translateY(100%); } to { opacity:1; transform:translateY(0); } }
@@ -660,7 +660,7 @@ function FormClient({ initial, clients, onSave, onClose }) {
           <Input label="Prix/passage contrôle (€)" type="number" value={f.prixPassageC||""} onChange={e=>set("prixPassageC",+e.target.value||0)}/>
         </div>
         {/* Récap tarification auto */}
-        <div style={{marginTop:12,background:"linear-gradient(135deg,#0e7490,#0891b2)",borderRadius:DS.radiusSm,padding:"14px 16px",color:"#fff"}}>
+        <div style={{marginTop:12,background:"#0891b2",borderRadius:DS.radiusSm,padding:"14px 16px",color:"#fff"}}>
           <div style={{fontSize:15,fontWeight:700,textTransform:"uppercase",letterSpacing:1,color:"rgba(255,255,255,0.5)",marginBottom:10}}>Tarification</div>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -2927,7 +2927,7 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
       {/* Widget passages du mois — redesigné */}
       <div style={{marginBottom:14,borderRadius:DS.radius,overflow:"hidden",boxShadow:DS.shadowMd,border:"1px solid "+(totalTaches>0?DS.border:"#86efac")}}>
         {/* Header */}
-        <div style={{background:DS.white,padding:"16px 18px",borderBottom:"1px solid "+DS.border}}>
+        <div style={{background:DS.white,padding:"14px 18px",borderBottom:"1px solid "+DS.border}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div>
               <div style={{fontWeight:800,fontSize:16,color:DS.dark,letterSpacing:-0.5}}>{MOIS_L[moisCourant]} {YEAR_NOW}</div>
@@ -3021,9 +3021,9 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
 
       {/* Action buttons */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>
-        <BtnPrimary onClick={onAddPassage} bg="linear-gradient(135deg,#0891b2,#06b6d4)" icon={Ico.clipboard(14,"#fff")} style={{width:"100%",fontSize:13,padding:"11px 8px",borderRadius:12,boxShadow:"0 2px 8px rgba(8,145,178,0.2)"}}>Passage</BtnPrimary>
-        <BtnPrimary onClick={()=>onAddLivraison()} bg="linear-gradient(135deg,#0d9488,#0891b2)" icon={Ico.truck(14,"#fff")} style={{width:"100%",fontSize:13,padding:"11px 8px",borderRadius:12,boxShadow:"0 2px 8px rgba(13,148,136,0.2)"}}>Livraison</BtnPrimary>
-        <BtnPrimary onClick={onAddRdv} bg="linear-gradient(135deg,#4f46e5,#6366f1)" icon={Ico.rdv(14,"#fff")} style={{width:"100%",fontSize:13,padding:"11px 8px",borderRadius:12,boxShadow:"0 2px 8px rgba(79,70,229,0.2)"}}>RDV</BtnPrimary>
+        <BtnPrimary onClick={onAddPassage} bg="#0891b2" icon={Ico.clipboard(14,"#fff")} style={{width:"100%",fontSize:13,padding:"11px 8px",borderRadius:10}}>Passage</BtnPrimary>
+        <BtnPrimary onClick={()=>onAddLivraison()} bg="#0891b2" icon={Ico.truck(14,"#fff")} style={{width:"100%",fontSize:13,padding:"11px 8px",borderRadius:10}}>Livraison</BtnPrimary>
+        <BtnPrimary onClick={onAddRdv} bg="#0891b2" icon={Ico.rdv(14,"#fff")} style={{width:"100%",fontSize:13,padding:"11px 8px",borderRadius:10}}>RDV</BtnPrimary>
       </div>
 
       {/* RDVs Aujourd'hui */}
@@ -3105,7 +3105,7 @@ function PageClients({ clients, passages, onClientClick, onAdd }) {
     <div>
       {/* Stats bar */}
       <div style={{display:"flex",gap:8,marginBottom:14}}>
-        <div style={{flex:1,background:"linear-gradient(135deg,#0e7490,#0891b2)",borderRadius:DS.radiusSm,padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
+        <div style={{flex:1,background:"#0891b2",borderRadius:DS.radiusSm,padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
           <div style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.12)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.clients(18,"#fff")}</div>
           <div><div style={{fontSize:20,fontWeight:900,color:"#fff"}}>{totalAll}</div><div style={{fontSize:10,color:"rgba(255,255,255,0.6)",fontWeight:600}}>Clients</div></div>
         </div>
@@ -3139,7 +3139,7 @@ function PageClients({ clients, passages, onClientClick, onAdd }) {
           const eff=eE+eC;
           const pct=tot>0?Math.round(eff/tot*100):0;
           const rest=Math.max(0,tot-eff);
-          const accentColor=al==="rouge"?DS.red:al==="jaune"?DS.yellow:al==="orange"?DS.orange:DS.green;
+          const accentColor=al==="rouge"?DS.red:al==="jaune"?"#d97706":al==="orange"?"#d97706":DS.green;
           return (
             <div key={c.id} onClick={()=>onClientClick(c)} className="fade-in card-hover"
               style={{animationDelay:`${idx*0.03}s`,background:DS.white,borderRadius:DS.radius,
@@ -3546,7 +3546,7 @@ function LoginScreen({ onLogin }) {
       <div style={{position:"absolute",bottom:"-20%",left:"-15%",width:"50vw",height:"50vw",borderRadius:"50%",background:"radial-gradient(circle, #7c3aed15 0%, transparent 70%)",pointerEvents:"none"}}/>
 
       <div className="scale-in" style={{marginBottom:32,display:"flex",flexDirection:"column",alignItems:"center",gap:12,position:"relative"}}>
-        <div style={{width:80,height:80,borderRadius:24,background:"linear-gradient(135deg,#0e7490,#0891b2)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 12px 40px rgba(12,18,34,0.4)"}}>{Ico.wave(42,"white")}</div>
+        <div style={{width:80,height:80,borderRadius:24,background:"#0891b2",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 12px 40px rgba(12,18,34,0.4)"}}>{Ico.wave(42,"white")}</div>
         <div style={{textAlign:"center"}}>
           <div style={{fontWeight:900,fontSize:28,color:DS.dark,letterSpacing:-1}}>BRIBLUE</div>
           <div style={{color:DS.mid,fontSize:12,marginTop:2,fontWeight:500}}>Création · Traitement de l'eau · Installation · Dépannage</div>
@@ -3626,7 +3626,7 @@ function ModalStock({ stock, onClose, onUpdateStock, onAddProduit, onDeleteProdu
           })}
         </div>
       </Section>
-      <div style={{padding:"12px 16px",background:"linear-gradient(135deg,#0e7490,#0891b2)",borderRadius:DS.radiusSm,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+      <div style={{padding:"12px 16px",background:"#0891b2",borderRadius:DS.radiusSm,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <span style={{color:"rgba(255,255,255,0.7)",fontSize:12,fontWeight:600}}>Produits en stock bas (≤2)</span>
         <span style={{color:"#fda4af",fontSize:16,fontWeight:900}}>{Object.values(stock).filter(q=>q<=2).length}</span>
       </div>
@@ -3764,7 +3764,7 @@ export default function App() {
     <>
     <GlobalStyles/>
     <div style={{height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:DS.bg,gap:16,fontFamily:"'Inter', -apple-system, system-ui, sans-serif"}}>
-      <div className="scale-in" style={{width:80,height:80,borderRadius:24,background:"linear-gradient(135deg,#0e7490,#0891b2)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 12px 40px rgba(12,18,34,0.35)"}}>{Ico.wave(42,"white")}</div>
+      <div className="scale-in" style={{width:80,height:80,borderRadius:24,background:"#0891b2",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 12px 40px rgba(12,18,34,0.35)"}}>{Ico.wave(42,"white")}</div>
       <div style={{fontWeight:900,fontSize:24,color:DS.blue,letterSpacing:-0.5}}>BRIBLUE</div>
       <div style={{color:DS.mid,fontSize:13}}>Chargement…</div>
     </div>
@@ -3785,7 +3785,7 @@ export default function App() {
     <GlobalStyles/>
     <div style={{minHeight:"100vh",background:DS.bg,fontFamily:"'Inter', -apple-system, system-ui, sans-serif",maxWidth:isMobile?640:1280,margin:"0 auto",position:"relative",display:"flex",flexDirection:"column",overflowX:"hidden",width:"100%"}}>
       {/* HEADER MODERNISÉ */}
-      <div style={{background:"linear-gradient(135deg,#0e7490,#0891b2)",padding:isMobile?"10px 16px":"12px 28px",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:50,boxShadow:"0 2px 20px rgba(3,105,161,0.35)",backdropFilter:"blur(16px)"}}>
+      <div style={{background:"#0891b2",padding:isMobile?"10px 16px":"12px 28px",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:50,boxShadow:"0 2px 20px rgba(3,105,161,0.35)",backdropFilter:"blur(16px)"}}>
         <button
           onClick={()=>setPage("dashboard")}
           className="btn-hover"
@@ -3842,9 +3842,9 @@ export default function App() {
         /* LAYOUT DESKTOP : sidebar gauche + contenu principal */
         <div style={{display:"flex",flex:1,minHeight:0}}>
           {/* Sidebar navigation desktop */}
-          <div style={{width:220,flexShrink:0,background:"#0e7490",borderRight:"none",display:"flex",flexDirection:"column",padding:"24px 12px",gap:4,position:"sticky",top:62,height:"calc(100vh - 62px)",overflowY:"auto"}}>
+          <div style={{width:220,flexShrink:0,background:"#1e2937",borderRight:"1px solid #374151",display:"flex",flexDirection:"column",padding:"24px 12px",gap:4,position:"sticky",top:62,height:"calc(100vh - 62px)",overflowY:"auto"}}>
             {/* Stats rapides */}
-            <div style={{padding:"12px 14px",borderRadius:12,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",marginBottom:16}}>
+            <div style={{padding:"12px 14px",borderRadius:10,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",marginBottom:16}}>
               <div style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Aperçu</div>
               <div style={{display:"flex",flexDirection:"column",gap:6}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>Clients</span><span style={{fontSize:13,fontWeight:800,color:"#fff"}}>{clients.length}</span></div>
@@ -3854,18 +3854,18 @@ export default function App() {
             </div>
             {/* Nav links */}
             {NAV.map(n=>(
-              <button key={n.id} onClick={()=>setPage(n.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",borderRadius:12,border:"none",cursor:"pointer",background:page===n.id?"rgba(255,255,255,0.12)":"transparent",textAlign:"left",fontFamily:"inherit",transition:"all .2s",width:"100%"}}>
+              <button key={n.id} onClick={()=>setPage(n.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",borderRadius:12,border:"none",cursor:"pointer",background:page===n.id?"rgba(8,145,178,0.15)":"transparent",textAlign:"left",fontFamily:"inherit",transition:"all .2s",width:"100%"}}>
                 {n.icon(page===n.id)}
-                <span style={{fontSize:13,fontWeight:page===n.id?800:500,color:page===n.id?"#fff":"rgba(255,255,255,0.6)"}}>{n.l}</span>
+                <span style={{fontSize:13,fontWeight:page===n.id?800:500,color:page===n.id?"#e0f2fe":"#9ca3af"}}>{n.l}</span>
                 {page===n.id&&<div style={{marginLeft:"auto",width:4,height:16,borderRadius:2,background:"#38bdf8"}}/>}
               </button>
             ))}
             {/* Actions rapides */}
             <div style={{marginTop:"auto",display:"flex",flexDirection:"column",gap:8,paddingTop:16,borderTop:"1px solid rgba(255,255,255,0.07)"}}>
-              <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",borderRadius:10,border:"1px solid rgba(255,255,255,0.2)",background:"rgba(255,255,255,0.08)",cursor:"pointer",fontFamily:"inherit",width:"100%"}}>
-                {Ico.clipboard(14,"#7dd3fc")}<span style={{fontSize:12,fontWeight:700,color:"rgba(255,255,255,0.9)"}}>Nouveau passage</span>
+              <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",borderRadius:10,border:"1px solid rgba(255,255,255,0.1)",background:"rgba(255,255,255,0.05)",cursor:"pointer",fontFamily:"inherit",width:"100%"}}>
+                {Ico.clipboard(14,"#7dd3fc")}<span style={{fontSize:12,fontWeight:700,color:"#9ca3af"}}>Nouveau passage</span>
               </button>
-              <button onClick={openAddClient} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",borderRadius:10,border:"1px solid rgba(255,255,255,0.2)",background:"rgba(255,255,255,0.08)",cursor:"pointer",fontFamily:"inherit",width:"100%"}}>
+              <button onClick={openAddClient} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",borderRadius:10,border:"1px solid rgba(255,255,255,0.1)",background:"rgba(255,255,255,0.05)",cursor:"pointer",fontFamily:"inherit",width:"100%"}}>
                 {Ico.userPlus(14,"#a5b4fc")}<span style={{fontSize:12,fontWeight:700,color:"#a5b4fc"}}>Nouveau client</span>
               </button>
             </div>
@@ -3887,11 +3887,11 @@ export default function App() {
       )}
 
       {/* NAV BAS MODERNISÉ — mobile seulement */}
-      {isMobile && <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:640,background:"rgba(14,116,144,0.97)",backdropFilter:"blur(20px)",borderTop:"1px solid rgba(255,255,255,0.08)",display:"flex",alignItems:"flex-end",boxShadow:"0 -4px 24px rgba(0,0,0,0.3)",zIndex:50,paddingBottom:"env(safe-area-inset-bottom,4px)"}}>
+      {isMobile && <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:640,background:"rgba(30,41,59,0.98)",backdropFilter:"blur(20px)",borderTop:"1px solid rgba(255,255,255,0.08)",display:"flex",alignItems:"flex-end",boxShadow:"0 -4px 24px rgba(0,0,0,0.3)",zIndex:50,paddingBottom:"env(safe-area-inset-bottom,4px)"}}>
         {NAV.map(n=>(
           <button key={n.id} onClick={()=>setPage(n.id)} style={{flex:1,padding:"10px 4px 12px",border:"none",cursor:"pointer",background:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:3,transition:"all .15s",position:"relative"}}>
-            {page===n.id && <div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",width:32,height:2,borderRadius:"0 0 2px 2px",background:n.id==="rdv"?"linear-gradient(90deg,#7c3aed,#a78bfa)":"linear-gradient(90deg,#0369a1,#0ea5e9)"}}/>}
-            <div style={{width:36,height:36,borderRadius:11,background:page===n.id?(n.id==="rdv"?"rgba(124,58,237,0.2)":"rgba(3,105,161,0.2)"):"transparent",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s"}}>
+            {page===n.id && <div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",width:32,height:2,borderRadius:"0 0 2px 2px",background:"#0891b2"}}/>}
+            <div style={{width:36,height:36,borderRadius:11,background:page===n.id?("rgba(8,145,178,0.18)"):"transparent",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s"}}>
               {n.icon(page===n.id)}
             </div>
             <span style={{fontSize:10,fontWeight:page===n.id?800:500,color:page===n.id?(n.id==="rdv"?"#818cf8":"#38bdf8"):"rgba(255,255,255,0.35)"}}>{n.l}</span>
