@@ -380,6 +380,19 @@ const DS = {
   font: "'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
 };
 
+const CLIENT_CARD_THEMES = [
+  { top:"linear-gradient(135deg,#e0f2fe,#f8fafc)", border:"#7dd3fc", chip:"#e0f2fe", accent:"#0369a1", shadow:"0 10px 30px rgba(2,132,199,0.10)" },
+  { top:"linear-gradient(135deg,#ecfdf5,#f8fafc)", border:"#86efac", chip:"#dcfce7", accent:"#15803d", shadow:"0 10px 30px rgba(34,197,94,0.10)" },
+  { top:"linear-gradient(135deg,#fef3c7,#fff7ed)", border:"#fbbf24", chip:"#fef3c7", accent:"#b45309", shadow:"0 10px 30px rgba(245,158,11,0.11)" },
+  { top:"linear-gradient(135deg,#ede9fe,#f8fafc)", border:"#c4b5fd", chip:"#ede9fe", accent:"#6d28d9", shadow:"0 10px 30px rgba(124,58,237,0.10)" },
+  { top:"linear-gradient(135deg,#ffe4e6,#fff1f2)", border:"#fda4af", chip:"#ffe4e6", accent:"#be123c", shadow:"0 10px 30px rgba(244,63,94,0.10)" },
+  { top:"linear-gradient(135deg,#cffafe,#f8fafc)", border:"#67e8f9", chip:"#cffafe", accent:"#0f766e", shadow:"0 10px 30px rgba(6,182,212,0.10)" },
+];
+function getClientCardTheme(client, index=0) {
+  const seed = String(client?.id || client?.nom || index).split("").reduce((a,ch)=>a+ch.charCodeAt(0),0);
+  return CLIENT_CARD_THEMES[seed % CLIENT_CARD_THEMES.length];
+}
+
 const AC = {
   rouge:  { bg:DS.redSoft,    bd:"#fca5a5", tx:DS.red,    lbl:"URGENT"   },
   jaune:  { bg:DS.yellowSoft, bd:"#fcd34d", tx:DS.yellow, lbl:"Attention" },
@@ -3135,9 +3148,10 @@ function PageClients({ clients, passages, onClientClick, onAdd }) {
 
       {filtered.length===0&&<div style={{textAlign:"center",color:DS.mid,padding:40,fontSize:13}}>Aucun client trouvé</div>}
 
-      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+      <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(auto-fit, minmax(300px, 1fr))",gap:12}}>
         {filtered.map((c,idx)=>{
           const al=alerteClient(c,passages); const col=AC[al];
+          const theme = getClientCardTheme(c, idx);
           const mpm=c.moisParMois||c.saisons||{};
           const tE=totalAnnuel(mpm,"entretien"), tC=totalAnnuel(mpm,"controle"), tot=tE+tC;
           const eE=passages.filter(p=>p.clientId===c.id&&isEntretienType(p.type)).length;
@@ -3146,38 +3160,51 @@ function PageClients({ clients, passages, onClientClick, onAdd }) {
           const pct=tot>0?Math.round(eff/tot*100):0;
           const rest=Math.max(0,tot-eff);
           return (
-            <div key={c.id} onClick={()=>onClientClick(c)} className="fade-in card-hover" style={{animationDelay:`${idx*0.03}s`,background:DS.white,borderRadius:DS.radius,overflow:"hidden",boxShadow:DS.shadow,border:"1px solid "+DS.border,cursor:"pointer",width:"100%",boxSizing:"border-box"}}>
+            <div key={c.id} onClick={()=>onClientClick(c)} className="fade-in card-hover" style={{animationDelay:`${idx*0.03}s`,background:theme.top,borderRadius:20,overflow:"hidden",boxShadow:theme.shadow,border:`1.5px solid ${theme.border}`,cursor:"pointer",width:"100%",boxSizing:"border-box",position:"relative"}}>
+              <div style={{position:"absolute",top:12,right:12,width:10,height:10,borderRadius:999,background:theme.accent,boxShadow:`0 0 0 4px ${theme.chip}`}}/>
               {/* Photo banner or gradient */}
               {c.photoPiscine
-                ? <div style={{height:56,background:`url(${c.photoPiscine}) center/cover`,position:"relative"}}><div style={{position:"absolute",inset:0,background:"linear-gradient(transparent 30%,rgba(0,0,0,0.5))"}}/></div>
-                : <div style={{height:6,background:`linear-gradient(90deg,${col.tx}44,${col.tx}11)`}}/>
+                ? <div style={{height:76,background:`url(${c.photoPiscine}) center/cover`,position:"relative",borderBottom:`1px solid ${theme.border}`}}><div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,rgba(255,255,255,0.05),rgba(15,23,42,0.42))"}}/></div>
+                : <div style={{height:10,background:`linear-gradient(90deg,${theme.accent},${theme.border})`}}/>
               }
-              <div style={{padding:"12px 16px"}}>
+              <div style={{padding:"14px 16px 16px"}}>
                 <div style={{display:"flex",gap:10,alignItems:"flex-start",minWidth:0}}>
-                  <Avatar nom={c.nom} size={38} photo={c.photoPiscine?null:undefined}/>
+                  <Avatar nom={c.nom} size={42} photo={c.photoPiscine?null:undefined}/>
                   <div style={{flex:1,minWidth:0,overflow:"hidden"}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
-                      <div style={{fontWeight:800,fontSize:14,color:DS.dark,letterSpacing:-0.3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{c.nom}</div>
-                      <Tag color={col.tx}>{col.lbl}</Tag>
+                      <div style={{fontWeight:900,fontSize:15,color:DS.dark,letterSpacing:-0.35,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{c.nom}</div>
+                      <Tag color={col.tx} bg={col.bg} style={{border:`1px solid ${col.bd}`}}>{col.lbl}</Tag>
                     </div>
-                    <div style={{display:"flex",gap:8,marginTop:4,flexWrap:"wrap",fontSize:11,color:DS.mid}}>
-                      <span style={{background:DS.light,padding:"2px 8px",borderRadius:6,fontWeight:600}}>{c.formule}</span>
-                      {c.adresse&&<span style={{display:"flex",alignItems:"center",gap:3}}>{Ico.pin(10,"#94a3b8")} {c.adresse.split(",").pop()?.trim()}</span>}
+                    <div style={{display:"flex",gap:8,marginTop:6,flexWrap:"wrap",fontSize:11,color:DS.mid}}>
+                      <span style={{background:theme.chip,color:theme.accent,padding:"4px 9px",borderRadius:999,fontWeight:800,border:`1px solid ${theme.border}`}}>{c.formule}</span>
+                      {c.adresse&&<span style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,0.65)",padding:"4px 8px",borderRadius:999,border:"1px solid rgba(255,255,255,0.7)"}}>{Ico.pin(10,theme.accent)} {c.adresse.split(",").pop()?.trim()}</span>}
                     </div>
                   </div>
                 </div>
 
-                {/* Progress section */}
-                {tot>0&&<div style={{marginTop:10}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
-                    <div style={{display:"flex",gap:8}}>
-                      {tE>0&&<span style={{fontSize:11,fontWeight:700,color:eE>=tE?DS.green:DS.blue}}>🔧 {eE}/{tE}</span>}
-                      {tC>0&&<span style={{fontSize:11,fontWeight:700,color:eC>=tC?DS.green:DS.teal}}>💧 {eC}/{tC}</span>}
-                    </div>
-                    <span style={{fontSize:11,fontWeight:800,color:pct>=100?DS.green:rest>3?DS.orange:DS.dark}}>{pct}%</span>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(3, minmax(0,1fr))",gap:8,marginTop:12}}>
+                  <div style={{padding:"9px 10px",borderRadius:12,background:"rgba(255,255,255,0.72)",border:`1px solid ${theme.border}`}}>
+                    <div style={{fontSize:10,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.6}}>Entretien</div>
+                    <div style={{marginTop:3,fontSize:14,fontWeight:900,color:theme.accent}}>{eE}/{tE||0}</div>
                   </div>
-                  <div style={{height:5,background:DS.light,borderRadius:99,overflow:"hidden"}}>
-                    <div style={{height:"100%",width:`${pct}%`,background:pct>=100?DS.greenGrad:pct>=50?DS.blueGrad:`linear-gradient(90deg,${DS.orange},#fbbf24)`,borderRadius:99,transition:"width .6s ease"}}/>
+                  <div style={{padding:"9px 10px",borderRadius:12,background:"rgba(255,255,255,0.72)",border:`1px solid ${theme.border}`}}>
+                    <div style={{fontSize:10,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.6}}>Contrôle</div>
+                    <div style={{marginTop:3,fontSize:14,fontWeight:900,color:theme.accent}}>{eC}/{tC||0}</div>
+                  </div>
+                  <div style={{padding:"9px 10px",borderRadius:12,background:"rgba(255,255,255,0.72)",border:`1px solid ${theme.border}`}}>
+                    <div style={{fontSize:10,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.6}}>Restants</div>
+                    <div style={{marginTop:3,fontSize:14,fontWeight:900,color:rest>0?DS.orange:DS.green}}>{rest}</div>
+                  </div>
+                </div>
+
+                {/* Progress section */}
+                {tot>0&&<div style={{marginTop:12}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                    <span style={{fontSize:11,fontWeight:800,color:DS.mid}}>Avancement annuel</span>
+                    <span style={{fontSize:12,fontWeight:900,color:pct>=100?DS.green:rest>3?DS.orange:theme.accent}}>{pct}%</span>
+                  </div>
+                  <div style={{height:7,background:"rgba(255,255,255,0.85)",borderRadius:99,overflow:"hidden",border:`1px solid ${theme.border}`}}>
+                    <div style={{height:"100%",width:`${pct}%`,background:pct>=100?DS.greenGrad:pct>=50?`linear-gradient(90deg,${theme.accent},#38bdf8)`: `linear-gradient(90deg,${DS.orange},#fbbf24)`,borderRadius:99,transition:"width .6s ease"}}/>
                   </div>
                 </div>}
               </div>
