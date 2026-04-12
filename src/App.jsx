@@ -36,7 +36,7 @@ const Ico = {
   chemicals: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v5l3 9a3 3 0 01-3 3H9a3 3 0 01-3-3l3-9V3z"/><line x1="9" y1="3" x2="15" y2="3"/><path d="M7.5 15h9"/></svg>,
   edit: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
   trash: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>,
-  close: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.8" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  close: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
   plus: (s=14,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
   save: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
   search: (s=16,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
@@ -165,35 +165,28 @@ async function load(key, fallback) {
   }
 }
 
-let saveChain = Promise.resolve();
-
 async function save(key, val) {
-  saveChain = saveChain
-    .catch(() => {})
-    .then(async () => {
-      try {
-        const { data, error } = await supabase
-          .from("app_data")
-          .select("data")
-          .eq("id", 1)
-          .single();
+  try {
+    const { data, error } = await supabase
+      .from("app_data")
+      .select("data")
+      .eq("id", 1)
+      .single();
 
-        const currentData = !error && data?.data ? data.data : {};
-        const updatedData = {
-          ...currentData,
-          [key]: val,
-        };
+    const currentData = !error && data?.data ? data.data : {};
 
-        await supabase
-          .from("app_data")
-          .upsert({
-            id: 1,
-            data: updatedData,
-          });
-      } catch {}
-    });
+    const updatedData = {
+      ...currentData,
+      [key]: val
+    };
 
-  return saveChain;
+    await supabase
+      .from("app_data")
+      .upsert({
+        id: 1,
+        data: updatedData
+      });
+  } catch {}
 }
 
 
@@ -239,50 +232,6 @@ function uid() { return Date.now() + Math.random().toString(36).slice(2); }
 const TODAY = new Date().toISOString().split("T")[0];
 const MOIS_NOW = new Date().getMonth() + 1;
 const YEAR_NOW = new Date().getFullYear();
-const MAX_CLIENT_PHOTOS = 10;
-const MAX_PASSAGE_PHOTOS = 10;
-
-function normalizePhotoList(value) {
-  if (Array.isArray(value)) return value.filter(Boolean).slice(0, MAX_CLIENT_PHOTOS);
-  if (typeof value === "string" && value) return [value];
-  return [];
-}
-function getClientPhotos(client) {
-  if (!client) return [];
-  return normalizePhotoList(client.photosPiscine ?? client.photoPiscine);
-}
-function getClientCoverPhoto(client) {
-  return getClientPhotos(client)[0] || "";
-}
-
-function normalizeClientRecord(client = {}) {
-  return {
-    ...client,
-    nom: client.nom || "",
-    tel: client.tel || "",
-    email: client.email || "",
-    adresse: client.adresse || "",
-    bassin: client.bassin || "Liner",
-    volume: Number.isFinite(Number(client.volume)) ? Number(client.volume) : 0,
-    formule: client.formule || "VAC",
-    prix: Number(client.prix) || 0,
-    prixPassageE: Number(client.prixPassageE) || 0,
-    prixPassageC: Number(client.prixPassageC) || 0,
-    dateDebut: client.dateDebut || TODAY,
-    dateFin: client.dateFin || `${new Date().getFullYear()+1}-03-31`,
-    photoPiscine: getClientCoverPhoto(client),
-    photosPiscine: getClientPhotos(client),
-    moisParMois: migrateMois(client.moisParMois || client.saisons),
-  };
-}
-
-const LINE_CLAMP_2 = {
-  overflow: "hidden",
-  display: "-webkit-box",
-  WebkitBoxOrient: "vertical",
-  WebkitLineClamp: 2,
-  wordBreak: "break-word",
-};
 
 
 // ICS EXPORT
@@ -358,40 +307,27 @@ function setupPWA() {
     const link = document.createElement("link"); link.rel="manifest"; link.href=URL.createObjectURL(blob); document.head.appendChild(link);
   }
   if (!document.querySelector('meta[name="theme-color"]')) { const m=document.createElement("meta"); m.name="theme-color"; m.content="#0369a1"; document.head.appendChild(m); }
-  if (!document.querySelector('meta[name="apple-mobile-web-app-capable"]')) { const m1=document.createElement("meta"); m1.name="apple-mobile-web-app-capable"; m1.content="yes"; document.head.appendChild(m1); } if (!document.querySelector('meta[name="mobile-web-app-capable"]')) { const m4=document.createElement("meta"); m4.name="mobile-web-app-capable"; m4.content="yes"; document.head.appendChild(m4); } const hasAppleStatus = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]'); if (!hasAppleStatus) { const m2=document.createElement("meta"); m2.name="apple-mobile-web-app-status-bar-style"; m2.content="black-translucent"; document.head.appendChild(m2); } const hasAppleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]'); if (!hasAppleTitle) { const m3=document.createElement("meta"); m3.name="apple-mobile-web-app-title"; m3.content="BRIBLUE"; document.head.appendChild(m3); }
+  if (!document.querySelector('meta[name="apple-mobile-web-app-capable"]')) { const m1=document.createElement("meta"); m1.name="apple-mobile-web-app-capable"; m1.content="yes"; document.head.appendChild(m1); const m2=document.createElement("meta"); m2.name="apple-mobile-web-app-status-bar-style"; m2.content="black-translucent"; document.head.appendChild(m2); const m3=document.createElement("meta"); m3.name="apple-mobile-web-app-title"; m3.content="BRIBLUE"; document.head.appendChild(m3); }
   if ('serviceWorker' in navigator) { const swCode=`self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>self.clients.claim());self.addEventListener('fetch',e=>e.respondWith(fetch(e.request).catch(()=>new Response('Offline',{status:503}))));`; const swBlob=new Blob([swCode],{type:'application/javascript'}); navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(()=>{}); }
 }
 
 // DESIGN SYSTEM V2  MODERNE
 const DS = {
-  blue:"#1b6b96", blueSoft:"#edf6fb", blueGrad:"linear-gradient(135deg,#2b7eab,#63b3d9)",
-  dark:"#132235", mid:"#64788b",
-  light:"#eef3f7", bg:"#f5f8fb", border:"#dbe5ee", white:"#ffffff",
-  green:"#1f8f6b", greenSoft:"#e8f7f0", greenGrad:"linear-gradient(135deg,#1f8f6b,#57c49e)",
-  red:"#c84a4a", redSoft:"#fdeeee",
-  orange:"#d9773b", orangeSoft:"#fff3e8",
-  yellow:"#c6922b", yellowSoft:"#fff8df",
-  purple:"#7b6fd6", purpleSoft:"#f2efff", purpleGrad:"linear-gradient(135deg,#7b6fd6,#a8a2ea)",
-  teal:"#237e90", tealSoft:"#e8f7f8",
+  blue:"#0369a1", blueSoft:"#e0f2fe", blueGrad:"linear-gradient(135deg,#0284c7,#0ea5e9)",
+  dark:"#0c1222", mid:"#64748b",
+  light:"#f1f5f9", bg:"#f8fafc", border:"#e2e8f0", white:"#ffffff",
+  green:"#059669", greenSoft:"#d1fae5", greenGrad:"linear-gradient(135deg,#059669,#34d399)",
+  red:"#dc2626", redSoft:"#fee2e2",
+  orange:"#ea580c", orangeSoft:"#ffedd5",
+  yellow:"#d97706", yellowSoft:"#fef3c7",
+  purple:"#7c3aed", purpleSoft:"#ede9fe", purpleGrad:"linear-gradient(135deg,#7c3aed,#a78bfa)",
+  teal:"#0891b2", tealSoft:"#e0f7fa",
   radius: 16, radiusSm: 12, radiusLg: 22,
-  shadow: "0 2px 10px rgba(19,34,53,0.05), 0 8px 24px rgba(19,34,53,0.04)",
-  shadowMd: "0 8px 28px rgba(19,34,53,0.08)",
-  shadowLg: "0 18px 48px rgba(19,34,53,0.14)",
+  shadow: "0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)",
+  shadowMd: "0 4px 24px rgba(0,0,0,0.08)",
+  shadowLg: "0 8px 40px rgba(0,0,0,0.12)",
   font: "'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
 };
-
-const CLIENT_CARD_THEMES = [
-  { top:"linear-gradient(135deg,#e0f2fe,#f8fafc)", border:"#7dd3fc", chip:"#e0f2fe", accent:"#0369a1", shadow:"0 10px 30px rgba(2,132,199,0.10)" },
-  { top:"linear-gradient(135deg,#ecfdf5,#f8fafc)", border:"#86efac", chip:"#dcfce7", accent:"#15803d", shadow:"0 10px 30px rgba(34,197,94,0.10)" },
-  { top:"linear-gradient(135deg,#fef3c7,#fff7ed)", border:"#fbbf24", chip:"#fef3c7", accent:"#b45309", shadow:"0 10px 30px rgba(245,158,11,0.11)" },
-  { top:"linear-gradient(135deg,#ede9fe,#f8fafc)", border:"#c4b5fd", chip:"#ede9fe", accent:"#6d28d9", shadow:"0 10px 30px rgba(124,58,237,0.10)" },
-  { top:"linear-gradient(135deg,#ffe4e6,#fff1f2)", border:"#fda4af", chip:"#ffe4e6", accent:"#be123c", shadow:"0 10px 30px rgba(244,63,94,0.10)" },
-  { top:"linear-gradient(135deg,#cffafe,#f8fafc)", border:"#67e8f9", chip:"#cffafe", accent:"#0f766e", shadow:"0 10px 30px rgba(6,182,212,0.10)" },
-];
-function getClientCardTheme(client, index=0) {
-  const seed = String(client?.id || client?.nom || index).split("").reduce((a,ch)=>a+ch.charCodeAt(0),0);
-  return CLIENT_CARD_THEMES[seed % CLIENT_CARD_THEMES.length];
-}
 
 const AC = {
   rouge:  { bg:DS.redSoft,    bd:"#fca5a5", tx:DS.red,    lbl:"URGENT"   },
@@ -423,12 +359,9 @@ const GlobalStyles = () => (
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     html { scroll-behavior: smooth; }
-    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: linear-gradient(180deg, ${DS.bg} 0%, #f8fbfd 100%); overflow-x: hidden; color-scheme: light; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: ${DS.bg}; overflow-x: hidden; }
     input, select, textarea, button { font-family: inherit; }
-    input, select, textarea { background: ${DS.white}; color: ${DS.dark}; }
-    textarea { caret-color: ${DS.dark}; }
-    input::placeholder, textarea::placeholder { color: #94a3b8; opacity: 1; }
-    input:focus, select:focus, textarea:focus { outline: none; border-color: ${DS.blue} !important; box-shadow: 0 0 0 4px ${DS.blue}1f !important; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: ${DS.blue} !important; box-shadow: 0 0 0 3px ${DS.blue}22 !important; }
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 99px; }
     ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 99px; border: 2px solid #f1f5f9; }
@@ -502,7 +435,7 @@ function Modal({ title, onClose, children, wide }) {
         {isMobile && <div style={{display:"flex",justifyContent:"center",padding:"12px 0 4px"}}><div style={{width:36,height:4,borderRadius:2,background:DS.border}}/></div>}
         <div style={{padding:isMobile?"8px 20px 16px":"16px 28px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid "+DS.border}}>
           <span style={{color:DS.dark,fontWeight:800,fontSize:17,letterSpacing:-0.3}}>{title}</span>
-          <button onClick={onClose} className="btn-hover" style={{width:44,height:44,borderRadius:22,background:DS.white,border:"1.5px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:DS.shadow}}>{Ico.close(18,DS.dark)}</button>
+          <button onClick={onClose} className="btn-hover" style={{width:34,height:34,borderRadius:17,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.close(14,DS.mid)}</button>
         </div>
         <div style={{padding:isMobile?"18px 20px 32px":"24px 28px 28px"}}>{children}</div>
       </div>
@@ -558,80 +491,44 @@ function Select({ label, options, ...p }) {
 function PhotoPicker({ label, value, onChange, compact }) {
   const cameraRef = useRef(null);
   const galleryRef = useRef(null);
-  const photos = normalizePhotoList(value);
-  const canAddMore = photos.length < MAX_CLIENT_PHOTOS;
-
-  const readFiles = (files) => Promise.all(
-    files.map(file => new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(file);
-    }))
-  );
-
-  const handleFiles = async (e) => {
-    const picked = Array.from(e.target.files || []);
-    if (!picked.length) return;
-    const slots = MAX_CLIENT_PHOTOS - photos.length;
-    if (slots <= 0) {
-      e.target.value = "";
-      alert(`Maximum ${MAX_CLIENT_PHOTOS} photos`);
-      return;
-    }
-    const images = (await readFiles(picked.slice(0, slots))).filter(Boolean);
-    onChange([...photos, ...images].slice(0, MAX_CLIENT_PHOTOS));
+  const handleFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => onChange(reader.result);
+    reader.readAsDataURL(file);
     e.target.value = "";
   };
-
-  const removePhoto = (index) => onChange(photos.filter((_, i) => i !== index));
 
   return (
     <div>
       {label && (
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:8,flexWrap:"wrap"}}>
-          <span style={{fontSize:15,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block"}}>
-            {label}
-          </span>
-          <Tag color={photos.length >= MAX_CLIENT_PHOTOS ? DS.orange : DS.blue} bg={photos.length >= MAX_CLIENT_PHOTOS ? DS.orangeSoft : DS.blueSoft}>
-            {photos.length}/{MAX_CLIENT_PHOTOS}
-          </Tag>
-        </div>
+        <span style={{fontSize:15,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:8}}>
+          {label}
+        </span>
       )}
-
-      {photos.length > 0 && (
-        <div style={{display:"grid",gridTemplateColumns:compact?"repeat(2, 1fr)":"repeat(auto-fill, minmax(140px, 1fr))",gap:10,marginBottom:12}}>
-          {photos.map((photo, index) => (
-            <div key={photo.slice(0, 40) + index} style={{position:"relative",borderRadius:DS.radius,overflow:"hidden",border:index===0?"2px solid "+DS.blue:"1px solid "+DS.border,background:"#000",minHeight:compact?110:140}}>
-              <img src={photo} alt={`photo ${index+1}`} style={{width:"100%",height:"100%",minHeight:compact?110:140,maxHeight:compact?120:180,objectFit:"cover",display:"block"}}/>
-              {index===0 && <div style={{position:"absolute",left:8,bottom:8,padding:"4px 8px",borderRadius:999,background:"rgba(3,105,161,0.9)",color:"#fff",fontSize:12,fontWeight:800}}>Photo principale</div>}
-              <button type="button" onClick={() => removePhoto(index)} style={{position:"absolute",top:8,right:8,width:40,height:40,borderRadius:20,background:"rgba(19,34,53,0.78)",border:"2px solid rgba(255,255,255,0.5)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2,boxShadow:"0 6px 18px rgba(0,0,0,0.2)"}}>{Ico.close(18,"#fff")}</button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {canAddMore ? (
-        <div style={{display:"flex",gap:10}}>
-          <button type="button" onClick={() => cameraRef.current?.click()} className="btn-hover" style={{flex:1,padding:"16px 10px",borderRadius:DS.radius,border:"2px dashed "+DS.blue,background:DS.blueSoft,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:8,fontFamily:"inherit"}}>
-            {Ico.camera(24,DS.blue)}
-            <span style={{fontSize:15,fontWeight:700,color:DS.blue}}>{photos.length ? "Ajouter une photo" : "Caméra"}</span>
-            <span style={{fontSize:15,color:DS.mid}}>{photos.length ? "Prendre une photo en plus" : "Photo directe"}</span>
-          </button>
-          <button type="button" onClick={() => galleryRef.current?.click()} className="btn-hover" style={{flex:1,padding:"16px 10px",borderRadius:DS.radius,border:"2px dashed "+DS.border,background:DS.light,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:8,fontFamily:"inherit"}}>
-            {Ico.image(24,DS.mid)}
-            <span style={{fontSize:15,fontWeight:700,color:DS.mid}}>Galerie</span>
-            <span style={{fontSize:15,color:"#94a3b8"}}>Jusqu'à {MAX_CLIENT_PHOTOS} photos</span>
-          </button>
+      {value ? (
+        <div style={{position:"relative",borderRadius:DS.radius,overflow:"hidden",border:"2px solid "+DS.blue,background:"#000"}}>
+          <img src={value} alt="photo" style={{width:"100%",maxHeight:compact?120:220,objectFit:"cover",display:"block"}}/>
+          <button onClick={() => onChange("")} style={{position:"absolute",top:8,right:8,width:32,height:32,borderRadius:16,background:"rgba(0,0,0,0.6)",border:"2px solid rgba(255,255,255,0.4)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2}}>{Ico.close(14,"#fff")}</button>
+          <button onClick={() => cameraRef.current?.click()} style={{position:"absolute",bottom:8,right:8,padding:"6px 12px",borderRadius:10,background:"rgba(0,0,0,0.55)",border:"1px solid rgba(255,255,255,0.3)",cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontSize:15,fontWeight:600,color:"#fff",fontFamily:"inherit"}}>{Ico.camera(13,"#fff")} Reprendre</button>
         </div>
       ) : (
-        <div style={{padding:"12px 14px",borderRadius:DS.radius,border:"1px dashed "+DS.orange,background:DS.orangeSoft,color:DS.orange,fontSize:14,fontWeight:700}}>
-          Limite atteinte : maximum {MAX_CLIENT_PHOTOS} photos par client.
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={() => cameraRef.current?.click()} className="btn-hover" style={{flex:1,padding:"16px 10px",borderRadius:DS.radius,border:"2px dashed "+DS.blue,background:DS.blueSoft,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:8,fontFamily:"inherit"}}>
+            {Ico.camera(24,DS.blue)}
+            <span style={{fontSize:15,fontWeight:700,color:DS.blue}}>Caméra</span>
+            <span style={{fontSize:15,color:DS.mid}}>Photo directe</span>
+          </button>
+          <button onClick={() => galleryRef.current?.click()} className="btn-hover" style={{flex:1,padding:"16px 10px",borderRadius:DS.radius,border:"2px dashed "+DS.border,background:DS.light,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:8,fontFamily:"inherit"}}>
+            {Ico.image(24,DS.mid)}
+            <span style={{fontSize:15,fontWeight:700,color:DS.mid}}>Galerie</span>
+            <span style={{fontSize:15,color:"#94a3b8"}}>Depuis l'album</span>
+          </button>
         </div>
       )}
-
-      <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleFiles}/>
-      <input ref={galleryRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={handleFiles}/>
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleFile}/>
+      <input ref={galleryRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleFile}/>
     </div>
   );
 }
@@ -680,193 +577,110 @@ function FormClient({ initial, clients, onSave, onClose }) {
   const isMobile = useIsMobile();
   const [f, setF] = useState(() => {
     if (initial) {
-      return normalizeClientRecord(initial);
+      return { ...initial, moisParMois: migrateMois(initial.moisParMois||initial.saisons), photoPiscine: initial.photoPiscine||"", prixPassageE: initial.prixPassageE||0, prixPassageC: initial.prixPassageC||0 };
     }
     return {
-      ...normalizeClientRecord({
-        id: `C${String(clients.length+1).padStart(3,"0")}`,
-        nom:"", tel:"", email:"", adresse:"", bassin:"Liner", volume:30,
-        formule:"VAC", prix:0, prixPassageE:0, prixPassageC:0, dateDebut:TODAY, photoPiscine:"",
-        dateFin: `${new Date().getFullYear()+1}-03-31`,
-        moisParMois: {...MOIS_PAR_MOIS_DEF},
-      }),
-      photosPiscine: [],
+      id: `C${String(clients.length+1).padStart(3,"0")}`,
+      nom:"", tel:"", email:"", adresse:"", bassin:"Liner", volume:30,
+      formule:"VAC", prix:0, prixPassageE:0, prixPassageC:0, dateDebut:TODAY, photoPiscine:"",
+      dateFin: `${new Date().getFullYear()+1}-03-31`,
+      moisParMois: {...MOIS_PAR_MOIS_DEF},
     };
   });
-
   const set = (k,v) => setF(p=>({...p,[k]:v}));
-  const setPhotos = (photos) => {
-    const cleanPhotos = normalizePhotoList(photos);
-    setF(p=>({...p, photosPiscine: cleanPhotos, photoPiscine: cleanPhotos[0] || ""}));
-  };
   const setMoisVal = (m,type,v) => setF(p=>({...p,moisParMois:{...p.moisParMois,[m]:{...p.moisParMois[m],[type]:Math.max(0,v)}}}));
   const totalE = totalAnnuel(f.moisParMois,"entretien");
   const totalC = totalAnnuel(f.moisParMois,"controle");
   const total = totalE + totalC;
-  const prixAnnuel = totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0);
-
-  const blockStyle = {
-    background: "linear-gradient(180deg,#ffffff,#fbfdff)",
-    border: "1px solid #dbe7f3",
-    borderRadius: 20,
-    padding: isMobile ? "16px 14px" : "18px 18px",
-    boxShadow: "0 10px 28px rgba(2,132,199,0.06)",
-    marginBottom: 16,
-  };
-  const infoChip = (label, value, color, bg) => (
-    <div style={{padding:"10px 12px",borderRadius:14,background:bg,border:`1px solid ${color}22`,display:"flex",flexDirection:"column",gap:4}}>
-      <span style={{fontSize:12,fontWeight:800,textTransform:"uppercase",letterSpacing:.8,color}}>{label}</span>
-      <span style={{fontSize:18,fontWeight:900,color:DS.dark}}>{value}</span>
-    </div>
-  );
 
   return (
     <Modal title={isNew ? "Nouveau client" : `Modifier — ${f.nom}`} onClose={onClose} wide>
-      <div style={{display:"flex",flexDirection:"column",gap:16}}>
-        <div style={{background:"linear-gradient(135deg,#eff8ff,#f8fbff 60%,#eefaf8)",border:"1px solid #d9ebf7",borderRadius:24,padding:isMobile?"16px":"20px",boxShadow:"0 12px 28px rgba(14,165,233,0.07)"}}>
-          <div style={{display:"flex",alignItems:isMobile?"flex-start":"center",justifyContent:"space-between",gap:14,flexDirection:isMobile?"column":"row"}}>
-            <div style={{display:"flex",alignItems:"center",gap:12}}>
-              <div style={{width:52,height:52,borderRadius:18,background:"linear-gradient(135deg,#0284c7,#22c55e)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 10px 22px rgba(2,132,199,0.18)"}}>
-                {Ico.userPlus(24,"#fff")}
-              </div>
-              <div>
-                <div style={{fontSize:isMobile?22:24,fontWeight:900,color:DS.dark,letterSpacing:-0.8}}>{isNew ? "Créer une fiche client" : "Mettre à jour la fiche client"}</div>
-                <div style={{fontSize:14,color:DS.mid,marginTop:4,maxWidth:560}}>Saisie plus claire, sections mieux séparées et calcul automatique du contrat.</div>
-              </div>
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(88px,1fr))",gap:8,width:isMobile?"100%":"auto"}}>
-              {infoChip("Photos", (f.photosPiscine||[]).length, DS.purple, DS.purpleSoft)}
-              {infoChip("Passages", total, DS.blue, DS.blueSoft)}
-              {infoChip("Contrat", `${prixAnnuel.toLocaleString("fr")} €`, DS.green, DS.greenSoft)}
-            </div>
-          </div>
+      <Section title="Informations">
+        <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12}}>
+          <div style={{gridColumn:"1/-1"}}><Input label="Nom complet *" value={f.nom} onChange={e=>set("nom",e.target.value)} placeholder="Dupont Marie"/></div>
+          <Input label="Téléphone" value={f.tel} onChange={e=>set("tel",e.target.value)}/>
+          <Input label="Email" type="email" value={f.email} onChange={e=>set("email",e.target.value)}/>
+          <div style={{gridColumn:"1/-1"}}><Input label="Adresse" value={f.adresse} onChange={e=>set("adresse",e.target.value)}/></div>
+          <Select label="Type bassin" value={f.bassin} onChange={e=>set("bassin",e.target.value)} options={["Liner","Béton","Coque polyester","PVC armé","Hors-sol","Autre"]}/>
+          <Input label="Volume (m³)" type="number" value={f.volume} onChange={e=>set("volume",+e.target.value)}/>
         </div>
-
-        <div style={blockStyle}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,gap:10,flexWrap:"wrap"}}>
-            <div>
-              <div style={{fontSize:18,fontWeight:900,color:DS.dark}}>Coordonnées client</div>
-              <div style={{fontSize:14,color:DS.mid,marginTop:3}}>Renseigne d’abord l’identité et les contacts.</div>
-            </div>
-            <Tag color={DS.blue} bg={DS.blueSoft}>Fiche principale</Tag>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1.2fr .8fr",gap:12}}>
-            <div><Input label="Nom complet *" value={f.nom} onChange={e=>set("nom",e.target.value)} placeholder="Ex. Dupont Marie" style={{background:"#fff"}}/></div>
-            <Input label="Téléphone" value={f.tel} onChange={e=>set("tel",e.target.value)} placeholder="06 12 34 56 78" inputMode="tel" autoComplete="tel" style={{background:"#fff"}}/>
-            <Input label="Email" type="email" value={f.email} onChange={e=>set("email",e.target.value)} placeholder="client@email.fr" autoComplete="email" style={{background:"#fff"}}/>
-            <div style={{gridColumn:"1/-1"}}>
-              <Input label="Adresse postale" value={f.adresse} onChange={e=>set("adresse",e.target.value)} placeholder="Rue, code postal, ville" autoComplete="street-address" style={{background:"#fff"}}/>
-            </div>
-          </div>
+      </Section>
+      <Section title="Photo de la piscine">
+        <PhotoPicker value={f.photoPiscine||""} onChange={v=>set("photoPiscine",v)} compact/>
+      </Section>
+      <Section title="Contrat">
+        <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr 1fr",gap:12}}>
+          <Select label="Formule" value={f.formule} onChange={e=>set("formule",e.target.value)} options={["VAC","VAC+","Confort","Confort+"]}/>
+          <div/>
+          {!isMobile&&<div/>}
+          <Input label="Date début" type="date" value={f.dateDebut} onChange={e=>set("dateDebut",e.target.value)}/>
+          <Input label="Date fin" type="date" value={f.dateFin} onChange={e=>set("dateFin",e.target.value)}/>
         </div>
-
-        <div style={blockStyle}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,gap:10,flexWrap:"wrap"}}>
-            <div>
-              <div style={{fontSize:18,fontWeight:900,color:DS.dark}}>Piscine et photos</div>
-              <div style={{fontSize:14,color:DS.mid,marginTop:3}}>Ajoute les infos techniques et les visuels de départ.</div>
-            </div>
-            <Tag color={DS.teal} bg={DS.tealSoft}>Jusqu'à 10 photos</Tag>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12,marginBottom:14}}>
-            <Select label="Type bassin" value={f.bassin} onChange={e=>set("bassin",e.target.value)} options={["Liner","Béton","Coque polyester","PVC armé","Hors-sol","Autre"]}/>
-            <Input label="Volume (m³)" type="number" value={f.volume} onChange={e=>set("volume",+e.target.value)} placeholder="30" inputMode="numeric" style={{background:"#fff"}}/>
-          </div>
-          <PhotoPicker label="Photos de la piscine" value={f.photosPiscine||[]} onChange={setPhotos} compact/>
+      </Section>
+      <Section title="Passages par mois">
+        <div style={{background:DS.dark,padding:"8px 14px",borderRadius:"12px 12px 0 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{color:"rgba(255,255,255,0.8)",fontSize:15,fontWeight:700}}>Planning mensuel</span>
+          <span style={{color:"#fff",fontSize:15,fontWeight:800}}>🔧 {totalE}  ·  💧 {totalC}  ·  Total {totalE+totalC}</span>
         </div>
-
-        <div style={blockStyle}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,gap:10,flexWrap:"wrap"}}>
-            <div>
-              <div style={{fontSize:18,fontWeight:900,color:DS.dark}}>Contrat</div>
-              <div style={{fontSize:14,color:DS.mid,marginTop:3}}>Formule, dates et prix calculés automatiquement.</div>
-            </div>
-            <Tag color={DS.green} bg={DS.greenSoft}>Calcul auto</Tag>
-          </div>
-
-          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr 1fr",gap:12,marginBottom:12}}>
-            <Select label="Formule" value={f.formule} onChange={e=>set("formule",e.target.value)} options={["VAC","VAC+","Confort","Confort+"]}/>
-            <Input label="Date début" type="date" value={f.dateDebut} onChange={e=>set("dateDebut",e.target.value)} style={{background:"#fff"}}/>
-            <Input label="Date fin" type="date" value={f.dateFin} onChange={e=>set("dateFin",e.target.value)} style={{background:"#fff"}}/>
-          </div>
-
-          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:10,marginBottom:14}}>
-            <Input label="Prix/passage entretien (€)" type="number" value={f.prixPassageE||""} onChange={e=>set("prixPassageE",+e.target.value||0)} inputMode="decimal" style={{background:"#fff"}}/>
-            <Input label="Prix/passage contrôle (€)" type="number" value={f.prixPassageC||""} onChange={e=>set("prixPassageC",+e.target.value||0)} inputMode="decimal" style={{background:"#fff"}}/>
-          </div>
-
-          <div style={{background:"linear-gradient(135deg,#0c1222,#173153 55%,#1f7a8c)",borderRadius:18,padding:"16px",color:"#fff",boxShadow:"inset 0 1px 0 rgba(255,255,255,0.06)"}}>
-            <div style={{fontSize:12,fontWeight:800,textTransform:"uppercase",letterSpacing:1,color:"rgba(255,255,255,0.62)",marginBottom:10}}>Récap contrat</div>
-            <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr 1fr",gap:10}}>
-              <div style={{background:"rgba(255,255,255,0.08)",borderRadius:14,padding:"12px 14px"}}>
-                <div style={{fontSize:13,color:"rgba(255,255,255,0.7)"}}>Entretiens</div>
-                <div style={{fontSize:22,fontWeight:900,marginTop:4}}>{totalE}</div>
-              </div>
-              <div style={{background:"rgba(255,255,255,0.08)",borderRadius:14,padding:"12px 14px"}}>
-                <div style={{fontSize:13,color:"rgba(255,255,255,0.7)"}}>Contrôles</div>
-                <div style={{fontSize:22,fontWeight:900,marginTop:4}}>{totalC}</div>
-              </div>
-              <div style={{background:"rgba(255,255,255,0.12)",borderRadius:14,padding:"12px 14px",border:"1px solid rgba(255,255,255,0.08)"}}>
-                <div style={{fontSize:13,color:"rgba(255,255,255,0.72)"}}>Prix annuel</div>
-                <div style={{fontSize:26,fontWeight:900,marginTop:4,color:"#67e8f9"}}>{prixAnnuel.toLocaleString("fr")} €</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style={blockStyle}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,gap:10,flexWrap:"wrap"}}>
-            <div>
-              <div style={{fontSize:18,fontWeight:900,color:DS.dark}}>Passages par mois</div>
-              <div style={{fontSize:14,color:DS.mid,marginTop:3}}>Ajuste rapidement le nombre de visites entretien et contrôle.</div>
-            </div>
-            <Tag color={DS.orange} bg={DS.orangeSoft}>{total} passages annuels</Tag>
-          </div>
-
-          <div style={{background:"#f6fbff",padding:"10px 14px",borderRadius:"16px 16px 0 0",display:"flex",justifyContent:"space-between",alignItems:"center",border:"1px solid #d9eaf7",borderBottom:"none"}}>
-            <span style={{color:DS.dark,fontSize:14,fontWeight:800}}>Planning mensuel</span>
-            <span style={{color:DS.mid,fontSize:14,fontWeight:800}}>🔧 {totalE} · 💧 {totalC}</span>
-          </div>
-          <div style={{border:"1px solid #d9eaf7",borderTop:"none",borderRadius:"0 0 16px 16px",overflow:"hidden"}}>
-            {[...Array(12)].map((_,i)=>{
-              const m=i+1; const mv=getMoisVal(f.moisParMois,m); const sc=SAISONS_META[getSaison(m)];
-              return (
-                <div key={m} style={{display:"flex",alignItems:"center",gap:8,padding:isMobile?"10px 10px":"10px 12px",borderBottom:i<11?"1px solid #e6eef6":"none",background:i%2===0?"#fff":"#fbfdff"}}>
-                  <div style={{width:isMobile?42:50,display:"flex",alignItems:"center",gap:6}}>
-                    <div style={{width:5,height:26,borderRadius:3,background:sc.color}}/>
-                    <span style={{fontSize:14,fontWeight:900,color:sc.color}}>{MOIS[m]}</span>
-                  </div>
-                  <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:isMobile?"wrap":"nowrap"}}>
-                    <div style={{display:"flex",alignItems:"center",gap:6,background:"#eff8ff",border:"1px solid #d9ebf7",padding:"6px 8px",borderRadius:12}}>
-                      <span style={{fontSize:15,color:DS.blue}}>🔧</span>
-                      <button onClick={()=>setMoisVal(m,"entretien",mv.entretien-1)} style={{width:30,height:30,borderRadius:10,border:"1px solid "+DS.border,background:"#fff",cursor:"pointer",fontSize:18,fontWeight:800,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
-                      <span style={{fontSize:17,fontWeight:900,color:DS.blue,minWidth:18,textAlign:"center"}}>{mv.entretien}</span>
-                      <button onClick={()=>setMoisVal(m,"entretien",mv.entretien+1)} style={{width:30,height:30,borderRadius:10,border:"1px solid "+DS.blue,background:DS.blueSoft,cursor:"pointer",fontSize:18,fontWeight:800,color:DS.blue,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
-                    </div>
-                    <div style={{display:"flex",alignItems:"center",gap:6,background:"#f2fbfb",border:"1px solid #d9f1f1",padding:"6px 8px",borderRadius:12}}>
-                      <span style={{fontSize:15,color:DS.teal}}>💧</span>
-                      <button onClick={()=>setMoisVal(m,"controle",mv.controle-1)} style={{width:30,height:30,borderRadius:10,border:"1px solid "+DS.border,background:"#fff",cursor:"pointer",fontSize:18,fontWeight:800,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
-                      <span style={{fontSize:17,fontWeight:900,color:DS.teal,minWidth:18,textAlign:"center"}}>{mv.controle}</span>
-                      <button onClick={()=>setMoisVal(m,"controle",mv.controle+1)} style={{width:30,height:30,borderRadius:10,border:"1px solid "+DS.teal,background:DS.tealSoft,cursor:"pointer",fontSize:18,fontWeight:800,color:DS.teal,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
-                    </div>
-                  </div>
-                  <div style={{fontSize:15,fontWeight:900,color:mv.entretien+mv.controle>0?DS.dark:"#b8c5d4",minWidth:28,textAlign:"right"}}>{mv.entretien+mv.controle>0?mv.entretien+mv.controle:"—"}</div>
+        <div style={{border:"1px solid "+DS.border,borderTop:"none",borderRadius:"0 0 12px 12px",overflow:"hidden"}}>
+          {[...Array(12)].map((_,i)=>{
+            const m=i+1; const mv=getMoisVal(f.moisParMois,m); const sc=SAISONS_META[getSaison(m)];
+            return (
+              <div key={m} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderBottom:i<11?"1px solid "+DS.border:"none",background:i%2===0?DS.white:DS.light}}>
+                <div style={{width:36,display:"flex",alignItems:"center",gap:4}}>
+                  <div style={{width:4,height:24,borderRadius:2,background:sc.color}}/>
+                  <span style={{fontSize:15,fontWeight:700,color:sc.color}}>{MOIS[m]}</span>
                 </div>
-              );
-            })}
+                <div style={{flex:1,display:"flex",alignItems:"center",gap:12}}>
+                  <div style={{display:"flex",alignItems:"center",gap:4}}>
+                    <span style={{fontSize:15,color:DS.blue}}>🔧</span>
+                    <button onClick={()=>setMoisVal(m,"entretien",mv.entretien-1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.border,background:DS.white,cursor:"pointer",fontSize:15,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                    <span style={{fontSize:16,fontWeight:900,color:DS.blue,minWidth:16,textAlign:"center"}}>{mv.entretien}</span>
+                    <button onClick={()=>setMoisVal(m,"entretien",mv.entretien+1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.blue,background:DS.blueSoft,cursor:"pointer",fontSize:15,fontWeight:700,color:DS.blue,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:4}}>
+                    <span style={{fontSize:15,color:DS.teal}}>💧</span>
+                    <button onClick={()=>setMoisVal(m,"controle",mv.controle-1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.border,background:DS.white,cursor:"pointer",fontSize:15,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                    <span style={{fontSize:16,fontWeight:900,color:DS.teal,minWidth:16,textAlign:"center"}}>{mv.controle}</span>
+                    <button onClick={()=>setMoisVal(m,"controle",mv.controle+1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.teal,background:DS.tealSoft,cursor:"pointer",fontSize:15,fontWeight:700,color:DS.teal,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                  </div>
+                </div>
+                <div style={{fontSize:15,fontWeight:700,color:mv.entretien+mv.controle>0?DS.dark:DS.border,minWidth:20,textAlign:"right"}}>{mv.entretien+mv.controle>0?mv.entretien+mv.controle:"—"}</div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:12}}>
+          <Input label="Prix/passage entretien (€)" type="number" value={f.prixPassageE||""} onChange={e=>set("prixPassageE",+e.target.value||0)}/>
+          <Input label="Prix/passage contrôle (€)" type="number" value={f.prixPassageC||""} onChange={e=>set("prixPassageC",+e.target.value||0)}/>
+        </div>
+        {/* Récap tarification auto */}
+        <div style={{marginTop:12,background:"linear-gradient(135deg,#0c1222,#1a365d)",borderRadius:DS.radiusSm,padding:"14px 16px",color:"#fff"}}>
+          <div style={{fontSize:15,fontWeight:700,textTransform:"uppercase",letterSpacing:1,color:"rgba(255,255,255,0.5)",marginBottom:10}}>Tarification</div>
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:15,color:"rgba(255,255,255,0.7)"}}>🔧 {totalE} entretiens × {f.prixPassageE||0}€</span>
+              <span style={{fontSize:15,fontWeight:800}}>{totalE*(f.prixPassageE||0)} €</span>
+            </div>
+            {totalC>0&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:15,color:"rgba(255,255,255,0.7)"}}>💧 {totalC} contrôles × {f.prixPassageC||0}€</span>
+              <span style={{fontSize:15,fontWeight:800}}>{totalC*(f.prixPassageC||0)} €</span>
+            </div>}
+            <div style={{borderTop:"1px solid rgba(255,255,255,0.15)",paddingTop:8,marginTop:4,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:15,fontWeight:700}}>Prix annuel</span>
+              <span style={{fontSize:22,fontWeight:900,color:"#22d3ee"}}>{(totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0)).toLocaleString("fr")} €</span>
+            </div>
           </div>
         </div>
-
-        <div style={{display:"flex",gap:10,position:"sticky",bottom:0,background:"linear-gradient(180deg,rgba(248,250,252,0),#f8fafc 25%,#f8fafc)",paddingTop:8}}>
-          <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"14px 14px",borderRadius:16,background:"#fff",border:"1.5px solid #d8e3ee",cursor:"pointer",fontWeight:800,fontSize:15,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 6px 18px rgba(15,23,42,0.05)"}}>{Ico.close(18,DS.dark)} Annuler</button>
-          <BtnPrimary onClick={()=>{ if(!f.nom.trim()) return alert("Nom requis"); const prixCalc=totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0); const photosPiscine = normalizePhotoList(f.photosPiscine||f.photoPiscine); onSave({ ...normalizeClientRecord(f), photosPiscine, photoPiscine: photosPiscine[0]||"", prix:prixCalc||f.prix||0 }); }} icon={Ico.save(16,"#fff")} style={{flex:2,borderRadius:16,padding:"14px 18px",background:"linear-gradient(135deg,#0284c7,#0891b2)"}}>Enregistrer le client</BtnPrimary>
-        </div>
+      </Section>
+      <div style={{display:"flex",gap:10}}>
+        <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
+        <BtnPrimary onClick={()=>{ if(!f.nom.trim()) return alert("Nom requis"); const prixCalc=totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0); onSave({...f, prix:prixCalc||f.prix||0}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
       </div>
     </Modal>
   );
 }
 
-// FORMULAIRE LIVRAISON
 // FORMULAIRE LIVRAISON
 function genererHTMLLivraison(livraison, client) {
   const dateStr = new Date(livraison.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"});
@@ -998,7 +812,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
         </div>
       </Section>
       <Section title="Description / notes">
-        <textarea value={f.description} onChange={e=>set("description",e.target.value)} placeholder="Quantités, marques, détails..." style={{width:"100%",padding:"10px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:15,minHeight:64,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,background:DS.white,caretColor:DS.dark,outline:"none",transition:"all .2s"}}/>
+        <textarea value={f.description} onChange={e=>set("description",e.target.value)} placeholder="Quantités, marques, détails..." style={{width:"100%",padding:"10px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:15,minHeight:64,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,outline:"none",transition:"all .2s"}}/>
       </Section>
       <Section title="Statut">
         <div style={{display:"flex",gap:8}}>
@@ -1024,7 +838,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
         );
       })()}
       <div style={{display:"flex",gap:10}}>
-        <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"13px 14px",borderRadius:DS.radiusSm,background:DS.white,border:"1.5px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:15,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:DS.shadow}}>{Ico.close(16,DS.dark)} Annuler</button>
+        <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
         <BtnPrimary onClick={()=>{ if(!f.clientId) return alert("Veuillez sélectionner un client"); if(!f.date) return alert("Date requise"); onSave({...f,id:isEdit?f.id:uid()}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
       </div>
     </Modal>
@@ -1082,10 +896,10 @@ function FormRdv({ initial, clients, onSave, onClose }) {
       </Section>
       <Section title="Description">
         <textarea value={f.description} onChange={e=>set("description",e.target.value)} placeholder="Détails, adresse, notes..."
-          style={{width:"100%",padding:"10px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:15,minHeight:64,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,background:DS.white,caretColor:DS.dark,outline:"none"}}/>
+          style={{width:"100%",padding:"10px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:15,minHeight:64,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,outline:"none"}}/>
       </Section>
       <div style={{display:"flex",gap:10}}>
-        <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"13px 14px",borderRadius:DS.radiusSm,background:DS.white,border:"1.5px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:15,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:DS.shadow}}>{Ico.close(16,DS.dark)} Annuler</button>
+        <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
         <BtnPrimary onClick={()=>{ if(!f.date) return alert("Date requise"); onSave({...f,id:isEdit?f.id:uid()}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
       </div>
     </Modal>
@@ -1117,77 +931,61 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
 
   return (
     <Modal title="" onClose={onClose} wide>
-      {/* Hero header */}
+      {/* Hero header — propre et lisible */}
       <div style={{margin:"-24px -28px 0",marginTop:isMobile?"-18px":"-24px",marginLeft:isMobile?"-20px":"-28px",marginRight:isMobile?"-20px":"-28px"}}>
-        {client.photoPiscine
-          ? <div style={{height:130,background:`url(${client.photoPiscine}) center/cover`,position:"relative"}}>
-              <div style={{position:"absolute",inset:0,background:"linear-gradient(transparent 20%,rgba(12,18,34,0.85))"}}/>
-              <div style={{position:"absolute",bottom:14,left:18,right:18,display:"flex",gap:14,alignItems:"flex-end"}}>
-                <Avatar nom={client.nom} size={52} photo={null}/>
-                <div style={{flex:1}}>
-                  <div style={{fontWeight:900,fontSize:17,color:"#fff",letterSpacing:-0.3,textShadow:"0 1px 4px rgba(0,0,0,0.4)"}}>{client.nom}</div>
-                  <div style={{display:"flex",gap:6,marginTop:4}}>
-                    <Tag color="#fff" bg="rgba(255,255,255,0.2)" style={{backdropFilter:"blur(4px)"}}>{client.formule}</Tag>
-                    <Tag color={col.tx} bg={col.bg}>{jours!==null&&jours>=0?`${jours}j restants`:jours!==null?`Expiré ${Math.abs(jours)}j`:col.lbl}</Tag>
-                  </div>
-                </div>
+        {/* Bandeau photo si disponible */}
+        {client.photoPiscine && (
+          <div style={{height:100,background:`url(${client.photoPiscine}) center/cover`,position:"relative"}}>
+            <div style={{position:"absolute",inset:0,background:"linear-gradient(transparent 30%,rgba(12,18,34,0.7))"}}/>
+          </div>
+        )}
+        {/* Bloc infos client */}
+        <div style={{background:client.photoPiscine?"#0c1222":"linear-gradient(135deg,#0f2040,#0369a1)",padding:"16px 20px 14px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:14}}>
+            <Avatar nom={client.nom} size={54} photo={null}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:900,fontSize:17,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:-0.3}}>{client.nom}</div>
+              <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap",alignItems:"center"}}>
+                <span style={{background:"rgba(56,189,248,0.2)",color:"#7dd3fc",fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:20,border:"1px solid rgba(56,189,248,0.3)"}}>{client.formule}</span>
+                {client.bassin&&<span style={{background:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.7)",fontSize:11,fontWeight:600,padding:"3px 8px",borderRadius:20}}>{client.bassin}{client.volume?" · "+client.volume+"m³":""}</span>}
               </div>
             </div>
-          : <div style={{background:"linear-gradient(135deg,#17324a,#24597d,#4f97bf)",padding:"22px 20px 18px",position:"relative",overflow:"hidden"}}>
-              <div style={{position:"absolute",top:"-20%",right:"-10%",width:120,height:120,borderRadius:60,background:"rgba(255,255,255,0.05)"}}/>
-              <div style={{display:"flex",gap:14,alignItems:"center",position:"relative"}}>
-                <Avatar nom={client.nom} size={52} photo={null}/>
-                <div style={{flex:1}}>
-                  <div style={{fontWeight:900,fontSize:17,color:"#fff",letterSpacing:-0.3}}>{client.nom}</div>
-                  <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
-                    <Tag color="#fff" bg="rgba(255,255,255,0.15)">{client.formule}</Tag>
-                    {client.bassin&&<Tag color="#fff" bg="rgba(255,255,255,0.1)">{client.bassin}</Tag>}
-                    <Tag color={col.tx} bg={col.bg}>{jours!==null&&jours>=0?`${jours}j restants`:jours!==null?`Expiré ${Math.abs(jours)}j`:col.lbl}</Tag>
-                  </div>
-                </div>
+            <div style={{flexShrink:0}}>
+              <div style={{background:col.bg,color:col.tx,fontSize:12,fontWeight:800,padding:"6px 12px",borderRadius:20,border:"1px solid "+col.bd+"55",textAlign:"center"}}>
+                {col.lbl}
               </div>
+              {jours!==null&&<div style={{fontSize:11,color:"rgba(255,255,255,0.55)",textAlign:"center",marginTop:3}}>{jours>=0?jours+"j restants":"Expiré"}</div>}
             </div>
-        }
-      </div>
-
-      {/* Stats ring */}
-      <div style={{display:"flex",gap:8,marginTop:16,marginBottom:14}}>
-        <div style={{flex:1,background:`linear-gradient(135deg,${DS.blue}08,#ffffff)`,borderRadius:DS.radiusSm,padding:"12px",border:"1px solid "+DS.blue+"18"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-            <span style={{fontSize:15,fontWeight:700,color:DS.blue,textTransform:"uppercase",letterSpacing:.5}}>🔧 Entretiens</span>
-            <span style={{fontSize:15,fontWeight:900,color:DS.blue}}>{effE}<span style={{fontWeight:500,color:DS.mid}}>/{totalE}</span></span>
           </div>
-          <ProgressBar value={effE} max={totalE} height={5}/>
-        </div>
-        <div style={{flex:1,background:`linear-gradient(135deg,${DS.teal}08,#ffffff)`,borderRadius:DS.radiusSm,padding:"12px",border:"1px solid "+DS.teal+"18"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-            <span style={{fontSize:15,fontWeight:700,color:DS.teal,textTransform:"uppercase",letterSpacing:.5}}>💧 Contrôles</span>
-            <span style={{fontSize:15,fontWeight:900,color:DS.teal}}>{effC}<span style={{fontWeight:500,color:DS.mid}}>/{totalC}</span></span>
-          </div>
-          <ProgressBar value={effC} max={totalC} height={5}/>
         </div>
       </div>
 
-      {/* Summary bar */}
-      <div style={{display:"flex",gap:6,marginBottom:16}}>
-        <div style={{flex:1,background:DS.light,borderRadius:10,padding:"10px 8px",textAlign:"center"}}>
-          <div style={{fontSize:20,fontWeight:900,color:pct>=100?DS.green:DS.dark}}>{pct}<span style={{fontSize:15,fontWeight:600}}>%</span></div>
-          <div style={{fontSize:9,color:DS.mid,fontWeight:600,marginTop:1}}>Avancement</div>
+      {/* Stats row */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginTop:16,marginBottom:14}}>
+        <div style={{textAlign:"center",padding:"10px 4px",borderRadius:12,background:DS.blueSoft,border:"1px solid "+DS.blue+"18"}}>
+          <div style={{fontSize:19,fontWeight:900,color:DS.blue,lineHeight:1}}>{effE}<span style={{fontSize:11,color:DS.mid,fontWeight:500}}>/{totalE}</span></div>
+          <div style={{fontSize:10,fontWeight:700,color:DS.blue,marginTop:3}}>🔧 Entretiens</div>
+          <div style={{height:3,background:DS.white,borderRadius:99,overflow:"hidden",marginTop:6,marginInline:4}}><div style={{height:"100%",width:`${totalE>0?Math.min(100,effE/totalE*100):0}%`,background:DS.blue,borderRadius:99}}/></div>
         </div>
-        <div style={{flex:1,background:rest>0?DS.orangeSoft:DS.greenSoft,borderRadius:10,padding:"10px 8px",textAlign:"center",border:"1px solid "+(rest>0?DS.orange:DS.green)+"22"}}>
-          <div style={{fontSize:20,fontWeight:900,color:rest>0?DS.orange:DS.green}}>{rest}</div>
-          <div style={{fontSize:9,color:rest>0?DS.orange:DS.green,fontWeight:600,marginTop:1}}>Restants</div>
+        <div style={{textAlign:"center",padding:"10px 4px",borderRadius:12,background:DS.tealSoft,border:"1px solid "+DS.teal+"18"}}>
+          <div style={{fontSize:19,fontWeight:900,color:DS.teal,lineHeight:1}}>{effC}<span style={{fontSize:11,color:DS.mid,fontWeight:500}}>/{totalC}</span></div>
+          <div style={{fontSize:10,fontWeight:700,color:DS.teal,marginTop:3}}>💧 Contrôles</div>
+          <div style={{height:3,background:DS.white,borderRadius:99,overflow:"hidden",marginTop:6,marginInline:4}}><div style={{height:"100%",width:`${totalC>0?Math.min(100,effC/totalC*100):0}%`,background:DS.teal,borderRadius:99}}/></div>
         </div>
-        <div style={{flex:1,background:`linear-gradient(135deg,${DS.purpleSoft},#ffffff)`,borderRadius:10,padding:"10px 8px",textAlign:"center",border:"1px solid #7c3aed18"}}>
-          <div style={{fontSize:16,fontWeight:900,color:DS.purple}}>{client.prix?client.prix.toLocaleString("fr"):"—"}<span style={{fontSize:15}}>€</span></div>
-          <div style={{fontSize:9,color:DS.purple,fontWeight:600,marginTop:1}}>Prix annuel</div>
+        <div style={{textAlign:"center",padding:"10px 4px",borderRadius:12,background:rest>0?DS.orangeSoft:DS.greenSoft,border:"1px solid "+(rest>0?DS.orange:DS.green)+"18"}}>
+          <div style={{fontSize:19,fontWeight:900,color:rest>0?DS.orange:DS.green,lineHeight:1}}>{pct}<span style={{fontSize:11,fontWeight:500}}>%</span></div>
+          <div style={{fontSize:10,fontWeight:700,color:rest>0?DS.orange:DS.green,marginTop:3}}>{rest>0?"⏳ "+rest+" restants":"✅ À jour"}</div>
+        </div>
+        <div style={{textAlign:"center",padding:"10px 4px",borderRadius:12,background:DS.purpleSoft,border:"1px solid "+DS.purple+"18"}}>
+          <div style={{fontSize:14,fontWeight:900,color:DS.purple,lineHeight:1}}>{client.prix?client.prix.toLocaleString("fr"):"—"}<span style={{fontSize:9}}>€</span></div>
+          <div style={{fontSize:10,fontWeight:700,color:DS.purple,marginTop:3}}>💰 Contrat</div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div style={{display:"flex",gap:0,marginBottom:16,background:"rgba(255,255,255,0.9)",border:"1px solid "+DS.border,borderRadius:DS.radiusSm,padding:4,boxShadow:DS.shadow}}>
+      <div style={{display:"flex",gap:0,marginBottom:16,background:DS.light,borderRadius:DS.radiusSm,padding:3}}>
         {[["infos","Infos"],["saisons","Planning"],["passages","Passages"],["rdvs","RDV"],["livraisons","Livr."]].map(([id,l])=>(
-          <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"9px 4px",borderRadius:10,cursor:"pointer",fontWeight:tab===id?800:600,fontSize:15,fontFamily:"inherit",background:tab===id?DS.white:"transparent",color:tab===id?DS.dark:DS.mid,boxShadow:tab===id?DS.shadow:"none",border:tab===id?"1px solid "+DS.border:"1px solid transparent",transition:"all .25s"}}>{l}</button>
+          <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"9px 4px",borderRadius:10,border:"none",cursor:"pointer",fontWeight:tab===id?800:600,fontSize:15,fontFamily:"inherit",background:tab===id?DS.white:"transparent",color:tab===id?DS.dark:DS.mid,boxShadow:tab===id?"0 1px 4px rgba(0,0,0,0.08)":"none",transition:"all .25s"}}>{l}</button>
         ))}
       </div>
 
@@ -1283,8 +1081,8 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                       {p.photoDepart && (<div style={{flex:1,position:"relative"}}><img src={p.photoDepart} alt="Départ" style={{width:"100%",height:60,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border}}/><span style={{position:"absolute",bottom:3,left:4,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.5)",borderRadius:4,padding:"1px 5px"}}>Départ</span></div>)}
                     </div>
                   )}
-                  {p.actions&&<div title={p.actions} style={{fontSize:15,color:DS.mid,marginBottom:4,...LINE_CLAMP_2}}>{p.actions}</div>}
-                  {p.obs&&<div style={{fontSize:15,color:DS.orange,display:"flex",alignItems:"flex-start",gap:4,marginBottom:8}}><span style={{flexShrink:0,marginTop:2}}>{Ico.note(11,DS.orange)}</span><span title={p.obs} style={LINE_CLAMP_2}>{p.obs}</span></div>}
+                  {p.actions&&<div style={{fontSize:15,color:DS.mid,marginBottom:4}}>{p.actions}</div>}
+                  {p.obs&&<div style={{fontSize:15,color:DS.orange,display:"flex",alignItems:"center",gap:4,marginBottom:8}}>{Ico.note(11,DS.orange)} {p.obs}</div>}
                   <div style={{display:"flex",gap:6,paddingTop:8,borderTop:"1px solid "+DS.border,flexWrap:"wrap"}}>
                     <div onClick={(e)=>e.stopPropagation()} style={{flex:"1 1 160px"}}>
                       <RapportStatusPicker
@@ -1297,9 +1095,9 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                         })}
                       />
                     </div>
-                    <button onClick={()=>onEditPassage&&onEditPassage(p)} className="btn-hover" style={{flex:1,padding:"10px 12px",borderRadius:10,background:DS.white,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:14,color:DS.dark,fontFamily:"inherit",fontWeight:700,boxShadow:DS.shadow}}>{Ico.edit(14,DS.dark)} Modifier</button>
-                    <button onClick={(e)=>{e.stopPropagation();ouvrirRapport(p,client);}} className="btn-hover" style={{flex:1,padding:"10px 12px",borderRadius:10,background:DS.blueSoft,border:"1px solid "+DS.blue+"22",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:14,color:DS.blue,fontFamily:"inherit",fontWeight:700,boxShadow:"0 4px 14px "+DS.blue+"12"}}>{Ico.pdf(14,DS.blue)} Rapport</button>
-                    {client.email&&<button onClick={(e)=>{e.stopPropagation();envoyerEmail(p,client,onUpdatePassageStatus);}} className="btn-hover" style={{flex:1,padding:"10px 12px",borderRadius:10,background:DS.greenSoft,border:"1px solid "+DS.green+"22",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:14,color:DS.green,fontFamily:"inherit",fontWeight:700,boxShadow:"0 4px 14px "+DS.green+"12"}}>{Ico.send(14,DS.green)} Email</button>}
+                    <button onClick={()=>onEditPassage&&onEditPassage(p)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(12,DS.mid)} Modifier</button>
+                    <button onClick={(e)=>{e.stopPropagation();ouvrirRapport(p,client);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.blueSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.blue,fontFamily:"inherit",fontWeight:700}}>{Ico.pdf(12,DS.blue)} Rapport</button>
+                    {client.email&&<button onClick={(e)=>{e.stopPropagation();envoyerEmail(p,client,onUpdatePassageStatus);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.green,fontFamily:"inherit",fontWeight:700}}>{Ico.send(12,DS.green)} Email</button>}
                   </div>
                 </Card>
               );
@@ -1338,7 +1136,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                     </div>
                   </div>
                   <div style={{display:"flex",gap:6,marginTop:10,paddingTop:8,borderTop:"1px solid "+DS.border}}>
-                    <button onClick={()=>onEditRdv&&onEditRdv(r)} className="btn-hover" style={{flex:1,padding:"10px 12px",borderRadius:10,background:DS.white,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:14,color:DS.dark,fontFamily:"inherit",fontWeight:700,boxShadow:DS.shadow}}>{Ico.edit(14,DS.dark)} Modifier</button>
+                    <button onClick={()=>onEditRdv&&onEditRdv(r)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(12,DS.mid)} Modifier</button>
                     <button onClick={()=>exportRdvToICS(r,client)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.purpleSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.purple,fontFamily:"inherit",fontWeight:700}}>{Ico.download(12,DS.purple)} Calendrier</button>
                     <button onClick={()=>{if(confirm("Supprimer ce RDV ?"))onDeleteRdv&&onDeleteRdv(r.id);}} style={{width:32,borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(12,DS.red)}</button>
                   </div>
@@ -1386,9 +1184,9 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                     ))}
                   </div>
                   <div style={{display:"flex",gap:6,paddingTop:8,borderTop:"1px solid "+DS.border}}>
-                    <button onClick={()=>{setEditLiv(l);setShowFormLiv(true);}} className="btn-hover" style={{flex:1,padding:"10px 12px",borderRadius:10,background:DS.white,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:14,color:DS.dark,fontFamily:"inherit",fontWeight:700,boxShadow:DS.shadow}}>{Ico.edit(14,DS.dark)} Modifier</button>
+                    <button onClick={()=>{setEditLiv(l);setShowFormLiv(true);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(12,DS.mid)} Modifier</button>
                     {client.email
-                      ? <button onClick={()=>envoyerEmailLivraison(l, client)} className="btn-hover" style={{flex:1,padding:"10px 12px",borderRadius:10,background:DS.greenSoft,border:"1px solid "+DS.green+"22",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:14,color:DS.green,fontFamily:"inherit",fontWeight:700,boxShadow:"0 4px 14px "+DS.green+"12"}}>{Ico.send(14,DS.green)} Email</button>
+                      ? <button onClick={()=>envoyerEmailLivraison(l, client)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.green,fontFamily:"inherit",fontWeight:700}}>{Ico.send(12,DS.green)} Email</button>
                       : <div style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:DS.mid,fontWeight:500,gap:4}}>{Ico.mail(11,DS.mid)} Pas d'email</div>
                     }
                     <button onClick={()=>{if(confirm("Supprimer cette livraison ?"))onDeleteLivraison(l.id);}} style={{width:32,borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(12,DS.red)}</button>
@@ -1873,12 +1671,11 @@ function genererHTMLRapport(passage, client) {
   const sigTech = passage.signatureTech ? `<img src="${passage.signatureTech}" class="sig-img"/>` : `<div class="sig-empty">Non signée</div>`;
   const sigClient = passage.signatureClient ? `<img src="${passage.signatureClient}" class="sig-img"/>` : `<div class="sig-empty">Non signée</div>`;
 
-  const hasPhotos = passage.photoArrivee || passage.photoDepart || (passage.photos||[]).some(Boolean) || (passage.photosDepart||[]).some(Boolean);
+  const hasPhotos = passage.photoArrivee || passage.photoDepart || (passage.photos||[]).some(Boolean);
   const allPhotos = [
     passage.photoArrivee ? {src:passage.photoArrivee, label:"À l'arrivée"} : null,
-    ...((passage.photos||[]).map((p,i)=>p?{src:p,label:`Photo arrivée ${i+2}`}:null)),
+    ...((passage.photos||[]).map((p,i)=>p?{src:p,label:`Photo ${i+2}`}:null)),
     passage.photoDepart ? {src:passage.photoDepart, label:"Au départ"} : null,
-    ...((passage.photosDepart||[]).map((p,i)=>p?{src:p,label:`Photo départ ${i+2}`}:null)),
   ].filter(Boolean);
   const sectionPhotos = hasPhotos ? `
 <div class="section">
@@ -2122,24 +1919,24 @@ async function envoyerEmail(passage, client, onSent) {
 function MRow({label,unit,value,onChange,ideal,okFn,icon,color="#0891b2"}) {
   const hasVal = value!==""&&value!==null&&value!==undefined&&value!==false;
   const ok = hasVal&&okFn ? okFn(+value) : true;
-  const statusColor = !hasVal?DS.border:ok?"#4caf80":"#d96b6b";
+  const statusColor = !hasVal?"#e2e8f0":ok?"#22c55e":"#ef4444";
   return (
-    <div style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:14,background:hasVal?(ok?DS.greenSoft:DS.redSoft):"#fbfdff",border:`1.5px solid ${hasVal?(ok?"#bfe7d6":"#f4c8c8"):DS.border}`,transition:"all .25s",boxShadow:hasVal?"inset 0 1px 0 rgba(255,255,255,0.7)":"none"}}>
-      <div style={{width:40,height:40,borderRadius:12,background:color+"12",border:`1px solid ${color}20`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+    <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:12,background:hasVal?(ok?"#f0fdf4":"#fef2f2"):DS.white,border:`1px solid ${hasVal?(ok?"#bbf7d0":"#fecaca"):"#f1f5f9"}`,transition:"all .25s"}}>
+      <div style={{width:34,height:34,borderRadius:10,background:color+"15",border:`1px solid ${color}22`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
         {icon}
       </div>
       <div style={{flex:1,minWidth:0}}>
-        <div style={{fontSize:13,fontWeight:700,color:DS.dark,lineHeight:1.2}}>{label}{unit&&<span style={{fontSize:11,color:"#8ca0b3",fontWeight:500}}> ({unit})</span>}</div>
-        {ideal&&<div style={{fontSize:10,color:"#8ca0b3",marginTop:2,fontWeight:600}}>idéal {ideal}</div>}
+        <div style={{fontSize:13,fontWeight:600,color:DS.dark,lineHeight:1.2}}>{label}{unit&&<span style={{fontSize:11,color:"#94a3b8",fontWeight:400}}> ({unit})</span>}</div>
+        {ideal&&<div style={{fontSize:10,color:"#94a3b8",marginTop:2,fontWeight:500}}>idéal {ideal}</div>}
       </div>
       <input type="number" step="0.1" value={value===""||value===null||value===undefined?"":value} onChange={e=>onChange(e.target.value===""?"":+e.target.value)}
-        style={{width:82,padding:"10px 12px",borderRadius:11,border:`2px solid ${statusColor}`,fontSize:16,fontWeight:800,boxSizing:"border-box",color:hasVal?(ok?DS.green:DS.red):DS.dark,background:"#fff",textAlign:"center",outline:"none",fontFamily:"inherit",flexShrink:0,transition:"all .2s",boxShadow:"0 1px 0 rgba(255,255,255,0.8) inset"}}/>
-      <div style={{width:32,height:32,borderRadius:16,background:!hasVal?DS.light:ok?DS.green:DS.red,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .3s",boxShadow:hasVal?`0 4px 10px ${ok?DS.green:DS.red}33`:"none"}}>
+        style={{width:72,padding:"8px 10px",borderRadius:9,border:`2px solid ${statusColor}`,fontSize:15,fontWeight:800,boxSizing:"border-box",color:hasVal?(ok?"#16a34a":"#dc2626"):DS.dark,background:"#fff",textAlign:"center",outline:"none",fontFamily:"inherit",flexShrink:0,transition:"all .2s"}}/>
+      <div style={{width:28,height:28,borderRadius:14,background:!hasVal?"#f1f5f9":ok?"#22c55e":"#ef4444",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .3s",boxShadow:hasVal?`0 2px 6px ${ok?"#22c55e":"#ef4444"}44`:"none"}}>
         {!hasVal
-          ? <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#b4c2cf" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          ? <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           : ok
-            ? <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            : <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            ? <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            : <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         }
       </div>
     </div>
@@ -2161,8 +1958,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
     signatureTech:"", signatureClient:"",
     photoArrivee:"",
     photoDepart:"",
-    photos:[],
-    photosDepart:[],
+    photos:[],  // extra photos (up to 4 total)
     ok:false,
     rapportStatut:"saisie",
   };
@@ -2170,7 +1966,6 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
   const isMobile = useIsMobile();
   const [f,setF]=useState(isEdit ? {...EMPTY,...initial, rapportStatut:getRapportStatus(initial)} : EMPTY);
   const [step,setStep]=useState(1);
-  const [showComplementaryMeasures, setShowComplementaryMeasures] = useState(!!(initial?.chloreLibre || initial?.ph || initial?.alcalinite || initial?.stabilisant || initial?.stabilisantHaut));
   const STEPS=6;
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
 
@@ -2179,14 +1974,8 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
 
   const handleSave = () => {
     if(!f.clientId||!f.date) return alert("Client et date requis");
-    const arrivalPhotos = normalizePhotoList([f.photoArrivee, ...(f.photos||[])]).slice(0, MAX_PASSAGE_PHOTOS);
-    const departPhotos = normalizePhotoList([f.photoDepart, ...(f.photosDepart||[])]).slice(0, MAX_PASSAGE_PHOTOS);
     const passage = {
       ...f,
-      photoArrivee: arrivalPhotos[0] || "",
-      photos: arrivalPhotos.slice(1),
-      photoDepart: departPhotos[0] || "",
-      photosDepart: departPhotos.slice(1),
       id: isEdit ? f.id : uid(),
       ph:ph||f.tPH||f.ph||"",
       chlore:cl||f.tChlore||f.chloreLibre||"",
@@ -2267,7 +2056,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
             <div key={i} style={{flex:1,display:"flex",justifyContent:"center",zIndex:2}}>
               <button onClick={()=>setStep(i+1)} title={s.l} style={{
                 width:active?44:36, height:active?44:36,
-                borderRadius:"50%", cursor:"pointer",
+                borderRadius:"50%", border:"none", cursor:"pointer",
                 background:active?s.color:done?"#059669":DS.white,
                 border:done||active?"none":`2px solid ${DS.border}`,
                 display:"flex",alignItems:"center",justifyContent:"center",
@@ -2326,8 +2115,8 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
         <div style={{margin:"-24px -28px 16px",marginTop:isMobile?"-18px":"-24px",marginLeft:isMobile?"-20px":"-28px",marginRight:isMobile?"-20px":"-28px",position:"relative",overflow:"hidden"}}>
           {/* Fond avec photo piscine si dispo */}
           {clientSel.photoPiscine
-            ? <div style={{position:"absolute",inset:0,background:`url(${clientSel.photoPiscine}) center/cover`,filter:"brightness(0.52)"}}/>
-            : <div style={{position:"absolute",inset:0,background:"linear-gradient(135deg,#17324a 0%,#285c7d 55%,#67a7cb 100%)"}}/>
+            ? <div style={{position:"absolute",inset:0,background:`url(${clientSel.photoPiscine}) center/cover`,filter:"brightness(0.35)"}}/>
+            : <div style={{position:"absolute",inset:0,background:"linear-gradient(135deg,#0c1222 0%,#0f2a4a 50%,#0369a1 100%)"}}/>
           }
           {/* Motif décoratif */}
           <div style={{position:"absolute",top:-30,right:-30,width:140,height:140,borderRadius:70,background:"rgba(56,189,248,0.08)",pointerEvents:"none"}}/>
@@ -2477,8 +2266,8 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                           <div key={p.key} style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid "+DS.border}}>
                             <img src={p.val} alt={p.label} style={{width:"100%",height:90,objectFit:"cover",display:"block"}}/>
                             <span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:4,padding:"1px 6px"}}>{p.label}</span>
-                            <button onClick={()=>removePhoto(p.key,p.idx)} style={{position:"absolute",top:6,right:6,width:34,height:34,borderRadius:17,background:"rgba(19,34,53,0.78)",border:"2px solid rgba(255,255,255,0.45)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 6px 16px rgba(0,0,0,0.18)"}}>
-                              {Ico.close(16,"#fff")}
+                            <button onClick={()=>removePhoto(p.key,p.idx)} style={{position:"absolute",top:4,right:4,width:24,height:24,borderRadius:12,background:"rgba(0,0,0,0.65)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                              {Ico.close(10,"#fff")}
                             </button>
                           </div>
                         ))}
@@ -2494,76 +2283,66 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
       {step===2 && (
         <div className="fade-in">
           {(()=>{
-            const electronicRules = [
-              { value:f.tSel, okFn:v=>v>=3&&v<=5 },
-              { value:f.tPhosphate, okFn:v=>v<=0.1 },
-              { value:f.tStabilisant, okFn:v=>v>=20&&v<=50 },
-              { value:f.tChlore, okFn:v=>v>=0.5&&v<=3 },
-              { value:f.tPH, okFn:v=>v>=7.0&&v<=7.6 },
-            ];
-            const electronicFilled = electronicRules.filter(x=>x.value!==""&&x.value!==null&&x.value!==undefined).length;
-            const electronicOk = electronicRules.filter(x=>x.value!==""&&x.value!==null&&x.value!==undefined && x.okFn(+x.value)).length;
+            const okCount = [
+              f.chloreLibre!==undefined&&f.chloreLibre!==""&&+f.chloreLibre>=1&&+f.chloreLibre<=3,
+              f.ph!==undefined&&f.ph!==""&&+f.ph>=7.2&&+f.ph<=7.8,
+              f.alcalinite!==undefined&&f.alcalinite!==""&&+f.alcalinite>=80&&+f.alcalinite<=120,
+              f.stabilisant!==undefined&&f.stabilisant!==""&&+f.stabilisant>=30&&+f.stabilisant<=50,
+            ].filter(Boolean).length;
+            const filledCount = [f.chloreLibre,f.ph,f.alcalinite,f.stabilisant].filter(v=>v!==""&&v!==null&&v!==undefined).length;
             return (
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
-            <div style={{borderRadius:DS.radius,overflow:"hidden",border:"1px solid "+DS.border,boxShadow:DS.shadowMd,background:DS.white}}>
-              <div style={{background:"linear-gradient(135deg,#3c7ea2,#76b7d4)",padding:"14px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div style={{borderRadius:DS.radius,overflow:"hidden",border:"1px solid "+DS.border,boxShadow:DS.shadow}}>
+              <div style={{background:"linear-gradient(135deg,#0891b2,#06b6d4)",padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <div style={{width:36,height:36,borderRadius:12,background:"rgba(255,255,255,0.18)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.chart(18,"#fff")}</div>
+                  <div style={{width:32,height:32,borderRadius:10,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.phTest(16,"#fff")}</div>
                   <div>
-                    <div style={{fontSize:14,fontWeight:800,color:"#fff",letterSpacing:.2}}>Analyse appareil</div>
-                    <div style={{fontSize:11,color:"rgba(255,255,255,0.8)",marginTop:1}}>Mesures principales utilisées au quotidien</div>
+                    <div style={{fontSize:13,fontWeight:800,color:"#fff",letterSpacing:.3}}>Test Bandelette</div>
+                    <div style={{fontSize:10,color:"rgba(255,255,255,0.75)",marginTop:1}}>Analyse chimique de l'eau</div>
                   </div>
                 </div>
-                <div style={{background:"rgba(255,255,255,0.18)",borderRadius:20,padding:"5px 12px",display:"flex",alignItems:"center",gap:6}}>
-                  <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  <span style={{fontSize:11,fontWeight:800,color:"#fff"}}>{electronicOk}/{electronicFilled||5} OK</span>
+                <div style={{background:"rgba(255,255,255,0.2)",borderRadius:20,padding:"4px 12px",display:"flex",alignItems:"center",gap:5}}>
+                  <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span style={{fontSize:11,fontWeight:800,color:"#fff"}}>{okCount}/{filledCount||4} OK</span>
                 </div>
               </div>
-              <div style={{background:DS.white,padding:"12px",display:"flex",flexDirection:"column",gap:8}}>
-                <MRow label="Taux de sel" unit="g/L" value={f.tSel} onChange={v=>set("tSel",v)} ideal="3 – 5" okFn={v=>v>=3&&v<=5} color={DS.purple}
-                  icon={<span style={{fontSize:16}}>🧂</span>}/>
-                <MRow label="Taux de phosphate" unit="ppm" value={f.tPhosphate} onChange={v=>set("tPhosphate",v)} ideal="≤ 0.1" okFn={v=>v<=0.1} color={DS.purple}
-                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={DS.purple} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v5l3 9a3 3 0 01-3 3H9a3 3 0 01-3-3l3-9V3z"/><path d="M6.5 15h11"/></svg>}/>
-                <MRow label="Taux de stabilisant" unit="ppm" value={f.tStabilisant} onChange={v=>set("tStabilisant",v)} ideal="20 – 50" okFn={v=>v>=20&&v<=50} color={DS.teal}
-                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={DS.teal} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}/>
-                <MRow label="Taux de chlore" unit="ppm" value={f.tChlore} onChange={v=>set("tChlore",v)} ideal="0.5 – 3" okFn={v=>v>=0.5&&v<=3} color={DS.blue}
-                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={DS.blue} strokeWidth="1.8" strokeLinecap="round"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>}/>
-                <MRow label="Taux de pH" value={f.tPH} onChange={v=>set("tPH",v)} ideal="7.0 – 7.6" okFn={v=>v>=7.0&&v<=7.6} color={DS.orange}
-                  icon={<span style={{fontSize:13,fontWeight:900,color:DS.orange,letterSpacing:-1}}>pH</span>}/>
+              <div style={{background:DS.white,padding:"10px 12px",display:"flex",flexDirection:"column",gap:6}}>
+                <MRow label="Chlore libre" unit="ppm" value={f.chloreLibre} onChange={v=>set("chloreLibre",v)} ideal="1 – 3" okFn={v=>v>=1&&v<=3} color="#0891b2"
+                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>}/>
+                <MRow label="pH" value={f.ph} onChange={v=>set("ph",v)} ideal="7.2 – 7.8" okFn={v=>v>=7.2&&v<=7.8} color="#0369a1"
+                  icon={<span style={{fontSize:13,fontWeight:900,color:"#0369a1",letterSpacing:-1}}>pH</span>}/>
+                <MRow label="Alcalinité totale" unit="ppm" value={f.alcalinite} onChange={v=>set("alcalinite",v)} ideal="80 – 120" okFn={v=>v>=80&&v<=120} color="#0284c7"
+                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="1.8" strokeLinecap="round"><path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/><path d="M2 16c2.5 3 5 3 7.5 0S14 13 16.5 16s5 3 7.5 0"/></svg>}/>
+                <div>
+                  <MRow label="Stabilisant" unit="ppm" value={f.stabilisant} onChange={v=>set("stabilisant",v)} ideal="30 – 50" okFn={v=>v>=30&&v<=50} color="#0891b2"
+                    icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}/>
+                  <label style={{display:"flex",alignItems:"center",gap:8,marginTop:6,padding:"6px 10px",borderRadius:8,background:f.stabilisantHaut?"#fff7ed":"#f8fafc",border:"1px solid "+(f.stabilisantHaut?"#fdba74":"#e2e8f0"),cursor:"pointer",width:"fit-content"}}>
+                    <input type="checkbox" checked={!!f.stabilisantHaut} onChange={e=>set("stabilisantHaut",e.target.checked)} style={{width:16,height:16,accentColor:"#ea580c"}}/>
+                    <span style={{fontSize:12,fontWeight:700,color:f.stabilisantHaut?"#ea580c":"#64748b"}}>⚠️ Stabilisant HAUT</span>
+                  </label>
+                </div>
               </div>
             </div>
-
-            <div style={{borderRadius:DS.radius,overflow:"hidden",border:"1px solid "+DS.border,boxShadow:DS.shadow,background:"#fbfdff"}}>
-              <button type="button" onClick={()=>setShowComplementaryMeasures(v=>!v)} className="btn-hover" style={{width:"100%",padding:"14px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,background:"transparent",border:"none",cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
-                <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <div style={{width:36,height:36,borderRadius:12,background:DS.blueSoft,display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.phTest(18,DS.blue)}</div>
-                  <div>
-                    <div style={{fontSize:13,fontWeight:800,color:DS.dark}}>Mesures complémentaires</div>
-                    <div style={{fontSize:11,color:DS.mid,marginTop:1}}>Bandelette / saisie secondaire, conservée sans suppression</div>
-                  </div>
+            <div style={{borderRadius:DS.radius,overflow:"hidden",border:"1px solid "+DS.border,boxShadow:DS.shadow}}>
+              <div style={{background:"linear-gradient(135deg,#7c3aed,#a78bfa)",padding:"12px 16px",display:"flex",alignItems:"center",gap:10}}>
+                <div style={{width:32,height:32,borderRadius:10,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.chart(16,"#fff")}</div>
+                <div>
+                  <div style={{fontSize:13,fontWeight:800,color:"#fff",letterSpacing:.3}}>Mesures Électroniques</div>
+                  <div style={{fontSize:10,color:"rgba(255,255,255,0.75)",marginTop:1}}>Relevés appareils de mesure</div>
                 </div>
-                <div style={{width:32,height:32,borderRadius:16,background:DS.white,border:"1px solid "+DS.border,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:DS.shadow}}>
-                  {showComplementaryMeasures ? Ico.back(16,DS.dark) : Ico.next(16,DS.dark)}
-                </div>
-              </button>
-              {showComplementaryMeasures && (
-                <div style={{padding:"0 12px 12px",display:"flex",flexDirection:"column",gap:8}}>
-                  <MRow label="Chlore libre" unit="ppm" value={f.chloreLibre} onChange={v=>set("chloreLibre",v)} ideal="1 – 3" okFn={v=>v>=1&&v<=3} color={DS.blue}
-                    icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={DS.blue} strokeWidth="1.8" strokeLinecap="round"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>}/>
-                  <MRow label="pH bandelette" value={f.ph} onChange={v=>set("ph",v)} ideal="7.2 – 7.8" okFn={v=>v>=7.2&&v<=7.8} color={DS.teal}
-                    icon={<span style={{fontSize:13,fontWeight:900,color:DS.teal,letterSpacing:-1}}>pH</span>}/>
-                  <MRow label="Alcalinité totale" unit="ppm" value={f.alcalinite} onChange={v=>set("alcalinite",v)} ideal="80 – 120" okFn={v=>v>=80&&v<=120} color={DS.blue}
-                    icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={DS.blue} strokeWidth="1.8" strokeLinecap="round"><path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/><path d="M2 16c2.5 3 5 3 7.5 0S14 13 16.5 16s5 3 7.5 0"/></svg>}/>
-                  <div>
-                    <MRow label="Stabilisant" unit="ppm" value={f.stabilisant} onChange={v=>set("stabilisant",v)} ideal="30 – 50" okFn={v=>v>=30&&v<=50} color={DS.teal}
-                      icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={DS.teal} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}/>
-                    <label style={{display:"flex",alignItems:"center",gap:8,marginTop:8,padding:"8px 10px",borderRadius:10,background:f.stabilisantHaut?DS.orangeSoft:"#f8fbfe",border:"1px solid "+(f.stabilisantHaut?"#efc29c":DS.border),cursor:"pointer",width:"fit-content"}}>
-                      <input type="checkbox" checked={!!f.stabilisantHaut} onChange={e=>set("stabilisantHaut",e.target.checked)} style={{width:16,height:16,accentColor:DS.orange}}/>
-                      <span style={{fontSize:12,fontWeight:700,color:f.stabilisantHaut?DS.orange:DS.mid}}>⚠️ Stabilisant haut</span>
-                    </label>
-                  </div>
-                </div>
-              )}
+              </div>
+              <div style={{background:DS.white,padding:"10px 12px",display:"flex",flexDirection:"column",gap:6}}>
+                <MRow label="Taux de sel" value={f.tSel} onChange={v=>set("tSel",v)} color="#7c3aed"
+                  icon={<span style={{fontSize:16}}>🧂</span>}/>
+                <MRow label="Taux de phosphate" value={f.tPhosphate} onChange={v=>set("tPhosphate",v)} color="#7c3aed"
+                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v5l3 9a3 3 0 01-3 3H9a3 3 0 01-3-3l3-9V3z"/><path d="M6.5 15h11"/></svg>}/>
+                <MRow label="Taux de chlore" value={f.tChlore} onChange={v=>set("tChlore",v)} ideal="1 – 1.5" okFn={v=>v>=0.5&&v<=3} color="#0891b2"
+                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>}/>
+                <MRow label="Taux de pH" value={f.tPH} onChange={v=>set("tPH",v)} ideal="7.2 – 7.4" okFn={v=>v>=7.0&&v<=7.6} color="#0369a1"
+                  icon={<span style={{fontSize:13,fontWeight:900,color:"#7c3aed",letterSpacing:-1}}>pH</span>}/>
+                <MRow label="Taux stabilisant" value={f.tStabilisant} onChange={v=>set("tStabilisant",v)} color="#7c3aed"
+                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}/>
+              </div>
             </div>
           </div>
             );
@@ -2653,7 +2432,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
               <div>
                 <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:4}}>Commentaires</span>
                 <textarea value={f.commentaires} onChange={e=>set("commentaires",e.target.value)} placeholder="Anomalies, recommandations..."
-                  style={{width:"100%",padding:"11px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:13,minHeight:100,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,background:DS.white,caretColor:DS.dark,transition:"all .2s"}}/>
+                  style={{width:"100%",padding:"11px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:13,minHeight:100,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,transition:"all .2s"}}/>
               </div>
               <OuiNon label="Livraison de produits ?" value={f.livraisonProduits} onChange={v=>set("livraisonProduits",v)}/>
               {f.livraisonProduits && (
@@ -2662,7 +2441,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                   <div>
                     <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:4}}>Autre (quantités, marques…)</span>
                     <textarea value={f.livraisonAutre} onChange={e=>set("livraisonAutre",e.target.value)}
-                      style={{width:"100%",padding:"9px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:13,minHeight:56,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,background:DS.white,caretColor:DS.dark}}/>
+                      style={{width:"100%",padding:"9px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:13,minHeight:56,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark}}/>
                   </div>
                 </>
               )}
@@ -2674,78 +2453,24 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
               </div>
               <OuiNon label="Présence du locataire / propriétaire ?" value={f.presenceClient} onChange={v=>set("presenceClient",v)}/>
               <div style={{borderTop:"1px solid "+DS.border,paddingTop:14}}>
-                {(() => {
-                  const filledDepartPhotos = [
-                    f.photoDepart ? {key:"pd", label:"Départ", val:f.photoDepart} : null,
-                    ...((f.photosDepart||[]).map((v,i)=>v?{key:`pd${i}`,label:`Photo départ ${i+2}`,val:v,idx:i}:null)),
-                  ].filter(Boolean);
-                  const canAddDepart = filledDepartPhotos.length < MAX_PASSAGE_PHOTOS;
-
-                  const addDepartPhotos = (e) => {
-                    const files = Array.from(e.target.files||[]).slice(0, MAX_PASSAGE_PHOTOS - filledDepartPhotos.length);
-                    if (!files.length) return;
-                    let newDepart = f.photoDepart||"";
-                    let newPhotosDepart = [...(f.photosDepart||[])];
-                    let readers = 0;
-                    files.forEach(file => {
-                      const r = new FileReader();
-                      r.onload = () => {
-                        if (!newDepart) newDepart = r.result;
-                        else newPhotosDepart = [...newPhotosDepart, r.result];
-                        readers++;
-                        if (readers === files.length) {
-                          set("photoDepart", newDepart);
-                          set("photosDepart", newPhotosDepart.slice(0, MAX_PASSAGE_PHOTOS - 1));
-                        }
-                      };
-                      r.readAsDataURL(file);
-                    });
-                    e.target.value="";
-                  };
-
-                  const removeDepartPhoto = (key, idx) => {
-                    if (key==="pd") set("photoDepart","");
-                    else {
-                      const arr = [...(f.photosDepart||[])];
-                      arr.splice(idx,1);
-                      set("photosDepart", arr);
-                    }
-                  };
-
-                  return (
-                    <div>
-                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-                        <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>
-                          Photos départ {filledDepartPhotos.length>0 && `(${filledDepartPhotos.length}/${MAX_PASSAGE_PHOTOS})`}
-                        </span>
-                        {canAddDepart && (
-                          <label style={{display:"flex",alignItems:"center",gap:5,padding:"7px 14px",borderRadius:8,background:DS.blueSoft,border:"1px solid "+DS.blue+"33",cursor:"pointer",fontSize:12,fontWeight:700,color:DS.blue}}>
-                            {Ico.plus(12,DS.blue)} Ajouter
-                            <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={addDepartPhotos}/>
-                          </label>
-                        )}
-                      </div>
-                      {filledDepartPhotos.length === 0
-                        ? <label style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8,padding:20,borderRadius:12,border:"2px dashed "+DS.border,background:DS.light,cursor:"pointer"}}>
-                            {Ico.camera(28,DS.mid)}
-                            <span style={{fontSize:13,color:DS.mid,fontWeight:600}}>Appuyez pour ajouter des photos au départ</span>
-                            <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={addDepartPhotos}/>
-                          </label>
-                        : <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                            {filledDepartPhotos.map(p=>(
-                              <div key={p.key} style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid "+DS.border}}>
-                                <img src={p.val} alt={p.label} style={{width:"100%",height:90,objectFit:"cover",display:"block"}}/>
-                                <span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:4,padding:"1px 6px"}}>{p.label}</span>
-                                <button onClick={()=>removeDepartPhoto(p.key,p.idx)} style={{position:"absolute",top:6,right:6,width:34,height:34,borderRadius:17,background:"rgba(19,34,53,0.78)",border:"2px solid rgba(255,255,255,0.45)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 6px 16px rgba(0,0,0,0.18)"}}>
-                                  {Ico.close(16,"#fff")}
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                      }
+                {f.photoDepart
+                  ? <div style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid "+DS.border}}>
+                      <img src={f.photoDepart} alt="Départ" style={{width:"100%",height:110,objectFit:"cover",display:"block"}}/>
+                      <span style={{position:"absolute",bottom:4,left:6,fontSize:10,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:4,padding:"2px 8px"}}>📸 Au départ</span>
+                      <button onClick={()=>set("photoDepart","")} style={{position:"absolute",top:6,right:6,width:26,height:26,borderRadius:13,background:"rgba(0,0,0,0.65)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                        {Ico.close(11,"#fff")}
+                      </button>
                     </div>
-                  );
-                })()}
+                  : <label style={{display:"flex",alignItems:"center",gap:8,padding:"12px 16px",borderRadius:10,border:"2px dashed "+DS.border,background:DS.light,cursor:"pointer"}}>
+                      {Ico.camera(18,DS.mid)}
+                      <span style={{fontSize:13,color:DS.mid,fontWeight:600}}>📸 Photo au départ</span>
+                      <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{
+                        const file=e.target.files?.[0]; if(!file) return;
+                        const r=new FileReader(); r.onload=()=>set("photoDepart",r.result); r.readAsDataURL(file);
+                        e.target.value="";
+                      }}/>
+                    </label>
+                }
               </div>
               <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",background:`linear-gradient(135deg,${DS.greenSoft},#bbf7d0)`,padding:"14px 16px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.green+"44",marginTop:4,transition:"all .2s"}}>
                 <input type="checkbox" checked={f.ok} onChange={e=>set("ok",e.target.checked)} style={{width:20,height:20,accentColor:DS.green}}/>
@@ -2764,16 +2489,15 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
             <SignaturePad label="Signature du technicien" value={f.signatureTech} onChange={v=>set("signatureTech",v)}/>
             <SignaturePad label="Signature du client / propriétaire" value={f.signatureClient} onChange={v=>set("signatureClient",v)}/>
           </div>
-          {(f.photoArrivee||f.photoDepart||(f.photos||[]).some(Boolean)||(f.photosDepart||[]).some(Boolean)) && (
+          {(f.photoArrivee||f.photoDepart||(f.photos||[]).some(Boolean)) && (
             <div style={{background:DS.light,borderRadius:DS.radiusSm,padding:14,border:"1px solid "+DS.border,marginBottom:16}}>
               <div style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>
-                Photos jointes ({[f.photoArrivee,...(f.photos||[]),f.photoDepart,...(f.photosDepart||[])].filter(Boolean).length}/20)
+                Photos jointes ({[f.photoArrivee,f.photoDepart,...(f.photos||[])].filter(Boolean).length}/5)
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                 {f.photoArrivee && (<div style={{position:"relative"}}><img src={f.photoArrivee} alt="Arrivée" style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Arrivée</span></div>)}
-                {(f.photos||[]).map((ph,i)=>ph?(<div key={`a${i}`} style={{position:"relative"}}><img src={ph} alt={`Photo arrivée ${i+2}`} style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Arrivée {i+2}</span></div>):null)}
+                {(f.photos||[]).map((ph,i)=>ph?(<div key={i} style={{position:"relative"}}><img src={ph} alt={`Photo ${i+2}`} style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Photo {i+2}</span></div>):null)}
                 {f.photoDepart && (<div style={{position:"relative"}}><img src={f.photoDepart} alt="Départ" style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Départ</span></div>)}
-                {(f.photosDepart||[]).map((ph,i)=>ph?(<div key={`d${i}`} style={{position:"relative"}}><img src={ph} alt={`Photo départ ${i+2}`} style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Départ {i+2}</span></div>):null)}
               </div>
             </div>
           )}
@@ -2984,7 +2708,7 @@ function CalendrierInteractif({ passages, rdvs, clients, onClientClick, onEditPa
 
 // ALERTES COLLAPSIBLE
 function AlertesBlock({ alertes, passages, onClientClick }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = React.useState(false);
   const preview = alertes.slice(0, 2);
   const isMobile = useIsMobile();
   return (
@@ -3046,7 +2770,6 @@ function AlertesBlock({ alertes, passages, onClientClick }) {
 
 // DASHBOARD  Bannire tches + RDV
 function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, onAddLivraison, onAddClient, onAddRdv, onEditPassage, onEditRdv }) {
-  const [showAllTaches, setShowAllTaches] = useState(false);
   const isMobile = useIsMobile();
   const moisCourant = MOIS_NOW;
   const saisonNow = getSaison(moisCourant);
@@ -3073,43 +2796,31 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
   return (
     <div>
       {/* Bannière tâches du mois */}
-      <Card style={{marginBottom:14,border:"none",background:totalTaches>0?"linear-gradient(135deg,#0c1222,#1a365d)":DS.greenGrad,padding:"14px 16px"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,gap:10}}>
-          <div style={{minWidth:0}}>
-            <div style={{fontWeight:900,fontSize:16,color:"#fff",letterSpacing:-0.3}}>{MOIS_L[moisCourant]}</div>
-            <div style={{fontSize:11,color:"rgba(255,255,255,0.72)",marginTop:2}}>
+      <Card style={{marginBottom:14,border:"none",background:totalTaches>0?"linear-gradient(135deg,#0c1222,#1a365d)":DS.greenGrad,padding:"18px 20px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <div>
+            <div style={{fontWeight:900,fontSize:18,color:"#fff",letterSpacing:-0.3}}>{MOIS_L[moisCourant]}</div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,0.7)",marginTop:2}}>
               {totalTaches>0 ? `${totalTaches} passage${totalTaches>1?"s":""} restant${totalTaches>1?"s":""}` : "Tout est à jour !"}
             </div>
           </div>
-          <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-            <Tag color={sMeta.color} bg={sMeta.bg}><span style={{display:"flex",alignItems:"center",gap:4}}>{Ico[sMeta.icon]&&Ico[sMeta.icon](12,sMeta.color)} {sMeta.label}</span></Tag>
-            {totalTaches>3 && (
-              <button onClick={()=>setShowAllTaches(v=>!v)} className="btn-hover" style={{width:34,height:34,borderRadius:12,border:"1px solid rgba(255,255,255,0.14)",background:"rgba(255,255,255,0.1)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:20,fontWeight:800,lineHeight:1,fontFamily:"inherit"}}>
-                {showAllTaches ? "−" : "+"}
-              </button>
-            )}
-          </div>
+          <Tag color={sMeta.color} bg={sMeta.bg}><span style={{display:"flex",alignItems:"center",gap:4}}>{Ico[sMeta.icon]&&Ico[sMeta.icon](12,sMeta.color)} {sMeta.label}</span></Tag>
         </div>
         {totalTaches > 0 && (
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            {tachesMois.filter(t=>t.total>0).slice(0, showAllTaches ? tachesMois.filter(t=>t.total>0).length : 3).map(({client,restE,restC,effE,prevE,effC,prevC})=>(
-              <div key={client.id} onClick={()=>onClientClick(client)} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:"rgba(255,255,255,0.08)",borderRadius:DS.radiusSm,cursor:"pointer",border:"1px solid rgba(255,255,255,0.08)"}}>
-                <Avatar nom={client.nom} size={32} photo={client.photoPiscine}/>
+            {tachesMois.filter(t=>t.total>0).map(({client,restE,restC,effE,prevE,effC,prevC})=>(
+              <div key={client.id} onClick={()=>onClientClick(client)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:"rgba(255,255,255,0.08)",borderRadius:DS.radiusSm,cursor:"pointer",border:"1px solid rgba(255,255,255,0.08)"}}>
+                <Avatar nom={client.nom} size={34} photo={client.photoPiscine}/>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontWeight:700,fontSize:12,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{client.nom}</div>
-                  <div style={{display:"flex",gap:8,marginTop:2,flexWrap:"wrap"}}>
-                    {prevE>0&&<span style={{fontSize:10,fontWeight:700,color:restE>0?"#fbbf24":"#86efac"}}>🔧 {effE}/{prevE}</span>}
-                    {prevC>0&&<span style={{fontSize:10,fontWeight:700,color:restC>0?"#fbbf24":"#86efac"}}>💧 {effC}/{prevC}</span>}
+                  <div style={{fontWeight:700,fontSize:13,color:"#fff"}}>{client.nom}</div>
+                  <div style={{display:"flex",gap:8,marginTop:3}}>
+                    {prevE>0&&<span style={{fontSize:11,fontWeight:700,color:restE>0?"#fbbf24":"#86efac"}}>🔧 {effE}/{prevE}</span>}
+                    {prevC>0&&<span style={{fontSize:11,fontWeight:700,color:restC>0?"#fbbf24":"#86efac"}}>💧 {effC}/{prevC}</span>}
                   </div>
                 </div>
-                {(restE+restC)>0 && <Tag color="#fff" bg="rgba(251,191,36,0.25)" style={{fontSize:11,padding:"2px 8px"}}>{restE+restC}</Tag>}
+                {(restE+restC)>0 && <Tag color="#fff" bg="rgba(251,191,36,0.25)">{restE+restC} rest.</Tag>}
               </div>
             ))}
-            {!showAllTaches && tachesMois.filter(t=>t.total>0).length>3 && (
-              <div style={{fontSize:11,color:"rgba(255,255,255,0.72)",textAlign:"center",paddingTop:2}}>
-                {tachesMois.filter(t=>t.total>0).length-3} autre{tachesMois.filter(t=>t.total>0).length-3>1?"s":""}
-              </div>
-            )}
           </div>
         )}
       </Card>
@@ -3224,10 +2935,9 @@ function PageClients({ clients, passages, onClientClick, onAdd }) {
 
       {filtered.length===0&&<div style={{textAlign:"center",color:DS.mid,padding:40,fontSize:13}}>Aucun client trouvé</div>}
 
-      <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(auto-fit, minmax(300px, 1fr))",gap:12}}>
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
         {filtered.map((c,idx)=>{
           const al=alerteClient(c,passages); const col=AC[al];
-          const theme = getClientCardTheme(c, idx);
           const mpm=c.moisParMois||c.saisons||{};
           const tE=totalAnnuel(mpm,"entretien"), tC=totalAnnuel(mpm,"controle"), tot=tE+tC;
           const eE=passages.filter(p=>p.clientId===c.id&&isEntretienType(p.type)).length;
@@ -3235,52 +2945,59 @@ function PageClients({ clients, passages, onClientClick, onAdd }) {
           const eff=eE+eC;
           const pct=tot>0?Math.round(eff/tot*100):0;
           const rest=Math.max(0,tot-eff);
+          const accentColor=al==="rouge"?DS.red:al==="jaune"?DS.yellow:al==="orange"?DS.orange:DS.green;
           return (
-            <div key={c.id} onClick={()=>onClientClick(c)} className="fade-in card-hover" style={{animationDelay:`${idx*0.03}s`,background:theme.top,borderRadius:20,overflow:"hidden",boxShadow:theme.shadow,border:`1.5px solid ${theme.border}`,cursor:"pointer",width:"100%",boxSizing:"border-box",position:"relative"}}>
-              <div style={{position:"absolute",top:12,right:12,width:10,height:10,borderRadius:999,background:theme.accent,boxShadow:`0 0 0 4px ${theme.chip}`}}/>
-              {/* Photo banner or gradient */}
-              {c.photoPiscine
-                ? <div style={{height:76,background:`url(${c.photoPiscine}) center/cover`,position:"relative",borderBottom:`1px solid ${theme.border}`}}><div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,rgba(255,255,255,0.05),rgba(15,23,42,0.42))"}}/></div>
-                : <div style={{height:10,background:`linear-gradient(90deg,${theme.accent},${theme.border})`}}/>
-              }
-              <div style={{padding:"14px 16px 16px"}}>
-                <div style={{display:"flex",gap:10,alignItems:"flex-start",minWidth:0}}>
-                  <Avatar nom={c.nom} size={42} photo={c.photoPiscine?null:undefined}/>
-                  <div style={{flex:1,minWidth:0,overflow:"hidden"}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
-                      <div style={{fontWeight:900,fontSize:15,color:DS.dark,letterSpacing:-0.35,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{c.nom}</div>
-                      <Tag color={col.tx} bg={col.bg} style={{border:`1px solid ${col.bd}`}}>{col.lbl}</Tag>
+            <div key={c.id} onClick={()=>onClientClick(c)} className="fade-in card-hover"
+              style={{animationDelay:`${idx*0.03}s`,background:DS.white,borderRadius:DS.radius,
+                overflow:"hidden",boxShadow:"0 1px 8px rgba(19,34,53,0.06), 0 4px 16px rgba(19,34,53,0.04)",
+                border:"1px solid "+DS.border,borderTop:"3px solid "+accentColor,
+                cursor:"pointer",width:"100%",boxSizing:"border-box"}}>
+              {/* Photo banner */}
+              {c.photoPiscine && (
+                <div style={{height:72,background:`url(${c.photoPiscine}) center/cover`,position:"relative"}}>
+                  <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,transparent 30%,rgba(12,18,34,0.5))"}}/>
+                </div>
+              )}
+              <div style={{padding:"16px"}}>
+                {/* Header */}
+                <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
+                  <Avatar nom={c.nom} size={46} photo={c.photoPiscine?null:undefined}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontWeight:800,fontSize:15,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:-0.3}}>{c.nom}</div>
+                    <div style={{display:"flex",gap:6,marginTop:5,alignItems:"center",flexWrap:"wrap"}}>
+                      <span style={{background:DS.blueSoft,color:DS.blue,padding:"3px 10px",borderRadius:20,fontWeight:700,fontSize:12}}>{c.formule}</span>
+                      {c.bassin&&<span style={{background:DS.light,color:DS.mid,padding:"3px 8px",borderRadius:20,fontWeight:600,fontSize:11}}>{c.bassin}{c.volume?" · "+c.volume+"m³":""}</span>}
                     </div>
-                    <div style={{display:"flex",gap:8,marginTop:6,flexWrap:"wrap",fontSize:11,color:DS.mid}}>
-                      <span style={{background:theme.chip,color:theme.accent,padding:"4px 9px",borderRadius:999,fontWeight:800,border:`1px solid ${theme.border}`}}>{c.formule}</span>
-                      {c.adresse&&<span style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,0.65)",padding:"4px 8px",borderRadius:999,border:"1px solid rgba(255,255,255,0.7)"}}>{Ico.pin(10,theme.accent)} {c.adresse.split(",").pop()?.trim()}</span>}
-                    </div>
+                  </div>
+                  <Tag color={col.tx} bg={col.bg} style={{fontSize:12,fontWeight:800,flexShrink:0}}>{col.lbl}</Tag>
+                </div>
+                {/* Adresse */}
+                {c.adresse&&<div style={{display:"flex",alignItems:"center",gap:5,fontSize:12,color:DS.mid,marginBottom:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                  {Ico.pin(11,DS.mid)} {c.adresse}
+                </div>}
+                {/* Stats */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:tot>0?10:0}}>
+                  <div style={{textAlign:"center",padding:"8px 4px",borderRadius:10,background:DS.blueSoft}}>
+                    <div style={{fontSize:17,fontWeight:900,color:DS.blue,lineHeight:1}}>{eE}<span style={{fontSize:10,fontWeight:500,color:DS.mid}}>/{tE}</span></div>
+                    <div style={{fontSize:10,fontWeight:700,color:DS.blue,marginTop:3}}>🔧 Entretien</div>
+                  </div>
+                  <div style={{textAlign:"center",padding:"8px 4px",borderRadius:10,background:DS.tealSoft}}>
+                    <div style={{fontSize:17,fontWeight:900,color:DS.teal,lineHeight:1}}>{eC}<span style={{fontSize:10,fontWeight:500,color:DS.mid}}>/{tC}</span></div>
+                    <div style={{fontSize:10,fontWeight:700,color:DS.teal,marginTop:3}}>💧 Contrôle</div>
+                  </div>
+                  <div style={{textAlign:"center",padding:"8px 4px",borderRadius:10,background:rest>0?DS.orangeSoft:DS.greenSoft}}>
+                    <div style={{fontSize:17,fontWeight:900,color:rest>0?DS.orange:DS.green,lineHeight:1}}>{rest}</div>
+                    <div style={{fontSize:10,fontWeight:700,color:rest>0?DS.orange:DS.green,marginTop:3}}>{rest>0?"⏳ Restants":"✅ À jour"}</div>
                   </div>
                 </div>
-
-                <div style={{display:"grid",gridTemplateColumns:"repeat(3, minmax(0,1fr))",gap:8,marginTop:12}}>
-                  <div style={{padding:"9px 10px",borderRadius:12,background:"rgba(255,255,255,0.72)",border:`1px solid ${theme.border}`}}>
-                    <div style={{fontSize:10,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.6}}>Entretien</div>
-                    <div style={{marginTop:3,fontSize:14,fontWeight:900,color:theme.accent}}>{eE}/{tE||0}</div>
+                {/* Progress bar */}
+                {tot>0&&<div>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                    <span style={{fontSize:11,fontWeight:600,color:DS.mid}}>Progression</span>
+                    <span style={{fontSize:12,fontWeight:800,color:pct>=100?DS.green:rest>3?DS.orange:DS.blue}}>{pct}%</span>
                   </div>
-                  <div style={{padding:"9px 10px",borderRadius:12,background:"rgba(255,255,255,0.72)",border:`1px solid ${theme.border}`}}>
-                    <div style={{fontSize:10,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.6}}>Contrôle</div>
-                    <div style={{marginTop:3,fontSize:14,fontWeight:900,color:theme.accent}}>{eC}/{tC||0}</div>
-                  </div>
-                  <div style={{padding:"9px 10px",borderRadius:12,background:"rgba(255,255,255,0.72)",border:`1px solid ${theme.border}`}}>
-                    <div style={{fontSize:10,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.6}}>Restants</div>
-                    <div style={{marginTop:3,fontSize:14,fontWeight:900,color:rest>0?DS.orange:DS.green}}>{rest}</div>
-                  </div>
-                </div>
-
-                {/* Progress section */}
-                {tot>0&&<div style={{marginTop:12}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                    <span style={{fontSize:11,fontWeight:800,color:DS.mid}}>Avancement annuel</span>
-                    <span style={{fontSize:12,fontWeight:900,color:pct>=100?DS.green:rest>3?DS.orange:theme.accent}}>{pct}%</span>
-                  </div>
-                  <div style={{height:7,background:"rgba(255,255,255,0.85)",borderRadius:99,overflow:"hidden",border:`1px solid ${theme.border}`}}>
-                    <div style={{height:"100%",width:`${pct}%`,background:pct>=100?DS.greenGrad:pct>=50?`linear-gradient(90deg,${theme.accent},#38bdf8)`: `linear-gradient(90deg,${DS.orange},#fbbf24)`,borderRadius:99,transition:"width .6s ease"}}/>
+                  <div style={{height:5,background:DS.light,borderRadius:99,overflow:"hidden"}}>
+                    <div style={{height:"100%",width:`${pct}%`,background:pct>=100?"linear-gradient(90deg,#059669,#34d399)":pct>=50?"linear-gradient(90deg,#0369a1,#38bdf8)":"linear-gradient(90deg,#d9773b,#fbbf24)",borderRadius:99,transition:"width .5s"}}/>
                   </div>
                 </div>}
               </div>
@@ -3292,77 +3009,9 @@ function PageClients({ clients, passages, onClientClick, onAdd }) {
   );
 }
 
-
-function PassageDetailModal({ passage, client, onClose }) {
-  const isMobile = useIsMobile();
-  if (!passage) return null;
-  const infoRows = [
-    ["Date", passage.date ? new Date(passage.date).toLocaleDateString("fr-FR",{weekday:"long", day:"2-digit", month:"long", year:"numeric"}) : "-"],
-    ["Client", client?.nom || passage.clientId || "-"],
-    ["Technicien", passage.tech || "-"],
-    ["Type", passage.type || "-"],
-    ["pH", passage.ph || passage.tPH || "-"],
-    ["Chlore", passage.chlore || passage.tChlore || "-"],
-    ["Sel", passage.tSel || "-"],
-    ["Phosphate", passage.tPhosphate || "-"],
-    ["Stabilisant", passage.tStabilisant || passage.stabilisant || "-"],
-    ["Qualité de l'eau", passage.qualiteEau || "-"],
-  ];
-  const longRows = [
-    ["Actions", passage.actions || ""],
-    ["Observations", passage.obs || passage.commentaires || ""],
-    ["État du fond", Array.isArray(passage.etatFond) ? passage.etatFond.join(", ") : (passage.etatFond || "")],
-    ["État des parois", Array.isArray(passage.etatParois) ? passage.etatParois.join(", ") : (passage.etatParois || "")],
-    ["État local technique", Array.isArray(passage.etatLocal) ? passage.etatLocal.join(", ") : (passage.etatLocal || "")],
-    ["Bac tampon", Array.isArray(passage.etatBacTampon) ? passage.etatBacTampon.join(", ") : (passage.etatBacTampon || "")],
-    ["Volet / bac", Array.isArray(passage.etatVoletBac) ? passage.etatVoletBac.join(", ") : (passage.etatVoletBac || "")],
-  ].filter(([,val])=>String(val||"").trim());
-  const photos = [
-    passage.photoArrivee ? {src:passage.photoArrivee, label:"Arrivée"} : null,
-    ...(passage.photos||[]).filter(Boolean).map((src,i)=>({src,label:`Arrivée ${i+2}`})),
-    passage.photoDepart ? {src:passage.photoDepart, label:"Départ"} : null,
-    ...(passage.photosDepart||[]).filter(Boolean).map((src,i)=>({src,label:`Départ ${i+2}`})),
-  ].filter(Boolean);
-
-  return (
-    <Modal title="Détail du passage" onClose={onClose} wide>
-      <div style={{display:"flex",flexDirection:"column",gap:14}}>
-        <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:10}}>
-          {infoRows.map(([label,val])=>(
-            <div key={label} style={{padding:"12px 14px",borderRadius:12,border:"1px solid "+DS.border,background:DS.white}}>
-              <div style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,marginBottom:5}}>{label}</div>
-              <div style={{fontSize:14,fontWeight:700,color:DS.dark,wordBreak:"break-word"}}>{val || "-"}</div>
-            </div>
-          ))}
-        </div>
-        {longRows.map(([label,val])=>(
-          <div key={label} style={{padding:"12px 14px",borderRadius:12,border:"1px solid "+DS.border,background:DS.white}}>
-            <div style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,marginBottom:6}}>{label}</div>
-            <div style={{fontSize:14,color:DS.dark,whiteSpace:"pre-wrap",lineHeight:1.45,wordBreak:"break-word"}}>{val}</div>
-          </div>
-        ))}
-        {photos.length>0 && (
-          <div style={{padding:"12px 14px",borderRadius:12,border:"1px solid "+DS.border,background:DS.white}}>
-            <div style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>Photos</div>
-            <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(3, 1fr)",gap:8}}>
-              {photos.map((ph, idx)=>(
-                <div key={idx} style={{position:"relative"}}>
-                  <img src={ph.src} alt={ph.label} style={{width:"100%",height:isMobile?110:130,objectFit:"cover",borderRadius:10,border:"1px solid "+DS.border,display:"block"}} />
-                  <span style={{position:"absolute",left:6,bottom:6,fontSize:10,fontWeight:800,color:"#fff",background:"rgba(0,0,0,0.58)",borderRadius:6,padding:"3px 6px"}}>{ph.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </Modal>
-  );
-}
-
 // PAGE PASSAGES
 function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePassageStatus }) {
   const [filter,setFilter]=useState("mois");
-  const [detailPassage, setDetailPassage] = useState(null);
   const now=new Date();
   const filtered=useMemo(()=>{
     return passages.filter(p=>{
@@ -3381,11 +3030,11 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
 
   return (
     <div>
-      <div style={{display:"flex",gap:6,marginBottom:14,background:"rgba(255,255,255,0.9)",border:"1px solid "+DS.border,borderRadius:DS.radius,padding:5,boxShadow:DS.shadow}}>
+      <div style={{display:"flex",gap:6,marginBottom:14,background:DS.light,borderRadius:DS.radius,padding:4}}>
         {[["semaine","7 jours",Ico.clock],[" mois","Ce mois",Ico.calendar],["tout","Tout",Ico.clipboard]].map(([v,l,ico])=>{
           const key=v.trim(); const active=filter===key;
           return (
-            <button key={key} onClick={()=>setFilter(key)} className="btn-hover" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"8px 4px",borderRadius:DS.radiusSm,cursor:"pointer",fontFamily:"inherit",background:active?DS.white:"transparent",color:active?DS.dark:DS.mid,boxShadow:active?DS.shadow:"none",border:active?"1px solid "+DS.border:"1px solid transparent",transition:"all .2s"}}>
+            <button key={key} onClick={()=>setFilter(key)} className="btn-hover" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"8px 4px",borderRadius:DS.radiusSm,border:"none",cursor:"pointer",fontFamily:"inherit",background:active?DS.white:"transparent",color:active?DS.dark:DS.mid,boxShadow:active?"0 1px 4px rgba(0,0,0,0.08)":"none",transition:"all .2s"}}>
               <span style={{fontWeight:800,fontSize:16,color:active?DS.blue:DS.mid}}>{counts[key]}</span>
               <span style={{fontSize:10,fontWeight:active?700:500}}>{l}</span>
             </button>
@@ -3434,8 +3083,8 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                         {p.photoDepart && (<div style={{position:"relative"}}><img src={p.photoDepart} alt="Départ" style={{height:48,width:72,objectFit:"cover",borderRadius:7,border:"1px solid "+DS.border}}/><span style={{position:"absolute",bottom:2,left:3,fontSize:8,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:3,padding:"1px 4px"}}>Dép.</span></div>)}
                       </div>
                     )}
-                    {p.actions&&<div title={p.actions} style={{fontSize:12,color:DS.mid,marginBottom:4,...LINE_CLAMP_2}}>{p.actions}</div>}
-                    {p.obs&&<div style={{fontSize:11,color:DS.orange,display:"flex",alignItems:"flex-start",gap:4}}><span style={{flexShrink:0,marginTop:2}}>{Ico.note(11,DS.orange)}</span><span title={p.obs} style={LINE_CLAMP_2}>{p.obs}</span></div>}
+                    {p.actions&&<div style={{fontSize:12,color:DS.mid,marginBottom:4}}>{p.actions}</div>}
+                    {p.obs&&<div style={{fontSize:11,color:DS.orange,display:"flex",alignItems:"center",gap:4}}>{Ico.note(11,DS.orange)} {p.obs}</div>}
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginTop:10,paddingTop:10,borderTop:"1px solid "+DS.border}}>
                       <button onClick={()=>ouvrirRapport(p,c)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.blueSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.blue,fontFamily:"inherit",fontWeight:700,boxShadow:"0 1px 4px "+DS.blue+"22"}}>
                         {Ico.pdf(14,DS.blue)} Rapport PDF
@@ -3446,13 +3095,10 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                           </button>
                         : <div style={{borderRadius:10,background:DS.light,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:DS.mid,fontWeight:500}}>{Ico.mail(12,DS.mid)} Pas d'email</div>
                       }
-                      <button onClick={()=>setDetailPassage(p)} className="btn-hover" style={{padding:"10px 12px",borderRadius:10,background:DS.light,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:12,color:DS.dark,fontFamily:"inherit",fontWeight:700}}>
-                        {Ico.search(13,DS.mid)} Voir
-                      </button>
-                      <button onClick={()=>onEdit(p)} className="btn-hover" style={{padding:"10px 12px",borderRadius:10,background:DS.white,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:12,color:DS.dark,fontFamily:"inherit",fontWeight:700,boxShadow:DS.shadow}}>
+                      <button onClick={()=>onEdit(p)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>
                         {Ico.edit(13,DS.mid)} Modifier
                       </button>
-                      <button onClick={()=>{if(confirm("Supprimer ce passage ?"))onDelete(p.id)}} className="btn-hover" style={{padding:"10px 12px",borderRadius:10,background:DS.redSoft,border:"1px solid "+DS.red+"22",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:12,color:DS.red,fontFamily:"inherit",fontWeight:700,boxShadow:"0 4px 14px "+DS.red+"10"}}>
+                      <button onClick={()=>{if(confirm("Supprimer ce passage ?"))onDelete(p.id)}} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.red,fontFamily:"inherit",fontWeight:700}}>
                         {Ico.trash(13,DS.red)} Supprimer
                       </button>
                     </div>
@@ -3463,7 +3109,6 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
           })}
         </div>
       }
-      {detailPassage && <PassageDetailModal passage={detailPassage} client={clients.find(x=>x.id===detailPassage.clientId)} onClose={()=>setDetailPassage(null)} />}
     </div>
   );
 }
@@ -3685,7 +3330,7 @@ export default function App() {
       const ct = await load("bb_contrats_v1", {});
       const sWithDefaults = {...Object.fromEntries(PRODUITS_DEFAUT.map(nom=>[nom, s[nom]??0])), ...s};
 // Migrate saisons format for existing clients
-      const cMigrated = c.map(cl => normalizeClientRecord(cl));
+      const cMigrated = c.map(cl => ({...cl, moisParMois: migrateMois(cl.moisParMois||cl.saisons), photoPiscine: cl.photoPiscine||"", prixPassageE: cl.prixPassageE||0, prixPassageC: cl.prixPassageC||0}));
       setClients(cMigrated); setPassages(passages_data); setLivraisons(l); setRdvs(r); setStock(sWithDefaults); setContrats(ct); setReady(true);
     })();
   },[loggedIn]);
@@ -3737,7 +3382,7 @@ export default function App() {
   const handleLogin = useCallback(()=>{ try{sessionStorage.setItem("bb_auth","1");}catch{} setLoggedIn(true); },[]);
   const handleLogout = useCallback(()=>{ try{sessionStorage.removeItem("bb_auth");}catch{} setLoggedIn(false);setReady(false);setClients([]);setPassages([]);setLivraisons([]);setRdvs([]); },[]);
 
-  const saveClient = useCallback(c=>{ const existing = clients.find(x=>x.id===c.id); const merged = normalizeClientRecord(existing ? { ...existing, ...c, moisParMois: c.moisParMois ?? existing.moisParMois ?? existing.saisons, photosPiscine: c.photosPiscine ?? existing.photosPiscine, photoPiscine: c.photoPiscine ?? existing.photoPiscine } : c); setClients(prev=>prev.find(x=>x.id===merged.id)?prev.map(x=>x.id===merged.id?merged:x):[...prev,merged]); setShowFormClient(false);setEditClient(null);setFicheClient(merged); },[clients]);
+  const saveClient = useCallback(c=>{ setClients(prev=>prev.find(x=>x.id===c.id)?prev.map(x=>x.id===c.id?c:x):[...prev,c]); setShowFormClient(false);setEditClient(null);setFicheClient(c); },[]);
   const deleteClient = useCallback(id=>{ if(!confirm("Supprimer ce client ?"))return; setClients(prev=>prev.filter(x=>x.id!==id)); setPassages(prev=>prev.filter(x=>x.clientId!==id)); setFicheClient(null); },[]);
   const savePassage = useCallback(p=>{ setPassages(prev=>prev.find(x=>x.id===p.id)?prev.map(x=>x.id===p.id?p:x):[...prev,p]); setShowFormPassage(false);setEditPassage(null); },[]);
   const updatePassageRapportStatus = useCallback((passageMaj) => {
