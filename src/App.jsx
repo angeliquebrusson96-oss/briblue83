@@ -1731,19 +1731,40 @@ function ouvrirRapport(passage, client) {
 }
 
 async function envoyerEmail(passage, client, onSent) {
-  const RESEND_API_KEY = "re_FLTMeUdh_vL8QGqJhP2C293WEVCm9c7rh";
   const FROM = "rapport-piscine@briblue83.com";
 
   if (!client?.email) { alert("Aucun email renseigné pour ce client."); return; }
 
   const dateStr = new Date(passage.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"});
-  const filename = `Rapport_BRIBLUE_${client?.nom?.replace(/\s/g,"_")||"client"}_${passage.date}.html`;
-  const html = genererHTMLRapport(passage, client);
+  const htmlRapport = genererHTMLRapport(passage, client);
 
-  // Encode HTML rapport en base64
-  const b64 = btoa(unescape(encodeURIComponent(html)));
-
-  const corps = `Bonjour ${client?.nom||""},\n\nVous trouverez ci-joint votre rapport d'entretien piscine du ${dateStr}.\n\nJe reste à votre disposition pour toute question.\n\nCordialement,\n\nDorian Briaire\nTechnicien de Piscine — BRI BLUE\n🌐 www.briblue83.com\n📧 briblue83@hotmail.com\n📍 Hyères et alentours\n📞 +33 6 67 18 61 15`;
+  const htmlEmail = `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;">
+<div style="max-width:600px;margin:0 auto;padding:24px 16px;">
+  <div style="background:linear-gradient(135deg,#0c1222,#0369a1);border-radius:12px 12px 0 0;padding:24px 28px;color:#fff;">
+    <div style="font-size:22px;font-weight:900;letter-spacing:2px;">BRI'BLUE</div>
+    <div style="font-size:12px;opacity:.75;margin-top:4px;">Entretien & Traitement de piscines</div>
+  </div>
+  <div style="background:#fff;padding:28px;border:1px solid #e2e8f0;border-top:none;">
+    <p style="font-size:15px;color:#1e293b;">Bonjour <strong>${client?.nom||""}</strong>,</p>
+    <p style="font-size:14px;color:#475569;line-height:1.6;">Vous trouverez ci-dessous votre rapport d'entretien piscine du <strong>${dateStr}</strong>.</p>
+    <div style="border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;margin:20px 0;">
+      ${htmlRapport.replace(/<!DOCTYPE html>[\s\S]*?<body[^>]*>/i,'').replace(/<\/body>[\s\S]*?<\/html>/i,'').replace(/<div class="no-print"[\s\S]*?<\/div>/g,'')}
+    </div>
+    <p style="font-size:13px;color:#64748b;line-height:1.6;">Je reste à votre disposition pour toute question.</p>
+  </div>
+  <div style="background:#f0f9ff;border:1px solid #e0f2fe;border-top:none;border-radius:0 0 12px 12px;padding:16px 28px;">
+    <p style="margin:0;font-size:12px;color:#64748b;">
+      <strong style="color:#0369a1;">Dorian Briaire</strong> — Technicien de Piscine<br/>
+      🌐 www.briblue83.com &nbsp;|&nbsp; 📞 +33 6 67 18 61 15<br/>
+      📍 Hyères et alentours &nbsp;|&nbsp; 📧 briblue83@hotmail.com
+    </p>
+  </div>
+</div>
+</body></html>`;
 
   try {
     const res = await fetch("/api/send-email", {
@@ -1753,11 +1774,8 @@ async function envoyerEmail(passage, client, onSent) {
         from: `BRIBLUE <${FROM}>`,
         to: [client.email],
         subject: `Rapport entretien piscine — ${dateStr}`,
-        text: corps,
-        attachments: [{
-          filename,
-          content: b64,
-        }],
+        html: htmlEmail,
+        text: `Bonjour ${client?.nom||""},\n\nVotre rapport d'entretien piscine du ${dateStr} est disponible.\n\nCordialement,\nDorian Briaire — BRIBLUE\nwww.briblue83.com | +33 6 67 18 61 15`,
       }),
     });
 
@@ -1765,10 +1783,10 @@ async function envoyerEmail(passage, client, onSent) {
 
     if (res.ok) {
       if (onSent) onSent({ ...passage, rapportStatut: "envoye", rapportEnvoyeAt: new Date().toISOString() });
-      alert(`✅ Email envoyé avec succès à ${client.email} !\n\nLe rapport est en pièce jointe.`);
+      alert(`✅ Email envoyé avec succès à ${client.email} !`);
     } else {
       console.error("Resend error:", data);
-      alert(`❌ Erreur envoi : ${data?.message || JSON.stringify(data)}\n\nVérifiez la console.`);
+      alert(`❌ Erreur envoi : ${data?.message || JSON.stringify(data)}`);
     }
   } catch(err) {
     console.error("Fetch error:", err);
