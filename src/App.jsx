@@ -2927,14 +2927,14 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
       {/* Widget passages du mois — redesigné */}
       <div style={{marginBottom:14,borderRadius:DS.radius,overflow:"hidden",boxShadow:DS.shadowMd,border:"1px solid "+(totalTaches>0?DS.border:"#86efac")}}>
         {/* Header */}
-        <div style={{background:totalTaches>0?"linear-gradient(135deg,#ecfeff,#f0fdfe)":"linear-gradient(135deg,#ecfdf5,#f0fdf4)",padding:"14px 16px",borderBottom:"1px solid "+(totalTaches>0?"#a5f3fc":"#6ee7b7")}}>
+        <div style={{background:DS.white,padding:"16px 18px",borderBottom:"1px solid "+DS.border}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div>
-              <div style={{fontWeight:900,fontSize:16,color:DS.dark,letterSpacing:-0.3}}>{MOIS_L[moisCourant]} {YEAR_NOW}</div>
+              <div style={{fontWeight:800,fontSize:16,color:DS.dark,letterSpacing:-0.5}}>{MOIS_L[moisCourant]} {YEAR_NOW}</div>
               <div style={{fontSize:12,color:"rgba(255,255,255,0.7)",marginTop:2}}>
                 {totalTaches>0
-                  ? <span style={{display:"flex",alignItems:"center",gap:6}}><span style={{background:"#fef3c7",color:"#b45309",padding:"1px 8px",borderRadius:20,fontWeight:700,border:"1px solid #fcd34d"}}>{totalTaches}</span> passage{totalTaches>1?"s":""} restant{totalTaches>1?"s":""}</span>
-                  : "✅ Tous les passages effectués sont faits !"}
+                  ? <><span style={{background:"#fef9c3",color:"#92400e",padding:"2px 10px",borderRadius:20,fontWeight:800,fontSize:13,border:"1px solid #fde68a"}}>{totalTaches}</span><span style={{marginLeft:6,color:DS.mid,fontSize:13}}>passage{totalTaches>1?"s":""} restant{totalTaches>1?"s":""}</span></>
+                  : <span style={{color:DS.green,fontWeight:600}}>✅ Tous les passages sont effectués</span>}
               </div>
             </div>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -3021,9 +3021,9 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
 
       {/* Action buttons */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>
-        <BtnPrimary onClick={onAddPassage} bg="linear-gradient(135deg,#0891b2,#06b6d4)" icon={Ico.clipboard(15,"#fff")} style={{width:"100%",fontSize:13,padding:"12px 8px",boxShadow:"0 4px 12px rgba(8,145,178,0.25)"}}>Passage</BtnPrimary>
-        <BtnPrimary onClick={()=>onAddLivraison()} bg="linear-gradient(135deg,#059669,#0d9488)" icon={Ico.truck(15,"#fff")} style={{width:"100%",fontSize:13,padding:"12px 8px",boxShadow:"0 4px 12px rgba(5,150,105,0.25)"}}>Livraison</BtnPrimary>
-        <BtnPrimary onClick={onAddRdv} bg="linear-gradient(135deg,#4f46e5,#6366f1)" icon={Ico.rdv(15,"#fff")} style={{width:"100%",fontSize:13,padding:"12px 8px",boxShadow:"0 4px 12px rgba(79,70,229,0.25)"}}>RDV</BtnPrimary>
+        <BtnPrimary onClick={onAddPassage} bg="linear-gradient(135deg,#0891b2,#06b6d4)" icon={Ico.clipboard(14,"#fff")} style={{width:"100%",fontSize:13,padding:"11px 8px",borderRadius:12,boxShadow:"0 2px 8px rgba(8,145,178,0.2)"}}>Passage</BtnPrimary>
+        <BtnPrimary onClick={()=>onAddLivraison()} bg="linear-gradient(135deg,#0d9488,#0891b2)" icon={Ico.truck(14,"#fff")} style={{width:"100%",fontSize:13,padding:"11px 8px",borderRadius:12,boxShadow:"0 2px 8px rgba(13,148,136,0.2)"}}>Livraison</BtnPrimary>
+        <BtnPrimary onClick={onAddRdv} bg="linear-gradient(135deg,#4f46e5,#6366f1)" icon={Ico.rdv(14,"#fff")} style={{width:"100%",fontSize:13,padding:"11px 8px",borderRadius:12,boxShadow:"0 2px 8px rgba(79,70,229,0.2)"}}>RDV</BtnPrimary>
       </div>
 
       {/* RDVs Aujourd'hui */}
@@ -3785,7 +3785,7 @@ export default function App() {
     <GlobalStyles/>
     <div style={{minHeight:"100vh",background:DS.bg,fontFamily:"'Inter', -apple-system, system-ui, sans-serif",maxWidth:isMobile?640:1280,margin:"0 auto",position:"relative",display:"flex",flexDirection:"column",overflowX:"hidden",width:"100%"}}>
       {/* HEADER MODERNISÉ */}
-      <div style={{background:"linear-gradient(135deg,#0e7490 0%,#0891b2 60%,#06b6d4 100%)",padding:isMobile?"10px 16px":"12px 28px",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:50,boxShadow:"0 2px 20px rgba(3,105,161,0.35)",backdropFilter:"blur(16px)"}}>
+      <div style={{background:"linear-gradient(135deg,#0e7490,#0891b2)",padding:isMobile?"10px 16px":"12px 28px",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:50,boxShadow:"0 2px 20px rgba(3,105,161,0.35)",backdropFilter:"blur(16px)"}}>
         <button
           onClick={()=>setPage("dashboard")}
           className="btn-hover"
@@ -3842,7 +3842,7 @@ export default function App() {
         /* LAYOUT DESKTOP : sidebar gauche + contenu principal */
         <div style={{display:"flex",flex:1,minHeight:0}}>
           {/* Sidebar navigation desktop */}
-          <div style={{width:220,flexShrink:0,background:"linear-gradient(180deg,#0e7490 0%,#0891b2 100%)",borderRight:"1px solid rgba(255,255,255,0.08)",display:"flex",flexDirection:"column",padding:"24px 12px",gap:4,position:"sticky",top:62,height:"calc(100vh - 62px)",overflowY:"auto"}}>
+          <div style={{width:220,flexShrink:0,background:"#0e7490",borderRight:"none",display:"flex",flexDirection:"column",padding:"24px 12px",gap:4,position:"sticky",top:62,height:"calc(100vh - 62px)",overflowY:"auto"}}>
             {/* Stats rapides */}
             <div style={{padding:"12px 14px",borderRadius:12,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",marginBottom:16}}>
               <div style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Aperçu</div>
@@ -3854,7 +3854,7 @@ export default function App() {
             </div>
             {/* Nav links */}
             {NAV.map(n=>(
-              <button key={n.id} onClick={()=>setPage(n.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",borderRadius:12,border:"none",cursor:"pointer",background:page===n.id?"rgba(255,255,255,0.15)":"transparent",textAlign:"left",fontFamily:"inherit",transition:"all .2s",width:"100%"}}>
+              <button key={n.id} onClick={()=>setPage(n.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",borderRadius:12,border:"none",cursor:"pointer",background:page===n.id?"rgba(255,255,255,0.12)":"transparent",textAlign:"left",fontFamily:"inherit",transition:"all .2s",width:"100%"}}>
                 {n.icon(page===n.id)}
                 <span style={{fontSize:13,fontWeight:page===n.id?800:500,color:page===n.id?"#fff":"rgba(255,255,255,0.6)"}}>{n.l}</span>
                 {page===n.id&&<div style={{marginLeft:"auto",width:4,height:16,borderRadius:2,background:"#38bdf8"}}/>}
@@ -3862,10 +3862,10 @@ export default function App() {
             ))}
             {/* Actions rapides */}
             <div style={{marginTop:"auto",display:"flex",flexDirection:"column",gap:8,paddingTop:16,borderTop:"1px solid rgba(255,255,255,0.07)"}}>
-              <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",borderRadius:10,border:"1px solid rgba(14,165,233,0.3)",background:"rgba(14,165,233,0.1)",cursor:"pointer",fontFamily:"inherit",width:"100%"}}>
-                {Ico.clipboard(14,"#7dd3fc")}<span style={{fontSize:12,fontWeight:700,color:"#7dd3fc"}}>Nouveau passage</span>
+              <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",borderRadius:10,border:"1px solid rgba(255,255,255,0.2)",background:"rgba(255,255,255,0.08)",cursor:"pointer",fontFamily:"inherit",width:"100%"}}>
+                {Ico.clipboard(14,"#7dd3fc")}<span style={{fontSize:12,fontWeight:700,color:"rgba(255,255,255,0.9)"}}>Nouveau passage</span>
               </button>
-              <button onClick={openAddClient} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",borderRadius:10,border:"1px solid rgba(124,58,237,0.3)",background:"rgba(124,58,237,0.1)",cursor:"pointer",fontFamily:"inherit",width:"100%"}}>
+              <button onClick={openAddClient} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",borderRadius:10,border:"1px solid rgba(255,255,255,0.2)",background:"rgba(255,255,255,0.08)",cursor:"pointer",fontFamily:"inherit",width:"100%"}}>
                 {Ico.userPlus(14,"#a5b4fc")}<span style={{fontSize:12,fontWeight:700,color:"#a5b4fc"}}>Nouveau client</span>
               </button>
             </div>
