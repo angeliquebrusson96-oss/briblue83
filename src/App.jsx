@@ -1811,7 +1811,7 @@ async function envoyerEmail(passage, client, onSent) {
 }
 
 // FORMULAIRE PASSAGE (avec Alcafix + types Entretien/Contrle)
-function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
+function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraison, onClose }) {
   const EMPTY = {
     date:TODAY, clientId:defaultClientId||"", type:"Entretien complet", tech:"Dorian",
     chloreLibre:"", ph:"", alcalinite:"", stabilisant:"",
@@ -1839,7 +1839,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
 
   const handleSave = () => {
     if(!f.clientId||!f.date) return alert("Client et date requis");
-    onSave({
+    const passage = {
       ...f,
       id: isEdit ? f.id : uid(),
       ph:ph||f.tPH||f.ph||"",
@@ -1854,7 +1854,20 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onClose }) {
         f.corrAutre&&f.corrAutre,
       ].filter(Boolean).join(", ") || "",
       obs: f.commentaires,
-    });
+    };
+    onSave(passage);
+    // Auto-créer une livraison si produits livrés
+    if (f.livraisonProduits && (f.produitsLivres?.length > 0 || f.livraisonAutre) && onSaveLivraison) {
+      onSaveLivraison({
+        id: uid(),
+        clientId: f.clientId,
+        date: f.date,
+        produits: f.produitsLivres || [],
+        description: f.livraisonAutre || "",
+        montant: "",
+        statut: "aFacturer",
+      });
+    }
   };
 
   const client = clients.find(c=>c.id===f.clientId);
@@ -3145,7 +3158,7 @@ export default function App() {
       })()}
 
       {showFormClient&&<FormClient initial={editClient} clients={clients} onSave={saveClient} onClose={()=>{setShowFormClient(false);setEditClient(null);}}/>}
-      {showFormPassage&&<FormPassage clients={clients} defaultClientId={defaultClientId} initial={editPassage} onSave={p=>savePassage(p)} onClose={()=>{setShowFormPassage(false);setEditPassage(null);}}/>}
+      {showFormPassage&&<FormPassage clients={clients} defaultClientId={defaultClientId} initial={editPassage} onSave={p=>savePassage(p)} onSaveLivraison={saveLivraison} onClose={()=>{setShowFormPassage(false);setEditPassage(null);}}/>}
       {showFormLivraison&&<FormLivraison clientId={defaultLivraisonClientId} clients={clients} onSave={l=>{saveLivraison(l);setShowFormLivraison(false);}} onClose={()=>setShowFormLivraison(false)}/>}
       {showFormRdv&&<FormRdv initial={editRdv} clients={clients} onSave={saveRdv} onClose={()=>{setShowFormRdv(false);setEditRdv(null);}}/>}
 
