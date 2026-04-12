@@ -2600,24 +2600,80 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
               </div>
               <OuiNon label="Présence du locataire / propriétaire ?" value={f.presenceClient} onChange={v=>set("presenceClient",v)}/>
               <div style={{borderTop:"1px solid "+DS.border,paddingTop:14}}>
-                {f.photoDepart
-                  ? <div style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid "+DS.border}}>
-                      <img src={f.photoDepart} alt="Départ" style={{width:"100%",height:110,objectFit:"cover",display:"block"}}/>
-                      <span style={{position:"absolute",bottom:4,left:6,fontSize:10,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:4,padding:"2px 8px"}}>📸 Au départ</span>
-                      <button onClick={()=>set("photoDepart","")} style={{position:"absolute",top:6,right:6,width:26,height:26,borderRadius:13,background:"rgba(0,0,0,0.65)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                        {Ico.close(11,"#fff")}
-                      </button>
+                {(()=>{
+                  const filledDepart = [
+                    f.photoDepart ? {key:"pd0", label:"Départ", val:f.photoDepart} : null,
+                    ...((f.photosDepart||[]).map((v,i)=>v?{key:`pd${i+1}`,label:`Départ ${i+2}`,val:v,idx:i}:null)),
+                  ].filter(Boolean);
+                  const canAdd = filledDepart.length < 10;
+
+                  const addDepart = (e) => {
+                    const files = Array.from(e.target.files||[]).slice(0, 10 - filledDepart.length);
+                    if(!files.length) return;
+                    let newDepart = f.photoDepart||"";
+                    let newExtras = [...(f.photosDepart||[])];
+                    let done = 0;
+                    files.forEach(file => {
+                      const r = new FileReader();
+                      r.onload = () => {
+                        if (!newDepart) newDepart = r.result;
+                        else newExtras = [...newExtras, r.result];
+                        done++;
+                        if (done === files.length) {
+                          set("photoDepart", newDepart);
+                          set("photosDepart", newExtras.slice(0,9));
+                        }
+                      };
+                      r.readAsDataURL(file);
+                    });
+                    e.target.value="";
+                  };
+
+                  const removeDepart = (key, idx) => {
+                    if (key==="pd0") {
+                      // Promouvoir la première extra si dispo
+                      const extras = [...(f.photosDepart||[])];
+                      set("photoDepart", extras[0]||"");
+                      set("photosDepart", extras.slice(1));
+                    } else {
+                      const arr = [...(f.photosDepart||[])]; arr.splice(idx,1); set("photosDepart",arr);
+                    }
+                  };
+
+                  return (
+                    <div>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                        <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>
+                          Photos départ {filledDepart.length>0&&`(${filledDepart.length}/10)`}
+                        </span>
+                        {canAdd&&(
+                          <label style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:8,background:DS.blueSoft,border:"1px solid "+DS.blue+"33",cursor:"pointer",fontSize:12,fontWeight:700,color:DS.blue}}>
+                            {Ico.plus(12,DS.blue)} Ajouter
+                            <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={addDepart}/>
+                          </label>
+                        )}
+                      </div>
+                      {filledDepart.length===0
+                        ? <label style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8,padding:18,borderRadius:12,border:"2px dashed "+DS.border,background:DS.light,cursor:"pointer"}}>
+                            {Ico.camera(26,DS.mid)}
+                            <span style={{fontSize:13,color:DS.mid,fontWeight:600}}>Ajouter des photos au départ</span>
+                            <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={addDepart}/>
+                          </label>
+                        : <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                            {filledDepart.map(p=>(
+                              <div key={p.key} style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid "+DS.border}}>
+                                <img src={p.val} alt={p.label} style={{width:"100%",height:90,objectFit:"cover",display:"block"}}/>
+                                <span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:4,padding:"1px 6px"}}>{p.label}</span>
+                                <button onClick={()=>removeDepart(p.key,p.idx)} style={{position:"absolute",top:5,right:5,width:24,height:24,borderRadius:12,background:"rgba(0,0,0,0.65)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                                  {Ico.close(10,"#fff")}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                      }
                     </div>
-                  : <label style={{display:"flex",alignItems:"center",gap:8,padding:"12px 16px",borderRadius:10,border:"2px dashed "+DS.border,background:DS.light,cursor:"pointer"}}>
-                      {Ico.camera(18,DS.mid)}
-                      <span style={{fontSize:13,color:DS.mid,fontWeight:600}}>📸 Photo au départ</span>
-                      <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{
-                        const file=e.target.files?.[0]; if(!file) return;
-                        const r=new FileReader(); r.onload=()=>set("photoDepart",r.result); r.readAsDataURL(file);
-                        e.target.value="";
-                      }}/>
-                    </label>
-                }
+                  );
+                })()}
               </div>
               <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",background:`linear-gradient(135deg,${DS.greenSoft},#bbf7d0)`,padding:"14px 16px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.green+"44",marginTop:4,transition:"all .2s"}}>
                 <input type="checkbox" checked={f.ok} onChange={e=>set("ok",e.target.checked)} style={{width:20,height:20,accentColor:DS.green}}/>
