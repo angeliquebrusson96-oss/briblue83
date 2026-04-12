@@ -2708,7 +2708,7 @@ function CalendrierInteractif({ passages, rdvs, clients, onClientClick, onEditPa
 
 // ALERTES COLLAPSIBLE
 function AlertesBlock({ alertes, passages, onClientClick }) {
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = useState(false);
   const preview = alertes.slice(0, 2);
   const isMobile = useIsMobile();
   return (
