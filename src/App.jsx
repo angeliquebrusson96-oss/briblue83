@@ -693,6 +693,7 @@ function FormClient({ initial, clients, onSave, onClose }) {
       photosPiscine: [],
     };
   });
+
   const set = (k,v) => setF(p=>({...p,[k]:v}));
   const setPhotos = (photos) => {
     const cleanPhotos = normalizePhotoList(photos);
@@ -702,95 +703,170 @@ function FormClient({ initial, clients, onSave, onClose }) {
   const totalE = totalAnnuel(f.moisParMois,"entretien");
   const totalC = totalAnnuel(f.moisParMois,"controle");
   const total = totalE + totalC;
+  const prixAnnuel = totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0);
+
+  const blockStyle = {
+    background: "linear-gradient(180deg,#ffffff,#fbfdff)",
+    border: "1px solid #dbe7f3",
+    borderRadius: 20,
+    padding: isMobile ? "16px 14px" : "18px 18px",
+    boxShadow: "0 10px 28px rgba(2,132,199,0.06)",
+    marginBottom: 16,
+  };
+  const infoChip = (label, value, color, bg) => (
+    <div style={{padding:"10px 12px",borderRadius:14,background:bg,border:`1px solid ${color}22`,display:"flex",flexDirection:"column",gap:4}}>
+      <span style={{fontSize:12,fontWeight:800,textTransform:"uppercase",letterSpacing:.8,color}}>{label}</span>
+      <span style={{fontSize:18,fontWeight:900,color:DS.dark}}>{value}</span>
+    </div>
+  );
 
   return (
     <Modal title={isNew ? "Nouveau client" : `Modifier — ${f.nom}`} onClose={onClose} wide>
-      <Section title="Informations">
-        <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12}}>
-          <div style={{gridColumn:"1/-1"}}><Input label="Nom complet *" value={f.nom} onChange={e=>set("nom",e.target.value)} placeholder="Dupont Marie"/></div>
-          <Input label="Téléphone" value={f.tel} onChange={e=>set("tel",e.target.value)}/>
-          <Input label="Email" type="email" value={f.email} onChange={e=>set("email",e.target.value)}/>
-          <div style={{gridColumn:"1/-1"}}><Input label="Adresse" value={f.adresse} onChange={e=>set("adresse",e.target.value)}/></div>
-          <Select label="Type bassin" value={f.bassin} onChange={e=>set("bassin",e.target.value)} options={["Liner","Béton","Coque polyester","PVC armé","Hors-sol","Autre"]}/>
-          <Input label="Volume (m³)" type="number" value={f.volume} onChange={e=>set("volume",+e.target.value)}/>
-        </div>
-      </Section>
-      <Section title="Photos de la piscine">
-        <PhotoPicker value={f.photosPiscine||[]} onChange={setPhotos} compact/>
-      </Section>
-      <Section title="Contrat">
-        <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr 1fr",gap:12}}>
-          <Select label="Formule" value={f.formule} onChange={e=>set("formule",e.target.value)} options={["VAC","VAC+","Confort","Confort+"]}/>
-          <div/>
-          {!isMobile&&<div/>}
-          <Input label="Date début" type="date" value={f.dateDebut} onChange={e=>set("dateDebut",e.target.value)}/>
-          <Input label="Date fin" type="date" value={f.dateFin} onChange={e=>set("dateFin",e.target.value)}/>
-        </div>
-      </Section>
-      <Section title="Passages par mois">
-        <div style={{background:DS.dark,padding:"8px 14px",borderRadius:"12px 12px 0 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <span style={{color:"rgba(255,255,255,0.8)",fontSize:15,fontWeight:700}}>Planning mensuel</span>
-          <span style={{color:"#fff",fontSize:15,fontWeight:800}}>🔧 {totalE}  ·  💧 {totalC}  ·  Total {totalE+totalC}</span>
-        </div>
-        <div style={{border:"1px solid "+DS.border,borderTop:"none",borderRadius:"0 0 12px 12px",overflow:"hidden"}}>
-          {[...Array(12)].map((_,i)=>{
-            const m=i+1; const mv=getMoisVal(f.moisParMois,m); const sc=SAISONS_META[getSaison(m)];
-            return (
-              <div key={m} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderBottom:i<11?"1px solid "+DS.border:"none",background:i%2===0?DS.white:DS.light}}>
-                <div style={{width:36,display:"flex",alignItems:"center",gap:4}}>
-                  <div style={{width:4,height:24,borderRadius:2,background:sc.color}}/>
-                  <span style={{fontSize:15,fontWeight:700,color:sc.color}}>{MOIS[m]}</span>
-                </div>
-                <div style={{flex:1,display:"flex",alignItems:"center",gap:12}}>
-                  <div style={{display:"flex",alignItems:"center",gap:4}}>
-                    <span style={{fontSize:15,color:DS.blue}}>🔧</span>
-                    <button onClick={()=>setMoisVal(m,"entretien",mv.entretien-1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.border,background:DS.white,cursor:"pointer",fontSize:15,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
-                    <span style={{fontSize:16,fontWeight:900,color:DS.blue,minWidth:16,textAlign:"center"}}>{mv.entretien}</span>
-                    <button onClick={()=>setMoisVal(m,"entretien",mv.entretien+1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.blue,background:DS.blueSoft,cursor:"pointer",fontSize:15,fontWeight:700,color:DS.blue,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
-                  </div>
-                  <div style={{display:"flex",alignItems:"center",gap:4}}>
-                    <span style={{fontSize:15,color:DS.teal}}>💧</span>
-                    <button onClick={()=>setMoisVal(m,"controle",mv.controle-1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.border,background:DS.white,cursor:"pointer",fontSize:15,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
-                    <span style={{fontSize:16,fontWeight:900,color:DS.teal,minWidth:16,textAlign:"center"}}>{mv.controle}</span>
-                    <button onClick={()=>setMoisVal(m,"controle",mv.controle+1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.teal,background:DS.tealSoft,cursor:"pointer",fontSize:15,fontWeight:700,color:DS.teal,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
-                  </div>
-                </div>
-                <div style={{fontSize:15,fontWeight:700,color:mv.entretien+mv.controle>0?DS.dark:DS.border,minWidth:20,textAlign:"right"}}>{mv.entretien+mv.controle>0?mv.entretien+mv.controle:"—"}</div>
+      <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        <div style={{background:"linear-gradient(135deg,#eff8ff,#f8fbff 60%,#eefaf8)",border:"1px solid #d9ebf7",borderRadius:24,padding:isMobile?"16px":"20px",boxShadow:"0 12px 28px rgba(14,165,233,0.07)"}}>
+          <div style={{display:"flex",alignItems:isMobile?"flex-start":"center",justifyContent:"space-between",gap:14,flexDirection:isMobile?"column":"row"}}>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              <div style={{width:52,height:52,borderRadius:18,background:"linear-gradient(135deg,#0284c7,#22c55e)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 10px 22px rgba(2,132,199,0.18)"}}>
+                {Ico.userPlus(24,"#fff")}
               </div>
-            );
-          })}
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:12}}>
-          <Input label="Prix/passage entretien (€)" type="number" value={f.prixPassageE||""} onChange={e=>set("prixPassageE",+e.target.value||0)}/>
-          <Input label="Prix/passage contrôle (€)" type="number" value={f.prixPassageC||""} onChange={e=>set("prixPassageC",+e.target.value||0)}/>
-        </div>
-        {/* Récap tarification auto */}
-        <div style={{marginTop:12,background:"linear-gradient(135deg,#0c1222,#1a365d)",borderRadius:DS.radiusSm,padding:"14px 16px",color:"#fff"}}>
-          <div style={{fontSize:15,fontWeight:700,textTransform:"uppercase",letterSpacing:1,color:"rgba(255,255,255,0.5)",marginBottom:10}}>Tarification</div>
-          <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{fontSize:15,color:"rgba(255,255,255,0.7)"}}>🔧 {totalE} entretiens × {f.prixPassageE||0}€</span>
-              <span style={{fontSize:15,fontWeight:800}}>{totalE*(f.prixPassageE||0)} €</span>
+              <div>
+                <div style={{fontSize:isMobile?22:24,fontWeight:900,color:DS.dark,letterSpacing:-0.8}}>{isNew ? "Créer une fiche client" : "Mettre à jour la fiche client"}</div>
+                <div style={{fontSize:14,color:DS.mid,marginTop:4,maxWidth:560}}>Saisie plus claire, sections mieux séparées et calcul automatique du contrat.</div>
+              </div>
             </div>
-            {totalC>0&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{fontSize:15,color:"rgba(255,255,255,0.7)"}}>💧 {totalC} contrôles × {f.prixPassageC||0}€</span>
-              <span style={{fontSize:15,fontWeight:800}}>{totalC*(f.prixPassageC||0)} €</span>
-            </div>}
-            <div style={{borderTop:"1px solid rgba(255,255,255,0.15)",paddingTop:8,marginTop:4,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{fontSize:15,fontWeight:700}}>Prix annuel</span>
-              <span style={{fontSize:22,fontWeight:900,color:"#22d3ee"}}>{(totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0)).toLocaleString("fr")} €</span>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(88px,1fr))",gap:8,width:isMobile?"100%":"auto"}}>
+              {infoChip("Photos", (f.photosPiscine||[]).length, DS.purple, DS.purpleSoft)}
+              {infoChip("Passages", total, DS.blue, DS.blueSoft)}
+              {infoChip("Contrat", `${prixAnnuel.toLocaleString("fr")} €`, DS.green, DS.greenSoft)}
             </div>
           </div>
         </div>
-      </Section>
-      <div style={{display:"flex",gap:10}}>
-        <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"13px 14px",borderRadius:DS.radiusSm,background:DS.white,border:"1.5px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:15,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:DS.shadow}}>{Ico.close(16,DS.dark)} Annuler</button>
-        <BtnPrimary onClick={()=>{ if(!f.nom.trim()) return alert("Nom requis"); const prixCalc=totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0); const photosPiscine = normalizePhotoList(f.photosPiscine||f.photoPiscine); onSave({ ...normalizeClientRecord(f), photosPiscine, photoPiscine: photosPiscine[0]||"", prix:prixCalc||f.prix||0 }); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
+
+        <div style={blockStyle}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,gap:10,flexWrap:"wrap"}}>
+            <div>
+              <div style={{fontSize:18,fontWeight:900,color:DS.dark}}>Coordonnées client</div>
+              <div style={{fontSize:14,color:DS.mid,marginTop:3}}>Renseigne d’abord l’identité et les contacts.</div>
+            </div>
+            <Tag color={DS.blue} bg={DS.blueSoft}>Fiche principale</Tag>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1.2fr .8fr",gap:12}}>
+            <div><Input label="Nom complet *" value={f.nom} onChange={e=>set("nom",e.target.value)} placeholder="Ex. Dupont Marie" style={{background:"#fff"}}/></div>
+            <Input label="Téléphone" value={f.tel} onChange={e=>set("tel",e.target.value)} placeholder="06 12 34 56 78" inputMode="tel" autoComplete="tel" style={{background:"#fff"}}/>
+            <Input label="Email" type="email" value={f.email} onChange={e=>set("email",e.target.value)} placeholder="client@email.fr" autoComplete="email" style={{background:"#fff"}}/>
+            <div style={{gridColumn:"1/-1"}}>
+              <Input label="Adresse postale" value={f.adresse} onChange={e=>set("adresse",e.target.value)} placeholder="Rue, code postal, ville" autoComplete="street-address" style={{background:"#fff"}}/>
+            </div>
+          </div>
+        </div>
+
+        <div style={blockStyle}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,gap:10,flexWrap:"wrap"}}>
+            <div>
+              <div style={{fontSize:18,fontWeight:900,color:DS.dark}}>Piscine et photos</div>
+              <div style={{fontSize:14,color:DS.mid,marginTop:3}}>Ajoute les infos techniques et les visuels de départ.</div>
+            </div>
+            <Tag color={DS.teal} bg={DS.tealSoft}>Jusqu'à 10 photos</Tag>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12,marginBottom:14}}>
+            <Select label="Type bassin" value={f.bassin} onChange={e=>set("bassin",e.target.value)} options={["Liner","Béton","Coque polyester","PVC armé","Hors-sol","Autre"]}/>
+            <Input label="Volume (m³)" type="number" value={f.volume} onChange={e=>set("volume",+e.target.value)} placeholder="30" inputMode="numeric" style={{background:"#fff"}}/>
+          </div>
+          <PhotoPicker label="Photos de la piscine" value={f.photosPiscine||[]} onChange={setPhotos} compact/>
+        </div>
+
+        <div style={blockStyle}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,gap:10,flexWrap:"wrap"}}>
+            <div>
+              <div style={{fontSize:18,fontWeight:900,color:DS.dark}}>Contrat</div>
+              <div style={{fontSize:14,color:DS.mid,marginTop:3}}>Formule, dates et prix calculés automatiquement.</div>
+            </div>
+            <Tag color={DS.green} bg={DS.greenSoft}>Calcul auto</Tag>
+          </div>
+
+          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr 1fr",gap:12,marginBottom:12}}>
+            <Select label="Formule" value={f.formule} onChange={e=>set("formule",e.target.value)} options={["VAC","VAC+","Confort","Confort+"]}/>
+            <Input label="Date début" type="date" value={f.dateDebut} onChange={e=>set("dateDebut",e.target.value)} style={{background:"#fff"}}/>
+            <Input label="Date fin" type="date" value={f.dateFin} onChange={e=>set("dateFin",e.target.value)} style={{background:"#fff"}}/>
+          </div>
+
+          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:10,marginBottom:14}}>
+            <Input label="Prix/passage entretien (€)" type="number" value={f.prixPassageE||""} onChange={e=>set("prixPassageE",+e.target.value||0)} inputMode="decimal" style={{background:"#fff"}}/>
+            <Input label="Prix/passage contrôle (€)" type="number" value={f.prixPassageC||""} onChange={e=>set("prixPassageC",+e.target.value||0)} inputMode="decimal" style={{background:"#fff"}}/>
+          </div>
+
+          <div style={{background:"linear-gradient(135deg,#0c1222,#173153 55%,#1f7a8c)",borderRadius:18,padding:"16px",color:"#fff",boxShadow:"inset 0 1px 0 rgba(255,255,255,0.06)"}}>
+            <div style={{fontSize:12,fontWeight:800,textTransform:"uppercase",letterSpacing:1,color:"rgba(255,255,255,0.62)",marginBottom:10}}>Récap contrat</div>
+            <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr 1fr",gap:10}}>
+              <div style={{background:"rgba(255,255,255,0.08)",borderRadius:14,padding:"12px 14px"}}>
+                <div style={{fontSize:13,color:"rgba(255,255,255,0.7)"}}>Entretiens</div>
+                <div style={{fontSize:22,fontWeight:900,marginTop:4}}>{totalE}</div>
+              </div>
+              <div style={{background:"rgba(255,255,255,0.08)",borderRadius:14,padding:"12px 14px"}}>
+                <div style={{fontSize:13,color:"rgba(255,255,255,0.7)"}}>Contrôles</div>
+                <div style={{fontSize:22,fontWeight:900,marginTop:4}}>{totalC}</div>
+              </div>
+              <div style={{background:"rgba(255,255,255,0.12)",borderRadius:14,padding:"12px 14px",border:"1px solid rgba(255,255,255,0.08)"}}>
+                <div style={{fontSize:13,color:"rgba(255,255,255,0.72)"}}>Prix annuel</div>
+                <div style={{fontSize:26,fontWeight:900,marginTop:4,color:"#67e8f9"}}>{prixAnnuel.toLocaleString("fr")} €</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={blockStyle}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,gap:10,flexWrap:"wrap"}}>
+            <div>
+              <div style={{fontSize:18,fontWeight:900,color:DS.dark}}>Passages par mois</div>
+              <div style={{fontSize:14,color:DS.mid,marginTop:3}}>Ajuste rapidement le nombre de visites entretien et contrôle.</div>
+            </div>
+            <Tag color={DS.orange} bg={DS.orangeSoft}>{total} passages annuels</Tag>
+          </div>
+
+          <div style={{background:"#f6fbff",padding:"10px 14px",borderRadius:"16px 16px 0 0",display:"flex",justifyContent:"space-between",alignItems:"center",border:"1px solid #d9eaf7",borderBottom:"none"}}>
+            <span style={{color:DS.dark,fontSize:14,fontWeight:800}}>Planning mensuel</span>
+            <span style={{color:DS.mid,fontSize:14,fontWeight:800}}>🔧 {totalE} · 💧 {totalC}</span>
+          </div>
+          <div style={{border:"1px solid #d9eaf7",borderTop:"none",borderRadius:"0 0 16px 16px",overflow:"hidden"}}>
+            {[...Array(12)].map((_,i)=>{
+              const m=i+1; const mv=getMoisVal(f.moisParMois,m); const sc=SAISONS_META[getSaison(m)];
+              return (
+                <div key={m} style={{display:"flex",alignItems:"center",gap:8,padding:isMobile?"10px 10px":"10px 12px",borderBottom:i<11?"1px solid #e6eef6":"none",background:i%2===0?"#fff":"#fbfdff"}}>
+                  <div style={{width:isMobile?42:50,display:"flex",alignItems:"center",gap:6}}>
+                    <div style={{width:5,height:26,borderRadius:3,background:sc.color}}/>
+                    <span style={{fontSize:14,fontWeight:900,color:sc.color}}>{MOIS[m]}</span>
+                  </div>
+                  <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:isMobile?"wrap":"nowrap"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,background:"#eff8ff",border:"1px solid #d9ebf7",padding:"6px 8px",borderRadius:12}}>
+                      <span style={{fontSize:15,color:DS.blue}}>🔧</span>
+                      <button onClick={()=>setMoisVal(m,"entretien",mv.entretien-1)} style={{width:30,height:30,borderRadius:10,border:"1px solid "+DS.border,background:"#fff",cursor:"pointer",fontSize:18,fontWeight:800,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                      <span style={{fontSize:17,fontWeight:900,color:DS.blue,minWidth:18,textAlign:"center"}}>{mv.entretien}</span>
+                      <button onClick={()=>setMoisVal(m,"entretien",mv.entretien+1)} style={{width:30,height:30,borderRadius:10,border:"1px solid "+DS.blue,background:DS.blueSoft,cursor:"pointer",fontSize:18,fontWeight:800,color:DS.blue,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:6,background:"#f2fbfb",border:"1px solid #d9f1f1",padding:"6px 8px",borderRadius:12}}>
+                      <span style={{fontSize:15,color:DS.teal}}>💧</span>
+                      <button onClick={()=>setMoisVal(m,"controle",mv.controle-1)} style={{width:30,height:30,borderRadius:10,border:"1px solid "+DS.border,background:"#fff",cursor:"pointer",fontSize:18,fontWeight:800,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                      <span style={{fontSize:17,fontWeight:900,color:DS.teal,minWidth:18,textAlign:"center"}}>{mv.controle}</span>
+                      <button onClick={()=>setMoisVal(m,"controle",mv.controle+1)} style={{width:30,height:30,borderRadius:10,border:"1px solid "+DS.teal,background:DS.tealSoft,cursor:"pointer",fontSize:18,fontWeight:800,color:DS.teal,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                    </div>
+                  </div>
+                  <div style={{fontSize:15,fontWeight:900,color:mv.entretien+mv.controle>0?DS.dark:"#b8c5d4",minWidth:28,textAlign:"right"}}>{mv.entretien+mv.controle>0?mv.entretien+mv.controle:"—"}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{display:"flex",gap:10,position:"sticky",bottom:0,background:"linear-gradient(180deg,rgba(248,250,252,0),#f8fafc 25%,#f8fafc)",paddingTop:8}}>
+          <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"14px 14px",borderRadius:16,background:"#fff",border:"1.5px solid #d8e3ee",cursor:"pointer",fontWeight:800,fontSize:15,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 6px 18px rgba(15,23,42,0.05)"}}>{Ico.close(18,DS.dark)} Annuler</button>
+          <BtnPrimary onClick={()=>{ if(!f.nom.trim()) return alert("Nom requis"); const prixCalc=totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0); const photosPiscine = normalizePhotoList(f.photosPiscine||f.photoPiscine); onSave({ ...normalizeClientRecord(f), photosPiscine, photoPiscine: photosPiscine[0]||"", prix:prixCalc||f.prix||0 }); }} icon={Ico.save(16,"#fff")} style={{flex:2,borderRadius:16,padding:"14px 18px",background:"linear-gradient(135deg,#0284c7,#0891b2)"}}>Enregistrer le client</BtnPrimary>
+        </div>
       </div>
     </Modal>
   );
 }
 
+// FORMULAIRE LIVRAISON
 // FORMULAIRE LIVRAISON
 function genererHTMLLivraison(livraison, client) {
   const dateStr = new Date(livraison.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"});
