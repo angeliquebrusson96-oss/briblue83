@@ -1393,7 +1393,7 @@ function NumField({ label, value, onChange, unit, ideal, okFn }) {
         )}
       </div>
       <div style={{display:"flex",alignItems:"center",gap:8}}>
-        <input type="number" step="0.1" value={value||""} onChange={e=>onChange(e.target.value===""?"":+e.target.value)}
+        <input type="number" step="0.1" value={value===""||value===null||value===undefined?"":value} onChange={e=>onChange(e.target.value===""?"":+e.target.value)}
           style={{flex:1,padding:"8px 10px",borderRadius:8,border:`1.5px solid ${statusColor}`,fontSize:16,fontWeight:800,boxSizing:"border-box",color:statusTx,background:"#fff",transition:"all .2s",outline:"none",fontFamily:"inherit",minWidth:0}}/>
         {hasVal && (
           <div style={{width:28,height:28,borderRadius:14,background:ok?"#22c55e":"#ef4444",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:`0 2px 6px ${ok?"#22c55e":"#ef4444"}44`}}>
@@ -1941,6 +1941,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
     corrChlore:"", corrPhosphate:"", corrPH:"", corrSel:"", corrAlgicide:"", corrPeroxyde:"", corrChloreChoc:"", corrAlcafix:"", corrAutre:"",
     devis:null, priseEchantillon:null, commentaires:"",
     livraisonProduits:null, produitsLivres:[], livraisonAutre:"",
+    stabilisantHaut:false,
     ressenti:0, presenceClient:null,
     signatureTech:"", signatureClient:"",
     photoArrivee:"",
@@ -2212,7 +2213,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
           {/* Composant ligne mesure inline */}
           {(()=>{
             const MRow = ({label,unit,value,onChange,ideal,okFn,icon,color="#0891b2"}) => {
-              const hasVal = value!==""&&value!==null&&value!==undefined;
+              const hasVal = value!==""&&value!==null&&value!==undefined&&value!==false;
               const ok = hasVal&&okFn ? okFn(+value) : true;
               const statusColor = !hasVal?"#e2e8f0":ok?"#22c55e":"#ef4444";
               return (
@@ -2227,7 +2228,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                     {ideal&&<div style={{fontSize:10,color:"#94a3b8",marginTop:2,fontWeight:500}}>idéal {ideal}</div>}
                   </div>
                   {/* Input compact */}
-                  <input type="number" step="0.1" value={value||""} onChange={e=>onChange(e.target.value===""?"":+e.target.value)}
+                  <input type="number" step="0.1" value={value===""||value===null||value===undefined?"":value} onChange={e=>onChange(e.target.value===""?"":+e.target.value)}
                     style={{width:72,padding:"8px 10px",borderRadius:9,border:`2px solid ${statusColor}`,fontSize:15,fontWeight:800,boxSizing:"border-box",color:hasVal?(ok?"#16a34a":"#dc2626"):DS.dark,background:"#fff",textAlign:"center",outline:"none",fontFamily:"inherit",flexShrink:0,transition:"all .2s"}}/>
                   {/* Status pill */}
                   <div style={{width:28,height:28,borderRadius:14,background:!hasVal?"#f1f5f9":ok?"#22c55e":"#ef4444",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .3s",boxShadow:hasVal?`0 2px 6px ${ok?"#22c55e":"#ef4444"}44`:"none"}}>
@@ -2276,8 +2277,14 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                       icon={<span style={{fontSize:13,fontWeight:900,color:"#0369a1",letterSpacing:-1}}>pH</span>}/>
                     <MRow label="Alcalinité totale" unit="ppm" value={f.alcalinite} onChange={v=>set("alcalinite",v)} ideal="80 – 120" okFn={v=>v>=80&&v<=120} color="#0284c7"
                       icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="1.8" strokeLinecap="round"><path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/><path d="M2 16c2.5 3 5 3 7.5 0S14 13 16.5 16s5 3 7.5 0"/></svg>}/>
-                    <MRow label="Stabilisant" unit="ppm" value={f.stabilisant} onChange={v=>set("stabilisant",v)} ideal="30 – 50" okFn={v=>v>=30&&v<=50} color="#0891b2"
-                      icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}/>
+                    <div>
+                      <MRow label="Stabilisant" unit="ppm" value={f.stabilisant} onChange={v=>set("stabilisant",v)} ideal="30 – 50" okFn={v=>v>=30&&v<=50} color="#0891b2"
+                        icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}/>
+                      <label style={{display:"flex",alignItems:"center",gap:8,marginTop:6,padding:"6px 10px",borderRadius:8,background:f.stabilisantHaut?"#fff7ed":"#f8fafc",border:"1px solid "+(f.stabilisantHaut?"#fdba74":"#e2e8f0"),cursor:"pointer",width:"fit-content"}}>
+                        <input type="checkbox" checked={!!f.stabilisantHaut} onChange={e=>set("stabilisantHaut",e.target.checked)} style={{width:16,height:16,accentColor:"#ea580c"}}/>
+                        <span style={{fontSize:12,fontWeight:700,color:f.stabilisantHaut?"#ea580c":"#64748b"}}>⚠️ Stabilisant HAUT</span>
+                      </label>
+                    </div>
                   </div>
                 </div>
 
