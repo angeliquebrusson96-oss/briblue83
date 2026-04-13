@@ -1025,8 +1025,8 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
         <div style={{flex:1}}/>
         {step<STEPS
           ? <button onClick={()=>setStep(s=>s+1)}
-              style={{padding:"11px 20px",borderRadius:DS.radiusSm,background:STEP_INFO[step].color,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,boxShadow:`0 3px 10px ${STEP_INFO[step].color}33`}}>
-              {STEP_INFO[step].l} {Ico.next(13,"#fff")}
+              style={{padding:"11px 20px",borderRadius:DS.radiusSm,background:(STEP_INFO[step]||STEP_INFO[STEPS-1]).color,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,boxShadow:`0 3px 10px ${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}33`}}>
+              {(STEP_INFO[step]||STEP_INFO[STEPS-1]).l} {Ico.next(13,"#fff")}
             </button>
           : <button onClick={()=>{if(!f.clientId)return alert("Client requis");if(!f.date)return alert("Date requise");onSave({...f,id:isEdit?f.id:uid()});}}
               style={{padding:"11px 20px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#059669,#0d9488)",border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,boxShadow:"0 3px 10px rgba(5,150,105,0.3)"}}>
@@ -2153,7 +2153,8 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
     signatureTech:"", signatureClient:"",
     photoArrivee:"",
     photoDepart:"",
-    photos:[],  // extra photos (up to 4 total)
+    photosDepart:[],
+    photos:[],
     ok:false,
     rapportStatut:"saisie",
   };
@@ -2786,8 +2787,8 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
         </button>
         <div style={{flex:1}}/>
         {step<STEPS
-          ? <button onClick={()=>setStep(s=>s+1)} className="btn-hover" style={{minHeight:52,padding:"14px 24px",borderRadius:DS.radiusSm,background:STEP_INFO[step].color,border:"none",cursor:"pointer",fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:8,boxShadow:`0 4px 16px ${STEP_INFO[step].color}44`,flexShrink:0}}>
-              {STEP_INFO[step].l} <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          ? <button onClick={()=>setStep(s=>s+1)} className="btn-hover" style={{minHeight:52,padding:"14px 24px",borderRadius:DS.radiusSm,background:(STEP_INFO[step]||STEP_INFO[STEPS-1]).color,border:"none",cursor:"pointer",fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:8,boxShadow:`0 4px 16px ${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}44`,flexShrink:0}}>
+              {(STEP_INFO[step]||STEP_INFO[STEPS-1]).l} <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
           : <button onClick={handleSave} className="btn-hover" style={{minHeight:52,padding:"14px 24px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:8,boxShadow:"0 4px 16px #05996944",flexShrink:0}}>
               <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Enregistrer
