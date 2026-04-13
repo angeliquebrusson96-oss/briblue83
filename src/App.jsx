@@ -229,6 +229,7 @@ function alerteClient(c, passages) {
   const cs = c.dateDebut ? c.dateDebut.slice(0,10) : null;
   const ce = c.dateFin ? c.dateFin.slice(0,10) : null;
   const today = TODAY;
+
   // Contrat pas encore commencé → ok
   if (cs && today < cs) return "ok";
   // Fin de contrat proche
@@ -238,38 +239,44 @@ function alerteClient(c, passages) {
   const now = new Date();
   const moisCur = now.getMonth() + 1;
   const yearCur = now.getFullYear();
-
   const mpm = c.moisParMois || c.saisons || {};
 
-  // Passages effectués dans la plage contrat
+  // Passages dans la plage du contrat
   const passContrat = passages.filter(p => {
     if (p.clientId !== c.id) return false;
     if (cs && ce) { const d = String(p.date).slice(0,10); return d >= cs && d <= ce; }
     return new Date(p.date).getFullYear() === yearCur;
   });
 
-  // Vérifier les mois PASSÉS (avant ce mois) dans l'année du contrat — s'il manque des passages → Retard
-  const csYear = cs ? parseInt(cs.slice(0,4)) : yearCur;
+  // Ne vérifier que les mois qui sont DANS la plage du contrat ET passés
   let retard = false;
   for (let m = 1; m < moisCur; m++) {
     const prev = (mpm[m]?.entretien||0) + (mpm[m]?.controle||0);
     if (prev === 0) continue;
+    // Vérifier que ce mois est bien dans la plage du contrat
+    const moisStr = `${yearCur}-${String(m).padStart(2,'0')}-01`;
+    if (cs && moisStr < cs.slice(0,8)+'01') continue; // mois avant le début du contrat
+    if (ce && moisStr > ce) continue; // mois après la fin
     const eff = passContrat.filter(p => {
       const d = new Date(p.date);
-      return d.getMonth()+1 === m && d.getFullYear() === csYear;
+      return d.getMonth()+1 === m && d.getFullYear() === yearCur;
     }).length;
     if (eff < prev) { retard = true; break; }
   }
   if (retard) return "orange";
 
-  // Vérifier le mois EN COURS dans l'année du contrat
+  // Mois EN COURS dans la plage du contrat
   const prevCur = (mpm[moisCur]?.entretien||0) + (mpm[moisCur]?.controle||0);
   if (prevCur > 0) {
-    const effCur = passContrat.filter(p => {
-      const d = new Date(p.date);
-      return d.getMonth()+1 === moisCur && d.getFullYear() === csYear;
-    }).length;
-    if (effCur < prevCur) return "aFaire";
+    const moisCurStr = `${yearCur}-${String(moisCur).padStart(2,'0')}-01`;
+    const inRange = (!cs || moisCurStr >= cs.slice(0,8)+'01') && (!ce || moisCurStr <= ce);
+    if (inRange) {
+      const effCur = passContrat.filter(p => {
+        const d = new Date(p.date);
+        return d.getMonth()+1 === moisCur && d.getFullYear() === yearCur;
+      }).length;
+      if (effCur < prevCur) return "aFaire";
+    }
   }
 
   return "ok";
@@ -920,7 +927,6 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
   const isMobile = useIsMobile();
   const [f, setF] = useState(()=>initial || { id:uid(), clientId:clientId||"", date:TODAY, produits:[], description:"", montant:"", statut:"aFacturer", photos:[] });
   const [step, setStep] = useState(1);
-  useEffect(()=>{ const el=document.querySelector('[data-modal-body="1"]'); if(el) el.scrollTop=0; },[step]);
   const set = (k,v) => setF(p=>({...p,[k]:v}));
   const PLIV = produitsStock.length > 0 ? produitsStock : PRODUITS_DEFAUT;
   const toggleProduit = (p) => { const arr = f.produits.includes(p) ? f.produits.filter(x=>x!==p) : [...f.produits,p]; set("produits",arr); };
