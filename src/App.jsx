@@ -230,6 +230,25 @@ function alerteClient(c, passages) {
 }
 function uid() { return Date.now() + Math.random().toString(36).slice(2); }
 const TODAY = new Date().toISOString().split("T")[0];
+
+/**
+ * calcMensualites(prixAnnuel)
+ * Si prixAnnuel / 12 n'est pas un entier :
+ *   - mois 1 = arrondi au centime supérieur pour absorber le reste
+ *   - mois 2-12 = Math.floor(prixAnnuel / 12 * 100) / 100
+ * Garantit que la somme des 12 mensualités == prixAnnuel exactement.
+ *
+ * Retourne { m1, m11, estRond, total }
+ */
+function calcMensualites(prixAnnuel) {
+  if (!prixAnnuel || prixAnnuel <= 0) return { m1: 0, m11: 0, estRond: true, total: 0 };
+  const base = Math.floor(prixAnnuel / 12 * 100) / 100; // centimes inférieurs
+  const somme11 = Math.round(base * 11 * 100) / 100;
+  const m1 = Math.round((prixAnnuel - somme11) * 100) / 100;
+  const estRond = m1 === base;
+  return { m1, m11: base, estRond, total: prixAnnuel };
+}
+
 const MOIS_NOW = new Date().getMonth() + 1;
 const YEAR_NOW = new Date().getFullYear();
 
@@ -693,9 +712,21 @@ function FormClient({ initial, clients, onSave, onClose }) {
               <span style={{fontSize:15,color:"rgba(255,255,255,0.7)"}}>💧 {totalC} contrôles × {f.prixPassageC||0}€</span>
               <span style={{fontSize:15,fontWeight:800}}>{totalC*(f.prixPassageC||0)} €</span>
             </div>}
-            <div style={{borderTop:"1px solid rgba(255,255,255,0.15)",paddingTop:8,marginTop:4,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{fontSize:15,fontWeight:700}}>Prix annuel</span>
-              <span style={{fontSize:22,fontWeight:900,color:"#22d3ee"}}>{(totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0)).toLocaleString("fr")} €</span>
+            <div style={{borderTop:"1px solid rgba(255,255,255,0.15)",paddingTop:8,marginTop:4}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                <span style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.8)"}}>Prix annuel</span>
+                <span style={{fontSize:20,fontWeight:900,color:"#22d3ee"}}>{(totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0)).toLocaleString("fr")} €</span>
+              </div>
+              {(()=>{
+                const prix = totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0);
+                if (!prix) return null;
+                const {m1,m11,estRond} = calcMensualites(prix);
+                return estRond
+                  ? <div style={{fontSize:12,color:"rgba(255,255,255,0.6)",textAlign:"right"}}>12 × {m11} €/mois</div>
+                  : <div style={{fontSize:12,color:"rgba(255,255,255,0.6)",textAlign:"right"}}>
+                      1er mois : <span style={{color:"#fcd34d",fontWeight:700}}>{m1} €</span> · puis 11 × {m11} €
+                    </div>;
+              })()}
             </div>
           </div>
         </div>
@@ -1171,8 +1202,12 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           <div style={{fontSize:10,fontWeight:600,color:DS.mid,marginTop:2}}>{rest>0?rest+" restants":"À jour"}</div>
         </div>
         <div style={{textAlign:"center",padding:"8px 4px",borderRadius:8,background:"#f8fafc",border:"1px solid #e5e7eb"}}>
-          <div style={{fontSize:13,fontWeight:800,color:DS.dark,lineHeight:1}}>{client.prix?client.prix.toLocaleString("fr"):"—"}<span style={{fontSize:9}}>€</span></div>
-          <div style={{fontSize:10,fontWeight:600,color:DS.mid,marginTop:2}}>Contrat/an</div>
+          {(()=>{
+            const {m1,m11,estRond} = calcMensualites(client.prix||0);
+            return estRond
+              ? <><div style={{fontSize:12,fontWeight:800,color:DS.blue,lineHeight:1}}>{m11}<span style={{fontSize:8}}>€</span></div><div style={{fontSize:9,fontWeight:600,color:DS.mid,marginTop:2}}>/ mois</div></>
+              : <><div style={{fontSize:11,fontWeight:800,color:DS.blue,lineHeight:1}}>{m11}<span style={{fontSize:8}}>€</span></div><div style={{fontSize:9,fontWeight:600,color:DS.mid,marginTop:1}}>×11 + <span style={{color:"#b45309"}}>{m1.toFixed(2)}€</span></div></>;
+          })()}
         </div>
       </div>
 
@@ -1639,7 +1674,7 @@ function genererContratHTML(client, sigPrestataire="", sigClient="") {
   const totalPrixE = totalE * prixE;
   const totalPrixC = totalC * prixC;
   const totalAnnuelPrix = totalPrixE + totalPrixC;
-  const mensualite = Math.round(totalAnnuelPrix / 12 * 100) / 100;
+  const { m1, m11, estRond } = calcMensualites(totalAnnuelPrix);
   const dateContrat = client.dateDebut ? new Date(client.dateDebut).toLocaleDateString("fr") : "—";
   const dateFin = client.dateFin ? new Date(client.dateFin).toLocaleDateString("fr") : "—";
   let moisRows = "";
@@ -1728,10 +1763,23 @@ table td{padding:7px 12px;border:1px solid #e2e8f0;font-size:12px}
 <div class="recap">
   <h3>Récapitulatif financier</h3>
   <div class="prix">Prix annuel : ${totalAnnuelPrix.toLocaleString("fr")} €</div>
+  ${estRond ? `
   <div class="mensualite">
-    <div><div class="mlabel">Mensualité indicative</div><div style="font-size:10px;color:rgba(255,255,255,0.5);margin-top:2px;">Prix annuel ÷ 12 mois</div></div>
-    <div class="montant">${mensualite.toLocaleString("fr",{minimumFractionDigits:2,maximumFractionDigits:2})} € / mois</div>
+    <div><div class="mlabel">Mensualité</div><div style="font-size:10px;color:rgba(255,255,255,0.5);margin-top:2px;">12 × ${m11} €</div></div>
+    <div class="montant">${m11} € / mois</div>
   </div>
+  ` : `
+  <div class="mensualite" style="flex-direction:column;gap:8px">
+    <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
+      <div><div class="mlabel">1ᵉʳ prélèvement (ajustement)</div><div style="font-size:10px;color:rgba(255,255,255,0.5);margin-top:2px;">Absorbe le reste d'arrondi</div></div>
+      <div class="montant" style="color:#fbbf24">${m1} €</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;width:100%;border-top:1px solid rgba(255,255,255,0.1);padding-top:8px">
+      <div><div class="mlabel">Mensualités 2 à 12</div><div style="font-size:10px;color:rgba(255,255,255,0.5);margin-top:2px;">11 prélèvements identiques</div></div>
+      <div class="montant">${m11} € / mois</div>
+    </div>
+  </div>
+  `}
 </div>
 <div class="conditions">
   <h3>Conditions & Informations</h3>
@@ -1739,7 +1787,7 @@ table td{padding:7px 12px;border:1px solid #e2e8f0;font-size:12px}
     <li>Utilisation exclusive des produits de la société pour garantir la qualité du traitement.</li>
     <li><strong>Produits non inclus</strong> dans le forfait annuel.</li>
     <li>Intervention supplémentaire possible en cas d'aléas climatiques (fortes pluies / vent).</li>
-    <li>Cahier d'entretien mis à jour rigoureusement à chaque passage.</li>
+    <li>Rapport d'entretien transmis par email après chaque passage.</li>
     <li>Kit d'entretien fourni et facturé séparément (brosse, épuisette, manche, tuyau).</li>
   </ul>
 </div>
@@ -2633,7 +2681,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
               <OuiNon label="Livraison de produits ?" value={f.livraisonProduits} onChange={v=>set("livraisonProduits",v)}/>
               {f.livraisonProduits && (
                 <>
-                  <MultiCheck label="Produit(s) livré(s)" values={f.produitsLivres} onChange={v=>set("produitsLivres",v)} options={PRODUITS_LIVRAISON}/>
+                  <MultiCheck label="Produit(s) livré(s)" values={f.produitsLivres} onChange={v=>set("produitsLivres",v)} options={produitsStock&&produitsStock.length>0?produitsStock:PRODUITS_DEFAUT}/>
                   <div>
                     <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:4}}>Autre (quantités, marques…)</span>
                     <textarea value={f.livraisonAutre} onChange={e=>set("livraisonAutre",e.target.value)}
