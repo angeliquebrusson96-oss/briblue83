@@ -1166,7 +1166,7 @@ function FormRdv({ initial, clients, onSave, onClose }) {
 }
 
 // FICHE CLIENT (avec diffrenciation Entretien/Contrle)
-function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[], contrats={}, onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
+function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[], contrats={}, onUpdateContrat, onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
   const [tab, setTab] = useState("infos");
   const [detailPassageFiche, setDetailPassageFiche] = useState(null);
   const [showFormLiv, setShowFormLiv] = useState(false);
@@ -1512,7 +1512,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           );
         })()}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:8}}>
-          <button onClick={()=>ouvrirContrat(client, contratClient?.signaturePrestataire||"", contratClient?.signatureClient||"")} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,boxShadow:"0 2px 8px rgba(2,132,199,0.3)"}}>
+          <button onClick={()=>{ ouvrirContrat(client, contratClient?.signaturePrestataire||"", contratClient?.signatureClient||""); if(!contratClient?.statut && onUpdateContrat) onUpdateContrat("CT-"+client.id, { clientId:client.id, statut:"prepare" }); }} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,boxShadow:"0 2px 8px rgba(2,132,199,0.3)"}}>
             {Ico.contract(13,"#fff")} Contrat
           </button>
           <button onClick={()=>envoyerContratSignature(client)} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:contratClient?.statut==="signe_complet"?DS.greenSoft:contratClient?.statut==="signe_client"?DS.blueSoft:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
@@ -3320,7 +3320,8 @@ function PageClients({ clients, passages, contrats={}, onClientClick, onAdd }) {
   const alertCount = clients.filter(c=>alerteClient(c,passages)!=="ok").length;
 
   const getContratStatut = (clientId) => {
-    const ct = contrats["CT-" + clientId];
+    // Chercher par clé CT-clientId OU par la propriété clientId dans les valeurs
+    const ct = contrats["CT-" + clientId] || Object.values(contrats).find(c=>c.clientId===clientId) || null;
     if (!ct) return null;
     const s = ct.statut;
     if (s === "signe_complet") {
@@ -3333,7 +3334,8 @@ function PageClients({ clients, passages, contrats={}, onClientClick, onAdd }) {
     }
     if (s === "signe_client") return { label:"📝 En attente co-signature", color:"#4f46e5", bg:"#eef2ff", border:"#a5b4fc" };
     if (s === "demande_envoyee") return { label:"📨 Contrat envoyé", color:"#0891b2", bg:"#f0f9ff", border:"#bae6fd" };
-    return { label:"📋 Contrat préparé", color:"#6b7280", bg:"#f9fafb", border:"#e5e7eb" };
+    if (s === "prepare") return { label:"📋 Contrat préparé", color:"#6b7280", bg:"#f9fafb", border:"#e5e7eb" };
+    return null; // statut inconnu = rien
   };
 
   return (
@@ -4132,7 +4134,7 @@ export default function App() {
       {/* MODALS */}
       {ficheClient&&(()=>{
         const latest=clients.find(c=>c.id===ficheClient.id)||ficheClient;
-        return <FicheClient client={latest} passages={passages} livraisons={livraisons.filter(l=>l.clientId===latest.id)} rdvs={rdvs} produitsStock={Object.keys(stock)} contrats={contrats} onSaveLivraison={saveLivraison} onDeleteLivraison={deleteLivraison} onUpdateStatutLivraison={updateStatutLivraison} onClose={()=>setFicheClient(null)} onEdit={()=>{setEditClient(latest);setShowFormClient(true);setFicheClient(null);}} onDelete={()=>deleteClient(latest.id)} onAddPassage={()=>openAddPassageFromClient(latest.id)} onEditPassage={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddRdv={()=>{setEditRdv({clientId:latest.id});setShowFormRdv(true);}} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} onDeleteRdv={deleteRdv}/>;
+        return <FicheClient client={latest} passages={passages} livraisons={livraisons.filter(l=>l.clientId===latest.id)} rdvs={rdvs} produitsStock={Object.keys(stock)} contrats={contrats} onUpdateContrat={(contractId,data)=>setContrats(prev=>({...prev,[contractId]:{...prev[contractId],...data}}))} onSaveLivraison={saveLivraison} onDeleteLivraison={deleteLivraison} onUpdateStatutLivraison={updateStatutLivraison} onClose={()=>setFicheClient(null)} onEdit={()=>{setEditClient(latest);setShowFormClient(true);setFicheClient(null);}} onDelete={()=>deleteClient(latest.id)} onAddPassage={()=>openAddPassageFromClient(latest.id)} onEditPassage={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddRdv={()=>{setEditRdv({clientId:latest.id});setShowFormRdv(true);}} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} onDeleteRdv={deleteRdv}/>;
       })()}
 
       {showFormClient&&<FormClient initial={editClient} clients={clients} onSave={saveClient} onClose={()=>{setShowFormClient(false);setEditClient(null);}}/>}
