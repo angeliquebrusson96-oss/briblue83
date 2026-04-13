@@ -3320,8 +3320,11 @@ function PageClients({ clients, passages, contrats={}, onClientClick, onAdd }) {
   const alertCount = clients.filter(c=>alerteClient(c,passages)!=="ok").length;
 
   const getContratStatut = (clientId) => {
-    // Chercher par clé CT-clientId OU par la propriété clientId dans les valeurs
-    const ct = contrats["CT-" + clientId] || Object.values(contrats).find(c=>c.clientId===clientId) || null;
+    // Chercher par clé ET par valeur clientId (les IDs peuvent être timestamp ou CT-xxx)
+    const ct = contrats["CT-" + clientId]
+      || Object.values(contrats).find(c => c.clientId === clientId)
+      || Object.values(contrats).find(c => c.clientId === "CT-" + clientId)
+      || null;
     if (!ct) return null;
     const s = ct.statut;
     if (s === "signe_complet") {
@@ -3345,8 +3348,11 @@ function PageClients({ clients, passages, contrats={}, onClientClick, onAdd }) {
           <div style={{width:32,height:32,borderRadius:8,background:"rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.clients(16,"#fff")}</div>
           <div><div style={{fontSize:18,fontWeight:800,color:"#fff"}}>{totalAll}</div><div style={{fontSize:10,color:"rgba(255,255,255,0.6)"}}>Clients</div></div>
         </div>
-        <div style={{background:"#fff3cd",borderRadius:DS.radiusSm,padding:"10px 14px",border:"1px solid #ffc107",fontSize:11,color:"#856404",display:"flex",alignItems:"center"}}>
-          DEBUG: {Object.keys(contrats).length} contrats — clés: {Object.keys(contrats).slice(0,3).join(", ")||"vide"}
+        <div style={{background:"#fff3cd",borderRadius:DS.radiusSm,padding:"10px 14px",border:"1px solid #ffc107",fontSize:11,color:"#856404",display:"flex",alignItems:"center",flexDirection:"column",gap:2}}>
+          <span>DEBUG: {Object.keys(contrats).length} contrats</span>
+          {Object.entries(contrats).map(([k,v])=>(
+            <span key={k}>{k} → clientId={v.clientId} statut={v.statut}</span>
+          ))}
         </div>
         {alertCount>0&&<div style={{background:DS.white,borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8,border:"1px solid #fecaca"}}>
           <div style={{width:32,height:32,borderRadius:8,background:"#fff1f2",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.alert(15,DS.red)}</div>
