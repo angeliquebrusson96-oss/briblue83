@@ -3372,7 +3372,6 @@ function PageClients({ clients, passages, contrats={}, onClientClick, onAdd }) {
           const pct=tot>0?Math.round(eff/tot*100):0;
           const rest=Math.max(0,tot-eff);
           const accentColor=al==="rouge"?DS.red:al==="jaune"?"#d97706":al==="orange"?"#d97706":DS.green;
-          const ctStatut = getContratStatut(c.id);
           return (
             <div key={c.id} onClick={()=>onClientClick(c)} className="fade-in card-hover"
               style={{animationDelay:`${idx*0.03}s`,background:DS.white,borderRadius:DS.radius,
@@ -3413,11 +3412,21 @@ function PageClients({ clients, passages, contrats={}, onClientClick, onAdd }) {
                 {tot>0&&<div style={{height:3,background:DS.light,borderRadius:99,overflow:"hidden"}}>
                   <div style={{height:"100%",width:`${pct}%`,background:pct>=100?"#059669":pct>=50?"#0891b2":"#f59e0b",borderRadius:99}}/>
                 </div>}
-                {ctStatut&&(
-                  <div style={{display:"flex",alignItems:"center",padding:"3px 8px",borderRadius:6,background:ctStatut.bg,border:"1px solid "+ctStatut.border}}>
+                {/* Badge statut contrat */}
+                {(()=>{
+                  const ctStatut = getContratStatut(c.id);
+                  // Debug temporaire
+                  const ctRaw = contrats["CT-"+c.id] || Object.values(contrats).find(x=>x.clientId===c.id);
+                  if (ctRaw && !ctStatut) {
+                    return <div style={{display:"flex",alignItems:"center",padding:"3px 8px",borderRadius:6,background:"#fff3cd",border:"1px solid #ffc107"}}>
+                      <span style={{fontSize:10,fontWeight:700,color:"#856404"}}>DEBUG: statut="{ctRaw.statut}"</span>
+                    </div>;
+                  }
+                  if (!ctStatut) return null;
+                  return <div style={{display:"flex",alignItems:"center",padding:"3px 8px",borderRadius:6,background:ctStatut.bg,border:"1px solid "+ctStatut.border}}>
                     <span style={{fontSize:10,fontWeight:700,color:ctStatut.color}}>{ctStatut.label}</span>
-                  </div>
-                )}
+                  </div>;
+                })()}
               </div>
             </div>
           );
