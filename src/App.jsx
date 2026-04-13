@@ -159,7 +159,10 @@ async function load(key, fallback) {
     if (error || !data?.data) return fallback;
 
     const allData = data.data;
-    return allData[key] ?? fallback;
+    // Si la clé existe dans Supabase, retourner sa valeur
+    // Si la clé n'existe pas (première fois), retourner null pour distinguer "pas encore en base" de "données vides"
+    if (key in allData) return allData[key];
+    return fallback;
   } catch {
     return fallback;
   }
@@ -3951,16 +3954,21 @@ export default function App() {
   useEffect(()=>{
     if(!loggedIn) return;
     (async()=>{
-      const c = await load("bb_clients_v2", CLIENTS_INIT);
-      const passages_data = await load("bb_passages_v2", PASSAGES_INIT);
+      const c = await load("bb_clients_v2", null);
+      const passages_data = await load("bb_passages_v2", null);
       const l = await load("bb_livraisons_v1", []);
       const r = await load("bb_rdvs_v1", []);
-      const s = await load("bb_stock_v1", Object.fromEntries(PRODUITS_DEFAUT.map(nom=>[nom,0])));
+      const s = await load("bb_stock_v1", {});
       const ct = await load("bb_contrats_v1", {});
-      const sWithDefaults = {...Object.fromEntries(PRODUITS_DEFAUT.map(nom=>[nom, s[nom]??0])), ...s};
-// Migrate saisons format for existing clients
-      const cMigrated = c.map(cl => ({...cl, moisParMois: migrateMois(cl.moisParMois||cl.saisons), photoPiscine: cl.photoPiscine||"", prixPassageE: cl.prixPassageE||0, prixPassageC: cl.prixPassageC||0}));
-      setClients(cMigrated); setPassages(passages_data); setLivraisons(l); setRdvs(r); setStock(sWithDefaults); setContrats(ct); setReady(true); setInitialLoaded(true);
+
+      // Si Supabase retourne null (première fois), utiliser les données initiales hardcodées
+      // Sinon toujours utiliser les données Supabase — ne JAMAIS écraser avec les défauts
+      const clientsData = c !== null ? c : CLIENTS_INIT;
+      const passagesData = passages_data !== null ? passages_data : PASSAGES_INIT;
+      const sWithDefaults = {...Object.fromEntries(PRODUITS_DEFAUT.map(nom=>[nom,0])), ...s};
+
+      const cMigrated = clientsData.map(cl => ({...cl, moisParMois: migrateMois(cl.moisParMois||cl.saisons), photoPiscine: cl.photoPiscine||"", prixPassageE: cl.prixPassageE||0, prixPassageC: cl.prixPassageC||0}));
+      setClients(cMigrated); setPassages(passagesData); setLivraisons(l); setRdvs(r); setStock(sWithDefaults); setContrats(ct); setReady(true); setInitialLoaded(true);
     })();
   },[loggedIn]);
 
