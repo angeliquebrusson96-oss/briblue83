@@ -3929,6 +3929,7 @@ export default function App() {
   const [rdvs, setRdvs] = useState([]);
   const [stock, setStock] = useState({});
   const [showStock, setShowStock] = useState(false);
+  const [contrats, setContrats] = useState({});
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [ready, setReady] = useState(false);
   const [ficheClient, setFicheClient] = useState(null);
