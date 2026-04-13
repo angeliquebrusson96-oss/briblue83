@@ -226,7 +226,13 @@ function isControleType(type) {
 }
 function alerteClient(c, passages) {
   const j = daysUntil(c.dateFin);
-  const eff = passages.filter(p=>p.clientId===c.id).length;
+  const cs = c.dateDebut ? new Date(c.dateDebut) : null;
+  const ce = c.dateFin ? new Date(c.dateFin) : null;
+  const eff = passages.filter(p=>{
+    if(p.clientId!==c.id) return false;
+    if(cs&&ce){const d=new Date(p.date);return d>=cs&&d<=ce;}
+    return new Date(p.date).getFullYear()===YEAR_NOW;
+  }).length;
   const prev = totalAnnuel(c.moisParMois||c.saisons);
   if (j !== null && j >= 0 && j <= 30) return "rouge";
   if (j !== null && j > 30 && j <= 60) return "jaune";
@@ -1179,13 +1185,20 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
   const al = alerteClient(client, passages);
   const col = AC[al];
   const rdvClient = rdvs.filter(r=>r.clientId===client.id).sort((a,b)=>a.date.localeCompare(b.date));
+  const contractStart = client.dateDebut ? new Date(client.dateDebut) : null;
+  const contractEnd = client.dateFin ? new Date(client.dateFin) : null;
+  const inContract = (p) => {
+    if(contractStart && contractEnd){ const d=new Date(p.date); return d>=contractStart&&d<=contractEnd; }
+    return new Date(p.date).getFullYear()===YEAR_NOW;
+  };
   const passC = passages.filter(p=>p.clientId===client.id).sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const passContrat = passC.filter(inContract);
   const contratClient = Object.values(contrats).find(c=>c.clientId===client.id) || null;
   const totalE = totalAnnuel(client.moisParMois||client.saisons,"entretien");
   const totalC = totalAnnuel(client.moisParMois||client.saisons,"controle");
   const total = totalE + totalC;
-  const effE = passC.filter(p=>isEntretienType(p.type)).length;
-  const effC = passC.filter(p=>isControleType(p.type)).length;
+  const effE = passContrat.filter(p=>isEntretienType(p.type)).length;
+  const effC = passContrat.filter(p=>isControleType(p.type)).length;
   const eff = passC.length;
   const jours = daysUntil(client.dateFin);
   const moisCourant = MOIS_NOW;
@@ -1308,14 +1321,39 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
       )}
 
       {tab==="saisons" && <div className="fade-in">
-        <div style={{fontSize:15,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Calendrier — {MOIS_L[moisCourant]}</div>
+        {(()=>{
+          // Année de référence du contrat = année de dateDebut
+          // Si le contrat chevauche 2 années civiles, on filtre par la plage dateDebut→dateFin
+          const contractStart = client.dateDebut ? new Date(client.dateDebut) : null;
+          const contractEnd = client.dateFin ? new Date(client.dateFin) : null;
+          // Année de départ du contrat (ex: 2025 pour un contrat sept.2025→août.2026)
+          const contractYear = contractStart ? contractStart.getFullYear() : YEAR_NOW;
+          const label = contractStart && contractEnd
+            ? `${contractStart.toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})} → ${contractEnd.toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})}`
+            : MOIS_L[moisCourant];
+          return <>
+        <div style={{fontSize:12,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
+          📅 <span>{label}</span>
+        </div>
         <div style={{border:"1px solid "+DS.border,borderRadius:DS.radiusSm,overflow:"hidden"}}>
           {[1,2,3,4,5,6,7,8,9,10,11,12].map((m,i)=>{
             const mpm = client.moisParMois || client.saisons || {};
             const prevE = getEntretienMois(mpm, m);
             const prevC = getControleMois(mpm, m);
             const prevT = prevE + prevC;
-            const passM = passC.filter(p=>{ const d=new Date(p.date); return d.getMonth()+1===m && d.getFullYear()===YEAR_NOW; });
+            // Filtrer les passages dans la plage du contrat pour ce mois
+            const passM = passC.filter(p=>{
+              const d = new Date(p.date);
+              const dMois = d.getMonth()+1;
+              const dYear = d.getFullYear();
+              if (dMois !== m) return false;
+              // Si on a des dates de contrat, filtrer dans la plage
+              if (contractStart && contractEnd) {
+                return d >= contractStart && d <= contractEnd;
+              }
+              // Sinon fallback sur l'année civile courante
+              return dYear === YEAR_NOW;
+            });
             const doneE = passM.filter(p=>isEntretienType(p.type)).length;
             const doneC = passM.filter(p=>isControleType(p.type)).length;
             const rest = Math.max(0, prevT - doneE - doneC);
@@ -1342,6 +1380,8 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           <span style={{color:"#fff",fontSize:15,fontWeight:800}}>🔧 {totalE}  ·  💧 {totalC}  ·  {total} passages</span>
         </div>
         <div style={{marginTop:8,fontSize:15,color:DS.mid,display:"flex",alignItems:"center",gap:5}}>⭐ = passage non prévu au planning</div>
+          </>;
+        })()}
       </div>}
 
       {tab==="passages" && (
@@ -3155,8 +3195,11 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
   const tachesMois = clients.map(c=>{
     const prevE = getEntretienMois(c.moisParMois||c.saisons, moisCourant);
     const prevC = getControleMois(c.moisParMois||c.saisons, moisCourant);
-    const effE = passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===moisCourant&&new Date(p.date).getFullYear()===YEAR_NOW&&isEntretienType(p.type)).length;
-    const effC = passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===moisCourant&&new Date(p.date).getFullYear()===YEAR_NOW&&isControleType(p.type)).length;
+    const cs = c.dateDebut ? new Date(c.dateDebut) : null;
+    const ce = c.dateFin ? new Date(c.dateFin) : null;
+    const inContrat = (d) => cs && ce ? d >= cs && d <= ce : d.getFullYear()===YEAR_NOW;
+    const effE = passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===moisCourant&&inContrat(new Date(p.date))&&isEntretienType(p.type)).length;
+    const effC = passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===moisCourant&&inContrat(new Date(p.date))&&isControleType(p.type)).length;
     const restE = Math.max(0,prevE-effE);
     const restC = Math.max(0,prevC-effC);
     return { client:c, prevE, prevC, effE, effC, restE, restC, total:restE+restC };
