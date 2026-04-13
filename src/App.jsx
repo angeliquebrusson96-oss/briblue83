@@ -3525,7 +3525,7 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
                         <svg width={8} height={8} viewBox="0 0 24 24" fill="none" stroke={meta.color} strokeWidth="3" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
                       </button>
                       {isOpen&&(
-                        <div onClick={e=>e.stopPropagation()} style={{position:"absolute",bottom:"calc(100% + 4px)",left:0,right:0,background:DS.white,borderRadius:8,boxShadow:"0 4px 20px rgba(0,0,0,0.15)",border:"1px solid "+DS.border,zIndex:50,overflow:"hidden"}}>
+                        <div onClick={e=>e.stopPropagation()} style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,background:DS.white,borderRadius:8,boxShadow:"0 4px 20px rgba(0,0,0,0.15)",border:"1px solid "+DS.border,zIndex:100,overflow:"auto",maxHeight:220}}>
                           {CONTRAT_STATUTS.map(s=>(
                             <button key={s.key} onClick={()=>setStatut(c.id,s.key)}
                               style={{width:"100%",display:"flex",alignItems:"center",gap:6,padding:"7px 10px",background:meta.key===s.key?s.bg:DS.white,border:"none",cursor:"pointer",fontFamily:"inherit",borderBottom:"1px solid "+DS.light}}>
