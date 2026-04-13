@@ -3465,8 +3465,10 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
           const al=alerteClient(c,passages); const col=AC[al];
           const mpm=c.moisParMois||c.saisons||{};
           const tE=totalAnnuel(mpm,"entretien"), tC=totalAnnuel(mpm,"controle"), tot=tE+tC;
-          const eE=passages.filter(p=>p.clientId===c.id&&isEntretienType(p.type)).length;
-          const eC=passages.filter(p=>p.clientId===c.id&&isControleType(p.type)).length;
+          const cs=c.dateDebut?c.dateDebut.slice(0,10):null; const ce=c.dateFin?c.dateFin.slice(0,10):null;
+          const inC=(p)=>{const ds=String(p.date).slice(0,10);return cs&&ce?ds>=cs&&ds<=ce:new Date(p.date).getFullYear()===YEAR_NOW;};
+          const eE=passages.filter(p=>p.clientId===c.id&&inC(p)&&isEntretienType(p.type)).length;
+          const eC=passages.filter(p=>p.clientId===c.id&&inC(p)&&isControleType(p.type)).length;
           const eff=eE+eC;
           const pct=tot>0?Math.round(eff/tot*100):0;
           const rest=Math.max(0,tot-eff);
@@ -4305,8 +4307,10 @@ export default function App() {
                   const al=alerteClient(c,passages); const col=AC[al]; const j=daysUntil(c.dateFin);
                   const mpm=c.moisParMois||c.saisons||{};
                   const tE=totalAnnuel(mpm,"entretien"), tC=totalAnnuel(mpm,"controle"), tot=tE+tC;
-                  const eE=passages.filter(p=>p.clientId===c.id&&isEntretienType(p.type)).length;
-                  const eC=passages.filter(p=>p.clientId===c.id&&isControleType(p.type)).length;
+                  const cs=c.dateDebut?c.dateDebut.slice(0,10):null; const ce=c.dateFin?c.dateFin.slice(0,10):null;
+          const inC=(p)=>{const ds=String(p.date).slice(0,10);return cs&&ce?ds>=cs&&ds<=ce:new Date(p.date).getFullYear()===YEAR_NOW;};
+          const eE=passages.filter(p=>p.clientId===c.id&&inC(p)&&isEntretienType(p.type)).length;
+                  const eC=passages.filter(p=>p.clientId===c.id&&inC(p)&&isControleType(p.type)).length;
                   const eff=eE+eC;
                   const pct=tot>0?Math.round(eff/tot*100):0;
                   // Calcul des mois en retard (mois passés où des passages restent)
