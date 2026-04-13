@@ -156,14 +156,16 @@ async function load(key, fallback) {
       .eq("id", 1)
       .single();
 
+    // Erreur réseau ou Supabase → retourner le fallback sans écraser
     if (error || !data?.data) return fallback;
 
     const allData = data.data;
-    // Si la clé existe dans Supabase, retourner sa valeur
-    // Si la clé n'existe pas (première fois), retourner null pour distinguer "pas encore en base" de "données vides"
+    // Clé présente → retourner sa valeur (même si tableau vide)
     if (key in allData) return allData[key];
-    return fallback;
+    // Clé absente (première utilisation) → retourner null pour signaler "jamais sauvegardé"
+    return null;
   } catch {
+    // Erreur JS → retourner fallback, ne pas écraser
     return fallback;
   }
 }
@@ -3956,19 +3958,23 @@ export default function App() {
     (async()=>{
       const c = await load("bb_clients_v2", null);
       const passages_data = await load("bb_passages_v2", null);
-      const l = await load("bb_livraisons_v1", []);
-      const r = await load("bb_rdvs_v1", []);
-      const s = await load("bb_stock_v1", {});
-      const ct = await load("bb_contrats_v1", {});
+      const l = await load("bb_livraisons_v1", null);
+      const r = await load("bb_rdvs_v1", null);
+      const s = await load("bb_stock_v1", null);
+      const ct = await load("bb_contrats_v1", null);
 
-      // Si Supabase retourne null (première fois), utiliser les données initiales hardcodées
-      // Sinon toujours utiliser les données Supabase — ne JAMAIS écraser avec les défauts
+      // null = clé absente de Supabase (première fois) → utiliser données initiales
+      // valeur présente = toujours utiliser les données Supabase
       const clientsData = c !== null ? c : CLIENTS_INIT;
       const passagesData = passages_data !== null ? passages_data : PASSAGES_INIT;
-      const sWithDefaults = {...Object.fromEntries(PRODUITS_DEFAUT.map(nom=>[nom,0])), ...s};
+      const livraisonsData = l !== null ? l : [];
+      const rdvsData = r !== null ? r : [];
+      const stockData = s !== null ? s : {};
+      const contratsData = ct !== null ? ct : {};
+      const sWithDefaults = {...Object.fromEntries(PRODUITS_DEFAUT.map(nom=>[nom,0])), ...stockData};
 
       const cMigrated = clientsData.map(cl => ({...cl, moisParMois: migrateMois(cl.moisParMois||cl.saisons), photoPiscine: cl.photoPiscine||"", prixPassageE: cl.prixPassageE||0, prixPassageC: cl.prixPassageC||0}));
-      setClients(cMigrated); setPassages(passagesData); setLivraisons(l); setRdvs(r); setStock(sWithDefaults); setContrats(ct); setReady(true); setInitialLoaded(true);
+      setClients(cMigrated); setPassages(passagesData); setLivraisons(livraisonsData); setRdvs(rdvsData); setStock(sWithDefaults); setContrats(contratsData); setReady(true); setInitialLoaded(true);
     })();
   },[loggedIn]);
 
