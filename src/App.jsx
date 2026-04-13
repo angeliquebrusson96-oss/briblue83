@@ -1176,7 +1176,7 @@ function FormRdv({ initial, clients, onSave, onClose }) {
 }
 
 // FICHE CLIENT (avec diffrenciation Entretien/Contrle)
-function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[], contrats={}, onUpdateContrat, onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
+function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[], contrats={}, onUpdateContrat, onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onDeletePassage, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
   const [tab, setTab] = useState("infos");
   const [detailPassageFiche, setDetailPassageFiche] = useState(null);
   const [showFormLiv, setShowFormLiv] = useState(false);
@@ -1386,9 +1386,17 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
 
       {tab==="passages" && (
         <div className="fade-in">
-          <button onClick={onAddPassage} className="btn-hover" style={{width:"100%",marginBottom:12,padding:"11px",borderRadius:DS.radiusSm,background:DS.blueSoft,color:DS.blue,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontFamily:"inherit"}}>
-            {Ico.plus(13,DS.blue)} Saisir un passage
-          </button>
+          <div style={{display:"flex",gap:8,marginBottom:12}}>
+            <button onClick={onAddPassage} className="btn-hover" style={{flex:1,padding:"11px",borderRadius:DS.radiusSm,background:DS.blueSoft,color:DS.blue,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontFamily:"inherit"}}>
+              {Ico.plus(13,DS.blue)} Saisir un passage
+            </button>
+            {passC.length>0&&onDeletePassage&&(
+              <button onClick={()=>{if(confirm(`Supprimer TOUS les ${passC.length} passages de ce client ?`))passC.forEach(p=>onDeletePassage(p.id));}}
+                style={{padding:"11px 14px",borderRadius:DS.radiusSm,background:DS.redSoft,border:"1px solid #fca5a5",cursor:"pointer",fontWeight:700,fontSize:13,color:DS.red,fontFamily:"inherit",display:"flex",alignItems:"center",gap:5}}>
+                {Ico.trash(13,DS.red)} Tout supprimer
+              </button>
+            )}
+          </div>
           {passC.length===0
             ? <div style={{textAlign:"center",color:DS.mid,padding:30,fontSize:15}}>Aucun passage enregistré</div>
             : passC.map(p=>{
@@ -1435,6 +1443,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                     <button onClick={()=>onEditPassage&&onEditPassage(p)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(12,DS.mid)} Modifier</button>
                     <button onClick={(e)=>{e.stopPropagation();ouvrirRapport(p,client);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.blueSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.blue,fontFamily:"inherit",fontWeight:700}}>{Ico.pdf(12,DS.blue)} Rapport</button>
                     {client.email&&<button onClick={(e)=>{e.stopPropagation();envoyerEmail(p,client,onUpdatePassageStatus);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.green,fontFamily:"inherit",fontWeight:700}}>{Ico.send(12,DS.green)} Email</button>}
+                    {onDeletePassage&&<button onClick={(e)=>{e.stopPropagation();if(confirm("Supprimer ce passage ?"))onDeletePassage(p.id);}} className="btn-hover" style={{padding:"6px 8px",borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(12,DS.red)}</button>}
                   </div>
                 </Card>
               );
@@ -4270,7 +4279,7 @@ export default function App() {
       {/* MODALS */}
       {ficheClient&&(()=>{
         const latest=clients.find(c=>c.id===ficheClient.id)||ficheClient;
-        return <FicheClient client={latest} passages={passages} livraisons={livraisons.filter(l=>l.clientId===latest.id)} rdvs={rdvs} produitsStock={Object.keys(stock)} contrats={contrats} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onSaveLivraison={saveLivraison} onDeleteLivraison={deleteLivraison} onUpdateStatutLivraison={updateStatutLivraison} onClose={()=>setFicheClient(null)} onEdit={()=>{setEditClient(latest);setShowFormClient(true);setFicheClient(null);}} onDelete={()=>deleteClient(latest.id)} onAddPassage={()=>openAddPassageFromClient(latest.id)} onEditPassage={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddRdv={()=>{setEditRdv({clientId:latest.id});setShowFormRdv(true);}} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} onDeleteRdv={deleteRdv}/>;
+        return <FicheClient client={latest} passages={passages} livraisons={livraisons.filter(l=>l.clientId===latest.id)} rdvs={rdvs} produitsStock={Object.keys(stock)} contrats={contrats} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onSaveLivraison={saveLivraison} onDeleteLivraison={deleteLivraison} onUpdateStatutLivraison={updateStatutLivraison} onClose={()=>setFicheClient(null)} onEdit={()=>{setEditClient(latest);setShowFormClient(true);setFicheClient(null);}} onDelete={()=>deleteClient(latest.id)} onDeletePassage={deletePassage} onAddPassage={()=>openAddPassageFromClient(latest.id)} onEditPassage={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddRdv={()=>{setEditRdv({clientId:latest.id});setShowFormRdv(true);}} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} onDeleteRdv={deleteRdv}/>;
       })()}
 
       {showFormClient&&<FormClient initial={editClient} clients={clients} onSave={saveClient} onClose={()=>{setShowFormClient(false);setEditClient(null);}}/>}
@@ -4379,13 +4388,14 @@ function ModalImportConnecteam({ clients, onImport, onClose }) {
       return "Entretien complet";
     };
     const mapOuiNon = (v) => { if (!v) return null; const s=String(v).toLowerCase(); if(s==="oui"||s==="yes"||s==="true") return true; if(s==="non"||s==="no"||s==="false") return false; return null; };
+    const fixNum = (v) => { if(v===null||v===undefined||v==="") return ""; const s=String(v).trim().replace(",","."); if(s.toLowerCase()==="haut") return "Haut"; const n=parseFloat(s); return isNaN(n)?s:String(n); };
     return {
       id: uid(),
       clientId,
       date,
       tech: row[7] || "Dorian",
       type: mapType(row[16]),
-      tSel: row[17]||"", tPhosphate: row[18]||"", tStabilisant: row[19]||"", tChlore: row[20]||"", tPH: row[21]||"",
+      tSel: fixNum(row[17]), tPhosphate: fixNum(row[18]), tStabilisant: fixNum(row[19]), tChlore: fixNum(row[20]), tPH: fixNum(row[21]),
       qualiteEau: row[22]||"",
       etatFond: row[23] ? [row[23]] : [],
       etatParois: row[24] ? [row[24]] : [],
@@ -4406,7 +4416,7 @@ function ModalImportConnecteam({ clients, onImport, onClose }) {
       ressenti: Number(row[57])||0,
       signatureTech: row[58]&&row[58]!=="Image"?row[58]:"",
       chloreLibre:"", ph:"", alcalinite:"", stabilisant:"",
-      stabilisantHaut: false, presenceClient: null,
+      stabilisantHaut: fixNum(row[19]).toLowerCase()==="haut", presenceClient: null,
       ok: true, rapportStatut: "cree",
     };
   };
