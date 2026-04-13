@@ -527,7 +527,7 @@ function Modal({ title, onClose, children, wide }) {
           </button>
         </div>
         {/* Contenu scrollable */}
-        <div style={{flex:1,overflowY:"auto",padding:isMobile?"14px 18px 24px":"20px 24px 24px",WebkitOverflowScrolling:"touch"}}>
+        <div data-modal-body="1" style={{flex:1,overflowY:"auto",padding:isMobile?"14px 18px 24px":"20px 24px 24px",WebkitOverflowScrolling:"touch"}}>
           {children}
         </div>
       </div>
@@ -920,7 +920,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
   const isMobile = useIsMobile();
   const [f, setF] = useState(()=>initial || { id:uid(), clientId:clientId||"", date:TODAY, produits:[], description:"", montant:"", statut:"aFacturer", photos:[] });
   const [step, setStep] = useState(1);
-  const STEPS = 3;
+  useEffect(()=>{ const el=document.querySelector('[data-modal-body="1"]'); if(el) el.scrollTop=0; },[step]);
   const set = (k,v) => setF(p=>({...p,[k]:v}));
   const PLIV = produitsStock.length > 0 ? produitsStock : PRODUITS_DEFAUT;
   const toggleProduit = (p) => { const arr = f.produits.includes(p) ? f.produits.filter(x=>x!==p) : [...f.produits,p]; set("produits",arr); };
@@ -2374,6 +2374,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
   const isMobile = useIsMobile();
   const [f,setF]=useState(isEdit ? {...EMPTY,...initial, rapportStatut:getRapportStatus(initial)} : EMPTY);
   const [step,setStep]=useState(1);
+  useEffect(()=>{ const el=document.querySelector('[data-modal-body="1"]'); if(el) el.scrollTop=0; },[step]);
   const STEPS=6;
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
 
