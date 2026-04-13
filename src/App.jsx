@@ -676,10 +676,13 @@ function FormClient({ initial, clients, onSave, onClose }) {
       <Section title="Passages par mois">
         <div style={{background:DS.dark,padding:"8px 14px",borderRadius:"12px 12px 0 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <span style={{color:"rgba(255,255,255,0.8)",fontSize:15,fontWeight:700}}>Planning mensuel</span>
-            <button onClick={()=>setF(p=>({...p,moisParMois:Object.fromEntries([1,2,3,4,5,6,7,8,9,10,11,12].map(m=>[m,{entretien:0,controle:0}]))}))} style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.7)",background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:6,padding:"3px 10px",cursor:"pointer",fontFamily:"inherit"}}>
-              🔄 Tout remettre à zéro
-            </button>
           <span style={{color:"#fff",fontSize:15,fontWeight:800}}>🔧 {totalE}  ·  💧 {totalC}  ·  Total {totalE+totalC}</span>
+        </div>
+        <div style={{padding:"6px 10px",background:"#f8fafc",borderLeft:"1px solid "+DS.border,borderRight:"1px solid "+DS.border,display:"flex",justifyContent:"flex-end"}}>
+          <button onClick={()=>setF(p=>({...p,moisParMois:Object.fromEntries([1,2,3,4,5,6,7,8,9,10,11,12].map(m=>[m,{entretien:0,controle:0}]))}))}
+            style={{fontSize:12,fontWeight:700,color:DS.red,background:DS.redSoft,border:"1px solid #fca5a5",borderRadius:6,padding:"4px 12px",cursor:"pointer",fontFamily:"inherit"}}>
+            🔄 Tout remettre à zéro
+          </button>
         </div>
         <div style={{border:"1px solid "+DS.border,borderTop:"none",borderRadius:"0 0 12px 12px",overflow:"hidden"}}>
           {[...Array(12)].map((_,i)=>{
