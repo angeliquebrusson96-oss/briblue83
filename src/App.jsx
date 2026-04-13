@@ -3320,7 +3320,7 @@ function PageClients({ clients, passages, contrats={}, onClientClick, onAdd }) {
   const alertCount = clients.filter(c=>alerteClient(c,passages)!=="ok").length;
 
   const getContratStatut = (clientId) => {
-    const ct = contrats[clientId];
+    const ct = contrats["CT-" + clientId];
     if (!ct) return null;
     const s = ct.statut;
     if (s === "signe_complet") {
@@ -3592,16 +3592,21 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
 
   return (
     <div>
-      <div style={{display:"flex",gap:6,marginBottom:14,background:DS.light,borderRadius:DS.radius,padding:4}}>
-        {[["semaine","7 jours",Ico.clock],[" mois","Ce mois",Ico.calendar],["tout","Tout",Ico.clipboard]].map(([v,l,ico])=>{
-          const key=v.trim(); const active=filter===key;
-          return (
-            <button key={key} onClick={()=>setFilter(key)} className="btn-hover" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"8px 4px",borderRadius:DS.radiusSm,border:"none",cursor:"pointer",fontFamily:"inherit",background:active?DS.white:"transparent",color:active?DS.dark:DS.mid,boxShadow:active?"0 1px 4px rgba(0,0,0,0.08)":"none",transition:"all .2s"}}>
-              <span style={{fontWeight:800,fontSize:16,color:active?DS.blue:DS.mid}}>{counts[key]}</span>
-              <span style={{fontSize:10,fontWeight:active?700:500}}>{l}</span>
-            </button>
-          );
-        })}
+      <div style={{display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
+        <div style={{display:"flex",gap:6,flex:1,background:DS.light,borderRadius:DS.radius,padding:4}}>
+          {[["semaine","7 jours",Ico.clock],[" mois","Ce mois",Ico.calendar],["tout","Tout",Ico.clipboard]].map(([v,l,ico])=>{
+            const key=v.trim(); const active=filter===key;
+            return (
+              <button key={key} onClick={()=>setFilter(key)} className="btn-hover" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"8px 4px",borderRadius:DS.radiusSm,border:"none",cursor:"pointer",fontFamily:"inherit",background:active?DS.white:"transparent",color:active?DS.dark:DS.mid,boxShadow:active?"0 1px 4px rgba(0,0,0,0.08)":"none",transition:"all .2s"}}>
+                <span style={{fontWeight:800,fontSize:16,color:active?DS.blue:DS.mid}}>{counts[key]}</span>
+                <span style={{fontSize:10,fontWeight:active?700:500}}>{l}</span>
+              </button>
+            );
+          })}
+        </div>
+        <BtnPrimary onClick={onAdd} bg={DS.blue} icon={Ico.plus(14,"#fff")} style={{flexShrink:0,padding:"10px 14px",fontSize:13,borderRadius:DS.radiusSm}}>
+          Nouveau
+        </BtnPrimary>
       </div>
       {filtered.length===0
         ? <div style={{textAlign:"center",color:DS.mid,padding:40,fontSize:13}}>Aucun passage sur cette période</div>
