@@ -623,12 +623,12 @@ function FormClient({ initial, clients, onSave, onClose }) {
   const isMobile = useIsMobile();
   const [f, setF] = useState(() => {
     if (initial) {
-      return { ...initial, moisParMois: migrateMois(initial.moisParMois||initial.saisons), photoPiscine: initial.photoPiscine||"", prixPassageE: initial.prixPassageE||0, prixPassageC: initial.prixPassageC||0 };
+      return { ...initial, moisParMois: migrateMois(initial.moisParMois||initial.saisons), photoPiscine: initial.photoPiscine||"", prixPassageE: initial.prixPassageE||0, prixPassageC: initial.prixPassageC||0, notesTarifaires: initial.notesTarifaires||"" };
     }
     return {
       id: `C${String(clients.length+1).padStart(3,"0")}`,
       nom:"", tel:"", email:"", adresse:"", bassin:"Liner", volume:30,
-      formule:"VAC", prix:0, prixPassageE:0, prixPassageC:0, dateDebut:TODAY, photoPiscine:"",
+      formule:"VAC", prix:0, prixPassageE:0, prixPassageC:0, dateDebut:TODAY, photoPiscine:"", notesTarifaires:"",
       dateFin: `${new Date().getFullYear()+1}-03-31`,
       moisParMois: {...MOIS_PAR_MOIS_DEF},
     };
@@ -729,6 +729,41 @@ function FormClient({ initial, clients, onSave, onClose }) {
               })()}
             </div>
           </div>
+        </div>
+      </Section>
+      <Section title="📝 Notes tarifaires (optionnel)">
+        <div style={{fontSize:12,color:DS.mid,marginBottom:8,lineHeight:1.5}}>
+          Ces notes apparaîtront dans le contrat — ex: produits inclus, remise accordée, condition spéciale…
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {(f.notesTarifaires||"").split("\n").filter((_,i,a)=>i<a.length).map((line,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{color:DS.blue,fontWeight:700,flexShrink:0}}>•</span>
+              <input
+                value={line}
+                placeholder={i===0?"Ex: Produits de traitement inclus dans le forfait":"Ajouter une note…"}
+                onChange={e=>{
+                  const lines=(f.notesTarifaires||"").split("\n");
+                  lines[i]=e.target.value;
+                  set("notesTarifaires",lines.join("\n"));
+                }}
+                style={{flex:1,padding:"9px 12px",borderRadius:8,border:"1.5px solid "+DS.border,fontSize:13,outline:"none",color:DS.dark,fontFamily:"inherit"}}
+              />
+              {(f.notesTarifaires||"").split("\n").length>1&&(
+                <button onClick={()=>{
+                  const lines=(f.notesTarifaires||"").split("\n");
+                  lines.splice(i,1);
+                  set("notesTarifaires",lines.join("\n"));
+                }} style={{width:26,height:26,borderRadius:6,background:"#fff1f2",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  {Ico.close(10,DS.red)}
+                </button>
+              )}
+            </div>
+          ))}
+          <button onClick={()=>set("notesTarifaires",(f.notesTarifaires?f.notesTarifaires+"\n":""))}
+            style={{display:"flex",alignItems:"center",gap:6,padding:"8px 12px",borderRadius:8,background:DS.blueSoft,border:"1px solid "+DS.blue+"33",cursor:"pointer",fontSize:12,fontWeight:700,color:DS.blue,fontFamily:"inherit",alignSelf:"flex-start"}}>
+            {Ico.plus(11,DS.blue)} Ajouter une note
+          </button>
         </div>
       </Section>
       <div style={{display:"flex",gap:10}}>
@@ -1781,6 +1816,14 @@ table td{padding:7px 12px;border:1px solid #e2e8f0;font-size:12px}
   </div>
   `}
 </div>
+${client.notesTarifaires ? `
+<div class="conditions" style="background:#f0f9ff;border-color:#bae6fd;">
+  <h3 style="color:#0891b2;">📝 Notes tarifaires particulières</h3>
+  <ul>
+    ${client.notesTarifaires.split("\n").filter(l=>l.trim()).map(l=>`<li style="color:#0e7490;font-weight:600;">${l.trim()}</li>`).join("")}
+  </ul>
+</div>
+` : ""}
 <div class="conditions">
   <h3>Conditions & Informations</h3>
   <ul>
