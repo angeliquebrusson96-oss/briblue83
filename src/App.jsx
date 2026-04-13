@@ -3312,33 +3312,40 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
 }
 
 // PAGE CLIENTS
-function PageClients({ clients, passages, contrats={}, onClientClick, onAdd }) {
+function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClientClick, onAdd }) {
   const [search, setSearch] = useState("");
   const isMobile = useIsMobile();
   const filtered = useMemo(()=>clients.filter(c=>c.nom.toLowerCase().includes(search.toLowerCase())||c.adresse?.toLowerCase().includes(search.toLowerCase())),[clients,search]);
   const totalAll = clients.length;
   const alertCount = clients.filter(c=>alerteClient(c,passages)!=="ok").length;
 
-  const getContratStatut = (clientId) => {
-    // Chercher par clé ET par valeur clientId (les IDs peuvent être timestamp ou CT-xxx)
-    const ct = contrats["CT-" + clientId]
-      || Object.values(contrats).find(c => c.clientId === clientId)
-      || Object.values(contrats).find(c => c.clientId === "CT-" + clientId)
-      || null;
-    if (!ct) return null;
-    const s = ct.statut;
-    if (s === "signe_complet") {
-      const client = clients.find(c=>c.id===clientId);
-      if (client?.dateFin) {
-        const joursRestants = Math.round((new Date(client.dateFin)-new Date())/(1000*60*60*24));
-        if (joursRestants < 60) return { label:"🔄 À renouveler", color:"#b45309", bg:"#fef3c7", border:"#fcd34d" };
-      }
-      return { label:"✅ Contrat signé", color:"#059669", bg:"#f0fdf4", border:"#86efac" };
-    }
-    if (s === "signe_client") return { label:"📝 En attente co-signature", color:"#4f46e5", bg:"#eef2ff", border:"#a5b4fc" };
-    if (s === "demande_envoyee") return { label:"📨 Contrat envoyé", color:"#0891b2", bg:"#f0f9ff", border:"#bae6fd" };
-    if (s === "prepare") return { label:"📋 Contrat préparé", color:"#6b7280", bg:"#f9fafb", border:"#e5e7eb" };
-    return null; // statut inconnu = rien
+  const CONTRAT_STATUTS = [
+    { key:"aucun",         label:"Aucun contrat",         color:"#9ca3af", bg:"#f9fafb", border:"#e5e7eb" },
+    { key:"prepare",       label:"📋 Contrat préparé",    color:"#6b7280", bg:"#f3f4f6", border:"#d1d5db" },
+    { key:"demande_envoyee",label:"📨 Contrat envoyé",    color:"#0891b2", bg:"#f0f9ff", border:"#bae6fd" },
+    { key:"signe_client",  label:"📝 En attente co-sign.", color:"#4f46e5", bg:"#eef2ff", border:"#a5b4fc" },
+    { key:"signe_complet", label:"✅ Contrat signé",      color:"#059669", bg:"#f0fdf4", border:"#86efac" },
+    { key:"renouveler",    label:"🔄 À renouveler",       color:"#b45309", bg:"#fef3c7", border:"#fcd34d" },
+    { key:"suspendu",      label:"⏸ Suspendu",            color:"#dc2626", bg:"#fff1f2", border:"#fda4af" },
+  ];
+
+  const [openPicker, setOpenPicker] = useState(null); // clientId du picker ouvert
+
+  const getContrat = (clientId) =>
+    contrats["CT-"+clientId]
+    || Object.values(contrats).find(c=>c.clientId===clientId)
+    || null;
+
+  const getStatutMeta = (clientId) => {
+    const ct = getContrat(clientId);
+    const key = ct?.statut || "aucun";
+    return CONTRAT_STATUTS.find(s=>s.key===key) || CONTRAT_STATUTS[0];
+  };
+
+  const setStatut = (clientId, key) => {
+    const contractId = "CT-"+clientId;
+    if (onUpdateContrat) onUpdateContrat(contractId, { clientId, statut: key });
+    setOpenPicker(null);
   };
 
   return (
@@ -3415,13 +3422,30 @@ function PageClients({ clients, passages, contrats={}, onClientClick, onAdd }) {
                 {tot>0&&<div style={{height:3,background:DS.light,borderRadius:99,overflow:"hidden"}}>
                   <div style={{height:"100%",width:`${pct}%`,background:pct>=100?"#059669":pct>=50?"#0891b2":"#f59e0b",borderRadius:99}}/>
                 </div>}
-                {/* Badge statut contrat */}
+                {/* Badge statut contrat — cliquable */}
                 {(()=>{
-                  const ctStatut = getContratStatut(c.id);
-                  if (!ctStatut) return null;
-                  return <div style={{display:"flex",alignItems:"center",padding:"3px 8px",borderRadius:6,background:ctStatut.bg,border:"1px solid "+ctStatut.border}}>
-                    <span style={{fontSize:10,fontWeight:700,color:ctStatut.color}}>{ctStatut.label}</span>
-                  </div>;
+                  const meta = getStatutMeta(c.id);
+                  const isOpen = openPicker===c.id;
+                  return (
+                    <div style={{position:"relative"}}>
+                      <button onClick={e=>{e.stopPropagation();setOpenPicker(isOpen?null:c.id);}}
+                        style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"4px 8px",borderRadius:6,background:meta.bg,border:"1px solid "+meta.border,cursor:"pointer",fontFamily:"inherit"}}>
+                        <span style={{fontSize:10,fontWeight:700,color:meta.color}}>{meta.label}</span>
+                        <svg width={8} height={8} viewBox="0 0 24 24" fill="none" stroke={meta.color} strokeWidth="3" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+                      </button>
+                      {isOpen&&(
+                        <div onClick={e=>e.stopPropagation()} style={{position:"absolute",bottom:"calc(100% + 4px)",left:0,right:0,background:DS.white,borderRadius:8,boxShadow:"0 4px 20px rgba(0,0,0,0.15)",border:"1px solid "+DS.border,zIndex:50,overflow:"hidden"}}>
+                          {CONTRAT_STATUTS.map(s=>(
+                            <button key={s.key} onClick={()=>setStatut(c.id,s.key)}
+                              style={{width:"100%",display:"flex",alignItems:"center",gap:6,padding:"7px 10px",background:meta.key===s.key?s.bg:DS.white,border:"none",cursor:"pointer",fontFamily:"inherit",borderBottom:"1px solid "+DS.light}}>
+                              <span style={{fontSize:11,fontWeight:meta.key===s.key?700:500,color:meta.key===s.key?s.color:DS.dark}}>{s.label}</span>
+                              {meta.key===s.key&&<svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke={s.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft:"auto"}}><polyline points="20 6 9 17 4 12"/></svg>}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
                 })()}
               </div>
             </div>
@@ -4070,7 +4094,7 @@ export default function App() {
           </div>
           <div style={{padding:"6px 16px 110px",overflowX:"hidden"}}>
             {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}}/>}
-            {page==="clients"&&<PageClients clients={clients} passages={passages} contrats={contrats} onClientClick={setFicheClient} onAdd={openAddClient}/>}
+            {page==="clients"&&<PageClients clients={clients} passages={passages} contrats={contrats} onUpdateContrat={(contractId,data)=>setContrats(prev=>({...prev,[contractId]:{...prev[contractId],...data}}))} onClientClick={setFicheClient} onAdd={openAddClient}/>}
             {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus}/>}
             {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
           </div>
@@ -4115,7 +4139,7 @@ export default function App() {
                 {page==="dashboard"&&<p style={{margin:"2px 0 0",color:DS.mid,fontSize:13,fontWeight:500}}>Aujourd'hui tâchons de ne rien oublier ;)</p>}
               </div>
               {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}}/>}
-              {page==="clients"&&<PageClients clients={clients} passages={passages} contrats={contrats} onClientClick={setFicheClient} onAdd={openAddClient}/>}
+              {page==="clients"&&<PageClients clients={clients} passages={passages} contrats={contrats} onUpdateContrat={(contractId,data)=>setContrats(prev=>({...prev,[contractId]:{...prev[contractId],...data}}))} onClientClick={setFicheClient} onAdd={openAddClient}/>}
               {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus}/>}
               {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
             </div>
