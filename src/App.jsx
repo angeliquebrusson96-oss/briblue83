@@ -3476,9 +3476,9 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
           return (
             <div key={c.id} onClick={()=>onClientClick(c)} className="fade-in card-hover"
               style={{animationDelay:`${idx*0.03}s`,background:DS.white,borderRadius:DS.radius,
-                overflow:"hidden",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",
+                overflow:openPicker===c.id?"visible":"hidden",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",
                 border:"1px solid "+DS.border,borderTop:"2px solid "+accentColor,
-                cursor:"pointer",display:"flex",flexDirection:"column"}}>
+                cursor:"pointer",display:"flex",flexDirection:"column",position:"relative",zIndex:openPicker===c.id?999:1}}>
               {c.photoPiscine&&(
                 <div style={{height:72,background:`url(${c.photoPiscine}) center/cover`,position:"relative",flexShrink:0}}>
                   <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,transparent 40%,rgba(0,0,0,0.35))"}}/>
