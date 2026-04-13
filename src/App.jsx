@@ -1333,7 +1333,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           const contractStart = client.dateDebut ? client.dateDebut.slice(0,10) : null;
           const contractEnd = client.dateFin ? client.dateFin.slice(0,10) : null;
           // Année de départ du contrat (ex: 2025 pour un contrat sept.2025→août.2026)
-          const contractYear = contractStart ? contractStart.getFullYear() : YEAR_NOW;
+          const contractYear = contractStart ? parseInt(contractStart.slice(0,4)) : YEAR_NOW;
           const label = contractStart && contractEnd
             ? `${contractStart.toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})} → ${contractEnd.toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})}`
             : MOIS_L[moisCourant];
