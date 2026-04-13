@@ -226,11 +226,14 @@ function isControleType(type) {
 }
 function alerteClient(c, passages) {
   const j = daysUntil(c.dateFin);
-  const cs = c.dateDebut ? new Date(c.dateDebut) : null;
-  const ce = c.dateFin ? new Date(c.dateFin) : null;
+  const cs = c.dateDebut ? c.dateDebut.slice(0,10) : null;
+  const ce = c.dateFin ? c.dateFin.slice(0,10) : null;
+  const today = TODAY;
+  // Contrat pas encore commencé → pas d'alerte
+  if (cs && today < cs) return "ok";
   const eff = passages.filter(p=>{
     if(p.clientId!==c.id) return false;
-    if(cs&&ce){const d=new Date(p.date);return d>=cs&&d<=ce;}
+    if(cs&&ce){const d=String(p.date).slice(0,10);return d>=cs&&d<=ce;}
     return new Date(p.date).getFullYear()===YEAR_NOW;
   }).length;
   const prev = totalAnnuel(c.moisParMois||c.saisons);
