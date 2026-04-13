@@ -229,17 +229,42 @@ function alerteClient(c, passages) {
   const cs = c.dateDebut ? c.dateDebut.slice(0,10) : null;
   const ce = c.dateFin ? c.dateFin.slice(0,10) : null;
   const today = TODAY;
-  // Contrat pas encore commencé → pas d'alerte
+  // Contrat pas encore commencé → ok
   if (cs && today < cs) return "ok";
-  const eff = passages.filter(p=>{
-    if(p.clientId!==c.id) return false;
-    if(cs&&ce){const d=String(p.date).slice(0,10);return d>=cs&&d<=ce;}
-    return new Date(p.date).getFullYear()===YEAR_NOW;
-  }).length;
-  const prev = totalAnnuel(c.moisParMois||c.saisons);
+  // Fin de contrat proche
   if (j !== null && j >= 0 && j <= 30) return "rouge";
   if (j !== null && j > 30 && j <= 60) return "jaune";
-  if (prev > 0 && eff / prev < 0.5 && (prev - eff) > 3) return "orange";
+
+  const now = new Date();
+  const moisCur = now.getMonth() + 1;
+  const yearCur = now.getFullYear();
+
+  const mpm = c.moisParMois || c.saisons || {};
+
+  // Passages effectués dans la plage contrat
+  const passContrat = passages.filter(p => {
+    if (p.clientId !== c.id) return false;
+    if (cs && ce) { const d = String(p.date).slice(0,10); return d >= cs && d <= ce; }
+    return new Date(p.date).getFullYear() === yearCur;
+  });
+
+  // Vérifier les mois PASSÉS (avant ce mois) — s'il manque des passages → Retard
+  let retard = false;
+  for (let m = 1; m < moisCur; m++) {
+    const prev = (mpm[m]?.entretien||0) + (mpm[m]?.controle||0);
+    if (prev === 0) continue;
+    const eff = passContrat.filter(p => new Date(p.date).getMonth()+1 === m).length;
+    if (eff < prev) { retard = true; break; }
+  }
+  if (retard) return "orange";
+
+  // Vérifier le mois EN COURS — s'il reste des passages → À faire
+  const prevCur = (mpm[moisCur]?.entretien||0) + (mpm[moisCur]?.controle||0);
+  if (prevCur > 0) {
+    const effCur = passContrat.filter(p => new Date(p.date).getMonth()+1 === moisCur).length;
+    if (effCur < prevCur) return "aFaire";
+  }
+
   return "ok";
 }
 function uid() { return Date.now() + Math.random().toString(36).slice(2); }
@@ -371,6 +396,7 @@ const AC = {
   rouge:  { bg:DS.redSoft,    bd:"#fda4af", tx:DS.red,    lbl:"URGENT"   },
   jaune:  { bg:DS.yellowSoft, bd:"#fcd34d", tx:DS.yellow, lbl:"Attention" },
   orange: { bg:DS.orangeSoft, bd:"#fcd34d", tx:DS.orange, lbl:"Retard"   },
+  aFaire: { bg:"#eff6ff",     bd:"#93c5fd", tx:"#2563eb", lbl:"À faire"  },
   ok:     { bg:DS.greenSoft,  bd:"#86efac", tx:DS.green,  lbl:"OK"       },
 };
 
