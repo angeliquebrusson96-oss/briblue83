@@ -3345,6 +3345,9 @@ function PageClients({ clients, passages, contrats={}, onClientClick, onAdd }) {
           <div style={{width:32,height:32,borderRadius:8,background:"rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.clients(16,"#fff")}</div>
           <div><div style={{fontSize:18,fontWeight:800,color:"#fff"}}>{totalAll}</div><div style={{fontSize:10,color:"rgba(255,255,255,0.6)"}}>Clients</div></div>
         </div>
+        <div style={{background:"#fff3cd",borderRadius:DS.radiusSm,padding:"10px 14px",border:"1px solid #ffc107",fontSize:11,color:"#856404",display:"flex",alignItems:"center"}}>
+          DEBUG: {Object.keys(contrats).length} contrats — clés: {Object.keys(contrats).slice(0,3).join(", ")||"vide"}
+        </div>
         {alertCount>0&&<div style={{background:DS.white,borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8,border:"1px solid #fecaca"}}>
           <div style={{width:32,height:32,borderRadius:8,background:"#fff1f2",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.alert(15,DS.red)}</div>
           <div><div style={{fontSize:18,fontWeight:800,color:DS.red}}>{alertCount}</div><div style={{fontSize:11,color:DS.red,fontWeight:600}}>Alertes</div></div>
