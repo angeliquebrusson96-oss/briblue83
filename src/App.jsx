@@ -459,8 +459,7 @@ function Modal({ title, onClose, children, wide }) {
     return ()=>{ document.body.style.overflow = prev; };
   },[]);
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:200,display:"flex",alignItems:isMobile?"flex-end":"center",justifyContent:"center"}}
-      onClick={onClose}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:200,display:"flex",alignItems:isMobile?"flex-end":"center",justifyContent:"center"}}>
       <div className={isMobile?"slide-up":"scale-in"}
         style={{background:DS.white,borderRadius:isMobile?"20px 20px 0 0":DS.radiusLg,
           width:"100%",maxWidth:wide?720:560,
@@ -1221,27 +1220,55 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
       </div>
 
       {/* Stats row */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginTop:14,marginBottom:12}}>
-        <div style={{textAlign:"center",padding:"8px 4px",borderRadius:8,background:"#f8fafc",border:"1px solid #e5e7eb"}}>
-          <div style={{fontSize:16,fontWeight:800,color:DS.blue,lineHeight:1}}>{effE}<span style={{fontSize:10,color:DS.mid,fontWeight:400}}>/{totalE}</span></div>
-          <div style={{fontSize:10,fontWeight:600,color:DS.mid,marginTop:2}}>Entretiens</div>
-          <div style={{height:2,background:"#e5e7eb",borderRadius:99,overflow:"hidden",marginTop:5,marginInline:4}}><div style={{height:"100%",width:`${totalE>0?Math.min(100,effE/totalE*100):0}%`,background:DS.blue,borderRadius:99}}/></div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginTop:14,marginBottom:14}}>
+        {/* Entretiens */}
+        <div style={{borderRadius:10,background:DS.white,border:"1px solid #e5e7eb",padding:"10px 8px",display:"flex",flexDirection:"column",gap:4}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <span style={{fontSize:9,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5}}>Entretiens</span>
+            <span style={{width:20,height:20,borderRadius:6,background:"#f0f9ff",display:"flex",alignItems:"center",justifyContent:"center"}}>🔧</span>
+          </div>
+          <div style={{fontSize:18,fontWeight:900,color:DS.blue,lineHeight:1}}>{effE}<span style={{fontSize:11,color:DS.mid,fontWeight:400}}>/{totalE}</span></div>
+          <div style={{height:3,background:"#e5e7eb",borderRadius:99,overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${totalE>0?Math.min(100,effE/totalE*100):0}%`,background:DS.blue,borderRadius:99,transition:"width .5s"}}/>
+          </div>
         </div>
-        <div style={{textAlign:"center",padding:"8px 4px",borderRadius:8,background:"#f8fafc",border:"1px solid #e5e7eb"}}>
-          <div style={{fontSize:16,fontWeight:800,color:DS.blue,lineHeight:1}}>{effC}<span style={{fontSize:10,color:DS.mid,fontWeight:400}}>/{totalC}</span></div>
-          <div style={{fontSize:10,fontWeight:600,color:DS.mid,marginTop:2}}>Contrôles</div>
-          <div style={{height:2,background:"#e5e7eb",borderRadius:99,overflow:"hidden",marginTop:5,marginInline:4}}><div style={{height:"100%",width:`${totalC>0?Math.min(100,effC/totalC*100):0}%`,background:DS.blue,borderRadius:99}}/></div>
+        {/* Contrôles */}
+        <div style={{borderRadius:10,background:DS.white,border:"1px solid #e5e7eb",padding:"10px 8px",display:"flex",flexDirection:"column",gap:4}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <span style={{fontSize:9,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5}}>Contrôles</span>
+            <span style={{width:20,height:20,borderRadius:6,background:"#f0f9ff",display:"flex",alignItems:"center",justifyContent:"center"}}>💧</span>
+          </div>
+          <div style={{fontSize:18,fontWeight:900,color:"#0e7490",lineHeight:1}}>{effC}<span style={{fontSize:11,color:DS.mid,fontWeight:400}}>/{totalC}</span></div>
+          <div style={{height:3,background:"#e5e7eb",borderRadius:99,overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${totalC>0?Math.min(100,effC/totalC*100):0}%`,background:"#0e7490",borderRadius:99,transition:"width .5s"}}/>
+          </div>
         </div>
-        <div style={{textAlign:"center",padding:"8px 4px",borderRadius:8,background:"#f8fafc",border:"1px solid #e5e7eb"}}>
-          <div style={{fontSize:16,fontWeight:800,color:pct>=100?DS.green:DS.dark,lineHeight:1}}>{pct}<span style={{fontSize:10,fontWeight:400}}>%</span></div>
-          <div style={{fontSize:10,fontWeight:600,color:DS.mid,marginTop:2}}>{rest>0?rest+" restants":"À jour"}</div>
+        {/* Avancement */}
+        <div style={{borderRadius:10,background:pct>=100?"#f0fdf4":rest>5?"#fffbeb":"#f0f9ff",border:"1px solid "+(pct>=100?"#86efac":rest>5?"#fde68a":"#bae6fd"),padding:"10px 8px",display:"flex",flexDirection:"column",gap:4}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <span style={{fontSize:9,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5}}>{rest>0?"Restants":"Avancement"}</span>
+            <span style={{fontSize:12}}>{pct>=100?"✅":rest>5?"⏳":"🔵"}</span>
+          </div>
+          <div style={{fontSize:18,fontWeight:900,color:pct>=100?DS.green:rest>5?"#b45309":DS.blue,lineHeight:1}}>
+            {rest>0?rest:pct}<span style={{fontSize:11,fontWeight:400,color:DS.mid}}>{rest>0?" pass.":"%"}</span>
+          </div>
+          <div style={{height:3,background:"#e5e7eb",borderRadius:99,overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${pct}%`,background:pct>=100?"#059669":"#0891b2",borderRadius:99,transition:"width .5s"}}/>
+          </div>
         </div>
-        <div style={{textAlign:"center",padding:"8px 4px",borderRadius:8,background:"#f8fafc",border:"1px solid #e5e7eb"}}>
+        {/* Mensualité */}
+        <div style={{borderRadius:10,background:DS.white,border:"1px solid #e5e7eb",padding:"10px 8px",display:"flex",flexDirection:"column",gap:4}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <span style={{fontSize:9,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5}}>Mensualité</span>
+            <span style={{width:20,height:20,borderRadius:6,background:"#f0fdf4",display:"flex",alignItems:"center",justifyContent:"center"}}>💶</span>
+          </div>
           {(()=>{
-            const {m1,m11,estRond} = calcMensualites(client.prix||0);
-            return estRond
-              ? <><div style={{fontSize:12,fontWeight:800,color:DS.blue,lineHeight:1}}>{m11}<span style={{fontSize:8}}>€</span></div><div style={{fontSize:9,fontWeight:600,color:DS.mid,marginTop:2}}>/ mois</div></>
-              : <><div style={{fontSize:11,fontWeight:800,color:DS.blue,lineHeight:1}}>{m11}<span style={{fontSize:8}}>€</span></div><div style={{fontSize:9,fontWeight:600,color:DS.mid,marginTop:1}}>×11 + <span style={{color:"#b45309"}}>{m1.toFixed(2)}€</span></div></>;
+            const {m1,m11,estRond}=calcMensualites(client.prix||0);
+            return <>
+              <div style={{fontSize:18,fontWeight:900,color:"#059669",lineHeight:1}}>{m11}<span style={{fontSize:11,fontWeight:400,color:DS.mid}}>€</span></div>
+              {!estRond&&<div style={{fontSize:9,color:"#b45309",fontWeight:600}}>1er: {m1}€</div>}
+              {estRond&&<div style={{fontSize:9,color:DS.mid}}>/ mois × 12</div>}
+            </>;
           })()}
         </div>
       </div>
@@ -3321,6 +3348,7 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
 
   const CONTRAT_STATUTS = [
     { key:"aucun",         label:"Aucun contrat",         color:"#9ca3af", bg:"#f9fafb", border:"#e5e7eb" },
+    { key:"cree",          label:"🆕 Contrat créé",       color:"#6366f1", bg:"#eef2ff", border:"#a5b4fc" },
     { key:"prepare",       label:"📋 Contrat préparé",    color:"#6b7280", bg:"#f3f4f6", border:"#d1d5db" },
     { key:"demande_envoyee",label:"📨 Contrat envoyé",    color:"#0891b2", bg:"#f0f9ff", border:"#bae6fd" },
     { key:"signe_client",  label:"📝 En attente co-sign.", color:"#4f46e5", bg:"#eef2ff", border:"#a5b4fc" },
@@ -3901,7 +3929,7 @@ export default function App() {
   const [rdvs, setRdvs] = useState([]);
   const [stock, setStock] = useState({});
   const [showStock, setShowStock] = useState(false);
-  const [contrats, setContrats] = useState({});
+  const [initialLoaded, setInitialLoaded] = useState(false);
   const [ready, setReady] = useState(false);
   const [ficheClient, setFicheClient] = useState(null);
   const [showFormClient, setShowFormClient] = useState(false);
@@ -3931,16 +3959,16 @@ export default function App() {
       const sWithDefaults = {...Object.fromEntries(PRODUITS_DEFAUT.map(nom=>[nom, s[nom]??0])), ...s};
 // Migrate saisons format for existing clients
       const cMigrated = c.map(cl => ({...cl, moisParMois: migrateMois(cl.moisParMois||cl.saisons), photoPiscine: cl.photoPiscine||"", prixPassageE: cl.prixPassageE||0, prixPassageC: cl.prixPassageC||0}));
-      setClients(cMigrated); setPassages(passages_data); setLivraisons(l); setRdvs(r); setStock(sWithDefaults); setContrats(ct); setReady(true);
+      setClients(cMigrated); setPassages(passages_data); setLivraisons(l); setRdvs(r); setStock(sWithDefaults); setContrats(ct); setReady(true); setInitialLoaded(true);
     })();
   },[loggedIn]);
 
-  useEffect(()=>{ if(ready) save("bb_clients_v2", clients); },[clients,ready]);
-  useEffect(()=>{ if(ready) save("bb_passages_v2", passages); },[passages,ready]);
-  useEffect(()=>{ if(ready) save("bb_livraisons_v1", livraisons); },[livraisons,ready]);
-  useEffect(()=>{ if(ready) save("bb_rdvs_v1", rdvs); },[rdvs,ready]);
-  useEffect(()=>{ if(ready) save("bb_stock_v1", stock); },[stock,ready]);
-  useEffect(()=>{ if(ready) save("bb_contrats_v1", contrats); },[contrats,ready]);
+  useEffect(()=>{ if(ready && initialLoaded) save("bb_clients_v2", clients); },[clients,ready,initialLoaded]);
+  useEffect(()=>{ if(ready && initialLoaded) save("bb_passages_v2", passages); },[passages,ready,initialLoaded]);
+  useEffect(()=>{ if(ready && initialLoaded) save("bb_livraisons_v1", livraisons); },[livraisons,ready,initialLoaded]);
+  useEffect(()=>{ if(ready && initialLoaded) save("bb_rdvs_v1", rdvs); },[rdvs,ready,initialLoaded]);
+  useEffect(()=>{ if(ready && initialLoaded) save("bb_stock_v1", stock); },[stock,ready,initialLoaded]);
+  useEffect(()=>{ if(ready && initialLoaded) save("bb_contrats_v1", contrats); },[contrats,ready,initialLoaded]);
 
   // Polling toutes les 10s pour détecter nouvelles signatures
   useEffect(()=>{
