@@ -156,11 +156,16 @@ async function load(key, fallback) {
       .eq("id", 1)
       .single();
 
+    // Erreur réseau ou Supabase → retourner le fallback sans écraser
     if (error || !data?.data) return fallback;
 
     const allData = data.data;
-    return allData[key] ?? fallback;
+    // Clé présente → retourner sa valeur (même si tableau vide)
+    if (key in allData) return allData[key];
+    // Clé absente (première utilisation) → retourner null pour signaler "jamais sauvegardé"
+    return null;
   } catch {
+    // Erreur JS → retourner fallback, ne pas écraser
     return fallback;
   }
 }
@@ -221,7 +226,13 @@ function isControleType(type) {
 }
 function alerteClient(c, passages) {
   const j = daysUntil(c.dateFin);
-  const eff = passages.filter(p=>p.clientId===c.id).length;
+  const cs = c.dateDebut ? new Date(c.dateDebut) : null;
+  const ce = c.dateFin ? new Date(c.dateFin) : null;
+  const eff = passages.filter(p=>{
+    if(p.clientId!==c.id) return false;
+    if(cs&&ce){const d=new Date(p.date);return d>=cs&&d<=ce;}
+    return new Date(p.date).getFullYear()===YEAR_NOW;
+  }).length;
   const prev = totalAnnuel(c.moisParMois||c.saisons);
   if (j !== null && j >= 0 && j <= 30) return "rouge";
   if (j !== null && j > 30 && j <= 60) return "jaune";
@@ -459,8 +470,7 @@ function Modal({ title, onClose, children, wide }) {
     return ()=>{ document.body.style.overflow = prev; };
   },[]);
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:200,display:"flex",alignItems:isMobile?"flex-end":"center",justifyContent:"center"}}
-      onClick={onClose}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:200,display:"flex",alignItems:isMobile?"flex-end":"center",justifyContent:"center"}}>
       <div className={isMobile?"slide-up":"scale-in"}
         style={{background:DS.white,borderRadius:isMobile?"20px 20px 0 0":DS.radiusLg,
           width:"100%",maxWidth:wide?720:560,
@@ -623,12 +633,12 @@ function FormClient({ initial, clients, onSave, onClose }) {
   const isMobile = useIsMobile();
   const [f, setF] = useState(() => {
     if (initial) {
-      return { ...initial, moisParMois: migrateMois(initial.moisParMois||initial.saisons), photoPiscine: initial.photoPiscine||"", prixPassageE: initial.prixPassageE||0, prixPassageC: initial.prixPassageC||0 };
+      return { ...initial, moisParMois: migrateMois(initial.moisParMois||initial.saisons), photoPiscine: initial.photoPiscine||"", prixPassageE: initial.prixPassageE||0, prixPassageC: initial.prixPassageC||0, notesTarifaires: initial.notesTarifaires||"" };
     }
     return {
       id: `C${String(clients.length+1).padStart(3,"0")}`,
       nom:"", tel:"", email:"", adresse:"", bassin:"Liner", volume:30,
-      formule:"VAC", prix:0, prixPassageE:0, prixPassageC:0, dateDebut:TODAY, photoPiscine:"",
+      formule:"VAC", prix:0, prixPassageE:0, prixPassageC:0, dateDebut:TODAY, photoPiscine:"", notesTarifaires:"",
       dateFin: `${new Date().getFullYear()+1}-03-31`,
       moisParMois: {...MOIS_PAR_MOIS_DEF},
     };
@@ -729,6 +739,41 @@ function FormClient({ initial, clients, onSave, onClose }) {
               })()}
             </div>
           </div>
+        </div>
+      </Section>
+      <Section title="📝 Notes tarifaires (optionnel)">
+        <div style={{fontSize:12,color:DS.mid,marginBottom:8,lineHeight:1.5}}>
+          Ces notes apparaîtront dans le contrat — ex: produits inclus, remise accordée, condition spéciale…
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {(f.notesTarifaires||"").split("\n").filter((_,i,a)=>i<a.length).map((line,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{color:DS.blue,fontWeight:700,flexShrink:0}}>•</span>
+              <input
+                value={line}
+                placeholder={i===0?"Ex: Produits de traitement inclus dans le forfait":"Ajouter une note…"}
+                onChange={e=>{
+                  const lines=(f.notesTarifaires||"").split("\n");
+                  lines[i]=e.target.value;
+                  set("notesTarifaires",lines.join("\n"));
+                }}
+                style={{flex:1,padding:"9px 12px",borderRadius:8,border:"1.5px solid "+DS.border,fontSize:13,outline:"none",color:DS.dark,fontFamily:"inherit"}}
+              />
+              {(f.notesTarifaires||"").split("\n").length>1&&(
+                <button onClick={()=>{
+                  const lines=(f.notesTarifaires||"").split("\n");
+                  lines.splice(i,1);
+                  set("notesTarifaires",lines.join("\n"));
+                }} style={{width:26,height:26,borderRadius:6,background:"#fff1f2",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  {Ico.close(10,DS.red)}
+                </button>
+              )}
+            </div>
+          ))}
+          <button onClick={()=>set("notesTarifaires",(f.notesTarifaires?f.notesTarifaires+"\n":""))}
+            style={{display:"flex",alignItems:"center",gap:6,padding:"8px 12px",borderRadius:8,background:DS.blueSoft,border:"1px solid "+DS.blue+"33",cursor:"pointer",fontSize:12,fontWeight:700,color:DS.blue,fontFamily:"inherit",alignSelf:"flex-start"}}>
+            {Ico.plus(11,DS.blue)} Ajouter une note
+          </button>
         </div>
       </Section>
       <div style={{display:"flex",gap:10}}>
@@ -1131,7 +1176,7 @@ function FormRdv({ initial, clients, onSave, onClose }) {
 }
 
 // FICHE CLIENT (avec diffrenciation Entretien/Contrle)
-function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[], contrats={}, onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
+function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[], contrats={}, onUpdateContrat, onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
   const [tab, setTab] = useState("infos");
   const [detailPassageFiche, setDetailPassageFiche] = useState(null);
   const [showFormLiv, setShowFormLiv] = useState(false);
@@ -1140,13 +1185,20 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
   const al = alerteClient(client, passages);
   const col = AC[al];
   const rdvClient = rdvs.filter(r=>r.clientId===client.id).sort((a,b)=>a.date.localeCompare(b.date));
+  const contractStart = client.dateDebut ? new Date(client.dateDebut) : null;
+  const contractEnd = client.dateFin ? new Date(client.dateFin) : null;
+  const inContract = (p) => {
+    if(contractStart && contractEnd){ const d=new Date(p.date); return d>=contractStart&&d<=contractEnd; }
+    return new Date(p.date).getFullYear()===YEAR_NOW;
+  };
   const passC = passages.filter(p=>p.clientId===client.id).sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const passContrat = passC.filter(inContract);
   const contratClient = Object.values(contrats).find(c=>c.clientId===client.id) || null;
   const totalE = totalAnnuel(client.moisParMois||client.saisons,"entretien");
   const totalC = totalAnnuel(client.moisParMois||client.saisons,"controle");
   const total = totalE + totalC;
-  const effE = passC.filter(p=>isEntretienType(p.type)).length;
-  const effC = passC.filter(p=>isControleType(p.type)).length;
+  const effE = passContrat.filter(p=>isEntretienType(p.type)).length;
+  const effC = passContrat.filter(p=>isControleType(p.type)).length;
   const eff = passC.length;
   const jours = daysUntil(client.dateFin);
   const moisCourant = MOIS_NOW;
@@ -1186,27 +1238,55 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
       </div>
 
       {/* Stats row */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginTop:14,marginBottom:12}}>
-        <div style={{textAlign:"center",padding:"8px 4px",borderRadius:8,background:"#f8fafc",border:"1px solid #e5e7eb"}}>
-          <div style={{fontSize:16,fontWeight:800,color:DS.blue,lineHeight:1}}>{effE}<span style={{fontSize:10,color:DS.mid,fontWeight:400}}>/{totalE}</span></div>
-          <div style={{fontSize:10,fontWeight:600,color:DS.mid,marginTop:2}}>Entretiens</div>
-          <div style={{height:2,background:"#e5e7eb",borderRadius:99,overflow:"hidden",marginTop:5,marginInline:4}}><div style={{height:"100%",width:`${totalE>0?Math.min(100,effE/totalE*100):0}%`,background:DS.blue,borderRadius:99}}/></div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginTop:14,marginBottom:14}}>
+        {/* Entretiens */}
+        <div style={{borderRadius:10,background:DS.white,border:"1px solid #e5e7eb",padding:"10px 8px",display:"flex",flexDirection:"column",gap:4}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <span style={{fontSize:9,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5}}>Entretiens</span>
+            <span style={{width:20,height:20,borderRadius:6,background:"#f0f9ff",display:"flex",alignItems:"center",justifyContent:"center"}}>🔧</span>
+          </div>
+          <div style={{fontSize:18,fontWeight:900,color:DS.blue,lineHeight:1}}>{effE}<span style={{fontSize:11,color:DS.mid,fontWeight:400}}>/{totalE}</span></div>
+          <div style={{height:3,background:"#e5e7eb",borderRadius:99,overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${totalE>0?Math.min(100,effE/totalE*100):0}%`,background:DS.blue,borderRadius:99,transition:"width .5s"}}/>
+          </div>
         </div>
-        <div style={{textAlign:"center",padding:"8px 4px",borderRadius:8,background:"#f8fafc",border:"1px solid #e5e7eb"}}>
-          <div style={{fontSize:16,fontWeight:800,color:DS.blue,lineHeight:1}}>{effC}<span style={{fontSize:10,color:DS.mid,fontWeight:400}}>/{totalC}</span></div>
-          <div style={{fontSize:10,fontWeight:600,color:DS.mid,marginTop:2}}>Contrôles</div>
-          <div style={{height:2,background:"#e5e7eb",borderRadius:99,overflow:"hidden",marginTop:5,marginInline:4}}><div style={{height:"100%",width:`${totalC>0?Math.min(100,effC/totalC*100):0}%`,background:DS.blue,borderRadius:99}}/></div>
+        {/* Contrôles */}
+        <div style={{borderRadius:10,background:DS.white,border:"1px solid #e5e7eb",padding:"10px 8px",display:"flex",flexDirection:"column",gap:4}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <span style={{fontSize:9,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5}}>Contrôles</span>
+            <span style={{width:20,height:20,borderRadius:6,background:"#f0f9ff",display:"flex",alignItems:"center",justifyContent:"center"}}>💧</span>
+          </div>
+          <div style={{fontSize:18,fontWeight:900,color:"#0e7490",lineHeight:1}}>{effC}<span style={{fontSize:11,color:DS.mid,fontWeight:400}}>/{totalC}</span></div>
+          <div style={{height:3,background:"#e5e7eb",borderRadius:99,overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${totalC>0?Math.min(100,effC/totalC*100):0}%`,background:"#0e7490",borderRadius:99,transition:"width .5s"}}/>
+          </div>
         </div>
-        <div style={{textAlign:"center",padding:"8px 4px",borderRadius:8,background:"#f8fafc",border:"1px solid #e5e7eb"}}>
-          <div style={{fontSize:16,fontWeight:800,color:pct>=100?DS.green:DS.dark,lineHeight:1}}>{pct}<span style={{fontSize:10,fontWeight:400}}>%</span></div>
-          <div style={{fontSize:10,fontWeight:600,color:DS.mid,marginTop:2}}>{rest>0?rest+" restants":"À jour"}</div>
+        {/* Avancement */}
+        <div style={{borderRadius:10,background:pct>=100?"#f0fdf4":rest>5?"#fffbeb":"#f0f9ff",border:"1px solid "+(pct>=100?"#86efac":rest>5?"#fde68a":"#bae6fd"),padding:"10px 8px",display:"flex",flexDirection:"column",gap:4}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <span style={{fontSize:9,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5}}>{rest>0?"Restants":"Avancement"}</span>
+            <span style={{fontSize:12}}>{pct>=100?"✅":rest>5?"⏳":"🔵"}</span>
+          </div>
+          <div style={{fontSize:18,fontWeight:900,color:pct>=100?DS.green:rest>5?"#b45309":DS.blue,lineHeight:1}}>
+            {rest>0?rest:pct}<span style={{fontSize:11,fontWeight:400,color:DS.mid}}>{rest>0?" pass.":"%"}</span>
+          </div>
+          <div style={{height:3,background:"#e5e7eb",borderRadius:99,overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${pct}%`,background:pct>=100?"#059669":"#0891b2",borderRadius:99,transition:"width .5s"}}/>
+          </div>
         </div>
-        <div style={{textAlign:"center",padding:"8px 4px",borderRadius:8,background:"#f8fafc",border:"1px solid #e5e7eb"}}>
+        {/* Mensualité */}
+        <div style={{borderRadius:10,background:DS.white,border:"1px solid #e5e7eb",padding:"10px 8px",display:"flex",flexDirection:"column",gap:4}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <span style={{fontSize:9,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5}}>Mensualité</span>
+            <span style={{width:20,height:20,borderRadius:6,background:"#f0fdf4",display:"flex",alignItems:"center",justifyContent:"center"}}>💶</span>
+          </div>
           {(()=>{
-            const {m1,m11,estRond} = calcMensualites(client.prix||0);
-            return estRond
-              ? <><div style={{fontSize:12,fontWeight:800,color:DS.blue,lineHeight:1}}>{m11}<span style={{fontSize:8}}>€</span></div><div style={{fontSize:9,fontWeight:600,color:DS.mid,marginTop:2}}>/ mois</div></>
-              : <><div style={{fontSize:11,fontWeight:800,color:DS.blue,lineHeight:1}}>{m11}<span style={{fontSize:8}}>€</span></div><div style={{fontSize:9,fontWeight:600,color:DS.mid,marginTop:1}}>×11 + <span style={{color:"#b45309"}}>{m1.toFixed(2)}€</span></div></>;
+            const {m1,m11,estRond}=calcMensualites(client.prix||0);
+            return <>
+              <div style={{fontSize:18,fontWeight:900,color:"#059669",lineHeight:1}}>{m11}<span style={{fontSize:11,fontWeight:400,color:DS.mid}}>€</span></div>
+              {!estRond&&<div style={{fontSize:9,color:"#b45309",fontWeight:600}}>1er: {m1}€</div>}
+              {estRond&&<div style={{fontSize:9,color:DS.mid}}>/ mois × 12</div>}
+            </>;
           })()}
         </div>
       </div>
@@ -1241,14 +1321,39 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
       )}
 
       {tab==="saisons" && <div className="fade-in">
-        <div style={{fontSize:15,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Calendrier — {MOIS_L[moisCourant]}</div>
+        {(()=>{
+          // Année de référence du contrat = année de dateDebut
+          // Si le contrat chevauche 2 années civiles, on filtre par la plage dateDebut→dateFin
+          const contractStart = client.dateDebut ? new Date(client.dateDebut) : null;
+          const contractEnd = client.dateFin ? new Date(client.dateFin) : null;
+          // Année de départ du contrat (ex: 2025 pour un contrat sept.2025→août.2026)
+          const contractYear = contractStart ? contractStart.getFullYear() : YEAR_NOW;
+          const label = contractStart && contractEnd
+            ? `${contractStart.toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})} → ${contractEnd.toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})}`
+            : MOIS_L[moisCourant];
+          return <>
+        <div style={{fontSize:12,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
+          📅 <span>{label}</span>
+        </div>
         <div style={{border:"1px solid "+DS.border,borderRadius:DS.radiusSm,overflow:"hidden"}}>
           {[1,2,3,4,5,6,7,8,9,10,11,12].map((m,i)=>{
             const mpm = client.moisParMois || client.saisons || {};
             const prevE = getEntretienMois(mpm, m);
             const prevC = getControleMois(mpm, m);
             const prevT = prevE + prevC;
-            const passM = passC.filter(p=>{ const d=new Date(p.date); return d.getMonth()+1===m && d.getFullYear()===YEAR_NOW; });
+            // Filtrer les passages dans la plage du contrat pour ce mois
+            const passM = passC.filter(p=>{
+              const d = new Date(p.date);
+              const dMois = d.getMonth()+1;
+              const dYear = d.getFullYear();
+              if (dMois !== m) return false;
+              // Si on a des dates de contrat, filtrer dans la plage
+              if (contractStart && contractEnd) {
+                return d >= contractStart && d <= contractEnd;
+              }
+              // Sinon fallback sur l'année civile courante
+              return dYear === YEAR_NOW;
+            });
             const doneE = passM.filter(p=>isEntretienType(p.type)).length;
             const doneC = passM.filter(p=>isControleType(p.type)).length;
             const rest = Math.max(0, prevT - doneE - doneC);
@@ -1275,6 +1380,8 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           <span style={{color:"#fff",fontSize:15,fontWeight:800}}>🔧 {totalE}  ·  💧 {totalC}  ·  {total} passages</span>
         </div>
         <div style={{marginTop:8,fontSize:15,color:DS.mid,display:"flex",alignItems:"center",gap:5}}>⭐ = passage non prévu au planning</div>
+          </>;
+        })()}
       </div>}
 
       {tab==="passages" && (
@@ -1477,7 +1584,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           );
         })()}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:8}}>
-          <button onClick={()=>ouvrirContrat(client, contratClient?.signaturePrestataire||"", contratClient?.signatureClient||"")} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,boxShadow:"0 2px 8px rgba(2,132,199,0.3)"}}>
+          <button onClick={()=>{ ouvrirContrat(client, contratClient?.signaturePrestataire||"", contratClient?.signatureClient||""); if(!contratClient?.statut && onUpdateContrat) onUpdateContrat("CT-"+client.id, { clientId:client.id, statut:"prepare" }); }} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,boxShadow:"0 2px 8px rgba(2,132,199,0.3)"}}>
             {Ico.contract(13,"#fff")} Contrat
           </button>
           <button onClick={()=>envoyerContratSignature(client)} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:contratClient?.statut==="signe_complet"?DS.greenSoft:contratClient?.statut==="signe_client"?DS.blueSoft:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
@@ -1781,6 +1888,14 @@ table td{padding:7px 12px;border:1px solid #e2e8f0;font-size:12px}
   </div>
   `}
 </div>
+${client.notesTarifaires ? `
+<div class="conditions" style="background:#f0f9ff;border-color:#bae6fd;">
+  <h3 style="color:#0891b2;">📝 Notes tarifaires particulières</h3>
+  <ul>
+    ${client.notesTarifaires.split("\n").filter(l=>l.trim()).map(l=>`<li style="color:#0e7490;font-weight:600;">${l.trim()}</li>`).join("")}
+  </ul>
+</div>
+` : ""}
 <div class="conditions">
   <h3>Conditions & Informations</h3>
   <ul>
@@ -3080,8 +3195,11 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
   const tachesMois = clients.map(c=>{
     const prevE = getEntretienMois(c.moisParMois||c.saisons, moisCourant);
     const prevC = getControleMois(c.moisParMois||c.saisons, moisCourant);
-    const effE = passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===moisCourant&&new Date(p.date).getFullYear()===YEAR_NOW&&isEntretienType(p.type)).length;
-    const effC = passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===moisCourant&&new Date(p.date).getFullYear()===YEAR_NOW&&isControleType(p.type)).length;
+    const cs = c.dateDebut ? new Date(c.dateDebut) : null;
+    const ce = c.dateFin ? new Date(c.dateFin) : null;
+    const inContrat = (d) => cs && ce ? d >= cs && d <= ce : d.getFullYear()===YEAR_NOW;
+    const effE = passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===moisCourant&&inContrat(new Date(p.date))&&isEntretienType(p.type)).length;
+    const effC = passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===moisCourant&&inContrat(new Date(p.date))&&isControleType(p.type)).length;
     const restE = Math.max(0,prevE-effE);
     const restC = Math.max(0,prevC-effC);
     return { client:c, prevE, prevC, effE, effC, restE, restC, total:restE+restC };
@@ -3269,42 +3387,67 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
 }
 
 // PAGE CLIENTS
-function PageClients({ clients, passages, onClientClick, onAdd }) {
+function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClientClick, onAdd }) {
   const [search, setSearch] = useState("");
   const isMobile = useIsMobile();
   const filtered = useMemo(()=>clients.filter(c=>c.nom.toLowerCase().includes(search.toLowerCase())||c.adresse?.toLowerCase().includes(search.toLowerCase())),[clients,search]);
   const totalAll = clients.length;
   const alertCount = clients.filter(c=>alerteClient(c,passages)!=="ok").length;
 
+  const CONTRAT_STATUTS = [
+    { key:"aucun",         label:"Aucun contrat",         color:"#9ca3af", bg:"#f9fafb", border:"#e5e7eb" },
+    { key:"cree",          label:"🆕 Contrat créé",       color:"#6366f1", bg:"#eef2ff", border:"#a5b4fc" },
+    { key:"prepare",       label:"📋 Contrat préparé",    color:"#6b7280", bg:"#f3f4f6", border:"#d1d5db" },
+    { key:"demande_envoyee",label:"📨 Contrat envoyé",    color:"#0891b2", bg:"#f0f9ff", border:"#bae6fd" },
+    { key:"signe_client",  label:"📝 En attente co-sign.", color:"#4f46e5", bg:"#eef2ff", border:"#a5b4fc" },
+    { key:"signe_complet", label:"✅ Contrat signé",      color:"#059669", bg:"#f0fdf4", border:"#86efac" },
+    { key:"renouveler",    label:"🔄 À renouveler",       color:"#b45309", bg:"#fef3c7", border:"#fcd34d" },
+    { key:"suspendu",      label:"⏸ Suspendu",            color:"#dc2626", bg:"#fff1f2", border:"#fda4af" },
+  ];
+
+  const [openPicker, setOpenPicker] = useState(null); // clientId du picker ouvert
+
+  const getContrat = (clientId) =>
+    contrats["CT-"+clientId]
+    || Object.values(contrats).find(c=>c.clientId===clientId)
+    || null;
+
+  const getStatutMeta = (clientId) => {
+    const ct = getContrat(clientId);
+    const key = ct?.statut || "aucun";
+    return CONTRAT_STATUTS.find(s=>s.key===key) || CONTRAT_STATUTS[0];
+  };
+
+  const setStatut = (clientId, key) => {
+    const contractId = "CT-"+clientId;
+    if (onUpdateContrat) onUpdateContrat(contractId, { clientId, statut: key });
+    setOpenPicker(null);
+  };
+
   return (
     <div>
-      {/* Stats bar */}
       <div style={{display:"flex",gap:8,marginBottom:14}}>
-        <div style={{flex:1,background:"#0891b2",borderRadius:DS.radiusSm,padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
-          <div style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.12)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.clients(18,"#fff")}</div>
-          <div><div style={{fontSize:20,fontWeight:900,color:"#fff"}}>{totalAll}</div><div style={{fontSize:10,color:"rgba(255,255,255,0.6)",fontWeight:600}}>Clients</div></div>
+        <div style={{flex:1,background:"#0891b2",borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:32,height:32,borderRadius:8,background:"rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.clients(16,"#fff")}</div>
+          <div><div style={{fontSize:18,fontWeight:800,color:"#fff"}}>{totalAll}</div><div style={{fontSize:10,color:"rgba(255,255,255,0.6)"}}>Clients</div></div>
         </div>
-        {alertCount>0&&<div style={{background:DS.redSoft,borderRadius:DS.radiusSm,padding:"12px 16px",display:"flex",alignItems:"center",gap:8,border:"1px solid #fca5a5"}}>
-          <div style={{width:36,height:36,borderRadius:10,background:DS.red+"18",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.alert(16,DS.red)}</div>
-          <div><div style={{fontSize:20,fontWeight:900,color:DS.red}}>{alertCount}</div><div style={{fontSize:10,color:DS.red,fontWeight:600}}>Alertes</div></div>
+        {alertCount>0&&<div style={{background:DS.white,borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8,border:"1px solid #fecaca"}}>
+          <div style={{width:32,height:32,borderRadius:8,background:"#fff1f2",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.alert(15,DS.red)}</div>
+          <div><div style={{fontSize:18,fontWeight:800,color:DS.red}}>{alertCount}</div><div style={{fontSize:11,color:DS.red,fontWeight:600}}>Alertes</div></div>
         </div>}
       </div>
-
-      {/* Search + Add */}
       <div style={{display:"flex",gap:10,marginBottom:14}}>
         <div style={{flex:1,position:"relative"}}>
           <div style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}>{Ico.search(16,"#94a3b8")}</div>
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher…"
-            style={{width:"100%",padding:"12px 14px 12px 40px",borderRadius:DS.radius,border:"1.5px solid "+DS.border,fontSize:13,outline:"none",boxSizing:"border-box",background:DS.white,color:DS.dark,fontFamily:"inherit"}}/>
+            style={{width:"100%",padding:"11px 14px 11px 40px",borderRadius:DS.radius,border:"1.5px solid "+DS.border,fontSize:13,outline:"none",boxSizing:"border-box",background:DS.white,color:DS.dark,fontFamily:"inherit"}}/>
         </div>
         <BtnPrimary onClick={onAdd} bg={DS.blue} icon={Ico.userPlus(14,"#fff")} style={{flexShrink:0,padding:"10px 16px",fontSize:13,borderRadius:DS.radiusSm}}>
           {!isMobile && "Nouveau"}
         </BtnPrimary>
       </div>
-
       {filtered.length===0&&<div style={{textAlign:"center",color:DS.mid,padding:40,fontSize:13}}>Aucun client trouvé</div>}
-
-      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+      <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:10}}>
         {filtered.map((c,idx)=>{
           const al=alerteClient(c,passages); const col=AC[al];
           const mpm=c.moisParMois||c.saisons||{};
@@ -3318,57 +3461,68 @@ function PageClients({ clients, passages, onClientClick, onAdd }) {
           return (
             <div key={c.id} onClick={()=>onClientClick(c)} className="fade-in card-hover"
               style={{animationDelay:`${idx*0.03}s`,background:DS.white,borderRadius:DS.radius,
-                overflow:"hidden",boxShadow:"0 1px 8px rgba(19,34,53,0.06), 0 4px 16px rgba(19,34,53,0.04)",
+                overflow:"hidden",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",
                 border:"1px solid "+DS.border,borderTop:"2px solid "+accentColor,
-                cursor:"pointer",width:"100%",boxSizing:"border-box"}}>
-              {/* Photo banner */}
-              {c.photoPiscine && (
-                <div style={{height:72,background:`url(${c.photoPiscine}) center/cover`,position:"relative"}}>
-                  <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,transparent 30%,rgba(12,18,34,0.5))"}}/>
+                cursor:"pointer",display:"flex",flexDirection:"column"}}>
+              {c.photoPiscine&&(
+                <div style={{height:72,background:`url(${c.photoPiscine}) center/cover`,position:"relative",flexShrink:0}}>
+                  <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,transparent 40%,rgba(0,0,0,0.35))"}}/>
                 </div>
               )}
-              <div style={{padding:"16px"}}>
-                {/* Header */}
-                <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
-                  <Avatar nom={c.nom} size={46} photo={c.photoPiscine?null:undefined}/>
+              <div style={{padding:"12px",flex:1,display:"flex",flexDirection:"column",gap:7}}>
+                <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
+                  <Avatar nom={c.nom} size={34}/>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontWeight:800,fontSize:15,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:-0.3}}>{c.nom}</div>
-                    <div style={{display:"flex",gap:6,marginTop:5,alignItems:"center",flexWrap:"wrap"}}>
-                      <span style={{background:"#f1f5f9",color:DS.mid,padding:"3px 10px",borderRadius:20,fontWeight:600,fontSize:12,border:"1px solid "+DS.border}}>{c.formule}</span>
-                      {c.bassin&&<span style={{background:DS.light,color:DS.mid,padding:"3px 8px",borderRadius:20,fontWeight:600,fontSize:11}}>{c.bassin}{c.volume?" · "+c.volume+"m³":""}</span>}
+                    <div style={{fontWeight:700,fontSize:13,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
+                    <div style={{display:"flex",gap:4,marginTop:3,flexWrap:"wrap"}}>
+                      <span style={{background:"#f1f5f9",color:DS.mid,padding:"1px 7px",borderRadius:20,fontWeight:600,fontSize:10,border:"1px solid "+DS.border}}>{c.formule}</span>
+                      {c.bassin&&<span style={{background:DS.light,color:DS.mid,padding:"1px 6px",borderRadius:20,fontWeight:500,fontSize:10}}>{c.bassin}</span>}
                     </div>
                   </div>
-                  <Tag color={col.tx} bg={col.bg} style={{fontSize:12,fontWeight:800,flexShrink:0}}>{col.lbl}</Tag>
+                  <Tag color={col.tx} bg={col.bg} style={{fontSize:9,fontWeight:700,flexShrink:0,padding:"2px 6px"}}>{col.lbl}</Tag>
                 </div>
-                {/* Adresse */}
-                {c.adresse&&<div style={{display:"flex",alignItems:"center",gap:5,fontSize:12,color:DS.mid,marginBottom:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                  {Ico.pin(11,DS.mid)} {c.adresse}
-                </div>}
-                {/* Stats */}
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:tot>0?10:0}}>
-                  <div style={{textAlign:"center",padding:"7px 4px",borderRadius:8,background:"#f8fafc",border:"1px solid "+DS.border}}>
-                    <div style={{fontSize:17,fontWeight:900,color:DS.blue,lineHeight:1}}>{eE}<span style={{fontSize:10,fontWeight:500,color:DS.mid}}>/{tE}</span></div>
-                    <div style={{fontSize:10,fontWeight:500,color:DS.mid,marginTop:2}}>Entretiens</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:3}}>
+                  <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"#f8fafc",border:"1px solid "+DS.border}}>
+                    <div style={{fontSize:13,fontWeight:800,color:DS.blue}}>{eE}<span style={{fontSize:9,color:DS.mid}}>/{tE}</span></div>
+                    <div style={{fontSize:9,color:DS.mid}}>Entret.</div>
                   </div>
-                  <div style={{textAlign:"center",padding:"7px 4px",borderRadius:8,background:"#f8fafc",border:"1px solid "+DS.border}}>
-                    <div style={{fontSize:17,fontWeight:900,color:DS.teal,lineHeight:1}}>{eC}<span style={{fontSize:10,fontWeight:500,color:DS.mid}}>/{tC}</span></div>
-                    <div style={{fontSize:10,fontWeight:500,color:DS.mid,marginTop:2}}>Contrôles</div>
+                  <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"#f8fafc",border:"1px solid "+DS.border}}>
+                    <div style={{fontSize:13,fontWeight:800,color:DS.teal}}>{eC}<span style={{fontSize:9,color:DS.mid}}>/{tC}</span></div>
+                    <div style={{fontSize:9,color:DS.mid}}>Contrôl.</div>
                   </div>
-                  <div style={{textAlign:"center",padding:"7px 4px",borderRadius:8,background:"#f8fafc",border:"1px solid "+DS.border}}>
-                    <div style={{fontSize:16,fontWeight:800,color:rest>0?"#b45309":DS.green,lineHeight:1}}>{rest}</div>
-                    <div style={{fontSize:10,fontWeight:500,color:DS.mid,marginTop:2}}>Restants</div>
+                  <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"#f8fafc",border:"1px solid "+DS.border}}>
+                    <div style={{fontSize:13,fontWeight:800,color:rest>0?"#b45309":DS.green}}>{pct}<span style={{fontSize:9,color:DS.mid}}>%</span></div>
+                    <div style={{fontSize:9,color:DS.mid}}>{rest>0?rest+" rest.":"À jour"}</div>
                   </div>
                 </div>
-                {/* Progress bar */}
-                {tot>0&&<div>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                    <span style={{fontSize:11,fontWeight:600,color:DS.mid}}>Progression</span>
-                    <span style={{fontSize:12,fontWeight:800,color:pct>=100?DS.green:rest>3?DS.orange:DS.blue}}>{pct}%</span>
-                  </div>
-                  <div style={{height:5,background:DS.light,borderRadius:99,overflow:"hidden"}}>
-                    <div style={{height:"100%",width:`${pct}%`,background:pct>=100?"linear-gradient(90deg,#059669,#34d399)":pct>=50?"linear-gradient(90deg,#0369a1,#38bdf8)":"linear-gradient(90deg,#d9773b,#fbbf24)",borderRadius:99,transition:"width .5s"}}/>
-                  </div>
+                {tot>0&&<div style={{height:3,background:DS.light,borderRadius:99,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${pct}%`,background:pct>=100?"#059669":pct>=50?"#0891b2":"#f59e0b",borderRadius:99}}/>
                 </div>}
+                {/* Badge statut contrat — cliquable */}
+                {(()=>{
+                  const meta = getStatutMeta(c.id);
+                  const isOpen = openPicker===c.id;
+                  return (
+                    <div style={{position:"relative"}}>
+                      <button onClick={e=>{e.stopPropagation();setOpenPicker(isOpen?null:c.id);}}
+                        style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"4px 8px",borderRadius:6,background:meta.bg,border:"1px solid "+meta.border,cursor:"pointer",fontFamily:"inherit"}}>
+                        <span style={{fontSize:10,fontWeight:700,color:meta.color}}>{meta.label}</span>
+                        <svg width={8} height={8} viewBox="0 0 24 24" fill="none" stroke={meta.color} strokeWidth="3" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+                      </button>
+                      {isOpen&&(
+                        <div onClick={e=>e.stopPropagation()} style={{position:"absolute",bottom:"calc(100% + 4px)",left:0,right:0,background:DS.white,borderRadius:8,boxShadow:"0 4px 20px rgba(0,0,0,0.15)",border:"1px solid "+DS.border,zIndex:50,overflow:"hidden"}}>
+                          {CONTRAT_STATUTS.map(s=>(
+                            <button key={s.key} onClick={()=>setStatut(c.id,s.key)}
+                              style={{width:"100%",display:"flex",alignItems:"center",gap:6,padding:"7px 10px",background:meta.key===s.key?s.bg:DS.white,border:"none",cursor:"pointer",fontFamily:"inherit",borderBottom:"1px solid "+DS.light}}>
+                              <span style={{fontSize:11,fontWeight:meta.key===s.key?700:500,color:meta.key===s.key?s.color:DS.dark}}>{s.label}</span>
+                              {meta.key===s.key&&<svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke={s.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft:"auto"}}><polyline points="20 6 9 17 4 12"/></svg>}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           );
@@ -3545,16 +3699,21 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
 
   return (
     <div>
-      <div style={{display:"flex",gap:6,marginBottom:14,background:DS.light,borderRadius:DS.radius,padding:4}}>
-        {[["semaine","7 jours",Ico.clock],[" mois","Ce mois",Ico.calendar],["tout","Tout",Ico.clipboard]].map(([v,l,ico])=>{
-          const key=v.trim(); const active=filter===key;
-          return (
-            <button key={key} onClick={()=>setFilter(key)} className="btn-hover" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"8px 4px",borderRadius:DS.radiusSm,border:"none",cursor:"pointer",fontFamily:"inherit",background:active?DS.white:"transparent",color:active?DS.dark:DS.mid,boxShadow:active?"0 1px 4px rgba(0,0,0,0.08)":"none",transition:"all .2s"}}>
-              <span style={{fontWeight:800,fontSize:16,color:active?DS.blue:DS.mid}}>{counts[key]}</span>
-              <span style={{fontSize:10,fontWeight:active?700:500}}>{l}</span>
-            </button>
-          );
-        })}
+      <div style={{display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
+        <div style={{display:"flex",gap:6,flex:1,background:DS.light,borderRadius:DS.radius,padding:4}}>
+          {[["semaine","7 jours",Ico.clock],[" mois","Ce mois",Ico.calendar],["tout","Tout",Ico.clipboard]].map(([v,l,ico])=>{
+            const key=v.trim(); const active=filter===key;
+            return (
+              <button key={key} onClick={()=>setFilter(key)} className="btn-hover" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"8px 4px",borderRadius:DS.radiusSm,border:"none",cursor:"pointer",fontFamily:"inherit",background:active?DS.white:"transparent",color:active?DS.dark:DS.mid,boxShadow:active?"0 1px 4px rgba(0,0,0,0.08)":"none",transition:"all .2s"}}>
+                <span style={{fontWeight:800,fontSize:16,color:active?DS.blue:DS.mid}}>{counts[key]}</span>
+                <span style={{fontSize:10,fontWeight:active?700:500}}>{l}</span>
+              </button>
+            );
+          })}
+        </div>
+        <BtnPrimary onClick={onAdd} bg={DS.blue} icon={Ico.plus(14,"#fff")} style={{flexShrink:0,padding:"10px 14px",fontSize:13,borderRadius:DS.radiusSm}}>
+          Nouveau
+        </BtnPrimary>
       </div>
       {filtered.length===0
         ? <div style={{textAlign:"center",color:DS.mid,padding:40,fontSize:13}}>Aucun passage sur cette période</div>
@@ -3818,7 +3977,9 @@ export default function App() {
   const [rdvs, setRdvs] = useState([]);
   const [stock, setStock] = useState({});
   const [showStock, setShowStock] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [contrats, setContrats] = useState({});
+  const [initialLoaded, setInitialLoaded] = useState(false);
   const [ready, setReady] = useState(false);
   const [ficheClient, setFicheClient] = useState(null);
   const [showFormClient, setShowFormClient] = useState(false);
@@ -3839,25 +4000,35 @@ export default function App() {
   useEffect(()=>{
     if(!loggedIn) return;
     (async()=>{
-      const c = await load("bb_clients_v2", CLIENTS_INIT);
-      const passages_data = await load("bb_passages_v2", PASSAGES_INIT);
-      const l = await load("bb_livraisons_v1", []);
-      const r = await load("bb_rdvs_v1", []);
-      const s = await load("bb_stock_v1", Object.fromEntries(PRODUITS_DEFAUT.map(nom=>[nom,0])));
-      const ct = await load("bb_contrats_v1", {});
-      const sWithDefaults = {...Object.fromEntries(PRODUITS_DEFAUT.map(nom=>[nom, s[nom]??0])), ...s};
-// Migrate saisons format for existing clients
-      const cMigrated = c.map(cl => ({...cl, moisParMois: migrateMois(cl.moisParMois||cl.saisons), photoPiscine: cl.photoPiscine||"", prixPassageE: cl.prixPassageE||0, prixPassageC: cl.prixPassageC||0}));
-      setClients(cMigrated); setPassages(passages_data); setLivraisons(l); setRdvs(r); setStock(sWithDefaults); setContrats(ct); setReady(true);
+      const c = await load("bb_clients_v2", null);
+      const passages_data = await load("bb_passages_v2", null);
+      const l = await load("bb_livraisons_v1", null);
+      const r = await load("bb_rdvs_v1", null);
+      const s = await load("bb_stock_v1", null);
+      const ct = await load("bb_contrats_v1", null);
+
+      // null = clé absente de Supabase (première fois) → utiliser données initiales
+      // valeur présente = toujours utiliser les données Supabase
+      const clientsData = c !== null ? c : CLIENTS_INIT;
+      const passagesData = passages_data !== null ? passages_data : PASSAGES_INIT;
+      const livraisonsData = l !== null ? l : [];
+      const rdvsData = r !== null ? r : [];
+      const stockData = s !== null ? s : {};
+      const contratsData = ct !== null ? ct : {};
+      const sWithDefaults = {...Object.fromEntries(PRODUITS_DEFAUT.map(nom=>[nom,0])), ...stockData};
+
+      const cMigrated = clientsData.map(cl => ({...cl, moisParMois: migrateMois(cl.moisParMois||cl.saisons), photoPiscine: cl.photoPiscine||"", prixPassageE: cl.prixPassageE||0, prixPassageC: cl.prixPassageC||0}));
+      setClients(cMigrated); setPassages(passagesData); setLivraisons(livraisonsData); setRdvs(rdvsData); setStock(sWithDefaults); setContrats(contratsData); setReady(true); setInitialLoaded(true);
     })();
   },[loggedIn]);
 
-  useEffect(()=>{ if(ready) save("bb_clients_v2", clients); },[clients,ready]);
-  useEffect(()=>{ if(ready) save("bb_passages_v2", passages); },[passages,ready]);
-  useEffect(()=>{ if(ready) save("bb_livraisons_v1", livraisons); },[livraisons,ready]);
-  useEffect(()=>{ if(ready) save("bb_rdvs_v1", rdvs); },[rdvs,ready]);
-  useEffect(()=>{ if(ready) save("bb_stock_v1", stock); },[stock,ready]);
-  useEffect(()=>{ if(ready) save("bb_contrats_v1", contrats); },[contrats,ready]);
+  // Sauvegarde MANUELLE uniquement — jamais automatique au chargement
+  const saveClients   = useCallback((data) => save("bb_clients_v2",    data), []);
+  const savePassages  = useCallback((data) => save("bb_passages_v2",   data), []);
+  const saveLivraisonsList = useCallback((data) => save("bb_livraisons_v1", data), []);
+  const saveRdvsList  = useCallback((data) => save("bb_rdvs_v1",       data), []);
+  const saveStock     = useCallback((data) => save("bb_stock_v1",      data), []);
+  const saveContrats  = useCallback((data) => save("bb_contrats_v1",   data), []);
 
   // Polling toutes les 10s pour détecter nouvelles signatures
   useEffect(()=>{
@@ -3899,34 +4070,49 @@ export default function App() {
   const handleLogin = useCallback(()=>{ try{sessionStorage.setItem("bb_auth","1");}catch{} setLoggedIn(true); },[]);
   const handleLogout = useCallback(()=>{ try{sessionStorage.removeItem("bb_auth");}catch{} setLoggedIn(false);setReady(false);setClients([]);setPassages([]);setLivraisons([]);setRdvs([]); },[]);
 
-  const saveClient = useCallback(c=>{ setClients(prev=>prev.find(x=>x.id===c.id)?prev.map(x=>x.id===c.id?c:x):[...prev,c]); setShowFormClient(false);setEditClient(null);setFicheClient(c); },[]);
-  const deleteClient = useCallback(id=>{ if(!confirm("Supprimer ce client ?"))return; setClients(prev=>prev.filter(x=>x.id!==id)); setPassages(prev=>prev.filter(x=>x.clientId!==id)); setFicheClient(null); },[]);
-  const savePassage = useCallback(p=>{ setPassages(prev=>prev.find(x=>x.id===p.id)?prev.map(x=>x.id===p.id?p:x):[...prev,p]); setShowFormPassage(false);setEditPassage(null); },[]);
+  const saveClient = useCallback(c=>{ setClients(prev=>{ const next=prev.find(x=>x.id===c.id)?prev.map(x=>x.id===c.id?c:x):[...prev,c]; saveClients(next); return next; }); setShowFormClient(false);setEditClient(null);setFicheClient(c); },[saveClients]);
+  const deleteClient = useCallback(id=>{ if(!confirm("Supprimer ce client ?"))return; setClients(prev=>{ const next=prev.filter(x=>x.id!==id); saveClients(next); return next; }); setPassages(prev=>{ const next=prev.filter(x=>x.clientId!==id); savePassages(next); return next; }); setFicheClient(null); },[saveClients,savePassages]);
+  const savePassage = useCallback(p=>{ setPassages(prev=>{ const next=prev.find(x=>x.id===p.id)?prev.map(x=>x.id===p.id?p:x):[...prev,p]; savePassages(next); return next; }); setShowFormPassage(false);setEditPassage(null); },[savePassages]);
   const updatePassageRapportStatus = useCallback((passageMaj) => {
     setPassages(prev => prev.map(x => x.id === passageMaj.id ? { ...x, ...passageMaj } : x));
   }, []);
-  const deletePassage = useCallback(id=>setPassages(prev=>prev.filter(x=>x.id!==id)),[]);
+  const deletePassage = useCallback(id=>{ setPassages(prev=>{ const next=prev.filter(x=>x.id!==id); savePassages(next); return next; }); },[savePassages]);
   const openAddPassageFromClient = useCallback(cid=>{ setEditPassage(null);setDefaultClientId(cid);setShowFormPassage(true); },[]);
   const openEditPassage = useCallback(p=>{ setEditPassage(p);setDefaultClientId(p.clientId);setShowFormPassage(true); },[]);
   const saveLivraison = useCallback(l=>{ 
-    setLivraisons(prev=>prev.find(x=>x.id===l.id)?prev.map(x=>x.id===l.id?l:x):[...prev,l]);
+    setLivraisons(prev=>{ const next=prev.find(x=>x.id===l.id)?prev.map(x=>x.id===l.id?l:x):[...prev,l]; saveLivraisonsList(next); return next; });
     // Déduire du stock les produits livrés
     if (l.produits?.length > 0) {
       setStock(prev => {
         const next = {...prev};
         l.produits.forEach(p => { if(next[p] !== undefined) next[p] = Math.max(0, (next[p]||0) - 1); });
+        saveStock(next);
         return next;
       });
     }
-  },[]);
-  const deleteLivraison = useCallback(id=>setLivraisons(prev=>prev.filter(x=>x.id!==id)),[]);
-  const updateStatutLivraison = useCallback((id,statut)=>{ setLivraisons(prev=>prev.map(x=>x.id===id?{...x,statut}:x)); },[]);
-  const updateStock = useCallback((produit, qty) => setStock(prev=>({...prev,[produit]:qty})),[]);
-  const addProduitStock = useCallback((nom) => setStock(prev=>({...prev,[nom]: prev[nom]??0})),[]);
-  const deleteProduitStock = useCallback((nom) => setStock(prev=>{ const n={...prev}; delete n[nom]; return n; }),[]);
+  },[saveLivraisonsList, saveStock]);
+  const deleteLivraison = useCallback(id=>{ setLivraisons(prev=>{ const next=prev.filter(x=>x.id!==id); saveLivraisonsList(next); return next; }); },[saveLivraisonsList]);
+  const updateStatutLivraison = useCallback((id,statut)=>{ setLivraisons(prev=>{ const next=prev.map(x=>x.id===id?{...x,statut}:x); saveLivraisonsList(next); return next; }); },[saveLivraisonsList]);
+  const updateStock = useCallback((produit, qty) => { setStock(prev=>{ const next={...prev,[produit]:qty}; saveStock(next); return next; }); },[saveStock]);
+  const addProduitStock = useCallback((nom) => { setStock(prev=>{ const next={...prev,[nom]:prev[nom]??0}; saveStock(next); return next; }); },[saveStock]);
+  const deleteProduitStock = useCallback((nom) => { setStock(prev=>{ const n={...prev}; delete n[nom]; saveStock(n); return n; }); },[saveStock]);
   const nbStockBas = useMemo(()=>Object.values(stock).filter(q=>q<=2).length,[stock]);
-  const saveRdv = useCallback(r=>{ setRdvs(prev=>prev.find(x=>x.id===r.id)?prev.map(x=>x.id===r.id?r:x):[...prev,r]); setShowFormRdv(false);setEditRdv(null); },[]);
-  const deleteRdv = useCallback(id=>setRdvs(prev=>prev.filter(x=>x.id!==id)),[]);
+  const handleImport = useCallback((newClients, newPassages) => {
+    setClients(prev => {
+      const next = [...prev, ...newClients];
+      saveClients(next);
+      return next;
+    });
+    setPassages(prev => {
+      const next = [...prev, ...newPassages];
+      savePassages(next);
+      return next;
+    });
+    setShowImport(false);
+  }, [saveClients, savePassages]);
+
+  const saveRdv = useCallback(r=>{ setRdvs(prev=>{ const next=prev.find(x=>x.id===r.id)?prev.map(x=>x.id===r.id?r:x):[...prev,r]; saveRdvsList(next); return next; }); setShowFormRdv(false);setEditRdv(null); },[saveRdvsList]);
+  const deleteRdv = useCallback(id=>{ setRdvs(prev=>{ const next=prev.filter(x=>x.id!==id); saveRdvsList(next); return next; }); },[saveRdvsList]);
 
   const openAddClient = useCallback(()=>{ setEditClient(null); setShowFormClient(true); },[]);
 
@@ -3976,6 +4162,10 @@ export default function App() {
         </button>
         <div style={{flex:1}} />
         <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+          {/* Import Connecteam */}
+          <button onClick={()=>setShowImport(true)} title="Import Connecteam" style={{width:34,height:34,borderRadius:8,background:"rgba(255,255,255,0.15)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </button>
           {/* Stock */}
           <button onClick={()=>setShowStock(true)} className="btn-hover" title="Stock produits" style={{position:"relative",width:34,height:34,borderRadius:8,background:"rgba(255,255,255,0.15)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
             {Ico.cart(16,"rgba(255,255,255,0.85)")}
@@ -4011,7 +4201,7 @@ export default function App() {
           </div>
           <div style={{padding:"6px 16px 110px",overflowX:"hidden"}}>
             {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}}/>}
-            {page==="clients"&&<PageClients clients={clients} passages={passages} onClientClick={setFicheClient} onAdd={openAddClient}/>}
+            {page==="clients"&&<PageClients clients={clients} passages={passages} contrats={contrats} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onClientClick={setFicheClient} onAdd={openAddClient}/>}
             {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus}/>}
             {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
           </div>
@@ -4056,7 +4246,7 @@ export default function App() {
                 {page==="dashboard"&&<p style={{margin:"2px 0 0",color:DS.mid,fontSize:13,fontWeight:500}}>Aujourd'hui tâchons de ne rien oublier ;)</p>}
               </div>
               {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}}/>}
-              {page==="clients"&&<PageClients clients={clients} passages={passages} onClientClick={setFicheClient} onAdd={openAddClient}/>}
+              {page==="clients"&&<PageClients clients={clients} passages={passages} contrats={contrats} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onClientClick={setFicheClient} onAdd={openAddClient}/>}
               {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus}/>}
               {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
             </div>
@@ -4080,13 +4270,14 @@ export default function App() {
       {/* MODALS */}
       {ficheClient&&(()=>{
         const latest=clients.find(c=>c.id===ficheClient.id)||ficheClient;
-        return <FicheClient client={latest} passages={passages} livraisons={livraisons.filter(l=>l.clientId===latest.id)} rdvs={rdvs} produitsStock={Object.keys(stock)} contrats={contrats} onSaveLivraison={saveLivraison} onDeleteLivraison={deleteLivraison} onUpdateStatutLivraison={updateStatutLivraison} onClose={()=>setFicheClient(null)} onEdit={()=>{setEditClient(latest);setShowFormClient(true);setFicheClient(null);}} onDelete={()=>deleteClient(latest.id)} onAddPassage={()=>openAddPassageFromClient(latest.id)} onEditPassage={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddRdv={()=>{setEditRdv({clientId:latest.id});setShowFormRdv(true);}} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} onDeleteRdv={deleteRdv}/>;
+        return <FicheClient client={latest} passages={passages} livraisons={livraisons.filter(l=>l.clientId===latest.id)} rdvs={rdvs} produitsStock={Object.keys(stock)} contrats={contrats} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onSaveLivraison={saveLivraison} onDeleteLivraison={deleteLivraison} onUpdateStatutLivraison={updateStatutLivraison} onClose={()=>setFicheClient(null)} onEdit={()=>{setEditClient(latest);setShowFormClient(true);setFicheClient(null);}} onDelete={()=>deleteClient(latest.id)} onAddPassage={()=>openAddPassageFromClient(latest.id)} onEditPassage={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddRdv={()=>{setEditRdv({clientId:latest.id});setShowFormRdv(true);}} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} onDeleteRdv={deleteRdv}/>;
       })()}
 
       {showFormClient&&<FormClient initial={editClient} clients={clients} onSave={saveClient} onClose={()=>{setShowFormClient(false);setEditClient(null);}}/>}
       {showFormPassage&&<FormPassage clients={clients} defaultClientId={defaultClientId} initial={editPassage} onSave={p=>savePassage(p)} onSaveLivraison={saveLivraison} produitsStock={Object.keys(stock)} onClose={()=>{setShowFormPassage(false);setEditPassage(null);}}/>}
       {showFormLivraison&&<FormLivraison clientId={defaultLivraisonClientId} clients={clients} produitsStock={Object.keys(stock)} onSave={l=>{saveLivraison(l);setShowFormLivraison(false);}} onClose={()=>setShowFormLivraison(false)}/>}
       {showFormRdv&&<FormRdv initial={editRdv} clients={clients} onSave={saveRdv} onClose={()=>{setShowFormRdv(false);setEditRdv(null);}}/>}
+      {showImport&&<ModalImportConnecteam clients={clients} onImport={handleImport} onClose={()=>setShowImport(false)}/>}
       {showStock&&<ModalStock stock={stock} onClose={()=>setShowStock(false)} onUpdateStock={updateStock} onAddProduit={addProduitStock} onDeleteProduit={deleteProduitStock}/>}
 
       {/* MODAL ALERTES */}
@@ -4160,5 +4351,235 @@ export default function App() {
       })()}
     </div>
     </>
+  );
+}
+// ================================================================
+// IMPORT CONNECTEAM
+// ================================================================
+function ModalImportConnecteam({ clients, onImport, onClose }) {
+  const [status, setStatus] = useState("idle"); // idle | parsing | preview | importing | done
+  const [rows, setRows] = useState([]);
+  const [errors, setErrors] = useState([]);
+  const [selected, setSelected] = useState([]);
+  const isMobile = useIsMobile();
+
+  // Mapping colonnes Connecteam → champs passage BRIBLUE
+  const mapRow = (row, clientId) => {
+    const date = row[4] ? new Date(row[4]).toISOString().split("T")[0] : new Date(row[2]).toISOString().split("T")[0];
+    const photos = [row[8],row[9],row[10],row[11],row[12],row[13],row[14],row[15]].filter(v=>v&&v!=="Image"&&v!=="None");
+    const photosDepart = [row[39],row[40],row[41],row[42],row[43],row[44],row[45],row[46]].filter(v=>v&&v!=="Image"&&v!=="None");
+    const mapType = (t) => {
+      if (!t) return "Entretien complet";
+      const tl = String(t).toLowerCase();
+      if (tl.includes("complet") || tl.includes("nettoyage")) return "Entretien complet";
+      if (tl.includes("contrôle") || tl.includes("controle") || tl.includes("visite")) return "Contrôle de l'eau";
+      if (tl.includes("sav") || tl.includes("dépann")) return "SAV";
+      if (tl.includes("hivern")) return "Hivernage";
+      if (tl.includes("remise")) return "Remise en service";
+      return "Entretien complet";
+    };
+    const mapOuiNon = (v) => { if (!v) return null; const s=String(v).toLowerCase(); if(s==="oui"||s==="yes"||s==="true") return true; if(s==="non"||s==="no"||s==="false") return false; return null; };
+    return {
+      id: uid(),
+      clientId,
+      date,
+      tech: row[7] || "Dorian",
+      type: mapType(row[16]),
+      tSel: row[17]||"", tPhosphate: row[18]||"", tStabilisant: row[19]||"", tChlore: row[20]||"", tPH: row[21]||"",
+      qualiteEau: row[22]||"",
+      etatFond: row[23] ? [row[23]] : [],
+      etatParois: row[24] ? [row[24]] : [],
+      etatLocal: row[25] ? [row[25]] : [],
+      etatBacTampon: row[26] ? [row[26]] : [],
+      etatVoletBac: row[27] ? [row[27]] : [],
+      corrChlore: row[28]||"", corrPhosphate: row[29]||"", corrPH: row[30]||"", corrSel: row[31]||"",
+      corrAlgicide: row[32]||"", corrPeroxyde: row[33]||"", corrChloreChoc: row[34]||"", corrAutre: row[35]||"",
+      devis: mapOuiNon(row[36]), priseEchantillon: mapOuiNon(row[37]),
+      commentaires: row[38]||"",
+      photoArrivee: photos[0]||"",
+      photos: photos.slice(1),
+      photoDepart: photosDepart[0]||"",
+      photosDepart: photosDepart.slice(1),
+      livraisonProduits: mapOuiNon(row[54]),
+      produitsLivres: row[55] ? String(row[55]).split(",").map(s=>s.trim()).filter(Boolean) : [],
+      livraisonAutre: row[56]||"",
+      ressenti: Number(row[57])||0,
+      signatureTech: row[58]&&row[58]!=="Image"?row[58]:"",
+      chloreLibre:"", ph:"", alcalinite:"", stabilisant:"",
+      stabilisantHaut: false, presenceClient: null,
+      ok: true, rapportStatut: "cree",
+    };
+  };
+
+  const parseFile = (file) => {
+    setStatus("parsing");
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        // Utilise SheetJS (XLSX) chargé en CDN
+        const XLSX = window.XLSX;
+        if (!XLSX) { setErrors(["SheetJS non chargé — rechargez la page"]); setStatus("idle"); return; }
+        const wb = XLSX.read(e.target.result, {type:"array", cellDates:true});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
+        if (data.length < 2) { setErrors(["Fichier vide"]); setStatus("idle"); return; }
+        const headers = data[0];
+        const dataRows = data.slice(1).filter(r => r.some(v=>v));
+        
+        // Matcher les clients
+        const parsed = dataRows.map((row, i) => {
+          const nomConnecteam = String(row[6] || row[5] || "").trim().toLowerCase();
+          const matched = clients.find(c => {
+            const nc = c.nom.toLowerCase();
+            return nc === nomConnecteam || nc.includes(nomConnecteam) || nomConnecteam.includes(nc) ||
+              nc.replace(/[^a-z]/g,"").includes(nomConnecteam.replace(/[^a-z]/g,"").slice(0,6));
+          });
+          return { row, nomConnecteam: String(row[6]||row[5]||"").trim(), matched, idx: i };
+        });
+        setRows(parsed);
+        setSelected(parsed.map((_,i)=>i));
+        setStatus("preview");
+      } catch(err) {
+        setErrors([String(err)]);
+        setStatus("idle");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const doImport = () => {
+    setStatus("importing");
+    const newClients = [];
+    const newPassages = [];
+    const clientMap = {};
+
+    selected.forEach(i => {
+      const {row, nomConnecteam, matched} = rows[i];
+      let clientId;
+      if (matched) {
+        clientId = matched.id;
+      } else {
+        // Créer client si pas déjà créé dans ce batch
+        if (clientMap[nomConnecteam]) {
+          clientId = clientMap[nomConnecteam];
+        } else {
+          const newC = {
+            id: uid(),
+            nom: String(row[6]||row[5]||"Inconnu").trim(),
+            tel:"", email:"", adresse:"", bassin:"Liner", volume:0,
+            formule:"VAC", prix:0, prixPassageE:0, prixPassageC:0,
+            dateDebut: new Date().toISOString().split("T")[0],
+            dateFin: `${new Date().getFullYear()+1}-03-31`,
+            photoPiscine:"", notesTarifaires:"",
+            moisParMois: {...Array.from({length:12},(_,i)=>i+1).reduce((a,m)=>({...a,[m]:{entretien:0,controle:0}}),{})},
+          };
+          newClients.push(newC);
+          clientMap[nomConnecteam] = newC.id;
+          clientId = newC.id;
+        }
+      }
+      const passage = mapRow(row, clientId);
+      newPassages.push(passage);
+    });
+
+    onImport(newClients, newPassages);
+    setStatus("done");
+  };
+
+  const unmatchedCount = rows.filter((_,i)=>selected.includes(i)&&!rows[i].matched).length;
+
+  return (
+    <Modal title="📥 Import Connecteam" onClose={onClose} wide>
+      {/* Chargement SheetJS */}
+      
+
+      {status==="idle"&&(
+        <div style={{display:"flex",flexDirection:"column",gap:16}}>
+          <div style={{padding:"20px",borderRadius:12,border:"2px dashed "+DS.border,background:DS.light,textAlign:"center"}}>
+            <div style={{fontSize:32,marginBottom:8}}>📊</div>
+            <div style={{fontWeight:700,fontSize:15,color:DS.dark,marginBottom:4}}>Fichier Excel Connecteam</div>
+            <div style={{fontSize:13,color:DS.mid,marginBottom:16}}>Glisse le fichier ou clique pour sélectionner</div>
+            <label style={{display:"inline-flex",alignItems:"center",gap:8,padding:"10px 20px",borderRadius:10,background:DS.blue,color:"#fff",cursor:"pointer",fontSize:14,fontWeight:700}}>
+              📂 Choisir le fichier .xlsx
+              <input type="file" accept=".xlsx,.xls" style={{display:"none"}} onChange={e=>e.target.files[0]&&parseFile(e.target.files[0])}/>
+            </label>
+          </div>
+          {errors.map((e,i)=><div key={i} style={{padding:"10px 14px",background:DS.redSoft,borderRadius:8,color:DS.red,fontSize:13}}>{e}</div>)}
+        </div>
+      )}
+
+      {status==="parsing"&&(
+        <div style={{textAlign:"center",padding:40}}>
+          <div style={{fontSize:32,marginBottom:12}}>⏳</div>
+          <div style={{fontWeight:700,color:DS.dark}}>Lecture en cours…</div>
+        </div>
+      )}
+
+      {status==="preview"&&(
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",borderRadius:10,background:DS.blueSoft,border:"1px solid "+DS.border}}>
+            <span style={{fontWeight:700,fontSize:14,color:DS.blue}}>{rows.length} passages trouvés</span>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>setSelected(rows.map((_,i)=>i))} style={{fontSize:12,fontWeight:700,color:DS.blue,background:"none",border:"none",cursor:"pointer"}}>Tout sélect.</button>
+              <button onClick={()=>setSelected([])} style={{fontSize:12,fontWeight:700,color:DS.mid,background:"none",border:"none",cursor:"pointer"}}>Tout désél.</button>
+            </div>
+          </div>
+          {unmatchedCount>0&&(
+            <div style={{padding:"10px 14px",background:"#fef3c7",borderRadius:8,border:"1px solid #fcd34d",fontSize:13,color:"#92400e"}}>
+              ⚠️ <strong>{unmatchedCount} client(s) non trouvé(s)</strong> — seront créés automatiquement
+            </div>
+          )}
+          <div style={{maxHeight:360,overflowY:"auto",display:"flex",flexDirection:"column",gap:4}}>
+            {rows.map((r,i)=>{
+              const sel = selected.includes(i);
+              return (
+                <label key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderRadius:8,cursor:"pointer",background:sel?DS.white:DS.light,border:"1.5px solid "+(sel?DS.border:"transparent")}}>
+                  <input type="checkbox" checked={sel} onChange={()=>setSelected(p=>p.includes(i)?p.filter(x=>x!==i):[...p,i])} style={{accentColor:DS.blue,width:14,height:14,flexShrink:0}}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                      <span style={{fontWeight:700,fontSize:13,color:DS.dark}}>{r.nomConnecteam||"—"}</span>
+                      {r.matched
+                        ? <span style={{fontSize:10,fontWeight:700,color:DS.green,background:DS.greenSoft,padding:"1px 6px",borderRadius:4}}>✓ {r.matched.nom}</span>
+                        : <span style={{fontSize:10,fontWeight:700,color:"#b45309",background:"#fef3c7",padding:"1px 6px",borderRadius:4}}>+ Nouveau client</span>
+                      }
+                    </div>
+                    <div style={{fontSize:11,color:DS.mid}}>
+                      {r.row[4]?new Date(r.row[4]).toLocaleDateString("fr"):"—"} · {r.row[16]||"Type ?"}
+                    </div>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+          <div style={{display:"flex",gap:10,paddingTop:8,borderTop:"1px solid "+DS.border}}>
+            <button onClick={()=>setStatus("idle")} style={{flex:1,padding:"11px",borderRadius:DS.radiusSm,background:DS.light,border:"1px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:13,color:DS.mid,fontFamily:"inherit"}}>
+              ← Retour
+            </button>
+            <button onClick={doImport} disabled={selected.length===0}
+              style={{flex:2,padding:"11px",borderRadius:DS.radiusSm,background:selected.length>0?DS.blue:"#9ca3af",border:"none",cursor:selected.length>0?"pointer":"default",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit"}}>
+              Importer {selected.length} passage{selected.length!==1?"s":""}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {status==="importing"&&(
+        <div style={{textAlign:"center",padding:40}}>
+          <div style={{fontSize:32,marginBottom:12}}>💾</div>
+          <div style={{fontWeight:700,color:DS.dark}}>Import en cours…</div>
+        </div>
+      )}
+
+      {status==="done"&&(
+        <div style={{textAlign:"center",padding:32,display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
+          <div style={{fontSize:48}}>✅</div>
+          <div style={{fontWeight:800,fontSize:16,color:DS.green}}>Import terminé !</div>
+          <div style={{fontSize:13,color:DS.mid}}>{selected.length} passages importés</div>
+          <button onClick={onClose} style={{marginTop:8,padding:"11px 24px",borderRadius:DS.radiusSm,background:DS.blue,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#fff",fontFamily:"inherit"}}>
+            Fermer
+          </button>
+        </div>
+      )}
+    </Modal>
   );
 }
