@@ -248,20 +248,27 @@ function alerteClient(c, passages) {
     return new Date(p.date).getFullYear() === yearCur;
   });
 
-  // Vérifier les mois PASSÉS (avant ce mois) — s'il manque des passages → Retard
+  // Vérifier les mois PASSÉS (avant ce mois) dans l'année du contrat — s'il manque des passages → Retard
+  const csYear = cs ? parseInt(cs.slice(0,4)) : yearCur;
   let retard = false;
   for (let m = 1; m < moisCur; m++) {
     const prev = (mpm[m]?.entretien||0) + (mpm[m]?.controle||0);
     if (prev === 0) continue;
-    const eff = passContrat.filter(p => new Date(p.date).getMonth()+1 === m).length;
+    const eff = passContrat.filter(p => {
+      const d = new Date(p.date);
+      return d.getMonth()+1 === m && d.getFullYear() === csYear;
+    }).length;
     if (eff < prev) { retard = true; break; }
   }
   if (retard) return "orange";
 
-  // Vérifier le mois EN COURS — s'il reste des passages → À faire
+  // Vérifier le mois EN COURS dans l'année du contrat
   const prevCur = (mpm[moisCur]?.entretien||0) + (mpm[moisCur]?.controle||0);
   if (prevCur > 0) {
-    const effCur = passContrat.filter(p => new Date(p.date).getMonth()+1 === moisCur).length;
+    const effCur = passContrat.filter(p => {
+      const d = new Date(p.date);
+      return d.getMonth()+1 === moisCur && d.getFullYear() === csYear;
+    }).length;
     if (effCur < prevCur) return "aFaire";
   }
 
