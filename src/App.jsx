@@ -3312,42 +3312,54 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
 }
 
 // PAGE CLIENTS
-function PageClients({ clients, passages, onClientClick, onAdd }) {
+function PageClients({ clients, passages, contrats={}, onClientClick, onAdd }) {
   const [search, setSearch] = useState("");
   const isMobile = useIsMobile();
   const filtered = useMemo(()=>clients.filter(c=>c.nom.toLowerCase().includes(search.toLowerCase())||c.adresse?.toLowerCase().includes(search.toLowerCase())),[clients,search]);
   const totalAll = clients.length;
   const alertCount = clients.filter(c=>alerteClient(c,passages)!=="ok").length;
 
+  const getContratStatut = (clientId) => {
+    const ct = contrats[clientId];
+    if (!ct) return null;
+    const s = ct.statut;
+    if (s === "signe_complet") {
+      const client = clients.find(c=>c.id===clientId);
+      if (client?.dateFin) {
+        const joursRestants = Math.round((new Date(client.dateFin)-new Date())/(1000*60*60*24));
+        if (joursRestants < 60) return { label:"🔄 À renouveler", color:"#b45309", bg:"#fef3c7", border:"#fcd34d" };
+      }
+      return { label:"✅ Contrat signé", color:"#059669", bg:"#f0fdf4", border:"#86efac" };
+    }
+    if (s === "signe_client") return { label:"📝 En attente co-signature", color:"#4f46e5", bg:"#eef2ff", border:"#a5b4fc" };
+    if (s === "demande_envoyee") return { label:"📨 Contrat envoyé", color:"#0891b2", bg:"#f0f9ff", border:"#bae6fd" };
+    return { label:"📋 Contrat préparé", color:"#6b7280", bg:"#f9fafb", border:"#e5e7eb" };
+  };
+
   return (
     <div>
-      {/* Stats bar */}
       <div style={{display:"flex",gap:8,marginBottom:14}}>
-        <div style={{flex:1,background:"#0891b2",borderRadius:DS.radiusSm,padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
-          <div style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.12)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.clients(18,"#fff")}</div>
-          <div><div style={{fontSize:20,fontWeight:900,color:"#fff"}}>{totalAll}</div><div style={{fontSize:10,color:"rgba(255,255,255,0.6)",fontWeight:600}}>Clients</div></div>
+        <div style={{flex:1,background:"#0891b2",borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:32,height:32,borderRadius:8,background:"rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.clients(16,"#fff")}</div>
+          <div><div style={{fontSize:18,fontWeight:800,color:"#fff"}}>{totalAll}</div><div style={{fontSize:10,color:"rgba(255,255,255,0.6)"}}>Clients</div></div>
         </div>
-        {alertCount>0&&<div style={{background:DS.redSoft,borderRadius:DS.radiusSm,padding:"12px 16px",display:"flex",alignItems:"center",gap:8,border:"1px solid #fca5a5"}}>
-          <div style={{width:36,height:36,borderRadius:10,background:DS.red+"18",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.alert(16,DS.red)}</div>
-          <div><div style={{fontSize:20,fontWeight:900,color:DS.red}}>{alertCount}</div><div style={{fontSize:10,color:DS.red,fontWeight:600}}>Alertes</div></div>
+        {alertCount>0&&<div style={{background:DS.white,borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8,border:"1px solid #fecaca"}}>
+          <div style={{width:32,height:32,borderRadius:8,background:"#fff1f2",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.alert(15,DS.red)}</div>
+          <div><div style={{fontSize:18,fontWeight:800,color:DS.red}}>{alertCount}</div><div style={{fontSize:11,color:DS.red,fontWeight:600}}>Alertes</div></div>
         </div>}
       </div>
-
-      {/* Search + Add */}
       <div style={{display:"flex",gap:10,marginBottom:14}}>
         <div style={{flex:1,position:"relative"}}>
           <div style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}>{Ico.search(16,"#94a3b8")}</div>
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher…"
-            style={{width:"100%",padding:"12px 14px 12px 40px",borderRadius:DS.radius,border:"1.5px solid "+DS.border,fontSize:13,outline:"none",boxSizing:"border-box",background:DS.white,color:DS.dark,fontFamily:"inherit"}}/>
+            style={{width:"100%",padding:"11px 14px 11px 40px",borderRadius:DS.radius,border:"1.5px solid "+DS.border,fontSize:13,outline:"none",boxSizing:"border-box",background:DS.white,color:DS.dark,fontFamily:"inherit"}}/>
         </div>
         <BtnPrimary onClick={onAdd} bg={DS.blue} icon={Ico.userPlus(14,"#fff")} style={{flexShrink:0,padding:"10px 16px",fontSize:13,borderRadius:DS.radiusSm}}>
           {!isMobile && "Nouveau"}
         </BtnPrimary>
       </div>
-
       {filtered.length===0&&<div style={{textAlign:"center",color:DS.mid,padding:40,fontSize:13}}>Aucun client trouvé</div>}
-
-      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+      <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:10}}>
         {filtered.map((c,idx)=>{
           const al=alerteClient(c,passages); const col=AC[al];
           const mpm=c.moisParMois||c.saisons||{};
@@ -3358,60 +3370,52 @@ function PageClients({ clients, passages, onClientClick, onAdd }) {
           const pct=tot>0?Math.round(eff/tot*100):0;
           const rest=Math.max(0,tot-eff);
           const accentColor=al==="rouge"?DS.red:al==="jaune"?"#d97706":al==="orange"?"#d97706":DS.green;
+          const ctStatut = getContratStatut(c.id);
           return (
             <div key={c.id} onClick={()=>onClientClick(c)} className="fade-in card-hover"
               style={{animationDelay:`${idx*0.03}s`,background:DS.white,borderRadius:DS.radius,
-                overflow:"hidden",boxShadow:"0 1px 8px rgba(19,34,53,0.06), 0 4px 16px rgba(19,34,53,0.04)",
+                overflow:"hidden",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",
                 border:"1px solid "+DS.border,borderTop:"2px solid "+accentColor,
-                cursor:"pointer",width:"100%",boxSizing:"border-box"}}>
-              {/* Photo banner */}
-              {c.photoPiscine && (
-                <div style={{height:72,background:`url(${c.photoPiscine}) center/cover`,position:"relative"}}>
-                  <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,transparent 30%,rgba(12,18,34,0.5))"}}/>
+                cursor:"pointer",display:"flex",flexDirection:"column"}}>
+              {c.photoPiscine&&(
+                <div style={{height:72,background:`url(${c.photoPiscine}) center/cover`,position:"relative",flexShrink:0}}>
+                  <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,transparent 40%,rgba(0,0,0,0.35))"}}/>
                 </div>
               )}
-              <div style={{padding:"16px"}}>
-                {/* Header */}
-                <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
-                  <Avatar nom={c.nom} size={46} photo={c.photoPiscine?null:undefined}/>
+              <div style={{padding:"12px",flex:1,display:"flex",flexDirection:"column",gap:7}}>
+                <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
+                  <Avatar nom={c.nom} size={34}/>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontWeight:800,fontSize:15,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:-0.3}}>{c.nom}</div>
-                    <div style={{display:"flex",gap:6,marginTop:5,alignItems:"center",flexWrap:"wrap"}}>
-                      <span style={{background:"#f1f5f9",color:DS.mid,padding:"3px 10px",borderRadius:20,fontWeight:600,fontSize:12,border:"1px solid "+DS.border}}>{c.formule}</span>
-                      {c.bassin&&<span style={{background:DS.light,color:DS.mid,padding:"3px 8px",borderRadius:20,fontWeight:600,fontSize:11}}>{c.bassin}{c.volume?" · "+c.volume+"m³":""}</span>}
+                    <div style={{fontWeight:700,fontSize:13,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
+                    <div style={{display:"flex",gap:4,marginTop:3,flexWrap:"wrap"}}>
+                      <span style={{background:"#f1f5f9",color:DS.mid,padding:"1px 7px",borderRadius:20,fontWeight:600,fontSize:10,border:"1px solid "+DS.border}}>{c.formule}</span>
+                      {c.bassin&&<span style={{background:DS.light,color:DS.mid,padding:"1px 6px",borderRadius:20,fontWeight:500,fontSize:10}}>{c.bassin}</span>}
                     </div>
                   </div>
-                  <Tag color={col.tx} bg={col.bg} style={{fontSize:12,fontWeight:800,flexShrink:0}}>{col.lbl}</Tag>
+                  <Tag color={col.tx} bg={col.bg} style={{fontSize:9,fontWeight:700,flexShrink:0,padding:"2px 6px"}}>{col.lbl}</Tag>
                 </div>
-                {/* Adresse */}
-                {c.adresse&&<div style={{display:"flex",alignItems:"center",gap:5,fontSize:12,color:DS.mid,marginBottom:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                  {Ico.pin(11,DS.mid)} {c.adresse}
-                </div>}
-                {/* Stats */}
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:tot>0?10:0}}>
-                  <div style={{textAlign:"center",padding:"7px 4px",borderRadius:8,background:"#f8fafc",border:"1px solid "+DS.border}}>
-                    <div style={{fontSize:17,fontWeight:900,color:DS.blue,lineHeight:1}}>{eE}<span style={{fontSize:10,fontWeight:500,color:DS.mid}}>/{tE}</span></div>
-                    <div style={{fontSize:10,fontWeight:500,color:DS.mid,marginTop:2}}>Entretiens</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:3}}>
+                  <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"#f8fafc",border:"1px solid "+DS.border}}>
+                    <div style={{fontSize:13,fontWeight:800,color:DS.blue}}>{eE}<span style={{fontSize:9,color:DS.mid}}>/{tE}</span></div>
+                    <div style={{fontSize:9,color:DS.mid}}>Entret.</div>
                   </div>
-                  <div style={{textAlign:"center",padding:"7px 4px",borderRadius:8,background:"#f8fafc",border:"1px solid "+DS.border}}>
-                    <div style={{fontSize:17,fontWeight:900,color:DS.teal,lineHeight:1}}>{eC}<span style={{fontSize:10,fontWeight:500,color:DS.mid}}>/{tC}</span></div>
-                    <div style={{fontSize:10,fontWeight:500,color:DS.mid,marginTop:2}}>Contrôles</div>
+                  <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"#f8fafc",border:"1px solid "+DS.border}}>
+                    <div style={{fontSize:13,fontWeight:800,color:DS.teal}}>{eC}<span style={{fontSize:9,color:DS.mid}}>/{tC}</span></div>
+                    <div style={{fontSize:9,color:DS.mid}}>Contrôl.</div>
                   </div>
-                  <div style={{textAlign:"center",padding:"7px 4px",borderRadius:8,background:"#f8fafc",border:"1px solid "+DS.border}}>
-                    <div style={{fontSize:16,fontWeight:800,color:rest>0?"#b45309":DS.green,lineHeight:1}}>{rest}</div>
-                    <div style={{fontSize:10,fontWeight:500,color:DS.mid,marginTop:2}}>Restants</div>
+                  <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"#f8fafc",border:"1px solid "+DS.border}}>
+                    <div style={{fontSize:13,fontWeight:800,color:rest>0?"#b45309":DS.green}}>{pct}<span style={{fontSize:9,color:DS.mid}}>%</span></div>
+                    <div style={{fontSize:9,color:DS.mid}}>{rest>0?rest+" rest.":"À jour"}</div>
                   </div>
                 </div>
-                {/* Progress bar */}
-                {tot>0&&<div>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                    <span style={{fontSize:11,fontWeight:600,color:DS.mid}}>Progression</span>
-                    <span style={{fontSize:12,fontWeight:800,color:pct>=100?DS.green:rest>3?DS.orange:DS.blue}}>{pct}%</span>
-                  </div>
-                  <div style={{height:5,background:DS.light,borderRadius:99,overflow:"hidden"}}>
-                    <div style={{height:"100%",width:`${pct}%`,background:pct>=100?"linear-gradient(90deg,#059669,#34d399)":pct>=50?"linear-gradient(90deg,#0369a1,#38bdf8)":"linear-gradient(90deg,#d9773b,#fbbf24)",borderRadius:99,transition:"width .5s"}}/>
-                  </div>
+                {tot>0&&<div style={{height:3,background:DS.light,borderRadius:99,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${pct}%`,background:pct>=100?"#059669":pct>=50?"#0891b2":"#f59e0b",borderRadius:99}}/>
                 </div>}
+                {ctStatut&&(
+                  <div style={{display:"flex",alignItems:"center",padding:"3px 8px",borderRadius:6,background:ctStatut.bg,border:"1px solid "+ctStatut.border}}>
+                    <span style={{fontSize:10,fontWeight:700,color:ctStatut.color}}>{ctStatut.label}</span>
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -4054,7 +4058,7 @@ export default function App() {
           </div>
           <div style={{padding:"6px 16px 110px",overflowX:"hidden"}}>
             {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}}/>}
-            {page==="clients"&&<PageClients clients={clients} passages={passages} onClientClick={setFicheClient} onAdd={openAddClient}/>}
+            {page==="clients"&&<PageClients clients={clients} passages={passages} contrats={contrats} onClientClick={setFicheClient} onAdd={openAddClient}/>}
             {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus}/>}
             {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
           </div>
@@ -4099,7 +4103,7 @@ export default function App() {
                 {page==="dashboard"&&<p style={{margin:"2px 0 0",color:DS.mid,fontSize:13,fontWeight:500}}>Aujourd'hui tâchons de ne rien oublier ;)</p>}
               </div>
               {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}}/>}
-              {page==="clients"&&<PageClients clients={clients} passages={passages} onClientClick={setFicheClient} onAdd={openAddClient}/>}
+              {page==="clients"&&<PageClients clients={clients} passages={passages} contrats={contrats} onClientClick={setFicheClient} onAdd={openAddClient}/>}
               {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus}/>}
               {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
             </div>
