@@ -1205,7 +1205,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
   const total = totalE + totalC;
   const effE = passContrat.filter(p=>isEntretienType(p.type)).length;
   const effC = passContrat.filter(p=>isControleType(p.type)).length;
-  const eff = passC.length;
+  const eff = passContrat.length;
   const jours = daysUntil(client.dateFin);
   const moisCourant = MOIS_NOW;
 
