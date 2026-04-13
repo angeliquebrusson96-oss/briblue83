@@ -676,6 +676,9 @@ function FormClient({ initial, clients, onSave, onClose }) {
       <Section title="Passages par mois">
         <div style={{background:DS.dark,padding:"8px 14px",borderRadius:"12px 12px 0 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <span style={{color:"rgba(255,255,255,0.8)",fontSize:15,fontWeight:700}}>Planning mensuel</span>
+            <button onClick={()=>setF(p=>({...p,moisParMois:{...MOIS_PAR_MOIS_DEF}}))} style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.7)",background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:6,padding:"3px 10px",cursor:"pointer",fontFamily:"inherit"}}>
+              🔄 Tout remettre à zéro
+            </button>
           <span style={{color:"#fff",fontSize:15,fontWeight:800}}>🔧 {totalE}  ·  💧 {totalC}  ·  Total {totalE+totalC}</span>
         </div>
         <div style={{border:"1px solid "+DS.border,borderTop:"none",borderRadius:"0 0 12px 12px",overflow:"hidden"}}>
