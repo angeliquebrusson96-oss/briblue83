@@ -172,25 +172,17 @@ async function load(key, fallback) {
 
 async function save(key, val) {
   try {
-    const { data, error } = await supabase
-      .from("app_data")
-      .select("data")
-      .eq("id", 1)
-      .single();
-
-    const currentData = !error && data?.data ? data.data : {};
-
-    const updatedData = {
-      ...currentData,
-      [key]: val
-    };
-
-    await supabase
-      .from("app_data")
-      .upsert({
-        id: 1,
-        data: updatedData
-      });
+    // Utilise jsonb_set via RPC pour ne patcher que la clé modifiée
+    // Évite de télécharger/uploader tout le JSON à chaque save
+    const { error } = await supabase.rpc('patch_app_data', {
+      p_key: key,
+      p_val: val
+    });
+    if (error) {
+      // Fallback : méthode classique si RPC pas disponible
+      const { data: current } = await supabase.from("app_data").select("data").eq("id",1).single();
+      await supabase.from("app_data").upsert({ id:1, data:{...(current?.data||{}), [key]:val} });
+    }
   } catch {}
 }
 
@@ -954,7 +946,6 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
     { l:"Produits",        color:"#059669" },
     { l:"Photos & Envoi",  color:"#4f46e5" },
   ];
-  const STEPS = STEP_INFO.length;
   const cur = STEP_INFO[step-1];
   const pct = Math.round((step-1)/STEPS*100);
 
@@ -1385,11 +1376,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           📅 <span>{label}</span>
         </div>
         <div style={{border:"1px solid "+DS.border,borderRadius:DS.radiusSm,overflow:"hidden"}}>
-          {(()=>{
-            // Réordonner les mois à partir du mois de début de contrat
-            const startMonth = contractStart ? parseInt(contractStart.slice(5,7)) : 1;
-            const orderedMonths = [...Array(12)].map((_,i) => ((startMonth - 1 + i) % 12) + 1);
-            return orderedMonths.map((m,i)=>{
+          {[1,2,3,4,5,6,7,8,9,10,11,12].map((m,i)=>{
             const mpm = client.moisParMois || client.saisons || {};
             const prevE = getEntretienMois(mpm, m);
             const prevC = getControleMois(mpm, m);
@@ -1424,8 +1411,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
               </div>
               {prevT>0 ? <div style={{fontSize:15,fontWeight:700,color:rest>0?DS.orange:DS.green,background:rest>0?DS.orangeSoft:DS.greenSoft,padding:"2px 8px",borderRadius:6}}>{rest>0?rest+" rest.":"✓"}</div> : null}
             </div>;
-          });
-          })()}
+          })}
         </div>
         <div style={{display:"flex",justifyContent:"space-between",marginTop:10,padding:"8px 12px",background:DS.dark,borderRadius:DS.radiusSm}}>
           <span style={{color:"rgba(255,255,255,0.7)",fontSize:15,fontWeight:600}}>Total annuel</span>
