@@ -1589,15 +1589,25 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
               <div style={{display:"flex",alignItems:"center",gap:6}}>
                 {planT>0 && <div style={{fontSize:13,fontWeight:700,color:rest>0?DS.orange:DS.green,background:rest>0?DS.orangeSoft:DS.greenSoft,padding:"2px 8px",borderRadius:6,minWidth:52,textAlign:"center"}}>{rest>0?rest+" rest.":"✓"}</div>}
                 {planT>0 && onUpdateClient && (
-                  <button
-                    onClick={()=>toggleManuel(mKey)}
-                    title={doneManuel>0?`${doneManuel} passage(s) manuel(s) — cliquer pour modifier`:"Marquer un passage manuel"}
-                    style={{width:30,height:30,borderRadius:8,border:"1.5px solid "+(doneManuel>0?"#7c3aed":DS.border),background:doneManuel>0?"#f5f3ff":DS.white,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"}}>
-                    {doneManuel>0
-                      ? <span style={{fontSize:13,fontWeight:800,color:"#7c3aed"}}>{doneManuel}</span>
-                      : <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={DS.mid} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    }
-                  </button>
+                  <div style={{display:"flex",alignItems:"center",gap:3}}>
+                    {doneManuel>0 && (
+                      <button
+                        onClick={()=>{ const newManuel={...manuelMap}; if(doneManuel<=1) delete newManuel[mKey]; else newManuel[mKey]=doneManuel-1; onUpdateClient({...client,passagesManuel:newManuel}); }}
+                        title="Retirer un passage manuel"
+                        style={{width:26,height:26,borderRadius:7,border:"1.5px solid #c4b5fd",background:"#f5f3ff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"}}>
+                        <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="3" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      </button>
+                    )}
+                    {doneManuel>0 && (
+                      <span style={{fontSize:13,fontWeight:800,color:"#7c3aed",minWidth:16,textAlign:"center"}}>{doneManuel}</span>
+                    )}
+                    <button
+                      onClick={()=>{ const newManuel={...manuelMap,[mKey]:(doneManuel||0)+1}; onUpdateClient({...client,passagesManuel:newManuel}); }}
+                      title="Ajouter un passage manuel"
+                      style={{width:26,height:26,borderRadius:7,border:"1.5px solid "+(doneManuel>0?"#c4b5fd":DS.border),background:doneManuel>0?"#f5f3ff":DS.white,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"}}>
+                      <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke={doneManuel>0?"#7c3aed":DS.mid} strokeWidth="3" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </button>
+                  </div>
                 )}
               </div>
             </div>;
