@@ -1460,7 +1460,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
 
         {/* TABS */}
         <div style={{background:"#fff",display:"flex",borderBottom:"1.5px solid #f1f5f9",overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-          {[["historique","Historique"],["infos","Infos"],["saisons","Planning"],["passages","Rapports"],["rdvs","RDV"],["livraisons","Livraisons"]].map(([id,l])=>(
+          {[["historique","Historique"],["infos","Infos"],["saisons","Planning"],["passages","Rapports"],["rdvs","RDV"],["livraisons","Livraisons"],["carnet","Carnet"]].map(([id,l])=>(
             <button key={id} onClick={()=>setTab(id)} style={{flexShrink:0,padding:"14px 16px",border:"none",cursor:"pointer",fontWeight:tab===id?800:500,fontSize:13,fontFamily:"inherit",background:"transparent",color:tab===id?DS.blue:"#94a3b8",borderBottom:tab===id?"2px solid "+DS.blue:"2px solid transparent",transition:"all .15s",whiteSpace:"nowrap"}}>{l}</button>
           ))}
         </div>
@@ -1961,6 +1961,76 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           </button>
         </div>
       </div>
+
+      {/* Tab: Carnet d'entretien */}
+      {tab==="carnet" && (()=>{
+        const code = generateCarnetCode(client.id);
+        const carnetUrl = window.location.origin + window.location.pathname + "?carnet=" + code;
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=8&data=${encodeURIComponent(carnetUrl)}`;
+        return (
+          <div className="fade-in" style={{paddingTop:4}}>
+            {/* QR + Code */}
+            <div style={{background:"#f8fafc",borderRadius:18,padding:20,border:"1px solid #f1f5f9",marginBottom:16}}>
+              <div style={{display:"flex",gap:18,alignItems:"center"}}>
+                {/* QR Code */}
+                <div style={{width:100,height:100,borderRadius:14,overflow:"hidden",flexShrink:0,border:"1px solid #e2e8f0",background:"#fff"}}>
+                  <img src={qrUrl} alt="QR Code" width={100} height={100} style={{display:"block"}}
+                    onError={e=>{e.target.style.display="none";}}/>
+                </div>
+                {/* Code + boutons */}
+                <div style={{flex:1}}>
+                  <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>Code d'accès client</div>
+                  <div style={{fontSize:26,fontWeight:900,color:"#1e3a5f",letterSpacing:5,marginBottom:12,fontFamily:"monospace"}}>{code}</div>
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                    <button onClick={()=>{try{navigator.clipboard.writeText(carnetUrl);toastSuccess("Lien copié !");}catch{}}} style={{padding:"8px 14px",background:"#1e3a5f",border:"none",borderRadius:10,fontSize:12,fontWeight:700,color:"#fff",cursor:"pointer",fontFamily:"inherit"}}>
+                      Copier le lien
+                    </button>
+                    <button onClick={()=>{
+                      const w=window.open("","_blank");
+                      w.document.write(`<html><body style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;background:#f8fafc;gap:16px;padding:32px">
+                        <div style="font-size:22px;font-weight:900;color:#1e3a5f">Carnet BRIBLUE</div>
+                        <div style="font-size:14px;color:#64748b">${client.nom}</div>
+                        <img src="${qrUrl}" width="200" height="200"/>
+                        <div style="font-size:32px;font-weight:900;letter-spacing:6px;color:#0891b2">${code}</div>
+                        <div style="font-size:11px;color:#94a3b8;text-align:center">Scannez le QR code ou rendez-vous sur<br/>${carnetUrl}</div>
+                        <script>window.print();</script>
+                      </body></html>`);
+                      w.document.close();
+                    }} style={{padding:"8px 14px",background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:10,fontSize:12,fontWeight:700,color:"#0891b2",cursor:"pointer",fontFamily:"inherit"}}>
+                      Imprimer PDF
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Ce que voit le client */}
+            <div style={{borderRadius:14,padding:14,background:"#f0fdf4",border:"1px solid #bbf7d0",marginBottom:10}}>
+              <div style={{fontSize:11,fontWeight:800,color:"#166534",marginBottom:8}}>Le client voit uniquement :</div>
+              {["Ses interventions effectuées","pH, chlore, température","Date et type d'entretien"].map(t=>(
+                <div key={t} style={{display:"flex",alignItems:"center",gap:7,marginBottom:4}}>
+                  <div style={{width:16,height:16,borderRadius:8,background:"#dcfce7",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    <svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  </div>
+                  <span style={{fontSize:12,color:"#166534",fontWeight:600}}>{t}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{borderRadius:14,padding:14,background:"#fff7ed",border:"1px solid #fed7aa"}}>
+              <div style={{fontSize:11,fontWeight:800,color:"#9a3412",marginBottom:8}}>Invisible pour le client :</div>
+              {["Prix et tarifs","Notes privées","Autres clients","Statut contrat"].map(t=>(
+                <div key={t} style={{display:"flex",alignItems:"center",gap:7,marginBottom:4}}>
+                  <div style={{width:16,height:16,borderRadius:8,background:"#ffedd5",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    <svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="#ea580c" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </div>
+                  <span style={{fontSize:12,color:"#9a3412",fontWeight:600}}>{t}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       </div>{/* fin contenu */}
     </Modal>
   );
@@ -4467,7 +4537,143 @@ function ModalStock({ stock, onClose, onUpdateStock, onAddProduit, onDeleteProdu
   );
 }
 
+
+// ── CARNET D'ENTRETIEN ─────────────────────────────────────────────────────
+function generateCarnetCode(clientId) {
+  // Code court et mémorisable basé sur l'id client
+  const hash = clientId.split("").reduce((a,c)=>((a<<5)-a)+c.charCodeAt(0)|0,0);
+  const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const prefix = letters[(Math.abs(hash)%24)] + letters[(Math.abs(hash>>4)%24)];
+  const num = String(Math.abs(hash)%9000+1000);
+  return prefix+"-"+num;
+}
+
+function CarnetPublic({ code, allClients, allPassages }) {
+  const client = allClients.find(c=>generateCarnetCode(c.id)===code.toUpperCase());
+  if (!client) return (
+    <div style={{minHeight:"100vh",background:"#f8fafc",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,fontFamily:"'Nunito',system-ui,sans-serif"}}>
+      <div style={{width:60,height:60,borderRadius:18,background:"#fee2e2",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:16}}>
+        <svg width={28} height={28} viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </div>
+      <div style={{fontSize:17,fontWeight:800,color:"#0f172a",marginBottom:6}}>Code invalide</div>
+      <div style={{fontSize:13,color:"#64748b"}}>Vérifiez le code fourni par votre technicien.</div>
+    </div>
+  );
+
+  // Uniquement les passages effectués (ok=true)
+  const passClient = allPassages
+    .filter(p=>p.clientId===client.id && p.ok)
+    .sort((a,b)=>new Date(b.date)-new Date(a.date));
+
+  const last = passClient[0]||null;
+
+  return (
+    <div style={{minHeight:"100vh",background:"#f8fafc",fontFamily:"'Nunito',system-ui,sans-serif",maxWidth:480,margin:"0 auto"}}>
+      {/* HEADER */}
+      <div style={{background:"#0891b2",padding:"22px 20px 18px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+          <svg width={22} height={16} viewBox="0 0 32 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/>
+            <path d="M2 16c2.5 3 5 3 7.5 0S14 13 16.5 16s5 3 7.5 0"/>
+          </svg>
+          <span style={{fontSize:12,fontWeight:800,color:"rgba(255,255,255,0.85)",letterSpacing:.5}}>BRIBLUE · Carnet d'entretien</span>
+        </div>
+        <div style={{fontSize:20,fontWeight:900,color:"#fff",marginBottom:3}}>Votre piscine</div>
+        <div style={{fontSize:12,color:"rgba(255,255,255,0.65)"}}>
+          {[client.formule,client.bassin].filter(Boolean).join(" · ")}
+          {client.dateDebut&&" · Suivi depuis "+new Date(client.dateDebut).toLocaleDateString("fr",{month:"long",year:"numeric"})}
+        </div>
+      </div>
+
+      <div style={{padding:"20px 18px"}}>
+
+        {/* DERNIÈRE INTERVENTION */}
+        {last&&(
+          <div style={{background:"#f0f9ff",borderRadius:16,padding:18,marginBottom:22,borderLeft:"4px solid #0891b2"}}>
+            <div style={{fontSize:10,fontWeight:700,color:"#0891b2",textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>Dernière intervention</div>
+            <div style={{fontSize:16,fontWeight:800,color:"#0f172a",marginBottom:4}}>{last.type||"Entretien"}</div>
+            <div style={{fontSize:12,color:"#64748b",marginBottom:last.ph||last.chlore||last.temperature?12:0}}>
+              {new Date(last.date).toLocaleDateString("fr",{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}
+            </div>
+            {(last.ph||last.chlore||last.temperature)&&(
+              <div style={{display:"flex",gap:8}}>
+                {last.ph&&<div style={{flex:1,background:"#fff",borderRadius:10,padding:"8px 4px",textAlign:"center"}}>
+                  <div style={{fontSize:9,color:"#94a3b8",fontWeight:700,textTransform:"uppercase"}}>pH</div>
+                  <div style={{fontSize:20,fontWeight:900,color:last.ph>=7&&last.ph<=7.6?"#059669":"#f59e0b"}}>{last.ph}</div>
+                </div>}
+                {last.chlore&&<div style={{flex:1,background:"#fff",borderRadius:10,padding:"8px 4px",textAlign:"center"}}>
+                  <div style={{fontSize:9,color:"#94a3b8",fontWeight:700,textTransform:"uppercase"}}>Chlore</div>
+                  <div style={{fontSize:20,fontWeight:900,color:last.chlore>=0.5&&last.chlore<=3?"#059669":"#f59e0b"}}>{last.chlore}</div>
+                </div>}
+                {last.temperature&&<div style={{flex:1,background:"#fff",borderRadius:10,padding:"8px 4px",textAlign:"center"}}>
+                  <div style={{fontSize:9,color:"#94a3b8",fontWeight:700,textTransform:"uppercase"}}>Temp.</div>
+                  <div style={{fontSize:20,fontWeight:900,color:"#0891b2"}}>{last.temperature}°</div>
+                </div>}
+              </div>
+            )}
+            {last.obs&&<div style={{marginTop:10,fontSize:12,color:"#64748b",fontStyle:"italic",paddingTop:8,borderTop:"1px solid #e0f2fe"}}>{last.obs}</div>}
+          </div>
+        )}
+
+        {/* LISTE INTERVENTIONS */}
+        {passClient.length>0&&(
+          <>
+            <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:.8,marginBottom:14}}>
+              Toutes les interventions ({passClient.length})
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:0}}>
+              {passClient.map((p,i)=>{
+                const d=new Date(p.date);
+                return (
+                  <div key={p.id} style={{display:"flex",gap:14,padding:"14px 0",borderBottom:i<passClient.length-1?"1px solid #f1f5f9":"none",alignItems:"flex-start"}}>
+                    {/* Dot + ligne */}
+                    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:0,paddingTop:4,flexShrink:0}}>
+                      <div style={{width:10,height:10,borderRadius:"50%",background:"#0891b2",flexShrink:0}}/>
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8}}>
+                        <div style={{fontSize:14,fontWeight:700,color:"#0f172a"}}>{p.type||"Entretien"}</div>
+                        <div style={{fontSize:11,color:"#94a3b8",flexShrink:0,fontWeight:500}}>
+                          {d.toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})}
+                        </div>
+                      </div>
+                      {(p.ph||p.chlore)&&<div style={{fontSize:12,color:"#64748b",marginTop:3}}>
+                        {[p.ph?"pH "+p.ph:null,p.chlore?"Cl "+p.chlore:null,p.temperature?p.temperature+"°C":null].filter(Boolean).join("  ·  ")}
+                      </div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {passClient.length===0&&(
+          <div style={{textAlign:"center",padding:"40px 0",color:"#94a3b8",fontSize:14}}>
+            Aucune intervention enregistrée pour le moment.
+          </div>
+        )}
+
+        {/* Footer */}
+        <div style={{marginTop:28,textAlign:"center",borderTop:"1px solid #f1f5f9",paddingTop:16}}>
+          <div style={{fontSize:10,color:"#cbd5e1",fontWeight:600,lineHeight:1.8}}>
+            BRIBLUE · Traitement de l'eau · La Seyne-sur-Mer<br/>
+            SIRET 84345436400053
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+// ── FIN CARNET ──────────────────────────────────────────────────────────────
 export default function App() {
+  // Détection URL carnet public
+  const [carnetCode] = useState(()=>{
+    try {
+      const p = new URLSearchParams(window.location.search);
+      return p.get("carnet")||"";
+    } catch { return ""; }
+  });
   const [loggedIn, setLoggedIn] = useState(false);
   const { online, pendingCount } = useOnlineStatus();
   const [page, setPage] = useState("dashboard");
@@ -4620,6 +4826,9 @@ export default function App() {
 
   const nbAlertes = useMemo(()=>clients.filter(c=>alerteClient(c,passages)!=="ok"&&!dismissedAlertes.includes(c.id)).length,[clients,passages,dismissedAlertes]);
   const nbAFacturer = useMemo(()=>livraisons.filter(l=>l.statut==="aFacturer").length,[livraisons]);
+
+  // Carnet public — accessible sans login
+  if(carnetCode) return <><GlobalStyles/><CarnetPublic code={carnetCode} allClients={clients.length?clients:CLIENTS_INIT} allPassages={passages.length?passages:PASSAGES_INIT}/></>;
 
   if(!loggedIn) return <><GlobalStyles/>
       <ToastContainer/>
