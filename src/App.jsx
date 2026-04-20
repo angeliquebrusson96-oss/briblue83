@@ -1416,13 +1416,13 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
 
   return (
     <Modal title="" onClose={onClose} wide>
-      {/* ═══ HERO THÈME B — clean gradient, no emoji, no boxes ═══ */}
+      {/* ═══ HERO — style E-Wallet card ═══ */}
       <div style={{margin:isMobile?"-18px -20px 0":"-24px -28px 0"}}>
 
         {/* Bannière photo piscine */}
         {client.photoPiscine&&(
-          <div style={{height:110,background:`url(${client.photoPiscine}) center/cover`,position:"relative"}}>
-            <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,transparent 30%,#0e7490)"}}/>
+          <div style={{height:90,background:`url(${client.photoPiscine}) center/cover`,position:"relative"}}>
+            <div style={{position:"absolute",inset:0,background:"rgba(8,145,178,0.45)"}}/>
           </div>
         )}
 
@@ -1668,53 +1668,38 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
             const passClient = passages.filter(p=>p.clientId===client.id);
             const livClient = (livraisons||[]).filter(l=>l.clientId===client.id);
             const rdvClient2 = (rdvs||[]).filter(r=>r.clientId===client.id);
-
-            const TYPE_DOT = {
-              passage:  "#0891b2",
-              controle: "#0e7490",
-              livraison:"#f59e0b",
-              rdv:      "#818cf8",
-              contrat:  "#22d3ee",
-            };
+            const nbP=passClient.length, nbL=livClient.length, nbR=rdvClient2.length;
 
             const events = [
-              ...(client.dateDebut?[{
-                date:client.dateDebut, type:"contrat",
-                title:"Début de contrat",
-                meta:[client.formule, client.prix?client.prix+"€/an":null].filter(Boolean).join(" · "),
-                badge:{label:"Contrat",color:"#0891b2"},
-              }]:[]),
-              ...passClient.map(p=>{
-                const isCtrl = isControleType(p.type);
-                return {
-                  date:p.date, type:isCtrl?"controle":"passage",
-                  title:p.type||"Passage",
-                  meta:[p.tech?"par "+p.tech:null, p.ph?"pH "+p.ph:null, p.chlore?"Cl "+p.chlore:null, p.temperature?p.temperature+"°C":null].filter(Boolean).join(" · "),
-                  obs:p.obs||p.actions||null,
-                  badge:p.ok?{label:"Effectué",color:"#059669"}:{label:"En cours",color:"#b45309"},
-                  _p:p,
-                };
-              }),
+              ...(client.dateDebut?[{date:client.dateDebut,type:"contrat",title:"Début de contrat",sub:client.formule+(client.prix?" · "+client.prix+"€/an":""),dot:"#22d3ee",badge:{l:"Contrat",c:"#0891b2"}}]:[]),
+              ...passClient.map(p=>({
+                date:p.date, type:"passage",
+                title:p.type||"Passage",
+                sub:[p.tech?"par "+p.tech:null,p.ph?"pH "+p.ph:null,p.chlore?"Cl "+p.chlore:null].filter(Boolean).join(" · "),
+                obs:p.obs||p.actions||null,
+                dot:isControleType(p.type)?"#0e7490":"#0891b2",
+                badge:p.ok?{l:"Effectué",c:"#059669"}:{l:"En cours",c:"#f59e0b"},
+                _p:p,
+              })),
               ...livClient.map(l=>({
                 date:l.date, type:"livraison",
                 title:"Livraison",
-                meta:[l.produits?.slice(0,3).join(", "), l.montant?l.montant+"€":null].filter(Boolean).join(" · "),
-                badge:{label:l.statut==="paye"?"Payé":l.statut==="facture"?"Facturé":"À facturer",color:l.statut==="paye"?"#059669":l.statut==="facture"?"#0891b2":"#b45309"},
+                sub:[l.produits?.slice(0,2).join(", "),l.montant?l.montant+"€":null].filter(Boolean).join(" · "),
+                dot:"#f59e0b",
+                badge:{l:l.statut==="paye"?"Payé":l.statut==="facture"?"Facturé":"À facturer",c:l.statut==="paye"?"#059669":l.statut==="facture"?"#0891b2":"#f59e0b"},
               })),
               ...rdvClient2.map(r=>({
                 date:r.date, type:"rdv",
                 title:r.type||"Rendez-vous",
-                meta:[r.heure?r.heure:null, r.duree?r.duree+" min":null].filter(Boolean).join(" · "),
-                badge:{label:r.date>=TODAY?"À venir":"Passé", color:r.date>=TODAY?"#818cf8":"#94a3b8"},
+                sub:[r.heure,r.duree?r.duree+" min":null].filter(Boolean).join(" · "),
+                dot:"#818cf8",
+                badge:{l:r.date>=TODAY?"À venir":"Passé",c:r.date>=TODAY?"#818cf8":"#94a3b8"},
               })),
             ].sort((a,b)=>b.date.localeCompare(a.date));
 
             if(!events.length) return (
-              <div style={{textAlign:"center",padding:"52px 0",color:DS.mid,fontSize:14,fontWeight:500}}>Aucun historique pour ce client</div>
+              <div style={{textAlign:"center",padding:"48px 0",color:"#94a3b8",fontSize:14}}>Aucun historique</div>
             );
-
-            // Résumé chiffres — ligne simple
-            const nbP=passClient.length, nbL=livClient.length, nbR=rdvClient2.length;
 
             // Grouper par mois
             const grouped={};
@@ -1727,76 +1712,54 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
             const keys=Object.keys(grouped).sort((a,b)=>b.localeCompare(a));
 
             return <>
-              {/* Compteurs en ligne — pur texte, séparateur · */}
-              <div style={{display:"flex",alignItems:"center",gap:0,marginBottom:20,padding:"0 4px"}}>
-                {[
-                  {n:nbP, label:nbP>1?"rapports":"rapport", color:DS.blue},
-                  {n:nbL, label:nbL>1?"livraisons":"livraison", color:"#f59e0b"},
-                  {n:nbR, label:nbR>1?"rdv":"rdv", color:"#818cf8"},
-                ].filter(({n})=>n>0).map(({n,label,color},i,arr)=>(
-                  <span key={i} style={{display:"inline-flex",alignItems:"baseline",gap:4}}>
-                    <span style={{fontSize:20,fontWeight:900,color,lineHeight:1}}>{n}</span>
-                    <span style={{fontSize:12,color:DS.mid,fontWeight:500}}>{label}</span>
-                    {i<arr.length-1&&<span style={{fontSize:14,color:"#cbd5e1",margin:"0 8px"}}>·</span>}
-                  </span>
-                ))}
+              {/* Résumé compteurs — style "View All" */}
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+                <div style={{fontSize:15,fontWeight:800,color:"#0f172a"}}>{events.length} activités</div>
+                <div style={{display:"flex",gap:12}}>
+                  {nbP>0&&<span style={{fontSize:12,color:DS.blue,fontWeight:700}}>{nbP} rapports</span>}
+                  {nbL>0&&<span style={{fontSize:12,color:"#f59e0b",fontWeight:700}}>{nbL} livr.</span>}
+                  {nbR>0&&<span style={{fontSize:12,color:"#818cf8",fontWeight:700}}>{nbR} RDV</span>}
+                </div>
               </div>
 
-              {/* Timeline groupée */}
               {keys.map(key=>{
                 const [yr,mo]=key.split("-");
                 const evts=grouped[key];
                 return (
                   <div key={key} style={{marginBottom:24}}>
+                    {/* Label mois */}
+                    <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>{MOIS_L[parseInt(mo)]} {yr}</div>
 
-                    {/* Label mois — petit, uppercase */}
-                    <div style={{fontSize:10,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:1.2,marginBottom:10,paddingLeft:20}}>{MOIS_L[parseInt(mo)]} {yr}</div>
+                    {/* Rangées activité */}
+                    {evts.map((ev,i)=>{
+                      const d=new Date(ev.date);
+                      return (
+                        <div key={i}
+                          onClick={ev._p?()=>setDetailPassageFiche(ev._p):undefined}
+                          style={{display:"flex",alignItems:"center",gap:14,padding:"12px 0",borderBottom:i<evts.length-1?"1px solid #f8fafc":"none",cursor:ev._p?"pointer":"default"}}>
 
-                    {/* Événements */}
-                    <div style={{position:"relative",paddingLeft:20}}>
-                      {/* Ligne */}
-                      <div style={{position:"absolute",left:6,top:6,bottom:6,width:1.5,background:"linear-gradient(180deg,"+DS.blue+",#dde8f0)",borderRadius:99}}/>
-
-                      {evts.map((ev,i)=>{
-                        const dot=TYPE_DOT[ev.type]||DS.blue;
-                        const d=new Date(ev.date);
-                        return (
-                          <div key={i} style={{position:"relative",marginBottom:i<evts.length-1?14:0,cursor:ev._p?"pointer":"default"}}
-                            onClick={ev._p?()=>setDetailPassageFiche(ev._p):undefined}>
-
-                            {/* Pastille */}
-                            <div style={{position:"absolute",left:-14,top:4,width:10,height:10,borderRadius:"50%",background:dot,boxShadow:"0 0 0 2.5px #eef2f7"}}/>
-
-                            {/* Contenu — pur texte, pas de card */}
-                            <div style={{paddingLeft:8}}>
-                              <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8}}>
-                                <span style={{fontWeight:700,fontSize:14,color:DS.dark,lineHeight:1.2}}>{ev.title}</span>
-                                <span style={{fontSize:10,color:DS.mid,fontWeight:500,flexShrink:0,whiteSpace:"nowrap"}}>
-                                  {d.toLocaleDateString("fr",{day:"2-digit",month:"short"})}
-                                </span>
-                              </div>
-
-                              {ev.meta&&<div style={{fontSize:12,color:DS.mid,marginTop:2,fontWeight:500}}>{ev.meta}</div>}
-
-                              {ev.obs&&<div style={{fontSize:11,color:"#94a3b8",marginTop:3,fontStyle:"italic",borderLeft:"2px solid "+dot,paddingLeft:6,borderRadius:0}}>{ev.obs}</div>}
-
-                              {/* Badge discret + boutons */}
-                              <div style={{display:"flex",alignItems:"center",gap:8,marginTop:5}}>
-                                <span style={{fontSize:10,fontWeight:700,color:ev.badge.color}}>{ev.badge.label}</span>
-                                {ev._p&&(
-                                  <>
-                                    <span style={{fontSize:9,color:"#cbd5e1"}}>·</span>
-                                    <button onClick={e=>{e.stopPropagation();setDetailPassageFiche(ev._p);}} style={{fontSize:11,fontWeight:600,color:DS.blue,background:"none",border:"none",cursor:"pointer",padding:0,fontFamily:"inherit",textDecoration:"underline",textDecorationColor:DS.blue+"55"}}>Aperçu</button>
-                                    <span style={{fontSize:9,color:"#cbd5e1"}}>·</span>
-                                    <button onClick={e=>{e.stopPropagation();ouvrirRapport(ev._p,client);}} style={{fontSize:11,fontWeight:600,color:DS.mid,background:"none",border:"none",cursor:"pointer",padding:0,fontFamily:"inherit",textDecoration:"underline",textDecorationColor:"#cbd5e1"}}>PDF</button>
-                                  </>
-                                )}
-                              </div>
-                            </div>
+                          {/* Icône ronde colorée */}
+                          <div style={{width:44,height:44,borderRadius:"50%",background:ev.dot+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                            <div style={{width:12,height:12,borderRadius:"50%",background:ev.dot}}/>
                           </div>
-                        );
-                      })}
-                    </div>
+
+                          {/* Titre + sous-titre */}
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:14,fontWeight:700,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ev.title}</div>
+                            <div style={{fontSize:12,color:"#94a3b8",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                              {d.toLocaleDateString("fr",{weekday:"short",day:"2-digit",month:"short"})}{ev.sub?" · "+ev.sub:""}
+                            </div>
+                            {ev.obs&&<div style={{fontSize:11,color:"#94a3b8",marginTop:2,fontStyle:"italic",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ev.obs}</div>}
+                          </div>
+
+                          {/* Badge + flèche si cliquable */}
+                          <div style={{flexShrink:0,textAlign:"right"}}>
+                            <div style={{fontSize:12,fontWeight:700,color:ev.badge.c}}>{ev.badge.l}</div>
+                            {ev._p&&<div style={{fontSize:10,color:"#cbd5e1",marginTop:2}}>Aperçu →</div>}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               })}
@@ -2028,6 +1991,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           </button>
         </div>
       </div>
+      </div>{/* fin fond blanc */}
     </Modal>
   );
 }
