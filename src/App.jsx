@@ -142,9 +142,25 @@ function useIsMobile() {
   useEffect(()=>{
     const h = ()=> setM(window.innerWidth < 768);
     window.addEventListener("resize", h);
-    return ()=> window.removeEventListener("resize", h);
+    window.addEventListener("orientationchange", h);
+    return ()=>{ window.removeEventListener("resize", h); window.removeEventListener("orientationchange", h); };
   },[]);
   return m;
+}
+
+function useOnlineStatus() {
+  const [online, setOnline] = useState(navigator.onLine);
+  const [pendingCount, setPendingCount] = useState(0);
+  useEffect(()=>{
+    const onOn = ()=>{ setOnline(true); flushOfflineQueue().then(()=>setPendingCount(0)); };
+    const onOff = ()=>setOnline(false);
+    window.addEventListener('online', onOn);
+    window.addEventListener('offline', onOff);
+    // Vérifier la queue toutes les 30s
+    const interval = setInterval(()=>{ setPendingCount(Object.keys(offlineQueue.pending).length); }, 5000);
+    return ()=>{ window.removeEventListener('online', onOn); window.removeEventListener('offline', onOff); clearInterval(interval); };
+  },[]);
+  return { online, pendingCount };
 }
 
 // STORAGE
@@ -170,20 +186,54 @@ async function load(key, fallback) {
   }
 }
 
+// Queue hors-ligne
+const offlineQueue = { pending: {}, flush: null };
+
+async function saveToSupabase(key, val) {
+  const { error } = await supabase.rpc('patch_app_data', { p_key: key, p_val: val });
+  if (error) {
+    const { data: current } = await supabase.from("app_data").select("data").eq("id",1).single();
+    await supabase.from("app_data").upsert({ id:1, data:{...(current?.data||{}), [key]:val} });
+  }
+}
+
+async function flushOfflineQueue() {
+  const keys = Object.keys(offlineQueue.pending);
+  if (!keys.length) return;
+  for (const key of keys) {
+    try {
+      await saveToSupabase(key, offlineQueue.pending[key]);
+      delete offlineQueue.pending[key];
+    } catch {}
+  }
+}
+
+// Écouter le retour de connexion
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    flushOfflineQueue();
+  });
+}
+
 async function save(key, val) {
+  // Toujours sauvegarder en mémoire locale d'abord
+  try { localStorage.setItem('briblue_' + key, JSON.stringify(val)); } catch {}
+  
+  if (!navigator.onLine) {
+    // Hors-ligne : stocker dans la queue
+    offlineQueue.pending[key] = val;
+    return;
+  }
+  
+  // En ligne : envoyer directement
   try {
-    // Utilise jsonb_set via RPC pour ne patcher que la clé modifiée
-    // Évite de télécharger/uploader tout le JSON à chaque save
-    const { error } = await supabase.rpc('patch_app_data', {
-      p_key: key,
-      p_val: val
-    });
-    if (error) {
-      // Fallback : méthode classique si RPC pas disponible
-      const { data: current } = await supabase.from("app_data").select("data").eq("id",1).single();
-      await supabase.from("app_data").upsert({ id:1, data:{...(current?.data||{}), [key]:val} });
-    }
-  } catch {}
+    await saveToSupabase(key, val);
+    // Vider la queue si items en attente
+    if (Object.keys(offlineQueue.pending).length > 0) flushOfflineQueue();
+  } catch {
+    // Erreur réseau : mettre en queue
+    offlineQueue.pending[key] = val;
+  }
 }
 
 
@@ -526,7 +576,7 @@ function Modal({ title, onClose, children, wide }) {
           </button>
         </div>
         {/* Contenu scrollable */}
-        <div data-modal-body="1" style={{flex:1,overflowY:"auto",padding:isMobile?"14px 18px 24px":"20px 24px 24px",WebkitOverflowScrolling:"touch"}}>
+        <div data-modal-body="1" style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",padding:isMobile?"14px 18px 24px":"20px 24px 24px",WebkitOverflowScrolling:"touch"}}>
           {children}
         </div>
       </div>
@@ -693,7 +743,7 @@ function FormClient({ initial, clients, onSave, onClose }) {
           <Input label="Email" type="email" value={f.email} onChange={e=>set("email",e.target.value)}/>
           <div style={{gridColumn:"1/-1"}}><Input label="Adresse" value={f.adresse} onChange={e=>set("adresse",e.target.value)}/></div>
           <Select label="Type bassin" value={f.bassin} onChange={e=>set("bassin",e.target.value)} options={["Liner","Béton","Coque polyester","PVC armé","Hors-sol","Autre"]}/>
-          <Input label="Volume (m³)" type="number" value={f.volume} onChange={e=>set("volume",+e.target.value)}/>
+          <Input label="Volume (m³)" type="number" style={{fontSize:16}} value={f.volume} onChange={e=>set("volume",+e.target.value)}/>
         </div>
       </Section>
       <Section title="Photo de la piscine">
@@ -748,8 +798,8 @@ function FormClient({ initial, clients, onSave, onClose }) {
           })}
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:12}}>
-          <Input label="Prix/passage entretien (€)" type="number" value={f.prixPassageE||""} onChange={e=>set("prixPassageE",+e.target.value||0)}/>
-          <Input label="Prix/passage contrôle (€)" type="number" value={f.prixPassageC||""} onChange={e=>set("prixPassageC",+e.target.value||0)}/>
+          <Input label="Prix/passage entretien (€)" type="number" style={{fontSize:16}} value={f.prixPassageE||""} onChange={e=>set("prixPassageE",+e.target.value||0)}/>
+          <Input label="Prix/passage contrôle (€)" type="number" style={{fontSize:16}} value={f.prixPassageC||""} onChange={e=>set("prixPassageC",+e.target.value||0)}/>
         </div>
         {/* Récap tarification auto */}
         <div style={{marginTop:12,background:"#0891b2",borderRadius:DS.radiusSm,padding:"14px 16px",color:"#fff"}}>
@@ -989,7 +1039,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
                     <option value="">Choisir…</option>
                     {clients.map(c=><option key={c.id} value={c.id}>{c.nom}</option>)}
                   </select>
-                : <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight:160,overflowY:"auto"}}>
+                : <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight:160,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
                     {clients.map(c=>{
                       const sel=f.clientId===c.id;
                       return (
@@ -1024,7 +1074,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
             </div>
             <div>
               <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>Montant €</span>
-              <input type="number" value={f.montant} onChange={e=>set("montant",e.target.value)} placeholder="0.00"
+              <input type="number" style={{fontSize:16}} value={f.montant} onChange={e=>set("montant",e.target.value)} placeholder="0.00"
                 style={{width:"100%",padding:"11px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:14,outline:"none",boxSizing:"border-box",color:DS.dark,fontFamily:"inherit"}}/>
             </div>
           </div>
@@ -1166,7 +1216,7 @@ function FormRdv({ initial, clients, onSave, onClose }) {
   return (
     <Modal title={isEdit ? "Modifier le RDV" : "Nouveau rendez-vous"} onClose={onClose}>
       <Section title="Client (optionnel)">
-        <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:180,overflowY:"auto"}}>
+        <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:180,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
           <button onClick={()=>set("clientId","")} style={{padding:"8px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+(f.clientId===""?DS.blue:DS.border),background:f.clientId===""?DS.blueSoft:DS.white,cursor:"pointer",textAlign:"left",fontFamily:"inherit",fontSize:15,fontWeight:f.clientId===""?700:400,color:f.clientId===""?DS.blue:DS.mid}}>— Aucun client —</button>
           {clients.map(c=>{
             const sel = f.clientId===c.id;
@@ -1183,7 +1233,7 @@ function FormRdv({ initial, clients, onSave, onClose }) {
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
           <Input label="Date *" type="date" value={f.date} onChange={e=>set("date",e.target.value)}/>
           <Input label="Heure" type="time" value={f.heure} onChange={e=>set("heure",e.target.value)}/>
-          <Input label="Durée (min)" type="number" value={f.duree} onChange={e=>set("duree",e.target.value)}/>
+          <Input label="Durée (min)" type="number" style={{fontSize:16}} value={f.duree} onChange={e=>set("duree",e.target.value)}/>
         </div>
       </Section>
       <Section title="Type">
@@ -1761,7 +1811,7 @@ function NumField({ label, value, onChange, unit, ideal, okFn }) {
         )}
       </div>
       <div style={{display:"flex",alignItems:"center",gap:8}}>
-        <input type="number" step="0.1" value={value===""||value===null||value===undefined?"":value} onChange={e=>onChange(e.target.value===""?"":+e.target.value)}
+        <input type="number" style={{fontSize:16}} step="0.1" value={value===""||value===null||value===undefined?"":value} onChange={e=>onChange(e.target.value===""?"":+e.target.value)}
           style={{flex:1,padding:"8px 10px",borderRadius:8,border:`1.5px solid ${statusColor}`,fontSize:16,fontWeight:800,boxSizing:"border-box",color:statusTx,background:"#fff",transition:"all .2s",outline:"none",fontFamily:"inherit",minWidth:0}}/>
         {hasVal && (
           <div style={{width:28,height:28,borderRadius:14,background:ok?"#22c55e":"#ef4444",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:`0 2px 6px ${ok?"#22c55e":"#ef4444"}44`}}>
@@ -2334,7 +2384,7 @@ function MRow({label,unit,value,onChange,ideal,okFn,icon,color="#0891b2"}) {
         <div style={{fontSize:13,fontWeight:600,color:DS.dark,lineHeight:1.2}}>{label}{unit&&<span style={{fontSize:11,color:"#94a3b8",fontWeight:400}}> ({unit})</span>}</div>
         {ideal&&<div style={{fontSize:10,color:"#94a3b8",marginTop:2,fontWeight:500}}>idéal {ideal}</div>}
       </div>
-      <input type="number" step="0.1" value={value===""||value===null||value===undefined?"":value} onChange={e=>onChange(e.target.value===""?"":+e.target.value)}
+      <input type="number" style={{fontSize:16}} step="0.1" value={value===""||value===null||value===undefined?"":value} onChange={e=>onChange(e.target.value===""?"":+e.target.value)}
         style={{width:72,padding:"8px 10px",borderRadius:9,border:`2px solid ${statusColor}`,fontSize:15,fontWeight:800,boxSizing:"border-box",color:hasVal?(ok?"#16a34a":"#be123c"):DS.dark,background:"#fff",textAlign:"center",outline:"none",fontFamily:"inherit",flexShrink:0,transition:"all .2s"}}/>
       <div style={{width:28,height:28,borderRadius:14,background:!hasVal?"#f1f5f9":ok?"#22c55e":"#ef4444",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .3s",boxShadow:hasVal?`0 2px 6px ${ok?"#22c55e":"#ef4444"}44`:"none"}}>
         {!hasVal
@@ -2575,7 +2625,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                 ))}
               </select>
             ) : (
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,maxHeight:220,overflowY:"auto"}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,maxHeight:220,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
                 {clients.map(c=>{
                   const sel=f.clientId===c.id;
                   return (
@@ -4020,6 +4070,7 @@ function ModalStock({ stock, onClose, onUpdateStock, onAddProduit, onDeleteProdu
 
 export default function App() {
   const [loggedIn, setLoggedIn] = useState(false);
+  const { online, pendingCount } = useOnlineStatus();
   const [page, setPage] = useState("dashboard");
   const [clients, setClients] = useState([]);
   const [passages, setPassages] = useState([]);
@@ -4213,6 +4264,12 @@ export default function App() {
         <div style={{flex:1}} />
         <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
           {/* Import Connecteam */}
+          {/* Indicateur connexion */}
+          <div title={online ? "Connecté" : "Hors-ligne"+(pendingCount>0?` — ${pendingCount} en attente`:"")}
+            style={{display:"flex",alignItems:"center",gap:4,padding:"4px 8px",borderRadius:8,background:"rgba(255,255,255,0.1)",flexShrink:0}}>
+            <div style={{width:7,height:7,borderRadius:"50%",background:online?"#4ade80":"#f87171",boxShadow:online?"0 0 6px #4ade80":"0 0 6px #f87171"}}/>
+            {pendingCount>0&&<span style={{fontSize:10,fontWeight:700,color:"#fde68a"}}>{pendingCount}</span>}
+          </div>
           <button onClick={()=>setShowImport(true)} title="Import Connecteam" style={{width:34,height:34,borderRadius:8,background:"rgba(255,255,255,0.15)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
             <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           </button>
@@ -4260,7 +4317,7 @@ export default function App() {
         /* LAYOUT DESKTOP : sidebar gauche + contenu principal */
         <div style={{display:"flex",flex:1,minHeight:0}}>
           {/* Sidebar navigation desktop */}
-          <div style={{width:220,flexShrink:0,background:"#1e2937",borderRight:"1px solid #374151",display:"flex",flexDirection:"column",padding:"24px 12px",gap:4,position:"sticky",top:62,height:"calc(100vh - 62px)",overflowY:"auto"}}>
+          <div style={{width:220,flexShrink:0,background:"#1e2937",borderRight:"1px solid #374151",display:"flex",flexDirection:"column",padding:"24px 12px",gap:4,position:"sticky",top:62,height:"calc(100vh - 62px)",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
             {/* Stats rapides */}
             <div style={{padding:"12px 14px",borderRadius:10,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",marginBottom:16}}>
               <div style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Aperçu</div>
@@ -4289,7 +4346,7 @@ export default function App() {
             </div>
           </div>
           {/* Contenu principal desktop */}
-          <div style={{flex:1,overflowY:"auto",minWidth:0}}>
+          <div style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",minWidth:0}}>
             <div style={{padding:"20px 32px 80px",maxWidth:860,margin:"0 auto"}}>
               <div style={{marginBottom:16}}>
                 <h2 style={{margin:0,fontSize:24,fontWeight:900,color:DS.dark,letterSpacing:-0.5}}>{PAGE_LABELS[page]}</h2>
@@ -4582,7 +4639,7 @@ function ModalImportConnecteam({ clients, onImport, onClose }) {
               ⚠️ <strong>{unmatchedCount} client(s) non trouvé(s)</strong> — seront créés automatiquement
             </div>
           )}
-          <div style={{maxHeight:360,overflowY:"auto",display:"flex",flexDirection:"column",gap:4}}>
+          <div style={{maxHeight:360,overflowY:"auto",WebkitOverflowScrolling:"touch",display:"flex",flexDirection:"column",gap:4}}>
             {rows.map((r,i)=>{
               const sel = selected.includes(i);
               return (
