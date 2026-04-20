@@ -1384,7 +1384,7 @@ function FormRdv({ initial, clients, onSave, onClose }) {
 
 // FICHE CLIENT (avec diffrenciation Entretien/Contrle)
 function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[], contrats={}, onUpdateContrat, onUpdateClient, onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onDeletePassage, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
-  const [tab, setTab] = useState("infos");
+  const [tab, setTab] = useState("historique");
   const [detailPassageFiche, setDetailPassageFiche] = useState(null);
   const [showFormLiv, setShowFormLiv] = useState(false);
   const [editLiv, setEditLiv] = useState(null);
@@ -1416,95 +1416,93 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
 
   return (
     <Modal title="" onClose={onClose} wide>
-      {/* Hero header — propre et lisible */}
-      <div style={{margin:"-24px -28px 0",marginTop:isMobile?"-18px":"-24px",marginLeft:isMobile?"-20px":"-28px",marginRight:isMobile?"-20px":"-28px"}}>
-        {/* Bandeau photo si disponible */}
+      {/* ═══ HERO CLIENT REDESIGN ═══ */}
+      <div style={{margin:isMobile?"-18px -20px 0":"-24px -28px 0"}}>
+
+        {/* Photo piscine en bannière si dispo */}
         {client.photoPiscine && (
-          <div style={{height:100,background:`url(${client.photoPiscine}) center/cover`,position:"relative"}}>
-            <div style={{position:"absolute",inset:0,background:"linear-gradient(transparent 30%,rgba(12,18,34,0.7))"}}/>
+          <div style={{height:120,background:`url(${client.photoPiscine}) center/cover`,position:"relative",borderRadius:0}}>
+            <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, transparent 40%, rgba(8,145,178,0.85))"}}/>
           </div>
         )}
-        {/* Bloc infos client */}
-        <div style={{background:"linear-gradient(135deg,#0891b2 0%,#06b6d4 100%)",padding:"14px 18px 18px"}}>
-          <div style={{display:"flex",alignItems:"center",gap:14}}>
-            <Avatar nom={client.nom} size={54} photo={null}/>
+
+        {/* HERO HEADER — gradient cyan */}
+        <div style={{background:"linear-gradient(135deg,#0891b2 0%,#06b6d4 100%)",padding:"18px 20px 0",position:"relative",overflow:"hidden"}}>
+          {/* Cercle déco */}
+          <div style={{position:"absolute",top:-40,right:-30,width:140,height:140,borderRadius:"50%",background:"rgba(255,255,255,0.07)",pointerEvents:"none"}}/>
+          <div style={{position:"absolute",bottom:-20,left:-20,width:80,height:80,borderRadius:"50%",background:"rgba(255,255,255,0.05)",pointerEvents:"none"}}/>
+
+          {/* Ligne 1 — Avatar + Nom + badge statut */}
+          <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:12,position:"relative",zIndex:1}}>
+            <Avatar nom={client.nom} size={52} photo={null}/>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontWeight:900,fontSize:17,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:-0.3}}>{client.nom}</div>
-              <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap",alignItems:"center"}}>
-                <span style={{background:"rgba(255,255,255,0.2)",color:"#fff",fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:20,border:"1px solid rgba(255,255,255,0.35)"}}>{client.formule}</span>
-                {client.bassin&&<span style={{background:"rgba(255,255,255,0.15)",color:"rgba(255,255,255,0.9)",fontSize:11,fontWeight:600,padding:"3px 8px",borderRadius:20}}>{client.bassin}{client.volume?" · "+client.volume+"m³":""}</span>}
+              <div style={{fontWeight:900,fontSize:18,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:-0.3,textShadow:"0 1px 3px rgba(0,0,0,0.2)"}}>{client.nom}</div>
+              <div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap",alignItems:"center"}}>
+                <span style={{background:"rgba(255,255,255,0.22)",color:"#fff",fontSize:11,fontWeight:700,padding:"2px 10px",borderRadius:20,backdropFilter:"blur(4px)"}}>{client.formule}</span>
+                {client.bassin&&<span style={{background:"rgba(255,255,255,0.14)",color:"rgba(255,255,255,0.92)",fontSize:11,fontWeight:600,padding:"2px 8px",borderRadius:20}}>{client.bassin}{client.volume?" · "+client.volume+"m³":""}</span>}
               </div>
             </div>
-            <div style={{flexShrink:0}}>
-              <div style={{background:col.bg,color:col.tx,fontSize:12,fontWeight:800,padding:"6px 12px",borderRadius:20,border:"1px solid "+col.bd+"55",textAlign:"center"}}>
-                {col.lbl}
-              </div>
-              {jours!==null&&<div style={{fontSize:11,color:"rgba(255,255,255,0.8)",textAlign:"center",marginTop:3}}>{jours>=0?jours+"j restants":"Expiré !"}</div>}
+            <div style={{flexShrink:0,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
+              <div style={{background:col.bg,color:col.tx,fontSize:12,fontWeight:800,padding:"5px 12px",borderRadius:20,border:"1.5px solid "+col.bd,boxShadow:"0 2px 6px rgba(0,0,0,0.1)"}}>{col.lbl}</div>
+              {jours!==null&&<div style={{fontSize:10,color:"rgba(255,255,255,0.85)",fontWeight:600}}>{jours>=0?jours+"j restants":"⚠️ Expiré"}</div>}
             </div>
+          </div>
+
+          {/* STATS INLINE sur fond hero */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,paddingBottom:16,position:"relative",zIndex:1}}>
+            {/* Entretiens */}
+            <div style={{background:"rgba(255,255,255,0.18)",borderRadius:14,padding:"10px 8px",textAlign:"center",backdropFilter:"blur(8px)"}}>
+              <div style={{fontSize:9,color:"rgba(255,255,255,0.75)",fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:2}}>Entret.</div>
+              <div style={{fontSize:20,fontWeight:900,color:"#fff",lineHeight:1}}>{effE}</div>
+              <div style={{fontSize:10,color:"rgba(255,255,255,0.65)"}}>/ {totalE}</div>
+              <div style={{height:3,background:"rgba(255,255,255,0.2)",borderRadius:99,marginTop:4,overflow:"hidden"}}>
+                <div style={{height:"100%",width:`${totalE>0?Math.min(100,effE/totalE*100):0}%`,background:"#fff",borderRadius:99}}/>
+              </div>
+            </div>
+            {/* Contrôles */}
+            <div style={{background:"rgba(255,255,255,0.18)",borderRadius:14,padding:"10px 8px",textAlign:"center",backdropFilter:"blur(8px)"}}>
+              <div style={{fontSize:9,color:"rgba(255,255,255,0.75)",fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:2}}>Contrôl.</div>
+              <div style={{fontSize:20,fontWeight:900,color:"#fff",lineHeight:1}}>{effC}</div>
+              <div style={{fontSize:10,color:"rgba(255,255,255,0.65)"}}>/ {totalC}</div>
+              <div style={{height:3,background:"rgba(255,255,255,0.2)",borderRadius:99,marginTop:4,overflow:"hidden"}}>
+                <div style={{height:"100%",width:`${totalC>0?Math.min(100,effC/totalC*100):0}%`,background:"#fff",borderRadius:99}}/>
+              </div>
+            </div>
+            {/* Restants */}
+            <div style={{background:rest>0?"rgba(251,191,36,0.25)":"rgba(52,211,153,0.25)",borderRadius:14,padding:"10px 8px",textAlign:"center",backdropFilter:"blur(8px)"}}>
+              <div style={{fontSize:9,color:"rgba(255,255,255,0.75)",fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:2}}>Restants</div>
+              <div style={{fontSize:20,fontWeight:900,color:rest>0?"#fde68a":"#6ee7b7",lineHeight:1}}>{rest>0?rest:pct+"%"}</div>
+              <div style={{fontSize:10,color:"rgba(255,255,255,0.65)"}}>{rest>0?"pass.":"À jour ✓"}</div>
+              <div style={{height:3,background:"rgba(255,255,255,0.2)",borderRadius:99,marginTop:4,overflow:"hidden"}}>
+                <div style={{height:"100%",width:`${pct}%`,background:pct>=100?"#6ee7b7":"#fde68a",borderRadius:99}}/>
+              </div>
+            </div>
+            {/* Mensualité */}
+            {(()=>{
+              const {m11,m1,estRond}=calcMensualites(client.prix||0);
+              return (
+                <div style={{background:"rgba(255,255,255,0.18)",borderRadius:14,padding:"10px 8px",textAlign:"center",backdropFilter:"blur(8px)"}}>
+                  <div style={{fontSize:9,color:"rgba(255,255,255,0.75)",fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:2}}>Mens.</div>
+                  <div style={{fontSize:16,fontWeight:900,color:"#fff",lineHeight:1}}>{m11}<span style={{fontSize:10}}>€</span></div>
+                  <div style={{fontSize:10,color:"rgba(255,255,255,0.65)"}}>{!estRond?"1er: "+m1+"€":"/ mois"}</div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+
+        {/* TABS — collées en bas du hero, flottantes */}
+        <div style={{background:"#eef2f7",padding:"10px 14px 0",borderBottom:"1px solid #dde8f0"}}>
+          <div style={{display:"flex",gap:0,overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+            {[["historique","📋 Historique"],["infos","👤 Infos"],["saisons","📅 Planning"],["passages","📄 Rapports"],["rdvs","🗓 RDV"],["livraisons","🚚 Livr."]].map(([id,l])=>(
+              <button key={id} onClick={()=>setTab(id)} style={{flexShrink:0,padding:"10px 12px",border:"none",cursor:"pointer",fontWeight:tab===id?700:500,fontSize:12,fontFamily:"inherit",background:"transparent",color:tab===id?DS.blue:DS.mid,borderBottom:tab===id?"3px solid "+DS.blue:"3px solid transparent",transition:"all .2s",whiteSpace:"nowrap"}}>{l}</button>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Stats row */}
-      <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(2,minmax(0,1fr))":"repeat(4,minmax(0,1fr))",gap:8,marginTop:14,marginBottom:14,width:"100%"}}>
-        {/* Entretiens */}
-        <div style={{borderRadius:14,background:"#eef2f7",border:"none",boxShadow:"5px 5px 10px rgba(166,210,220,0.6), -4px -4px 8px rgba(255,255,255,0.9)",padding:"12px 10px",display:"flex",flexDirection:"column",gap:4}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <span style={{fontSize:9,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5}}>Entretiens</span>
-            <span style={{width:20,height:20,borderRadius:6,background:"#f0f9ff",display:"flex",alignItems:"center",justifyContent:"center"}}>🔧</span>
-          </div>
-          <div style={{fontSize:18,fontWeight:900,color:DS.blue,lineHeight:1}}>{effE}<span style={{fontSize:11,color:DS.mid,fontWeight:400}}>/{totalE}</span></div>
-          <div style={{height:3,background:"#dde8f0",borderRadius:99,overflow:"hidden"}}>
-            <div style={{height:"100%",width:`${totalE>0?Math.min(100,effE/totalE*100):0}%`,background:DS.blue,borderRadius:99,transition:"width .5s"}}/>
-          </div>
-        </div>
-        {/* Contrôles */}
-        <div style={{borderRadius:14,background:"#eef2f7",border:"none",boxShadow:"5px 5px 10px rgba(166,210,220,0.6), -4px -4px 8px rgba(255,255,255,0.9)",padding:"12px 10px",display:"flex",flexDirection:"column",gap:4}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <span style={{fontSize:9,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5}}>Contrôles</span>
-            <span style={{width:20,height:20,borderRadius:6,background:"#f0f9ff",display:"flex",alignItems:"center",justifyContent:"center"}}>💧</span>
-          </div>
-          <div style={{fontSize:18,fontWeight:900,color:"#0e7490",lineHeight:1}}>{effC}<span style={{fontSize:11,color:DS.mid,fontWeight:400}}>/{totalC}</span></div>
-          <div style={{height:3,background:"#dde8f0",borderRadius:99,overflow:"hidden"}}>
-            <div style={{height:"100%",width:`${totalC>0?Math.min(100,effC/totalC*100):0}%`,background:"#0e7490",borderRadius:99,transition:"width .5s"}}/>
-          </div>
-        </div>
-        {/* Avancement */}
-        <div style={{borderRadius:10,background:pct>=100?"#f0fdf4":rest>5?"#fffbeb":"#f0f9ff",border:"1px solid "+(pct>=100?"#86efac":rest>5?"#fde68a":"#bae6fd"),padding:"10px 8px",display:"flex",flexDirection:"column",gap:4}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <span style={{fontSize:9,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5}}>{rest>0?"Restants":"Avancement"}</span>
-            <span style={{fontSize:12}}>{pct>=100?"✅":rest>5?"⏳":"🔵"}</span>
-          </div>
-          <div style={{fontSize:18,fontWeight:900,color:pct>=100?DS.green:rest>5?"#b45309":DS.blue,lineHeight:1}}>
-            {rest>0?rest:pct}<span style={{fontSize:11,fontWeight:400,color:DS.mid}}>{rest>0?" pass.":"%"}</span>
-          </div>
-          <div style={{height:3,background:"#dde8f0",borderRadius:99,overflow:"hidden"}}>
-            <div style={{height:"100%",width:`${pct}%`,background:pct>=100?"#059669":"#0891b2",borderRadius:99,transition:"width .5s"}}/>
-          </div>
-        </div>
-        {/* Mensualité */}
-        <div style={{borderRadius:14,background:"#eef2f7",border:"none",boxShadow:"5px 5px 10px rgba(166,210,220,0.6), -4px -4px 8px rgba(255,255,255,0.9)",padding:"12px 10px",display:"flex",flexDirection:"column",gap:4}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <span style={{fontSize:9,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5}}>Mensualité</span>
-            <span style={{width:20,height:20,borderRadius:6,background:"#f0fdf4",display:"flex",alignItems:"center",justifyContent:"center"}}>💶</span>
-          </div>
-          {(()=>{
-            const {m1,m11,estRond}=calcMensualites(client.prix||0);
-            return <>
-              <div style={{fontSize:18,fontWeight:900,color:"#059669",lineHeight:1}}>{m11}<span style={{fontSize:11,fontWeight:400,color:DS.mid}}>€</span></div>
-              {!estRond&&<div style={{fontSize:9,color:"#b45309",fontWeight:600}}>1er: {m1}€</div>}
-              {estRond&&<div style={{fontSize:9,color:DS.mid}}>/ mois × 12</div>}
-            </>;
-          })()}
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div style={{display:"flex",gap:4,marginBottom:16,background:"#e4ecf2",borderRadius:16,padding:4}}>
-        {[["infos","Infos"],["saisons","Planning"],["passages","Rapports"],["timeline","Timeline"],["rdvs","RDV"],["livraisons","Livraisons"]].map(([id,l])=>(
-          <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"8px 4px",borderRadius:12,border:"none",cursor:"pointer",fontWeight:tab===id?700:500,fontSize:12,fontFamily:"inherit",background:tab===id?"#eef2f7":"transparent",color:tab===id?DS.blue:DS.mid,boxShadow:tab===id?"4px 4px 8px rgba(166,210,220,0.55), -3px -3px 6px rgba(255,255,255,0.85)":"none",transition:"all .2s"}}>{l}</button>
-        ))}
-      </div>
+      {/* Espacement après hero */}
+      <div style={{marginTop:16}}/>
 
       {/* Tab: Infos */}
       {tab==="infos" && (
@@ -1676,92 +1674,169 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
 
 
       {/* Tab: Timeline */}
-      {tab==="timeline" && (
-        <div className="fade-in" style={{display:"flex",flexDirection:"column",gap:0,position:"relative"}}>
-          {/* Ligne verticale */}
-          <div style={{position:"absolute",left:20,top:8,bottom:8,width:3,background:"linear-gradient(180deg,#06b6d4,#0891b2 60%,#dde8f0)",borderRadius:99,zIndex:0}}/>
+      {tab==="historique" && (
+        <div className="fade-in">
           {(()=>{
-            // Fusionner passages + livraisons + rdvs en timeline triée
             const passClient = passages.filter(p=>p.clientId===client.id);
             const livClient = (livraisons||[]).filter(l=>l.clientId===client.id);
             const rdvClient2 = (rdvs||[]).filter(r=>r.clientId===client.id);
-            const events = [
-              // Contrat créé
-              ...(client.dateDebut ? [{
-                date: client.dateDebut,
-                type: "contrat",
-                icon: "📄",
-                color: DS.blue,
-                bg: DS.blueSoft,
-                title: "Contrat démarré",
-                sub: client.formule + (client.prix ? " · " + client.prix + "€/an" : ""),
-              }] : []),
-              // Passages
-              ...passClient.map(p => ({
-                date: p.date,
-                type: "passage",
-                icon: p.type?.toLowerCase().includes("contrôle") ? "💧" : "🔧",
-                color: p.type?.toLowerCase().includes("contrôle") ? "#0e7490" : DS.blue,
-                bg: p.type?.toLowerCase().includes("contrôle") ? "#e0f2fe" : DS.blueSoft,
-                title: p.type || "Passage",
-                sub: [p.tech ? "Par " + p.tech : null, p.ph ? "pH " + p.ph : null, p.chlore ? "Cl " + p.chlore : null].filter(Boolean).join(" · "),
-                ok: p.ok,
-                id: p.id,
-                _p: p,
-              })),
-              // Livraisons
-              ...livClient.map(l => ({
-                date: l.date,
-                type: "livraison",
-                icon: "🚚",
-                color: "#f59e0b",
-                bg: "#fffbeb",
-                title: "Livraison",
-                sub: [l.produits?.join(", "), l.montant ? l.montant + "€" : null].filter(Boolean).join(" · "),
-              })),
-              // RDVs passés
-              ...rdvClient2.filter(r=>r.date<TODAY).map(r => ({
-                date: r.date,
-                type: "rdv",
-                icon: "📅",
-                color: DS.purple,
-                bg: DS.purpleSoft,
-                title: r.type || "Rendez-vous",
-                sub: r.heure ? r.heure + (r.duree ? " · " + r.duree + " min" : "") : "",
-              })),
-            ].sort((a,b) => b.date.localeCompare(a.date));
 
-            if (events.length === 0) return (
-              <div style={{textAlign:"center",padding:"40px 20px",color:DS.mid,fontSize:14}}>
-                Aucun événement pour ce client
+            // Compteurs rapides
+            const nbPass = passClient.length;
+            const nbLiv = livClient.length;
+            const nbRdv = rdvClient2.length;
+
+            const TYPE_META = {
+              contrat:  { dot:"#0891b2", label:"Contrat",   accent:"#e0f2fe" },
+              passage:  { dot:"#0891b2", label:"Rapport",   accent:"#e0f2fe" },
+              controle: { dot:"#0e7490", label:"Contrôle",  accent:"#ccfbf1" },
+              livraison:{ dot:"#f59e0b", label:"Livraison", accent:"#fef3c7" },
+              rdv:      { dot:"#818cf8", label:"RDV",       accent:"#ede9fe" },
+            };
+
+            const events = [
+              ...(client.dateDebut ? [{
+                date: client.dateDebut, type:"contrat",
+                title:"Contrat démarré",
+                chips:[client.formule, client.prix?(client.prix+"€/an"):null].filter(Boolean),
+                badge:{label:"Début",color:"#0891b2",bg:"#e0f2fe"},
+              }] : []),
+              ...passClient.map(p => {
+                const isCtrl = isControleType(p.type);
+                const chips = [
+                  p.tech?"👤 "+p.tech:null,
+                  p.ph?"pH "+p.ph:null,
+                  p.chlore?"Cl "+p.chlore:null,
+                  p.temperature?p.temperature+"°C":null,
+                ].filter(Boolean);
+                return {
+                  date:p.date, type:isCtrl?"controle":"passage",
+                  title: p.type||"Passage",
+                  chips,
+                  obs: p.obs||p.actions||null,
+                  badge: p.ok?{label:"OK",color:"#059669",bg:"#dcfce7"}:{label:"En cours",color:"#b45309",bg:"#fef3c7"},
+                  _p: p,
+                };
+              }),
+              ...livClient.map(l=>({
+                date:l.date, type:"livraison",
+                title:"Livraison",
+                chips:[l.produits?.slice(0,3).join(", ")||(l.produits?.length?" produit":""), l.montant?(l.montant+"€"):null].filter(Boolean),
+                badge:{label:l.statut==="paye"?"Payé":l.statut==="facture"?"Facturé":"À facturer",color:l.statut==="paye"?"#059669":l.statut==="facture"?"#0891b2":"#b45309",bg:l.statut==="paye"?"#dcfce7":l.statut==="facture"?"#e0f2fe":"#fef3c7"},
+              })),
+              ...rdvClient2.map(r=>({
+                date:r.date, type:"rdv",
+                title:r.type||"Rendez-vous",
+                chips:[r.heure?("⏰ "+r.heure):null, r.duree?(r.duree+" min"):null, r.description||null].filter(Boolean),
+                badge: r.date>=TODAY?{label:"À venir",color:"#818cf8",bg:"#ede9fe"}:{label:"Passé",color:"#94a3b8",bg:"#f1f5f9"},
+              })),
+            ].sort((a,b)=>b.date.localeCompare(a.date));
+
+            if(events.length===0) return (
+              <div style={{textAlign:"center",padding:"52px 20px",display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
+                <div style={{fontSize:40}}>📋</div>
+                <div style={{fontWeight:700,fontSize:15,color:DS.dark}}>Aucun historique</div>
+                <div style={{fontSize:13,color:DS.mid}}>Les passages, livraisons et RDV apparaîtront ici</div>
               </div>
             );
 
-            return events.map((ev, i) => (
-              <div key={i} style={{display:"flex",gap:14,alignItems:"flex-start",paddingBottom:16,position:"relative",zIndex:1}}>
-                {/* Pastille */}
-                <div style={{width:44,height:44,borderRadius:14,background:ev.bg,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,boxShadow:"4px 4px 8px rgba(166,210,220,0.55), -3px -3px 6px rgba(255,255,255,0.85)",border:"2px solid #fff"}}>
-                  {ev.icon}
-                </div>
-                {/* Contenu */}
-                <div style={{flex:1,background:"#eef2f7",borderRadius:14,padding:"10px 14px",boxShadow:"4px 4px 8px rgba(166,210,220,0.5), -3px -3px 6px rgba(255,255,255,0.85)",minWidth:0}}>
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
-                    <span style={{fontWeight:700,fontSize:14,color:ev.color}}>{ev.title}</span>
-                    <span style={{fontSize:11,color:DS.mid,fontWeight:600,flexShrink:0}}>
-                      {new Date(ev.date).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})}
-                    </span>
-                  </div>
-                  {ev.sub && <div style={{fontSize:12,color:DS.mid,marginTop:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ev.sub}</div>}
-                  {ev.type==="passage" && ev._p && (
-                    <div style={{display:"flex",gap:6,marginTop:8}}>
-                      <button onClick={(e)=>{e.stopPropagation();ouvrirRapport(ev._p,client);}} style={{padding:"5px 10px",borderRadius:8,background:"#eef2f7",border:"none",cursor:"pointer",fontSize:11,fontWeight:700,color:DS.blue,fontFamily:"inherit",boxShadow:"3px 3px 5px rgba(166,210,220,0.5), -2px -2px 4px rgba(255,255,255,0.8)",display:"flex",alignItems:"center",gap:4}}>
-                        {Ico.pdf(10,DS.blue)} Rapport PDF
-                      </button>
+            // Grouper par mois
+            const grouped = {};
+            events.forEach(ev=>{
+              const d=new Date(ev.date);
+              const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+              if(!grouped[key]) grouped[key]=[];
+              grouped[key].push(ev);
+            });
+            const keys = Object.keys(grouped).sort((a,b)=>b.localeCompare(a));
+
+            return (
+              <div>
+                {/* Résumé rapide */}
+                <div style={{display:"flex",gap:8,marginBottom:16}}>
+                  {[
+                    {n:nbPass, label:"Rapports", icon:"🔧", color:"#0891b2", bg:"#e0f2fe"},
+                    {n:nbLiv,  label:"Livraisons",icon:"🚚", color:"#f59e0b", bg:"#fef3c7"},
+                    {n:nbRdv,  label:"RDV",       icon:"📅", color:"#818cf8", bg:"#ede9fe"},
+                  ].map(({n,label,icon,color,bg})=>(
+                    <div key={label} style={{flex:1,background:"#eef2f7",borderRadius:14,padding:"10px 8px",textAlign:"center",boxShadow:"4px 4px 8px rgba(166,210,220,0.55), -3px -3px 6px rgba(255,255,255,0.85)"}}>
+                      <div style={{fontSize:18}}>{icon}</div>
+                      <div style={{fontSize:20,fontWeight:900,color,lineHeight:1.1}}>{n}</div>
+                      <div style={{fontSize:10,color:DS.mid,fontWeight:600}}>{label}</div>
                     </div>
-                  )}
+                  ))}
                 </div>
+
+                {/* Timeline groupée par mois */}
+                {keys.map(key=>{
+                  const [yr,mo]=key.split("-");
+                  const label=MOIS_L[parseInt(mo)]+" "+yr;
+                  const evts=grouped[key];
+                  return (
+                    <div key={key} style={{marginBottom:20}}>
+                      {/* En-tête mois */}
+                      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+                        <div style={{height:1,flex:1,background:"linear-gradient(90deg,#dde8f0,transparent)"}}/>
+                        <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:1,padding:"3px 12px",background:"#eef2f7",borderRadius:20,boxShadow:"2px 2px 5px rgba(166,210,220,0.4), -1px -1px 3px rgba(255,255,255,0.8)"}}>{label}</span>
+                        <div style={{height:1,flex:1,background:"linear-gradient(90deg,transparent,#dde8f0)"}}/>
+                      </div>
+
+                      {/* Événements du mois */}
+                      <div style={{position:"relative",paddingLeft:36}}>
+                        {/* Ligne verticale */}
+                        <div style={{position:"absolute",left:11,top:4,bottom:4,width:2,background:"linear-gradient(180deg,#06b6d4,#dde8f0)",borderRadius:99}}/>
+
+                        {evts.map((ev,i)=>{
+                          const meta = TYPE_META[ev.type]||TYPE_META.passage;
+                          const d = new Date(ev.date);
+                          return (
+                            <div key={i} style={{position:"relative",marginBottom:i<evts.length-1?12:0}}>
+                              {/* Pastille sur la ligne */}
+                              <div style={{position:"absolute",left:-25,top:12,width:14,height:14,borderRadius:"50%",background:meta.dot,boxShadow:"0 0 0 3px #eef2f7, 0 0 0 4px "+meta.dot+"55",zIndex:2}}/>
+
+                              {/* Carte événement */}
+                              <div style={{background:"#eef2f7",borderRadius:16,padding:"12px 14px",boxShadow:"4px 4px 8px rgba(166,210,220,0.55), -3px -3px 6px rgba(255,255,255,0.85)"}}>
+                                {/* Header carte */}
+                                <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:ev.chips?.length||ev.obs?8:0}}>
+                                  <div style={{flex:1,minWidth:0}}>
+                                    <div style={{fontWeight:700,fontSize:13,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ev.title}</div>
+                                    <div style={{fontSize:11,color:DS.mid,marginTop:1}}>
+                                      {d.toLocaleDateString("fr",{weekday:"short",day:"2-digit",month:"short"})}
+                                    </div>
+                                  </div>
+                                  <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
+                                    {ev.badge&&<span style={{fontSize:10,fontWeight:700,color:ev.badge.color,background:ev.badge.bg,padding:"2px 8px",borderRadius:10,whiteSpace:"nowrap"}}>{ev.badge.label}</span>}
+                                  </div>
+                                </div>
+
+                                {/* Chips infos */}
+                                {ev.chips?.length>0&&(
+                                  <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:ev.obs?6:0}}>
+                                    {ev.chips.map((c,ci)=>(
+                                      <span key={ci} style={{fontSize:10,fontWeight:600,color:DS.mid,background:"rgba(255,255,255,0.7)",padding:"2px 8px",borderRadius:8,border:"1px solid #dde8f0"}}>{c}</span>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Observation */}
+                                {ev.obs&&<div style={{fontSize:11,color:DS.mid,fontStyle:"italic",padding:"5px 8px",background:"rgba(255,255,255,0.5)",borderRadius:8,borderLeft:"3px solid "+meta.dot}}>{ev.obs}</div>}
+
+                                {/* Bouton PDF pour passages */}
+                                {ev.type==="passage"&&ev._p&&(
+                                  <button onClick={e=>{e.stopPropagation();ouvrirRapport(ev._p,client);}} style={{marginTop:8,display:"inline-flex",alignItems:"center",gap:5,padding:"5px 10px",borderRadius:10,background:"#eef2f7",border:"none",cursor:"pointer",fontSize:11,fontWeight:700,color:DS.blue,fontFamily:"inherit",boxShadow:"3px 3px 5px rgba(166,210,220,0.5), -2px -2px 4px rgba(255,255,255,0.8)"}}>
+                                    {Ico.pdf(10,DS.blue)} Voir rapport PDF
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            ));
+            );
           })()}
         </div>
       )}
