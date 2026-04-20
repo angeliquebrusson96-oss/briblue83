@@ -1728,7 +1728,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
               </a>}
             </div>
           )}
-          <div style={{background:"#fff",borderRadius:14,border:"1px solid #f1f5f9",overflow:"hidden"}}>
+          <div style={{background:"#fff",borderRadius:14,border:"1px solid #f1f5f9",overflow:"hidden",marginBottom:16}}>
           {[
             {ico:Ico.phone(15,DS.blue),l:"Téléphone",v:client.tel,href:client.tel?"tel:"+client.tel:null},
             {ico:Ico.mail(15,DS.blue),l:"Email",v:client.email,href:client.email?"mailto:"+client.email:null},
@@ -1746,6 +1746,44 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
               </div>
             </div>
           ))}
+          </div>
+
+          {/* Statut contrat */}
+          {(()=>{
+            const ct=contratClient;
+            if(!ct) return null;
+            const cfg={
+              signe_complet:{bg:"#f0fdf4",border:"#6ee7b7",color:DS.green,label:"✅ Contrat co-signé",sub:"Signé le "+new Date(ct.signedAt||0).toLocaleDateString("fr")},
+              signe_client: {bg:"#eff6ff",border:"#93c5fd",color:DS.blue,label:"📝 Client signé",sub:"En attente de votre signature"},
+              signe:        {bg:"#f0fdf4",border:"#6ee7b7",color:DS.green,label:"✅ Contrat signé",sub:""},
+            }[ct.statut]||{bg:"#fff7ed",border:"#fed7aa",color:DS.orange,label:"📨 En attente de signature",sub:""};
+            return <div style={{background:cfg.bg,border:"1px solid "+cfg.border,borderRadius:10,padding:"8px 12px",display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,fontWeight:800,color:cfg.color}}>{cfg.label}</div>
+                {cfg.sub&&<div style={{fontSize:10,color:DS.mid,marginTop:1}}>{cfg.sub}</div>}
+              </div>
+            </div>;
+          })()}
+
+          {/* Boutons actions */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:8}}>
+            <button onClick={()=>{ouvrirContrat(client,contratClient?.signaturePrestataire||"",contratClient?.signatureClient||"");if(!contratClient?.statut&&onUpdateContrat)onUpdateContrat("CT-"+client.id,{clientId:client.id,statut:"cree"});}}
+              style={{height:44,borderRadius:12,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,boxShadow:"0 2px 8px rgba(2,132,199,0.25)",WebkitTapHighlightColor:"transparent"}}>
+              {Ico.contract(12,"#fff")} Contrat
+            </button>
+            <button onClick={()=>envoyerContratSignature(client)}
+              style={{height:44,borderRadius:12,background:contratClient?.statut==="signe_complet"?DS.greenSoft:contratClient?.statut==="signe_client"?DS.blueSoft:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,WebkitTapHighlightColor:"transparent"}}>
+              {Ico.sign(12,contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff")}
+              {contratClient?.statut==="signe_complet"?"Signé":contratClient?.statut==="signe_client"?"Attente":"Envoyer"}
+            </button>
+            <button onClick={onEdit}
+              style={{height:44,borderRadius:12,background:"#f1f5f9",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,WebkitTapHighlightColor:"transparent"}}>
+              {Ico.edit(12,DS.dark)} Modifier
+            </button>
+            <button onClick={onDelete}
+              style={{width:44,height:44,borderRadius:12,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",WebkitTapHighlightColor:"transparent"}}>
+              {Ico.trash(14,DS.red)}
+            </button>
           </div>
         </div>
       )}
@@ -1848,88 +1886,120 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
       )}
       {detailPassageFiche && <PassageDetailModal passage={detailPassageFiche} client={client} onClose={()=>setDetailPassageFiche(null)}/>}
 
-      {/* ══════ BARRE D'ACTION FLOTTANTE ══════ */}
-      <div style={{marginTop:20,paddingTop:14,borderTop:"1px solid #f1f5f9"}}>
-        {/* Statut contrat */}
-        {(()=>{
-          const ct=contratClient;
-          if(!ct) return null;
-          const cfg={
-            signe_complet:{bg:"#f0fdf4",border:"#6ee7b7",color:DS.green,label:"✅ Contrat co-signé",sub:"Signé le "+new Date(ct.signedAt||0).toLocaleDateString("fr")},
-            signe_client: {bg:"#eff6ff",border:"#93c5fd",color:DS.blue,label:"📝 Client signé",sub:"En attente de votre signature"},
-            signe:        {bg:"#f0fdf4",border:"#6ee7b7",color:DS.green,label:"✅ Contrat signé",sub:""},
-          }[ct.statut]||{bg:"#fff7ed",border:"#fed7aa",color:DS.orange,label:"📨 En attente de signature",sub:""};
-          return <div style={{background:cfg.bg,border:"1px solid "+cfg.border,borderRadius:10,padding:"8px 12px",display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-            <div style={{flex:1}}>
-              <div style={{fontSize:12,fontWeight:800,color:cfg.color}}>{cfg.label}</div>
-              {cfg.sub&&<div style={{fontSize:10,color:DS.mid,marginTop:1}}>{cfg.sub}</div>}
-            </div>
-          </div>;
-        })()}
-
-        {/* Boutons principaux */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:8}}>
-          <button onClick={()=>{ouvrirContrat(client,contratClient?.signaturePrestataire||"",contratClient?.signatureClient||"");if(!contratClient?.statut&&onUpdateContrat)onUpdateContrat("CT-"+client.id,{clientId:client.id,statut:"cree"});}}
-            style={{height:44,borderRadius:12,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,boxShadow:"0 2px 8px rgba(2,132,199,0.25)",WebkitTapHighlightColor:"transparent"}}>
-            {Ico.contract(12,"#fff")} Contrat
-          </button>
-          <button onClick={()=>envoyerContratSignature(client)}
-            style={{height:44,borderRadius:12,background:contratClient?.statut==="signe_complet"?DS.greenSoft:contratClient?.statut==="signe_client"?DS.blueSoft:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,WebkitTapHighlightColor:"transparent"}}>
-            {Ico.sign(12,contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff")}
-            {contratClient?.statut==="signe_complet"?"Signé":contratClient?.statut==="signe_client"?"Attente":"Envoyer"}
-          </button>
-          <button onClick={onEdit}
-            style={{height:44,borderRadius:12,background:"#f1f5f9",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,WebkitTapHighlightColor:"transparent"}}>
-            {Ico.edit(12,DS.dark)} Modifier
-          </button>
-          <button onClick={onDelete}
-            style={{width:44,height:44,borderRadius:12,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",WebkitTapHighlightColor:"transparent"}}>
-            {Ico.trash(14,DS.red)}
-          </button>
-        </div>
-      </div>
-
       {/* ── CARNET ── */}
       {tab==="carnet" && (()=>{
         const code=generateCarnetCode(client.id);
         const carnetUrl=window.location.origin+window.location.pathname+"?carnet="+code;
-        const qrUrl=`https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=8&data=${encodeURIComponent(carnetUrl)}`;
+        const qrUrl=`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=10&data=${encodeURIComponent(carnetUrl)}`;
+        const lastPass = passC.find(p=>p.ok);
         return (
-          <div className="fade-in" style={{paddingTop:4}}>
-            <div style={{background:"linear-gradient(135deg,#0c1f3f,#0e3460)",borderRadius:16,padding:18,marginBottom:14,display:"flex",gap:16,alignItems:"center"}}>
-              <div style={{width:88,height:88,borderRadius:12,overflow:"hidden",flexShrink:0,border:"3px solid rgba(255,255,255,0.1)",background:"#fff"}}>
-                <img src={qrUrl} alt="QR Code" width={88} height={88} style={{display:"block"}} onError={e=>{e.target.style.display="none";}}/>
+          <div className="fade-in" style={{display:"flex",flexDirection:"column",gap:14}}>
+
+            {/* QR Card principale */}
+            <div style={{background:"linear-gradient(145deg,#0c1f3f,#0e3460,#0a5a8a)",borderRadius:20,padding:"24px 20px",position:"relative",overflow:"hidden",boxShadow:"0 8px 32px rgba(8,145,178,0.25)"}}>
+              {/* Décos */}
+              <div style={{position:"absolute",right:-30,top:-30,width:140,height:140,borderRadius:"50%",background:"rgba(8,145,178,0.12)",pointerEvents:"none"}}/>
+              <div style={{position:"absolute",left:-20,bottom:-20,width:100,height:100,borderRadius:"50%",background:"rgba(255,255,255,0.03)",pointerEvents:"none"}}/>
+
+              {/* Badge BRIBLUE */}
+              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:18,position:"relative"}}>
+                <svg width={16} height={12} viewBox="0 0 32 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/>
+                  <path d="M2 16c2.5 3 5 3 7.5 0S14 13 16.5 16s5 3 7.5 0"/>
+                </svg>
+                <span style={{fontSize:10,fontWeight:800,color:"rgba(255,255,255,0.5)",letterSpacing:1,textTransform:"uppercase"}}>Carnet numérique</span>
               </div>
-              <div style={{flex:1}}>
-                <div style={{fontSize:9,color:"rgba(255,255,255,0.45)",fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Code d'accès</div>
-                <div style={{fontSize:22,fontWeight:900,color:"#7dd3fc",letterSpacing:4,fontFamily:"monospace",marginBottom:10}}>{code}</div>
-                <div style={{display:"flex",gap:6}}>
-                  <button onClick={()=>{try{navigator.clipboard.writeText(carnetUrl);toastSuccess("Lien copié !");}catch{}}} style={{flex:1,padding:"7px 6px",background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:8,fontSize:10,fontWeight:700,color:"#fff",cursor:"pointer",fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>
-                    Copier lien
-                  </button>
-                  <button onClick={()=>{const w=window.open("","_blank");w.document.write(`<html><body style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;background:#f8fafc;gap:16px;padding:32px"><div style="font-size:22px;font-weight:900;color:#1e3a5f">Carnet BRIBLUE</div><div style="font-size:14px;color:#64748b">${client.nom}</div><img src="${qrUrl}" width="200" height="200"/><div style="font-size:32px;font-weight:900;letter-spacing:6px;color:#0891b2">${code}</div><div style="font-size:11px;color:#94a3b8;text-align:center">Scannez le QR code ou rendez-vous sur<br/>${carnetUrl}</div><script>window.print();<\/script></body></html>`);w.document.close();}} style={{flex:1,padding:"7px 6px",background:"rgba(8,145,178,0.25)",border:"1px solid rgba(8,145,178,0.4)",borderRadius:8,fontSize:10,fontWeight:700,color:"#7dd3fc",cursor:"pointer",fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>
-                    Imprimer
-                  </button>
+
+              {/* Contenu principal : QR + code */}
+              <div style={{display:"flex",gap:18,alignItems:"center",position:"relative"}}>
+                {/* QR Code */}
+                <div style={{width:96,height:96,borderRadius:14,overflow:"hidden",flexShrink:0,background:"#fff",padding:4,boxShadow:"0 4px 16px rgba(0,0,0,0.3)"}}>
+                  <img src={qrUrl} alt="QR" width={88} height={88} style={{display:"block",borderRadius:8}} onError={e=>{e.target.style.display="none";}}/>
+                </div>
+                {/* Nom + code */}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:16,fontWeight:900,color:"#fff",marginBottom:4,lineHeight:1.2}}>{client.nom}</div>
+                  <div style={{fontSize:10,color:"rgba(255,255,255,0.45)",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>Code d'accès</div>
+                  <div style={{fontSize:26,fontWeight:900,color:"#7dd3fc",letterSpacing:4,fontFamily:"'Courier New',monospace",background:"rgba(125,211,252,0.08)",borderRadius:8,padding:"4px 10px",display:"inline-block"}}>{code}</div>
                 </div>
               </div>
+
+              {/* Boutons d'action */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:18,position:"relative"}}>
+                <button onClick={()=>{try{navigator.clipboard.writeText(carnetUrl);toastSuccess("Lien copié !");}catch{}}}
+                  style={{padding:"10px 8px",background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.14)",borderRadius:10,fontSize:12,fontWeight:700,color:"#e2e8f0",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6,WebkitTapHighlightColor:"transparent"}}>
+                  <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                  Copier le lien
+                </button>
+                <button onClick={()=>{const w=window.open("","_blank");w.document.write(`<html><body style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;background:#f8fafc;gap:16px;padding:32px"><div style="font-size:22px;font-weight:900;color:#1e3a5f">Carnet BRIBLUE</div><div style="font-size:14px;color:#64748b">${client.nom}</div><img src="${qrUrl}" width="200" height="200"/><div style="font-size:32px;font-weight:900;letter-spacing:6px;color:#0891b2">${code}</div><div style="font-size:11px;color:#94a3b8;text-align:center">Scannez le QR code ou rendez-vous sur<br/>${carnetUrl}</div><script>window.print();<\/script></body></html>`);w.document.close();}}
+                  style={{padding:"10px 8px",background:"rgba(8,145,178,0.2)",border:"1px solid rgba(8,145,178,0.35)",borderRadius:10,fontSize:12,fontWeight:700,color:"#7dd3fc",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6,WebkitTapHighlightColor:"transparent"}}>
+                  <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                  Imprimer QR
+                </button>
+              </div>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-              <div style={{background:"#f0fdf4",borderRadius:12,padding:"10px 12px",border:"1px solid #bbf7d0"}}>
-                <div style={{fontSize:10,fontWeight:800,color:"#166534",marginBottom:6}}>✅ Visible client</div>
-                {["Interventions effectuées","pH, chlore, température","Date et type d'entretien"].map(t=>(
-                  <div key={t} style={{fontSize:10,color:"#166534",marginBottom:3,display:"flex",gap:5,alignItems:"center"}}>
-                    <svg width={8} height={8} viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>{t}
+
+            {/* Dernière intervention */}
+            {lastPass && (
+              <div style={{background:"#fff",borderRadius:16,border:"1px solid #f1f5f9",padding:"14px 16px",boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+                <div style={{fontSize:10,fontWeight:800,color:"#94a3b8",textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>Dernière intervention</div>
+                <div style={{display:"flex",alignItems:"center",gap:12}}>
+                  <div style={{width:42,height:42,borderRadius:12,background:"linear-gradient(135deg,#0891b2,#0e7490)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:18}}>
+                    {isControleType(lastPass.type)?"💧":"🔧"}
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:14,fontWeight:800,color:"#0f172a"}}>{lastPass.type||"Entretien"}</div>
+                    <div style={{fontSize:12,color:"#64748b",marginTop:2}}>
+                      {new Date(lastPass.date).toLocaleDateString("fr",{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}
+                      {lastPass.tech&&<span style={{color:"#94a3b8"}}> · {lastPass.tech}</span>}
+                    </div>
+                  </div>
+                  {(lastPass.ph||lastPass.chlore)&&(
+                    <div style={{display:"flex",gap:5,flexShrink:0}}>
+                      {lastPass.ph&&<div style={{background:lastPass.ph>=7&&lastPass.ph<=7.6?"#dcfce7":"#fef2f2",borderRadius:8,padding:"4px 8px",textAlign:"center"}}>
+                        <div style={{fontSize:8,color:lastPass.ph>=7&&lastPass.ph<=7.6?"#166534":"#b91c1c",fontWeight:700}}>pH</div>
+                        <div style={{fontSize:14,fontWeight:900,color:lastPass.ph>=7&&lastPass.ph<=7.6?"#166534":"#b91c1c",lineHeight:1}}>{lastPass.ph}</div>
+                      </div>}
+                      {lastPass.chlore&&<div style={{background:lastPass.chlore>=0.5&&lastPass.chlore<=3?"#dcfce7":"#fef2f2",borderRadius:8,padding:"4px 8px",textAlign:"center"}}>
+                        <div style={{fontSize:8,color:lastPass.chlore>=0.5&&lastPass.chlore<=3?"#166534":"#b91c1c",fontWeight:700}}>Cl</div>
+                        <div style={{fontSize:14,fontWeight:900,color:lastPass.chlore>=0.5&&lastPass.chlore<=3?"#166534":"#b91c1c",lineHeight:1}}>{lastPass.chlore}</div>
+                      </div>}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Ce que voit le client */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div style={{background:"#f0fdf4",borderRadius:14,padding:"12px 14px",border:"1px solid #bbf7d0"}}>
+                <div style={{fontSize:11,fontWeight:800,color:"#166534",marginBottom:8,display:"flex",alignItems:"center",gap:5}}>
+                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  Visible client
+                </div>
+                {["Interventions réalisées","pH · chlore · température","Date et type d'entretien","Nom du technicien"].map(t=>(
+                  <div key={t} style={{fontSize:11,color:"#166534",marginBottom:4,display:"flex",gap:5,alignItems:"flex-start"}}>
+                    <span style={{color:"#22c55e",flexShrink:0,marginTop:1}}>•</span>{t}
                   </div>
                 ))}
               </div>
-              <div style={{background:"#fff7ed",borderRadius:12,padding:"10px 12px",border:"1px solid #fed7aa"}}>
-                <div style={{fontSize:10,fontWeight:800,color:"#9a3412",marginBottom:6}}>🔒 Caché</div>
-                {["Prix et tarifs","Notes privées","Autres clients","Statut contrat"].map(t=>(
-                  <div key={t} style={{fontSize:10,color:"#9a3412",marginBottom:3,display:"flex",gap:5,alignItems:"center"}}>
-                    <svg width={8} height={8} viewBox="0 0 24 24" fill="none" stroke="#ea580c" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>{t}
+              <div style={{background:"#fff7ed",borderRadius:14,padding:"12px 14px",border:"1px solid #fed7aa"}}>
+                <div style={{fontSize:11,fontWeight:800,color:"#9a3412",marginBottom:8,display:"flex",alignItems:"center",gap:5}}>
+                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#ea580c" strokeWidth="2.5" strokeLinecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                  Caché
+                </div>
+                {["Prix et tarifs","Notes privées","Autres clients","Données contrat"].map(t=>(
+                  <div key={t} style={{fontSize:11,color:"#9a3412",marginBottom:4,display:"flex",gap:5,alignItems:"flex-start"}}>
+                    <span style={{color:"#f97316",flexShrink:0,marginTop:1}}>•</span>{t}
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Lien URL */}
+            <div style={{background:"#f8fafc",borderRadius:12,padding:"10px 14px",border:"1px solid #e2e8f0"}}>
+              <div style={{fontSize:9,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:.8,marginBottom:4}}>Lien du carnet</div>
+              <div style={{fontSize:11,color:"#0891b2",fontWeight:600,wordBreak:"break-all",lineHeight:1.5}}>{carnetUrl}</div>
             </div>
           </div>
         );
