@@ -25,6 +25,8 @@ const BRAND_LOGO = `data:image/svg+xml;utf8,${encodeURIComponent(`
 </svg>`)}`;
 
 
+const LOGO_FICHE = "data:image/png;base64,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";
+
 // ICNES SVG PREMIUM
 const Ico = {
 // Pool-themed professional icons
@@ -1383,7 +1385,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
 
       {/* Tabs */}
       <div style={{display:"flex",gap:0,marginBottom:16,background:DS.light,borderRadius:DS.radiusSm,padding:3}}>
-        {[["infos","Infos"],["saisons","Planning"],["passages","Passages"],["rdvs","RDV"],["livraisons","Livraisons"]].map(([id,l])=>(
+        {[["infos","Infos"],["saisons","Planning"],["passages","Fiches Entretien"],["rdvs","RDV"],["livraisons","Livraisons"]].map(([id,l])=>(
           <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"9px 4px",borderRadius:10,border:"none",cursor:"pointer",fontWeight:tab===id?800:600,fontSize:15,fontFamily:"inherit",background:tab===id?DS.white:"transparent",color:tab===id?DS.dark:DS.mid,boxShadow:tab===id?"0 1px 4px rgba(0,0,0,0.08)":"none",transition:"all .25s"}}>{l}</button>
         ))}
       </div>
@@ -3799,6 +3801,11 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
 
   return (
     <div>
+      {/* Header Fiches Entretien avec logo */}
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+        <img src={LOGO_FICHE} style={{width:28,height:28,objectFit:"contain"}}/>
+        <span style={{fontWeight:800,fontSize:17,color:DS.dark}}>Fiches Entretien</span>
+      </div>
       <div style={{display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
         <div style={{display:"flex",gap:6,flex:1,background:DS.light,borderRadius:DS.radius,padding:4}}>
           {[["semaine","7 jours",Ico.clock],[" mois","Ce mois",Ico.calendar],["tout","Tout",Ico.clipboard]].map(([v,l,ico])=>{
@@ -3811,9 +3818,10 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
             );
           })}
         </div>
-        <BtnPrimary onClick={onAdd} bg={DS.blue} icon={Ico.plus(14,"#fff")} style={{flexShrink:0,padding:"10px 14px",fontSize:13,borderRadius:DS.radiusSm}}>
-          Nouveau
-        </BtnPrimary>
+        <button onClick={onAdd} className="btn-hover" style={{flexShrink:0,padding:"9px 12px",background:DS.blue,border:"none",borderRadius:DS.radiusSm,cursor:"pointer",display:"flex",alignItems:"center",gap:7,fontFamily:"inherit",fontWeight:700,fontSize:13,color:"#fff"}}>
+          <img src={LOGO_FICHE} style={{width:16,height:16,objectFit:"contain",filter:"brightness(0) invert(1)"}}/>
+          Fiche Entretien
+        </button>
       </div>
       {filtered.length===0
         ? <div style={{textAlign:"center",color:DS.mid,padding:40,fontSize:13}}>Aucun passage sur cette période</div>
@@ -4236,11 +4244,11 @@ export default function App() {
   const NAV = [
     { id:"dashboard", l:"Accueil", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#38bdf8":"rgba(255,255,255,0.35)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M5 16c2 2 4 2 6 0s4-2 6 0" opacity={a?1:0.4}/><path d="M9 21V14h6v7"/></svg> },
     { id:"clients",   l:"Clients", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#38bdf8":"rgba(255,255,255,0.35)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a4 4 0 014-4h8a4 4 0 014 4v2"/></svg> },
-    { id:"interventions", l:"Passages", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#38bdf8":"rgba(255,255,255,0.35)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 12c2 2.5 4 2.5 6 0s4-2.5 6 0 4 2.5 6 0"/><line x1="8" y1="4" x2="8" y2="2"/><line x1="16" y1="4" x2="16" y2="2"/></svg> },
+    { id:"interventions", l:"Fiches Entretien", icon:(a)=><img src={LOGO_FICHE} style={{width:22,height:22,objectFit:"contain",filter:a?"invert(60%) sepia(100%) saturate(400%) hue-rotate(170deg)":"brightness(0) invert(1)",opacity:a?1:0.35}}/> },
     { id:"rdv", l:"RDV", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#818cf8":"rgba(255,255,255,0.35)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="12" cy="15" r="2.5" fill={a?"#818cf8":"none"}/></svg> },
   ];
 
-  const PAGE_LABELS = { dashboard:`Bonjour Dorian 👋`, clients:"Clients", passages:"Passages", interventions:"Passages", rdv:"Rendez-vous" };
+  const PAGE_LABELS = { dashboard:`Bonjour Dorian 👋`, clients:"Clients", passages:"Fiches Entretien", interventions:"Fiches Entretien", rdv:"Rendez-vous" };
 
   return (
     <>
@@ -4286,8 +4294,9 @@ export default function App() {
             </button>
           )}
           {/* Nouveau passage */}
-          <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} className="btn-hover" title="Nouveau passage" style={{width:34,height:34,borderRadius:8,background:"rgba(255,255,255,0.15)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-            {Ico.clipboard(16,"rgba(255,255,255,0.85)")}
+          <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} className="btn-hover" title="Fiche Entretien" style={{height:34,padding:"0 10px",borderRadius:8,background:"rgba(255,255,255,0.15)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+            <img src={LOGO_FICHE} style={{width:16,height:16,objectFit:"contain",filter:"brightness(0) invert(1)"}}/>
+            {!isMobile&&<span style={{fontSize:12,fontWeight:700,color:"rgba(255,255,255,0.9)"}}>Fiche Entretien</span>}
           </button>
           {/* Séparateur vertical */}
           <div style={{width:1,height:20,background:"rgba(255,255,255,0.2)",flexShrink:0}}/>
