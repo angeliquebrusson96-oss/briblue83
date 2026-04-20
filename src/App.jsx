@@ -130,76 +130,15 @@ function getMoisVal(mpm, m) { const d = migrateMois(mpm); return d[m] || d[Strin
 // DÉDUCTION AUTOMATIQUE : passage ⭐ non prévu
 // Si en mois M les passages effectués > planning, l'excédent
 // est déduit du mois précédent ou suivant qui a un déficit.
-// Retourne { moisParMoisEffectif, deductions }
-// deductions = [{moisExtra, moisDeduit, typeLabel, n}]
 // ═══════════════════════════════════════════════════════════
-function computeDeductions(mpm, passagesClient, contractStart, contractEnd) {
-  const yearRef = contractStart ? parseInt(contractStart.slice(0,4)) : YEAR_NOW;
-
-  // Pour chaque mois, calculer passages effectués dans la plage contrat
-  const done = {}; // done[m] = {e, c}
-  for (let m = 1; m <= 12; m++) {
-    const passM = passagesClient.filter(p => {
-      const d = new Date(p.date);
-      if (d.getMonth()+1 !== m) return false;
-      if (contractStart && contractEnd) {
-        const ds = String(p.date).slice(0,10);
-        return ds >= contractStart && ds <= contractEnd;
-      }
-      return d.getFullYear() === yearRef;
-    });
-    done[m] = {
-      e: passM.filter(p => isEntretienType(p.type)).length,
-      c: passM.filter(p => isControleType(p.type)).length,
-    };
-  }
-
-  // Planning prévu
+// Planning brut sans déduction automatique — retourne simplement le planning prévu par mois
+function getPlanningMois(mpm) {
   const plan = {};
   for (let m = 1; m <= 12; m++) {
     const v = getMoisVal(mpm, m);
     plan[m] = { e: v.entretien, c: v.controle };
   }
-
-  // Copie modifiable du planning effectif (pour affichage après déduction)
-  const eff = {};
-  for (let m = 1; m <= 12; m++) eff[m] = { e: plan[m].e, c: plan[m].c };
-
-  const deductions = [];
-
-  for (let m = 1; m <= 12; m++) {
-    const extraE = Math.max(0, done[m].e - plan[m].e);
-    const extraC = Math.max(0, done[m].c - plan[m].c);
-
-    // Pour chaque type (E puis C), chercher mois précédent ou suivant avec déficit
-    const tryDeduce = (type, extra) => {
-      let remaining = extra;
-      // Cherche mois précédent (m-1) puis suivant (m+1)
-      for (const candidate of [m - 1, m + 1]) {
-        if (candidate < 1 || candidate > 12 || remaining <= 0) continue;
-        const planVal = type === 'e' ? plan[candidate].e : plan[candidate].c;
-        const doneVal = type === 'e' ? done[candidate].e : done[candidate].c;
-        const deficit = Math.max(0, planVal - doneVal);
-        if (deficit > 0) {
-          const n = Math.min(remaining, deficit);
-          // On "crédite" le mois candidat : son planning effectif diminue du déficit comblé
-          if (type === 'e') eff[candidate].e = Math.max(0, eff[candidate].e - n);
-          else eff[candidate].c = Math.max(0, eff[candidate].c - n);
-          deductions.push({
-            moisExtra: m,
-            moisDeduit: candidate,
-            typeLabel: type === 'e' ? '🔧 Entretien' : '💧 Contrôle',
-            n,
-          });
-          remaining -= n;
-        }
-      }
-    };
-    if (extraE > 0) tryDeduce('e', extraE);
-    if (extraC > 0) tryDeduce('c', extraC);
-  }
-
-  return { moisParMoisEffectif: eff, deductions };
+  return plan;
 }
 
 
@@ -380,13 +319,13 @@ function alerteClient(c, passages) {
     return new Date(p.date).getFullYear() === yearCur;
   });
 
-  // Calcul avec déductions automatiques (passages ⭐ non prévus)
-  const { moisParMoisEffectif: mpmEff } = computeDeductions(mpm, passContrat, cs, ce);
+  // Planning brut (sans déduction automatique)
+  const mpmPlan = getPlanningMois(mpm);
 
   // Ne vérifier que les mois qui sont DANS la plage du contrat ET passés
   let retard = false;
   for (let m = 1; m < moisCur; m++) {
-    const effPlan = (mpmEff[m]?.e||0) + (mpmEff[m]?.c||0);
+    const effPlan = (mpmPlan[m]?.e||0) + (mpmPlan[m]?.c||0);
     if (effPlan === 0) continue;
     const moisStr = `${yearCur}-${String(m).padStart(2,'0')}-01`;
     if (cs && moisStr < cs.slice(0,8)+'01') continue;
@@ -573,6 +512,8 @@ const GlobalStyles = () => (
     html { scroll-behavior: smooth; }
     body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f8fafc; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
     input, select, textarea, button { font-family: inherit; }
+    input, select, textarea { background: #ffffff !important; color: #0f172a !important; -webkit-text-fill-color: #0f172a !important; color-scheme: light; }
+    input::placeholder, textarea::placeholder { color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important; }
     input:focus, select:focus, textarea:focus { outline: none; border-color: ${DS.blue} !important; box-shadow: 0 0 0 3px ${DS.blue}22 !important; }
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-track { background: #f3f4f6; border-radius: 99px; }
@@ -1588,17 +1529,16 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
             ? `${new Date(contractStart).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})} → ${new Date(contractEnd).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})}`
             : MOIS_L[moisCourant];
           const mpmRaw = client.moisParMois || client.saisons || {};
-          const { moisParMoisEffectif: mpmEff, deductions } = computeDeductions(mpmRaw, passC, contractStart, contractEnd);
+          const mpmPlan = getPlanningMois(mpmRaw);
           return <>
         <div style={{fontSize:12,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
           📅 <span>{label}</span>
         </div>
         <div style={{border:"1px solid "+DS.border,borderRadius:DS.radiusSm,overflow:"hidden"}}>
           {[1,2,3,4,5,6,7,8,9,10,11,12].map((m,i)=>{
-            const prevE = getMoisVal(mpmRaw, m).entretien;
-            const prevC = getMoisVal(mpmRaw, m).controle;
-            const prevT = prevE + prevC;
-            // Filtrer les passages dans la plage du contrat pour ce mois
+            const planE = mpmPlan[m].e;
+            const planC = mpmPlan[m].c;
+            const planT = planE + planC;
             const passM = passC.filter(p=>{
               const d = new Date(p.date);
               const dMois = d.getMonth()+1;
@@ -1611,35 +1551,20 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
             });
             const doneE = passM.filter(p=>isEntretienType(p.type)).length;
             const doneC = passM.filter(p=>isControleType(p.type)).length;
-            const extraE = Math.max(0, doneE - prevE);
-            const extraC = Math.max(0, doneC - prevC);
-            const hasExtra = extraE > 0 || extraC > 0;
-            // Planning effectif après déduction
-            const effE = mpmEff[m].e;
-            const effC = mpmEff[m].c;
-            const effT = effE + effC;
-            const rest = Math.max(0, effT - doneE - doneC);
-            // Déductions qui impactent ce mois
-            const dedM = deductions.filter(d=>d.moisDeduit===m);
-            const dedSource = deductions.filter(d=>d.moisExtra===m);
+            const doneT = doneE + doneC;
+            const rest = Math.max(0, planT - doneT);
             const sc = SAISONS_META[getSaison(m)] || SAISONS_META.ete;
             const cur = m === MOIS_NOW;
-            const wasDedFrom = dedM.length > 0; // ce mois a absorbé un extra d'un autre mois
-            return <div key={m} style={{display:"flex",alignItems:"center",padding:"9px 12px",borderBottom:i<11?"1px solid "+DS.border:"none",background:cur?sc.bg:wasDedFrom?"#fefce8":i%2===0?DS.white:"#f9fafb"}}>
-              <div style={{width:4,height:22,borderRadius:2,background:wasDedFrom?"#f59e0b":sc.color,marginRight:8,flexShrink:0}}/>
-              <div style={{width:42,fontWeight:cur?800:600,fontSize:15,color:cur?sc.color:wasDedFrom?"#b45309":DS.mid}}>{MOIS[m]}</div>
+            return <div key={m} style={{display:"flex",alignItems:"center",padding:"9px 12px",borderBottom:i<11?"1px solid "+DS.border:"none",background:cur?sc.bg:i%2===0?DS.white:"#f9fafb"}}>
+              <div style={{width:4,height:22,borderRadius:2,background:sc.color,marginRight:8,flexShrink:0}}/>
+              <div style={{width:42,fontWeight:cur?800:600,fontSize:15,color:cur?sc.color:DS.mid}}>{MOIS[m]}</div>
               <div style={{flex:1,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                {prevE>0||doneE>0 ? <span style={{fontSize:15,fontWeight:700,color:doneE>=effE?DS.green:DS.blue}}>🔧 {doneE}/{effE}{prevE!==effE?<sup style={{fontSize:10,color:"#b45309"}}> ({prevE}→{effE})</sup>:null}</span> : null}
-                {prevC>0||doneC>0 ? <span style={{fontSize:15,fontWeight:700,color:doneC>=effC?DS.green:DS.teal}}>💧 {doneC}/{effC}{prevC!==effC?<sup style={{fontSize:10,color:"#b45309"}}> ({prevC}→{effC})</sup>:null}</span> : null}
-                {prevT===0 && doneE===0 && doneC===0 ? <span style={{fontSize:15,color:"#d1d5db"}}>—</span> : null}
-                {hasExtra && <span title={`${extraE+extraC} passage${extraE+extraC>1?"s":""} non prévu — déduit sur mois adjacent`} style={{fontSize:15,lineHeight:1}}>⭐</span>}
-                {dedM.map((d,i)=>(
-                  <span key={i} title={`${d.typeLabel} déduit depuis ${MOIS[d.moisExtra]}`} style={{fontSize:10,fontWeight:700,color:"#b45309",background:"#fef3c7",padding:"1px 6px",borderRadius:4,border:"1px solid #fcd34d"}}>
-                    ← {MOIS[d.moisExtra]}
-                  </span>
-                ))}
+                {planE>0||doneE>0 ? <span style={{fontSize:15,fontWeight:700,color:doneE>=planE?DS.green:DS.blue}}>🔧 {doneE}/{planE}</span> : null}
+                {planC>0||doneC>0 ? <span style={{fontSize:15,fontWeight:700,color:doneC>=planC?DS.green:DS.teal}}>💧 {doneC}/{planC}</span> : null}
+                {planT===0 && doneT===0 ? <span style={{fontSize:15,color:"#d1d5db"}}>—</span> : null}
+                {doneT>planT ? <span style={{fontSize:10,fontWeight:700,color:DS.blue,background:DS.blueSoft,padding:"1px 6px",borderRadius:4,border:"1px solid "+DS.border}}>+{doneT-planT} suppl.</span> : null}
               </div>
-              {effT>0 ? <div style={{fontSize:15,fontWeight:700,color:rest>0?DS.orange:DS.green,background:rest>0?DS.orangeSoft:DS.greenSoft,padding:"2px 8px",borderRadius:6}}>{rest>0?rest+" rest.":"✓"}</div> : null}
+              {planT>0 ? <div style={{fontSize:15,fontWeight:700,color:rest>0?DS.orange:DS.green,background:rest>0?DS.orangeSoft:DS.greenSoft,padding:"2px 8px",borderRadius:6}}>{rest>0?rest+" rest.":"✓"}</div> : null}
             </div>;
           })}
         </div>
@@ -1647,17 +1572,6 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           <span style={{color:"rgba(255,255,255,0.7)",fontSize:15,fontWeight:600}}>Total annuel</span>
           <span style={{color:"#fff",fontSize:15,fontWeight:800}}>🔧 {totalE}  ·  💧 {totalC}  ·  {total} passages</span>
         </div>
-        {deductions.length>0&&(
-          <div style={{marginTop:8,padding:"8px 12px",background:"#fffbeb",borderRadius:DS.radiusSm,border:"1px solid #fcd34d"}}>
-            <div style={{fontSize:11,fontWeight:800,color:"#b45309",textTransform:"uppercase",letterSpacing:.7,marginBottom:5}}>⭐ Déductions automatiques</div>
-            {deductions.map((d,i)=>(
-              <div key={i} style={{fontSize:12,color:"#92400e",marginBottom:2}}>
-                {d.typeLabel} de <strong>{MOIS[d.moisExtra]}</strong> déduit sur <strong>{MOIS[d.moisDeduit]}</strong> ({d.n} passage{d.n>1?"s":""})
-              </div>
-            ))}
-          </div>
-        )}
-        <div style={{marginTop:8,fontSize:15,color:DS.mid,display:"flex",alignItems:"center",gap:5}}>⭐ = passage non prévu — déduit automatiquement sur mois adjacent</div>
           </>;
         })()}
       </div>}
@@ -2617,8 +2531,9 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
   useEffect(()=>{ const el=document.querySelector('[data-modal-body="1"]'); if(el) el.scrollTop=0; },[step]);
   const isSAV = f.type==="SAV";
   const isDevis = f.type==="Demande de devis";
+  const isSansDonnees = f.type==="Passage sans données";
   const isSimplified = isSAV || isDevis;
-  const STEPS = isSimplified ? 3 : 6;
+  const STEPS = isSansDonnees ? 1 : isSimplified ? 3 : 6;
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
 
   const ph=Number(f.tPH)||Number(f.ph);
@@ -2628,7 +2543,8 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
     if(!f.clientId||!f.date){ toastWarn("Client et date requis"); return; }
     const isSAVsave = f.type==="SAV";
     const isDevissave = f.type==="Demande de devis";
-    const isSimplifiedSave = isSAVsave || isDevissave;
+    const isSansDonneesSave = f.type==="Passage sans données";
+    const isSimplifiedSave = isSAVsave || isDevissave || isSansDonneesSave;
     const passage = {
       ...f,
       id: isEdit ? f.id : uid(),
@@ -2705,7 +2621,10 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
     {ic:DEVIS_ICON,l:isMobile?"Devis":"Détail devis",color:"#7c3aed"},
     {ic:STEP_ICONS[5],l:isMobile?"Sign.":"Clôture",color:"#059669"},
   ];
-  const STEP_INFO = isSAV ? STEP_INFO_SAV : isDevis ? STEP_INFO_DEVIS : STEP_INFO_FULL;
+  const STEP_INFO_SANS = [
+    {ic:(c="currentColor",s=16)=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16" strokeWidth="2.5"/></svg>,l:"Enregistrer",color:"#64748b"},
+  ];
+  const STEP_INFO = isSansDonnees ? STEP_INFO_SANS : isSAV ? STEP_INFO_SAV : isDevis ? STEP_INFO_DEVIS : STEP_INFO_FULL;
 
   const Stepper = () => {
     const pct = Math.round((step-1)/STEPS*100);
@@ -2872,6 +2791,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                 {v:"Fin de rattrapage",ico:Ico.check,col:"#059669",bg:"#d1fae5"},
                 {v:"SAV",ico:(s,c)=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17" strokeWidth="2.5"/></svg>,col:"#dc2626",bg:"#fef2f2"},
                 {v:"Demande de devis",ico:(s,c)=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/><path d="M9 9h1"/></svg>,col:"#7c3aed",bg:"#f5f3ff"},
+                {v:"Passage sans données",ico:(s,c)=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16" strokeWidth="2.5"/></svg>,col:"#64748b",bg:"#f1f5f9"},
               ].map(({v,ico,col,bg})=>{
                 const sel=f.type===v;
                 return (
@@ -2954,6 +2874,45 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                 </div>
               );
             })()}
+          </div>
+        </div>
+      )}
+
+      {isSansDonnees && step===1 && (
+        <div className="fade-in" style={{display:"flex",flexDirection:"column",gap:16}}>
+          <div style={{padding:"16px",background:"#f8fafc",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,display:"flex",alignItems:"flex-start",gap:12}}>
+            <div style={{width:36,height:36,borderRadius:10,background:"#e2e8f0",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16" strokeWidth="2.5"/></svg>
+            </div>
+            <div>
+              <div style={{fontSize:13,fontWeight:700,color:"#475569",marginBottom:3}}>Passage sans données</div>
+              <div style={{fontSize:12,color:DS.mid}}>Ce passage sera enregistré avec la date et le type uniquement, sans mesures ni rapport.</div>
+            </div>
+          </div>
+          <div>
+            <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>Type d'intervention</span>
+            <div style={{display:"flex",flexDirection:"column",gap:5}}>
+              {[
+                {v:"Entretien complet",col:"#0284c7"},
+                {v:"Contrôle d'eau",col:"#0891b2"},
+                {v:"Visite technique",col:"#4f46e5"},
+                {v:"Bassin en rattrapage",col:"#b45309"},
+              ].map(({v,col})=>{
+                const sel=f.commentaires===v||(f.commentaires===''&&v==="Entretien complet");
+                return (
+                  <button key={v} onClick={()=>set("commentaires",v)} className="btn-hover"
+                    style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",borderRadius:12,border:`1.5px solid ${sel?col:DS.border}`,background:sel?col+"12":DS.white,cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:sel?700:400,color:sel?col:DS.mid,transition:"all .2s"}}>
+                    {v}
+                    {sel&&<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft:"auto"}}><polyline points="20 6 9 17 4 12"/></svg>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div>
+            <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>Note (optionnel)</span>
+            <textarea value={f.obs||""} onChange={e=>set("obs",e.target.value)} placeholder="Ex: Passage effectué, client absent..."
+              style={{width:"100%",padding:"11px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:13,minHeight:80,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark}}/>
           </div>
         </div>
       )}
