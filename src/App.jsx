@@ -1416,65 +1416,41 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
 
   return (
     <Modal title="" onClose={onClose} wide>
-      {/* ═══ HERO — style E-Wallet card ═══ */}
+      {/* ═══ HERO ═══ */}
       <div style={{margin:isMobile?"-18px -20px 0":"-24px -28px 0"}}>
 
-        {/* Bannière photo piscine */}
-        {client.photoPiscine&&(
-          <div style={{height:90,background:`url(${client.photoPiscine}) center/cover`,position:"relative"}}>
-            <div style={{position:"absolute",inset:0,background:"rgba(8,145,178,0.45)"}}/>
-          </div>
-        )}
-
-        {/* HERO — gradient profond */}
-        <div style={{background:"linear-gradient(160deg,#0e7490 0%,#0891b2 55%,#22d3ee 100%)",padding:"20px 20px 0",position:"relative",overflow:"hidden"}}>
-
-          {/* Vague déco SVG en fond */}
-          <svg style={{position:"absolute",bottom:0,left:0,width:"100%",opacity:.08,pointerEvents:"none"}} viewBox="0 0 400 60" preserveAspectRatio="none">
-            <path d="M0 40 C80 10 160 60 240 30 C320 0 360 50 400 20 L400 60 L0 60Z" fill="white"/>
-          </svg>
-
-          {/* Identité client */}
-          <div style={{display:"flex",alignItems:"flex-start",gap:14,marginBottom:16,position:"relative",zIndex:1}}>
-            <Avatar nom={client.nom} size={50} photo={null}/>
+        {/* Bandeau couleur avec nom */}
+        <div style={{background:"#0891b2",padding:"24px 20px 20px"}}>
+          {/* Nom + statut */}
+          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,marginBottom:20}}>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontWeight:900,fontSize:17,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:-0.5}}>{client.nom}</div>
-              <div style={{fontSize:12,color:"rgba(255,255,255,0.7)",marginTop:3,fontWeight:500}}>
-                {[client.formule,client.bassin,client.volume?client.volume+"m³":null].filter(Boolean).join(" · ")}
-              </div>
-              {/* Barre progression globale */}
-              <div style={{marginTop:8}}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                  <span style={{fontSize:10,color:"rgba(255,255,255,0.6)",fontWeight:600,letterSpacing:.3}}>AVANCEMENT</span>
-                  <span style={{fontSize:10,color:pct>=100?"#6ee7b7":rest>0?"#fde68a":"#fff",fontWeight:700}}>{pct}%</span>
-                </div>
-                <div style={{height:4,background:"rgba(255,255,255,0.2)",borderRadius:99,overflow:"hidden"}}>
-                  <div className="scale-in" style={{height:"100%",width:`${pct}%`,background:pct>=100?"#6ee7b7":rest>0?"#fde68a":"#fff",borderRadius:99,transition:"width 1s cubic-bezier(.22,1,.36,1)"}}/>
-                </div>
+              <div style={{fontSize:20,fontWeight:900,color:"#fff",lineHeight:1.2,marginBottom:6}}>{client.nom}</div>
+              <div style={{fontSize:13,color:"rgba(255,255,255,0.75)",fontWeight:500}}>
+                {[client.formule,client.bassin].filter(Boolean).join(" · ")}
+                {jours!==null&&<span style={{marginLeft:8,fontWeight:700,color:jours<=30?"#fde68a":"rgba(255,255,255,0.9)"}}>{jours>=0?jours+"j restants":"Expiré"}</span>}
               </div>
             </div>
-            {/* Statut + jours */}
-            <div style={{flexShrink:0,textAlign:"right"}}>
-              <div style={{fontSize:12,fontWeight:800,color:col.tx,background:col.bg,padding:"4px 10px",borderRadius:20}}>{col.lbl}</div>
-              {jours!==null&&<div style={{fontSize:10,color:"rgba(255,255,255,0.65)",marginTop:4,fontWeight:600}}>{jours>=0?jours+"j":"Expiré"}</div>}
-            </div>
+            <div style={{background:col.bg,color:col.tx,fontSize:13,fontWeight:800,padding:"6px 14px",borderRadius:22,flexShrink:0,whiteSpace:"nowrap"}}>{col.lbl}</div>
           </div>
 
-          {/* STATS ROW — 4 chiffres en ligne, typographie seule */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",borderTop:"1px solid rgba(255,255,255,0.15)",position:"relative",zIndex:1}}>
+          {/* 4 stats — grandes, lisibles, fond semi-transparent */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
             {[
-              {label:"Entretiens", val:`${effE}/${totalE}`, accent:"#fff", pct:totalE>0?effE/totalE*100:0},
-              {label:"Contrôles",  val:`${effC}/${totalC}`, accent:"#67e8f9", pct:totalC>0?effC/totalC*100:0},
-              {label:"Restants",   val:rest>0?String(rest):"OK",  accent:rest>0?"#fde68a":"#6ee7b7", sub:rest>0?"pass.":""},
-              {label:"Mensualité", val:(()=>{const {m11}=calcMensualites(client.prix||0);return m11+"€";})(), accent:"#a7f3d0"},
-            ].map(({label,val,accent,pct:p,sub},i)=>(
-              <div key={i} style={{padding:"12px 6px 10px",textAlign:"center",borderRight:i<3?"1px solid rgba(255,255,255,0.1)":"none"}}>
-                <div style={{fontSize:8,color:"rgba(255,255,255,0.55)",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:3}}>{label}</div>
-                <div style={{fontSize:18,fontWeight:900,color:accent,lineHeight:1,letterSpacing:-0.5}}>{val}</div>
-                {sub!==undefined&&sub&&<div style={{fontSize:9,color:"rgba(255,255,255,0.45)",marginTop:1}}>{sub}</div>}
-                {p!==undefined&&(
-                  <div style={{height:2,background:"rgba(255,255,255,0.15)",borderRadius:99,marginTop:5,overflow:"hidden"}}>
-                    <div style={{height:"100%",width:`${Math.min(100,p)}%`,background:accent,borderRadius:99,transition:"width 1s"}}/>
+              {label:"Entretiens effectués", val:effE, total:totalE, color:"#fff"},
+              {label:"Contrôles effectués",  val:effC, total:totalC, color:"#a5f3fc"},
+              {label:"Passages restants",    val:rest, total:total,  color:rest>0?"#fde68a":"#a7f3d0", big:true},
+              {label:"Mensualité",           val:(()=>{const {m11}=calcMensualites(client.prix||0);return m11;})(), suffix:"€/mois", color:"#a7f3d0"},
+            ].map(({label,val,total,color,suffix,big},i)=>(
+              <div key={i} style={{background:"rgba(0,0,0,0.15)",borderRadius:14,padding:"14px 16px"}}>
+                <div style={{fontSize:11,color:"rgba(255,255,255,0.6)",fontWeight:600,marginBottom:6,textTransform:"uppercase",letterSpacing:.5}}>{label}</div>
+                <div style={{display:"flex",alignItems:"baseline",gap:4}}>
+                  <span style={{fontSize:big?32:28,fontWeight:900,color,lineHeight:1}}>{val}</span>
+                  {total!==undefined&&<span style={{fontSize:13,color:"rgba(255,255,255,0.45)",fontWeight:500}}>/{total}</span>}
+                  {suffix&&<span style={{fontSize:13,color:"rgba(255,255,255,0.6)",fontWeight:500}}>{suffix}</span>}
+                </div>
+                {total!==undefined&&total>0&&(
+                  <div style={{height:3,background:"rgba(255,255,255,0.15)",borderRadius:99,marginTop:8,overflow:"hidden"}}>
+                    <div style={{height:"100%",width:Math.min(100,val/total*100)+"%",background:color,borderRadius:99,transition:"width 1s"}}/>
                   </div>
                 )}
               </div>
@@ -1482,32 +1458,33 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           </div>
         </div>
 
-        {/* TABS underline — sans emoji */}
-        <div style={{background:"#eef2f7",borderBottom:"1px solid #dde8f0",overflowX:"auto",WebkitOverflowScrolling:"touch",display:"flex"}}>
+        {/* TABS */}
+        <div style={{background:"#fff",display:"flex",borderBottom:"1.5px solid #f1f5f9",overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
           {[["historique","Historique"],["infos","Infos"],["saisons","Planning"],["passages","Rapports"],["rdvs","RDV"],["livraisons","Livraisons"]].map(([id,l])=>(
-            <button key={id} onClick={()=>setTab(id)} style={{flexShrink:0,padding:"11px 14px",border:"none",cursor:"pointer",fontWeight:tab===id?700:500,fontSize:12,fontFamily:"inherit",background:"transparent",color:tab===id?DS.blue:"#94a3b8",borderBottom:tab===id?"2.5px solid "+DS.blue:"2.5px solid transparent",transition:"color .2s, border-color .2s",whiteSpace:"nowrap",letterSpacing:.1}}>{l}</button>
+            <button key={id} onClick={()=>setTab(id)} style={{flexShrink:0,padding:"14px 16px",border:"none",cursor:"pointer",fontWeight:tab===id?800:500,fontSize:13,fontFamily:"inherit",background:"transparent",color:tab===id?DS.blue:"#94a3b8",borderBottom:tab===id?"2px solid "+DS.blue:"2px solid transparent",transition:"all .15s",whiteSpace:"nowrap"}}>{l}</button>
           ))}
         </div>
       </div>
 
-      <div style={{marginTop:16}}/>
+      {/* Contenu */}
+      <div style={{paddingTop:20}}>
 
       {/* Tab: Infos */}
       {tab==="infos" && (
-        <div className="fade-in" style={{display:"flex",flexDirection:"column",gap:6}}>
+        <div className="fade-in">
           {[
-            {ico:Ico.phone(13,DS.blue),l:"Téléphone",v:client.tel,href:client.tel?"tel:"+client.tel:null},
-            {ico:Ico.mail(13,DS.blue),l:"Email",v:client.email,href:client.email?"mailto:"+client.email:null},
-            {ico:Ico.pin(13,DS.blue),l:"Adresse",v:client.adresse},
-            {ico:Ico.pool(13,DS.blue),l:"Bassin",v:[client.bassin,client.volume?client.volume+" m³":null].filter(Boolean).join(" — ")},
-            {ico:Ico.calendar(13,DS.blue),l:"Début",v:client.dateDebut?new Date(client.dateDebut).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}):null},
-            {ico:Ico.calendar(13,DS.orange),l:"Fin",v:client.dateFin?new Date(client.dateFin).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}):null},
-          ].filter(r=>r.v).map(r=>(
-            <div key={r.l} style={{display:"flex",gap:12,padding:"12px 16px",background:"#eef2f7",borderRadius:14,alignItems:"center",border:"none",boxShadow:"4px 4px 8px rgba(166,210,220,0.55), -3px -3px 6px rgba(255,255,255,0.85)"}}>
-              <div style={{width:32,height:32,borderRadius:8,background:DS.blueSoft,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{r.ico}</div>
+            {ico:Ico.phone(16,DS.blue),l:"Téléphone",v:client.tel,href:client.tel?"tel:"+client.tel:null},
+            {ico:Ico.mail(16,DS.blue),l:"Email",v:client.email,href:client.email?"mailto:"+client.email:null},
+            {ico:Ico.pin(16,DS.blue),l:"Adresse",v:client.adresse},
+            {ico:Ico.pool(16,DS.blue),l:"Bassin",v:[client.bassin,client.volume?client.volume+" m³":null].filter(Boolean).join(" — ")},
+            {ico:Ico.calendar(16,DS.blue),l:"Début contrat",v:client.dateDebut?new Date(client.dateDebut).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}):null},
+            {ico:Ico.calendar(16,DS.orange),l:"Fin contrat",v:client.dateFin?new Date(client.dateFin).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}):null},
+          ].filter(r=>r.v).map((r,i,arr)=>(
+            <div key={r.l} style={{display:"flex",gap:16,padding:"16px 0",alignItems:"center",borderBottom:i<arr.length-1?"1px solid #f1f5f9":"none"}}>
+              <div style={{width:42,height:42,borderRadius:12,background:"#f0f9ff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{r.ico}</div>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,color:DS.mid,fontWeight:600,textTransform:"uppercase",letterSpacing:.5}}>{r.l}</div>
-                {r.href ? <a href={r.href} style={{fontSize:15,color:DS.blue,fontWeight:700,textDecoration:"none"}}>{r.v}</a> : <div style={{fontSize:15,color:DS.dark,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis"}}>{r.v}</div>}
+                <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.6,marginBottom:3}}>{r.l}</div>
+                {r.href?<a href={r.href} style={{fontSize:15,color:DS.blue,fontWeight:700,textDecoration:"none"}}>{r.v}</a>:<div style={{fontSize:15,color:"#0f172a",fontWeight:600}}>{r.v}</div>}
               </div>
             </div>
           ))}
@@ -1666,39 +1643,42 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
         <div className="fade-in">
           {(()=>{
             const passClient = passages.filter(p=>p.clientId===client.id);
-            const livClient = (livraisons||[]).filter(l=>l.clientId===client.id);
+            const livClient  = (livraisons||[]).filter(l=>l.clientId===client.id);
             const rdvClient2 = (rdvs||[]).filter(r=>r.clientId===client.id);
-            const nbP=passClient.length, nbL=livClient.length, nbR=rdvClient2.length;
 
             const events = [
-              ...(client.dateDebut?[{date:client.dateDebut,type:"contrat",title:"Début de contrat",sub:client.formule+(client.prix?" · "+client.prix+"€/an":""),dot:"#22d3ee",badge:{l:"Contrat",c:"#0891b2"}}]:[]),
+              ...(client.dateDebut?[{
+                date:client.dateDebut, title:"Début de contrat",
+                sub:client.formule+(client.prix?" · "+client.prix+"€/an":""),
+                dotColor:"#22d3ee", statusLabel:"Contrat", statusColor:"#0891b2",
+              }]:[]),
               ...passClient.map(p=>({
-                date:p.date, type:"passage",
+                date:p.date,
                 title:p.type||"Passage",
-                sub:[p.tech?"par "+p.tech:null,p.ph?"pH "+p.ph:null,p.chlore?"Cl "+p.chlore:null].filter(Boolean).join(" · "),
-                obs:p.obs||p.actions||null,
-                dot:isControleType(p.type)?"#0e7490":"#0891b2",
-                badge:p.ok?{l:"Effectué",c:"#059669"}:{l:"En cours",c:"#f59e0b"},
+                sub:[p.tech?"par "+p.tech:null, p.ph?"pH "+p.ph:null, p.chlore?"Cl "+p.chlore:null].filter(Boolean).join("  ·  "),
+                dotColor:isControleType(p.type)?"#0e7490":"#0891b2",
+                statusLabel:p.ok?"Effectué":"En cours",
+                statusColor:p.ok?"#059669":"#f59e0b",
                 _p:p,
               })),
               ...livClient.map(l=>({
-                date:l.date, type:"livraison",
-                title:"Livraison",
-                sub:[l.produits?.slice(0,2).join(", "),l.montant?l.montant+"€":null].filter(Boolean).join(" · "),
-                dot:"#f59e0b",
-                badge:{l:l.statut==="paye"?"Payé":l.statut==="facture"?"Facturé":"À facturer",c:l.statut==="paye"?"#059669":l.statut==="facture"?"#0891b2":"#f59e0b"},
+                date:l.date, title:"Livraison",
+                sub:[l.produits?.slice(0,2).join(", "), l.montant?l.montant+"€":null].filter(Boolean).join("  ·  "),
+                dotColor:"#f59e0b",
+                statusLabel:l.statut==="paye"?"Payé":l.statut==="facture"?"Facturé":"À facturer",
+                statusColor:l.statut==="paye"?"#059669":"#f59e0b",
               })),
               ...rdvClient2.map(r=>({
-                date:r.date, type:"rdv",
-                title:r.type||"Rendez-vous",
-                sub:[r.heure,r.duree?r.duree+" min":null].filter(Boolean).join(" · "),
-                dot:"#818cf8",
-                badge:{l:r.date>=TODAY?"À venir":"Passé",c:r.date>=TODAY?"#818cf8":"#94a3b8"},
+                date:r.date, title:r.type||"Rendez-vous",
+                sub:[r.heure, r.duree?r.duree+" min":null].filter(Boolean).join("  ·  "),
+                dotColor:"#818cf8",
+                statusLabel:r.date>=TODAY?"À venir":"Passé",
+                statusColor:r.date>=TODAY?"#818cf8":"#94a3b8",
               })),
             ].sort((a,b)=>b.date.localeCompare(a.date));
 
             if(!events.length) return (
-              <div style={{textAlign:"center",padding:"48px 0",color:"#94a3b8",fontSize:14}}>Aucun historique</div>
+              <div style={{textAlign:"center",padding:"48px 0",color:"#94a3b8",fontSize:15}}>Aucun historique</div>
             );
 
             // Grouper par mois
@@ -1709,61 +1689,49 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
               if(!grouped[key]) grouped[key]=[];
               grouped[key].push(ev);
             });
-            const keys=Object.keys(grouped).sort((a,b)=>b.localeCompare(a));
 
-            return <>
-              {/* Résumé compteurs — style "View All" */}
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
-                <div style={{fontSize:15,fontWeight:800,color:"#0f172a"}}>{events.length} activités</div>
-                <div style={{display:"flex",gap:12}}>
-                  {nbP>0&&<span style={{fontSize:12,color:DS.blue,fontWeight:700}}>{nbP} rapports</span>}
-                  {nbL>0&&<span style={{fontSize:12,color:"#f59e0b",fontWeight:700}}>{nbL} livr.</span>}
-                  {nbR>0&&<span style={{fontSize:12,color:"#818cf8",fontWeight:700}}>{nbR} RDV</span>}
-                </div>
-              </div>
+            return Object.keys(grouped).sort((a,b)=>b.localeCompare(a)).map(key=>{
+              const [yr,mo]=key.split("-");
+              return (
+                <div key={key} style={{marginBottom:28}}>
+                  {/* Label mois — bien visible */}
+                  <div style={{fontSize:13,fontWeight:800,color:"#0f172a",marginBottom:12,paddingBottom:8,borderBottom:"2px solid #f1f5f9"}}>
+                    {MOIS_L[parseInt(mo)]} {yr}
+                    <span style={{marginLeft:8,fontSize:11,color:"#94a3b8",fontWeight:500}}>{grouped[key].length} événement{grouped[key].length>1?"s":""}</span>
+                  </div>
 
-              {keys.map(key=>{
-                const [yr,mo]=key.split("-");
-                const evts=grouped[key];
-                return (
-                  <div key={key} style={{marginBottom:24}}>
-                    {/* Label mois */}
-                    <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>{MOIS_L[parseInt(mo)]} {yr}</div>
+                  {grouped[key].map((ev,i)=>{
+                    const d=new Date(ev.date);
+                    return (
+                      <div key={i}
+                        onClick={ev._p?()=>setDetailPassageFiche(ev._p):undefined}
+                        style={{display:"flex",alignItems:"center",gap:16,padding:"14px 0",borderBottom:i<grouped[key].length-1?"1px solid #f8fafc":"none",cursor:ev._p?"pointer":"default"}}>
 
-                    {/* Rangées activité */}
-                    {evts.map((ev,i)=>{
-                      const d=new Date(ev.date);
-                      return (
-                        <div key={i}
-                          onClick={ev._p?()=>setDetailPassageFiche(ev._p):undefined}
-                          style={{display:"flex",alignItems:"center",gap:14,padding:"12px 0",borderBottom:i<evts.length-1?"1px solid #f8fafc":"none",cursor:ev._p?"pointer":"default"}}>
-
-                          {/* Icône ronde colorée */}
-                          <div style={{width:44,height:44,borderRadius:"50%",background:ev.dot+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                            <div style={{width:12,height:12,borderRadius:"50%",background:ev.dot}}/>
-                          </div>
-
-                          {/* Titre + sous-titre */}
-                          <div style={{flex:1,minWidth:0}}>
-                            <div style={{fontSize:14,fontWeight:700,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ev.title}</div>
-                            <div style={{fontSize:12,color:"#94a3b8",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                              {d.toLocaleDateString("fr",{weekday:"short",day:"2-digit",month:"short"})}{ev.sub?" · "+ev.sub:""}
-                            </div>
-                            {ev.obs&&<div style={{fontSize:11,color:"#94a3b8",marginTop:2,fontStyle:"italic",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ev.obs}</div>}
-                          </div>
-
-                          {/* Badge + flèche si cliquable */}
-                          <div style={{flexShrink:0,textAlign:"right"}}>
-                            <div style={{fontSize:12,fontWeight:700,color:ev.badge.c}}>{ev.badge.l}</div>
-                            {ev._p&&<div style={{fontSize:10,color:"#cbd5e1",marginTop:2}}>Aperçu →</div>}
+                        {/* Point couleur + date */}
+                        <div style={{width:48,flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                          <div style={{width:14,height:14,borderRadius:"50%",background:ev.dotColor,flexShrink:0}}/>
+                          <div style={{fontSize:10,color:"#94a3b8",fontWeight:600,textAlign:"center",lineHeight:1.2}}>
+                            {d.toLocaleDateString("fr",{day:"2-digit",month:"short"})}
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
-            </>;
+
+                        {/* Titre + sous-infos */}
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:15,fontWeight:700,color:"#0f172a",marginBottom:4}}>{ev.title}</div>
+                          {ev.sub&&<div style={{fontSize:13,color:"#64748b",fontWeight:500}}>{ev.sub}</div>}
+                        </div>
+
+                        {/* Statut */}
+                        <div style={{flexShrink:0,textAlign:"right"}}>
+                          <div style={{fontSize:13,fontWeight:700,color:ev.statusColor,whiteSpace:"nowrap"}}>{ev.statusLabel}</div>
+                          {ev._p&&<div style={{fontSize:11,color:"#cbd5e1",marginTop:2}}>Appuyer →</div>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            });
           })()}
         </div>
       )}
@@ -1991,7 +1959,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           </button>
         </div>
       </div>
-      </div>{/* fin fond blanc */}
+      </div>{/* fin contenu */}
     </Modal>
   );
 }
