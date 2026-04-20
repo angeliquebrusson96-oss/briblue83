@@ -4602,6 +4602,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
     .sort((a,b)=>new Date(b.date)-new Date(a.date));
 
   const last = passClient[0]||null;
+  const [selectedPassage, setSelectedPassage] = useState(null);
 
   return (
     <div style={{minHeight:"100vh",background:"#f8fafc",fontFamily:"'Nunito',system-ui,sans-serif",maxWidth:480,margin:"0 auto"}}>
@@ -4661,8 +4662,10 @@ function CarnetPublic({ code, allClients, allPassages }) {
               {passClient.map((p,i)=>{
                 const d=new Date(p.date);
                 return (
-                  <div key={p.id} style={{display:"flex",gap:14,padding:"14px 0",borderBottom:i<passClient.length-1?"1px solid #f1f5f9":"none",alignItems:"flex-start"}}>
-                    {/* Dot + ligne */}
+                  <div key={p.id} onClick={()=>setSelectedPassage(p)} style={{display:"flex",gap:14,padding:"14px 0",borderBottom:i<passClient.length-1?"1px solid #f1f5f9":"none",alignItems:"flex-start",cursor:"pointer",borderRadius:8,transition:"background 0.15s"}}
+                    onMouseEnter={e=>e.currentTarget.style.background="#f0f9ff"}
+                    onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                    {/* Dot */}
                     <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:0,paddingTop:4,flexShrink:0}}>
                       <div style={{width:10,height:10,borderRadius:"50%",background:"#0891b2",flexShrink:0}}/>
                     </div>
@@ -4676,6 +4679,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
                       {(p.ph||p.chlore)&&<div style={{fontSize:12,color:"#64748b",marginTop:3}}>
                         {[p.ph?"pH "+p.ph:null,p.chlore?"Cl "+p.chlore:null,p.temperature?p.temperature+"°C":null].filter(Boolean).join("  ·  ")}
                       </div>}
+                      <div style={{fontSize:11,color:"#0891b2",marginTop:4,fontWeight:600}}>Voir le détail →</div>
                     </div>
                   </div>
                 );
@@ -4698,6 +4702,84 @@ function CarnetPublic({ code, allClients, allPassages }) {
           </div>
         </div>
       </div>
+
+      {/* MODALE DÉTAIL INTERVENTION */}
+      {selectedPassage&&(
+        <div onClick={()=>setSelectedPassage(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:1000,padding:0}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"22px 22px 0 0",width:"100%",maxWidth:480,padding:"24px 20px 36px",boxShadow:"0 -8px 40px rgba(0,0,0,0.18)"}}>
+            {/* Handle */}
+            <div style={{width:40,height:4,background:"#e2e8f0",borderRadius:2,margin:"0 auto 20px"}}/>
+            {/* Type + date */}
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+              <div>
+                <div style={{fontSize:18,fontWeight:900,color:"#0f172a"}}>{selectedPassage.type||"Entretien"}</div>
+                <div style={{fontSize:12,color:"#64748b",marginTop:2}}>
+                  {new Date(selectedPassage.date).toLocaleDateString("fr",{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}
+                </div>
+              </div>
+              <button onClick={()=>setSelectedPassage(null)} style={{width:32,height:32,borderRadius:"50%",background:"#f1f5f9",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+
+            {/* Mesures */}
+            {(selectedPassage.ph||selectedPassage.chlore||selectedPassage.temperature)&&(
+              <div style={{display:"flex",gap:10,marginBottom:16}}>
+                {selectedPassage.ph&&(
+                  <div style={{flex:1,background:"#f0f9ff",borderRadius:12,padding:"12px 8px",textAlign:"center"}}>
+                    <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:4}}>pH</div>
+                    <div style={{fontSize:26,fontWeight:900,color:selectedPassage.ph>=7&&selectedPassage.ph<=7.6?"#059669":"#f59e0b"}}>{selectedPassage.ph}</div>
+                    <div style={{fontSize:10,color:"#94a3b8",marginTop:2}}>{selectedPassage.ph>=7&&selectedPassage.ph<=7.6?"✓ Idéal":"⚠ Hors norme"}</div>
+                  </div>
+                )}
+                {selectedPassage.chlore&&(
+                  <div style={{flex:1,background:"#f0f9ff",borderRadius:12,padding:"12px 8px",textAlign:"center"}}>
+                    <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:4}}>Chlore</div>
+                    <div style={{fontSize:26,fontWeight:900,color:selectedPassage.chlore>=0.5&&selectedPassage.chlore<=3?"#059669":"#f59e0b"}}>{selectedPassage.chlore}</div>
+                    <div style={{fontSize:10,color:"#94a3b8",marginTop:2}}>{selectedPassage.chlore>=0.5&&selectedPassage.chlore<=3?"✓ Idéal":"⚠ Hors norme"}</div>
+                  </div>
+                )}
+                {selectedPassage.temperature&&(
+                  <div style={{flex:1,background:"#f0f9ff",borderRadius:12,padding:"12px 8px",textAlign:"center"}}>
+                    <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:4}}>Temp.</div>
+                    <div style={{fontSize:26,fontWeight:900,color:"#0891b2"}}>{selectedPassage.temperature}°</div>
+                    <div style={{fontSize:10,color:"#94a3b8",marginTop:2}}>Eau</div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Actions */}
+            {selectedPassage.actions&&(
+              <div style={{background:"#f8fafc",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
+                <div style={{fontSize:10,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:.6,marginBottom:6}}>Actions réalisées</div>
+                <div style={{fontSize:13,color:"#334155",lineHeight:1.6}}>{selectedPassage.actions}</div>
+              </div>
+            )}
+
+            {/* Observations */}
+            {selectedPassage.obs&&(
+              <div style={{background:"#fffbeb",borderRadius:12,padding:"12px 14px",marginBottom:12,borderLeft:"3px solid #f59e0b"}}>
+                <div style={{fontSize:10,fontWeight:700,color:"#b45309",textTransform:"uppercase",letterSpacing:.6,marginBottom:6}}>Observations</div>
+                <div style={{fontSize:13,color:"#334155",lineHeight:1.6}}>{selectedPassage.obs}</div>
+              </div>
+            )}
+
+            {/* Technicien */}
+            {selectedPassage.tech&&(
+              <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8}}>
+                <div style={{width:28,height:28,borderRadius:"50%",background:"#0891b2",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </div>
+                <div>
+                  <div style={{fontSize:10,color:"#94a3b8",fontWeight:600}}>Technicien</div>
+                  <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{selectedPassage.tech}</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
