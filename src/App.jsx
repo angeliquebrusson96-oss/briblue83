@@ -1378,6 +1378,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
   const [detailPassageFiche, setDetailPassageFiche] = useState(null);
   const [showFormLiv, setShowFormLiv] = useState(false);
   const [editLiv, setEditLiv] = useState(null);
+  const [selectedMois, setSelectedMois] = useState(null);
   const isMobile = useIsMobile();
   const al = alerteClient(client, passages);
   const col = AC[al];
@@ -1576,7 +1577,9 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
             const sc = SAISONS_META[getSaison(m)] || SAISONS_META.ete;
             const cur = m === MOIS_NOW;
             const complet = planT > 0 && rest === 0;
-            return <div key={m} style={{display:"flex",alignItems:"center",padding:"9px 12px",borderBottom:i<11?"1px solid "+DS.border:"none",background:cur?sc.bg:i%2===0?DS.white:"#f9fafb"}}>
+            const isSelMois = selectedMois === m;
+            return <div key={m}>
+            <div onClick={()=>passM.length>0?setSelectedMois(isSelMois?null:m):null} style={{display:"flex",alignItems:"center",padding:"9px 12px",borderBottom:(!isSelMois&&i<11)?"1px solid "+DS.border:"none",background:isSelMois?sc.bg:cur?sc.bg:i%2===0?DS.white:"#f9fafb",cursor:passM.length>0?"pointer":"default",transition:"background .15s"}}>
               <div style={{width:4,height:22,borderRadius:2,background:sc.color,marginRight:8,flexShrink:0}}/>
               <div style={{width:42,fontWeight:cur?800:600,fontSize:15,color:cur?sc.color:DS.mid}}>{MOIS[m]}</div>
               <div style={{flex:1,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
@@ -1610,6 +1613,40 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                   </div>
                 )}
               </div>
+            </div>
+            {isSelMois && passM.length>0 && (
+              <div style={{borderBottom:i<11?"1px solid "+DS.border:"none",background:"#f8fafc",padding:"8px 12px 12px",display:"flex",flexDirection:"column",gap:8}}>
+                {passM.sort((a,b)=>new Date(b.date)-new Date(a.date)).map(p=>{
+                  const phOk=p.ph>=7.0&&p.ph<=7.6;
+                  const clOk=p.chlore>=0.5&&p.chlore<=3.0;
+                  const isCtrl=isControleType(p.type);
+                  const rapportStatus=getRapportStatus(p);
+                  const rapportMeta=RAPPORT_STATUS[rapportStatus];
+                  return (
+                    <div key={p.id} style={{background:DS.white,borderRadius:10,border:"1px solid "+DS.border,padding:"10px 12px"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+                        <div>
+                          <div style={{fontWeight:700,fontSize:13,color:DS.dark}}>{new Date(p.date).toLocaleDateString("fr",{day:"2-digit",month:"long"})}</div>
+                          <div style={{display:"flex",gap:5,marginTop:4,flexWrap:"wrap"}}>
+                            <Tag color={isCtrl?DS.teal:DS.blue}>{isCtrl?"💧":"🔧"} {p.type}</Tag>
+                            {p.ph&&<Tag color={phOk?DS.green:DS.red}>pH {p.ph}</Tag>}
+                            {p.chlore&&<Tag color={clOk?DS.green:DS.red}>Cl {p.chlore}</Tag>}
+                            <Tag color={rapportMeta.color} bg={rapportMeta.bg}>{rapportMeta.label}</Tag>
+                          </div>
+                        </div>
+                        {p.tech&&<span style={{fontSize:11,color:DS.mid}}>{p.tech}</span>}
+                      </div>
+                      <div style={{display:"flex",gap:5,paddingTop:8,borderTop:"1px solid "+DS.border,flexWrap:"wrap"}}>
+                        <button onClick={(e)=>{e.stopPropagation();setDetailPassageFiche(p);}} className="btn-hover" style={{flex:1,padding:"5px",borderRadius:8,background:DS.light,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:13,color:DS.dark,fontFamily:"inherit",fontWeight:700}}>{Ico.search(11,DS.mid)} Aperçu</button>
+                        <button onClick={(e)=>{e.stopPropagation();onEditPassage&&onEditPassage(p);}} className="btn-hover" style={{flex:1,padding:"5px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:13,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(11,DS.mid)} Modifier</button>
+                        <button onClick={(e)=>{e.stopPropagation();ouvrirRapport(p,client);}} className="btn-hover" style={{flex:1,padding:"5px",borderRadius:8,background:DS.blueSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:13,color:DS.blue,fontFamily:"inherit",fontWeight:700}}>{Ico.pdf(11,DS.blue)} Rapport</button>
+                        {onDeletePassage&&<button onClick={(e)=>{e.stopPropagation();showConfirm("Supprimer ce passage ?",()=>onDeletePassage(p.id));}} className="btn-hover" style={{padding:"5px 8px",borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(11,DS.red)}</button>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             </div>;
           })}
         </div>
