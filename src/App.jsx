@@ -1159,6 +1159,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
     { l:"Produits",        color:"#059669" },
     { l:"Photos & Envoi",  color:"#4f46e5" },
   ];
+  const STEPS = STEP_INFO.length;
   const cur = STEP_INFO[step-1];
   const pct = Math.round((step-1)/STEPS*100);
 
