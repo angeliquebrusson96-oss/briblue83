@@ -4575,56 +4575,101 @@ export default function App() {
     <>
     <GlobalStyles/>
     <div style={{minHeight:"100vh",background:DS.bg,fontFamily:"'Inter', -apple-system, system-ui, sans-serif",maxWidth:isMobile?640:1280,margin:"0 auto",position:"relative",display:"flex",flexDirection:"column",overflowX:"hidden",width:"100%"}}>
-      {/* HEADER MODERNISÉ */}
-      <div style={{background:"#0891b2",padding:isMobile?"8px 10px":"12px 28px",display:"flex",alignItems:"center",gap:isMobile?4:12,position:"sticky",top:0,zIndex:50,boxShadow:"0 2px 20px rgba(3,105,161,0.35)",backdropFilter:"blur(16px)",width:"100%",boxSizing:"border-box",overflow:"hidden"}}>
-        <button
-          onClick={()=>setPage("dashboard")}
-          className="btn-hover"
-          style={{background:"none",border:"none",padding:0,margin:0,cursor:"pointer",display:"flex",alignItems:"center",gap:10,flexShrink:0}}
-        >
-          <div style={{width:isMobile?28:38,height:isMobile?28:38,borderRadius:isMobile?8:12,background:"linear-gradient(135deg,#0ea5e9,#0369a1)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"0 4px 12px rgba(14,165,233,0.4)"}}>
-            {Ico.wave(isMobile?16:22,"white")}
+      {/* HEADER */}
+      <div style={{background:"linear-gradient(90deg,#0369a1 0%,#0891b2 60%,#06b6d4 100%)",padding:isMobile?"0 10px":"0 28px",display:"flex",alignItems:"center",gap:isMobile?5:16,position:"sticky",top:0,zIndex:50,boxShadow:"0 2px 16px rgba(3,105,161,0.4)",width:"100%",boxSizing:"border-box",minHeight:isMobile?62:64}}>
+
+        {/* LOGO */}
+        <button onClick={()=>setPage("dashboard")} className="btn-hover" style={{background:"none",border:"none",padding:0,margin:0,cursor:"pointer",display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+          <div style={{width:isMobile?36:40,height:isMobile?36:40,borderRadius:isMobile?10:12,background:"rgba(255,255,255,0.15)",border:"1.5px solid rgba(255,255,255,0.3)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            {Ico.wave(isMobile?22:24,"white")}
           </div>
-          {!isMobile && <div style={{display:"flex",flexDirection:"column",lineHeight:1}}>
-            <span style={{fontWeight:900,fontSize:18,color:"#fff",letterSpacing:2,fontFamily:"'Inter',sans-serif",textShadow:"0 1px 2px rgba(0,0,0,0.2)"}}>BRI<span style={{color:"#bae6fd"}}>'</span>BLUE</span>
-            <span style={{fontSize:9,color:"rgba(255,255,255,0.55)",fontWeight:500,letterSpacing:0.5,marginTop:1}}>Traitement · Piscines</span>
+          {!isMobile&&<div style={{display:"flex",flexDirection:"column",lineHeight:1.1}}>
+            <span style={{fontWeight:900,fontSize:18,color:"#fff",letterSpacing:1.5}}>BRI<span style={{color:"#bae6fd"}}>'</span>BLUE</span>
+            <span style={{fontSize:9,color:"rgba(255,255,255,0.6)",fontWeight:500,letterSpacing:0.8,marginTop:1}}>Traitement · Piscines</span>
           </div>}
         </button>
-        <div style={{flex:1}} />
-        <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
-          {/* Import Connecteam */}
-          {/* Indicateur connexion */}
-          <div title={online ? "Connecté" : "Hors-ligne"+(pendingCount>0?` — ${pendingCount} en attente`:"")}
-            style={{display:"flex",alignItems:"center",gap:3,padding:"3px 5px",borderRadius:6,background:"rgba(255,255,255,0.1)",flexShrink:0}}>
-            <div style={{width:7,height:7,borderRadius:"50%",background:online?"#4ade80":"#f87171",boxShadow:online?"0 0 6px #4ade80":"0 0 6px #f87171"}}/>
-            {pendingCount>0&&<span style={{fontSize:10,fontWeight:700,color:"#fde68a"}}>{pendingCount}</span>}
+
+        <div style={{flex:1}}/>
+
+        <div style={{display:"flex",gap:isMobile?5:6,alignItems:"center",flexShrink:0}}>
+
+          {/* Connexion */}
+          <div style={{display:"flex",alignItems:"center",gap:4,padding:isMobile?"5px":"4px 8px",borderRadius:8,background:"rgba(0,0,0,0.2)",border:"1px solid rgba(255,255,255,0.1)",flexShrink:0}}>
+            <div style={{width:8,height:8,borderRadius:"50%",background:online?"#4ade80":"#f87171",boxShadow:online?"0 0 6px #4ade80":"0 0 6px #f87171",flexShrink:0}}/>
+            {!isMobile&&<span style={{fontSize:10,fontWeight:600,color:online?"rgba(255,255,255,0.7)":"#fda4af",marginLeft:3}}>{online?"En ligne":"Hors-ligne"}</span>}
           </div>
-          <button onClick={()=>setShowImport(true)} title="Import Connecteam" style={{width:isMobile?36:42,height:isMobile?36:42,borderRadius:10,background:"rgba(255,255,255,0.15)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          </button>
-          {/* Stock */}
-          <button onClick={()=>setShowStock(true)} className="btn-hover" title="Stock produits" style={{position:"relative",width:isMobile?36:42,height:isMobile?36:42,borderRadius:10,background:"rgba(255,255,255,0.15)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-            {Ico.cart(20,"rgba(255,255,255,0.85)")}
-            {nbStockBas>0&&<span style={{position:"absolute",top:-4,right:-4,minWidth:18,height:18,borderRadius:9,background:"#ef4444",color:"#fff",fontSize:10,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 4px"}}>{nbStockBas}</span>}
-          </button>
-          {/* Alertes */}
-          {nbAlertes>0&&(
-            <button onClick={()=>setShowModalAlertes(true)} className="btn-hover" title="Alertes" style={{position:"relative",width:isMobile?36:42,height:isMobile?36:42,borderRadius:10,background:"rgba(255,255,255,0.15)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              {Ico.alert(20,"rgba(255,255,255,0.85)")}
-              <span style={{position:"absolute",top:-4,right:-4,minWidth:18,height:18,borderRadius:9,background:"#ef4444",color:"#fff",fontSize:10,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 4px"}}>{nbAlertes}</span>
+
+          {/* IMPORT — desktop uniquement */}
+          {!isMobile&&(
+            <button onClick={()=>setShowImport(true)} className="btn-hover" title="Importer depuis Connecteam"
+              style={{display:"flex",alignItems:"center",gap:6,padding:"0 13px",height:38,borderRadius:9,background:"rgba(255,255,255,0.12)",border:"1px solid rgba(255,255,255,0.2)",cursor:"pointer",flexShrink:0}}>
+              <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 12v7a2 2 0 002 2h12a2 2 0 002-2v-7"/>
+                <polyline points="16 6 12 2 8 6"/>
+                <line x1="12" y1="2" x2="12" y2="15"/>
+              </svg>
+              <span style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.9)"}}>Import</span>
             </button>
           )}
-          {/* Nouveau passage */}
-          <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} className="btn-hover" title="Fiche Entretien" style={{height:isMobile?36:42,padding:isMobile?"0 10px":"0 16px",borderRadius:10,background:"rgba(255,255,255,0.2)",border:"1.5px solid rgba(255,255,255,0.3)",cursor:"pointer",display:"flex",alignItems:"center",gap:7,flexShrink:0}}>
-            <IconFiche size={20} color="#fff"/>
-            {!isMobile&&<span style={{fontSize:13,fontWeight:800,color:"#fff",letterSpacing:.2}}>Fiche Entretien</span>}
+
+          {/* STOCK — fond blanc, contour noir, icône sombre */}
+          <button onClick={()=>setShowStock(true)} className="btn-hover" title="Stock produits"
+            style={{position:"relative",width:isMobile?48:undefined,height:isMobile?48:38,padding:isMobile?0:"0 13px",display:"flex",alignItems:"center",justifyContent:"center",gap:6,borderRadius:10,background:"#fff",border:"2px solid #1e293b",cursor:"pointer",flexShrink:0,boxShadow:"0 2px 6px rgba(0,0,0,0.2)"}}>
+            <svg width={isMobile?26:16} height={isMobile?26:16} viewBox="0 0 24 24" fill="none" stroke="#1e293b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 8V21H3V8"/><path d="M23 3H1v5h22V3z"/><line x1="10" y1="12" x2="14" y2="12"/>
+            </svg>
+            {!isMobile&&<span style={{fontSize:11,fontWeight:700,color:"#1e293b"}}>Stock</span>}
+            {nbStockBas>0&&<span style={{position:"absolute",top:-6,right:-6,minWidth:18,height:18,borderRadius:9,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",boxShadow:"0 0 0 2px #0891b2"}}>{nbStockBas}</span>}
           </button>
-          {/* Séparateur vertical */}
-          <div style={{width:1,height:20,background:"rgba(255,255,255,0.2)",flexShrink:0}}/>
-          {/* Déconnexion */}
-          <button onClick={handleLogout} className="btn-hover" title="Déconnexion" style={{width:isMobile?36:42,height:isMobile?36:42,borderRadius:10,background:"rgba(255,255,255,0.08)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-            <svg width={19} height={19} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+
+          {/* ALERTES */}
+          {nbAlertes>0&&(
+            <button onClick={()=>setShowModalAlertes(true)} className="btn-hover" title="Alertes contrats"
+              style={{position:"relative",width:isMobile?48:undefined,height:isMobile?48:38,padding:isMobile?0:"0 13px",display:"flex",alignItems:"center",justifyContent:"center",gap:6,borderRadius:10,background:"rgba(251,191,36,0.2)",border:"1.5px solid rgba(251,191,36,0.45)",cursor:"pointer",flexShrink:0}}>
+              <svg width={isMobile?26:16} height={isMobile?26:16} viewBox="0 0 24 24" fill="none" stroke="#fde68a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                <path d="M13.73 21a2 2 0 01-3.46 0"/>
+              </svg>
+              {!isMobile&&<span style={{fontSize:11,fontWeight:700,color:"#fde68a"}}>Alertes</span>}
+              <span style={{position:"absolute",top:-6,right:-6,minWidth:18,height:18,borderRadius:9,background:"#f59e0b",color:"#fff",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",boxShadow:"0 0 0 2px #0891b2"}}>{nbAlertes}</span>
+            </button>
+          )}
+
+          {/* LIVRAISON — fond blanc, contour noir, mobile uniquement */}
+          {isMobile&&(
+            <button onClick={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} className="btn-hover" title="Nouvelle livraison"
+              style={{width:48,height:48,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:10,background:"#fff",border:"2px solid #1e293b",cursor:"pointer",flexShrink:0,boxShadow:"0 2px 6px rgba(0,0,0,0.2)"}}>
+              <svg width={26} height={26} viewBox="0 0 24 24" fill="none" stroke="#1e293b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="1" y="3" width="15" height="13" rx="1"/>
+                <path d="M16 8h4l3 4v4h-7V8z"/>
+                <circle cx="5.5" cy="18.5" r="2.5"/>
+                <circle cx="18.5" cy="18.5" r="2.5"/>
+              </svg>
+            </button>
+          )}
+
+          {/* SÉPARATEUR */}
+          <div style={{width:1,height:22,background:"rgba(255,255,255,0.2)",flexShrink:0,margin:"0 1px"}}/>
+
+          {/* FICHE ENTRETIEN — fond blanc, contour noir, icône clé */}
+          <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} className="btn-hover" title="Nouvelle fiche d'entretien"
+            style={{width:isMobile?48:undefined,height:isMobile?48:38,padding:isMobile?0:"0 16px",display:"flex",alignItems:"center",justifyContent:"center",gap:6,borderRadius:10,background:"#fff",border:"2px solid #1e293b",cursor:"pointer",flexShrink:0,boxShadow:"0 2px 8px rgba(0,0,0,0.2)"}}>
+            <svg width={isMobile?26:16} height={isMobile?26:16} viewBox="0 0 24 24" fill="none" stroke="#1e293b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
+            </svg>
+            {!isMobile&&<span style={{fontSize:12,fontWeight:800,color:"#1e293b",whiteSpace:"nowrap"}}>+ Fiche entretien</span>}
           </button>
+
+          {/* DÉCONNEXION */}
+          <button onClick={handleLogout} className="btn-hover" title="Déconnexion"
+            style={{width:isMobile?48:38,height:isMobile?48:38,borderRadius:10,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.15)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            <svg width={isMobile?22:16} height={isMobile?22:16} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+          </button>
+
         </div>
       </div>
 
