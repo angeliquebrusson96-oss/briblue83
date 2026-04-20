@@ -4455,6 +4455,7 @@ function generateCarnetCode(clientId) {
 function CarnetPublic({ code, allClients, allPassages }) {
   const [loadedClients, setLoadedClients] = useState(null);
   const [loadedPassages, setLoadedPassages] = useState(null);
+  const [selectedPassage, setSelectedPassage] = useState(null);
 
   // Charger les données depuis Supabase directement (sans login)
   useEffect(() => {
@@ -4506,7 +4507,6 @@ function CarnetPublic({ code, allClients, allPassages }) {
     .sort((a,b)=>new Date(b.date)-new Date(a.date));
 
   const last = passClient[0]||null;
-  const [selectedPassage, setSelectedPassage] = useState(null);
 
   return (
     <div style={{minHeight:"100vh",background:"#f8fafc",fontFamily:"'Nunito',system-ui,sans-serif",maxWidth:480,margin:"0 auto"}}>
