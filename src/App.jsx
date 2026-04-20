@@ -1382,7 +1382,7 @@ function FormRdv({ initial, clients, onSave, onClose }) {
   );
 }
 
-// FICHE CLIENT (avec diffrenciation Entretien/Contrle)
+// FICHE CLIENT — VERSION REDESSINÉE
 function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[], contrats={}, onUpdateContrat, onUpdateClient, onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onDeletePassage, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
   const [tab, setTab] = useState("historique");
   const [detailPassageFiche, setDetailPassageFiche] = useState(null);
@@ -1409,324 +1409,128 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
   const effC = passContrat.filter(p=>isControleType(p.type)).length;
   const eff = passContrat.length;
   const jours = daysUntil(client.dateFin);
-  const moisCourant = MOIS_NOW;
-
-  const pct = total>0?Math.round(eff/total*100):0;
   const rest = Math.max(0,total-eff);
+  const pct = total>0?Math.round(eff/total*100):0;
+  const mensualite = (()=>{const {m11}=calcMensualites(client.prix||0);return m11;})();
+
+  // TABS config
+  const TABS = [
+    {id:"historique", label:"Historique", ico:"🕐"},
+    {id:"passages",   label:"Passages",   ico:"🔧"},
+    {id:"saisons",    label:"Planning",   ico:"📅"},
+    {id:"infos",      label:"Infos",      ico:"ℹ️"},
+    {id:"rdvs",       label:"RDV",        ico:"📆"},
+    {id:"livraisons", label:"Livraisons", ico:"📦"},
+    {id:"carnet",     label:"Carnet",     ico:"📱"},
+  ];
 
   return (
     <Modal title="" onClose={onClose} wide>
-      {/* ═══ HERO ═══ */}
+      {/* ══════════════════ HERO HEADER ══════════════════ */}
       <div style={{margin:isMobile?"-18px -20px 0":"-24px -28px 0"}}>
 
-        {/* Bandeau couleur avec nom */}
-        <div style={{background:"#1e3a5f",padding:"24px 20px 20px"}}>
-          {/* Nom + statut */}
-          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,marginBottom:20}}>
+        {/* Bandeau gradient */}
+        <div style={{background:"linear-gradient(135deg,#0c1f3f 0%,#0e3460 60%,#0891b2 100%)",padding:"20px 20px 0",position:"relative",overflow:"hidden"}}>
+          {/* Décoration cercle bg */}
+          <div style={{position:"absolute",right:-40,top:-40,width:180,height:180,borderRadius:"50%",background:"rgba(255,255,255,0.04)",pointerEvents:"none"}}/>
+          <div style={{position:"absolute",right:40,bottom:-20,width:100,height:100,borderRadius:"50%",background:"rgba(8,145,178,0.15)",pointerEvents:"none"}}/>
+
+          {/* Ligne 1 : nom + badge alerte */}
+          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10,marginBottom:8,position:"relative"}}>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:20,fontWeight:900,color:"#fff",lineHeight:1.2,marginBottom:6}}>{client.nom}</div>
-              <div style={{fontSize:13,color:"rgba(255,255,255,0.75)",fontWeight:500}}>
-                {[client.formule,client.bassin].filter(Boolean).join(" · ")}
-                {jours!==null&&<span style={{marginLeft:8,fontWeight:700,color:jours<=30?"#fde68a":"#bfdbfe"}}>{jours>=0?jours+"j restants":"Expiré"}</span>}
+              <div style={{fontSize:isMobile?18:22,fontWeight:900,color:"#fff",lineHeight:1.15,letterSpacing:-.3}}>{client.nom}</div>
+              <div style={{fontSize:12,color:"rgba(255,255,255,0.55)",marginTop:3,fontWeight:500}}>
+                {[client.formule,client.bassin,client.volume?client.volume+"m³":null].filter(Boolean).join(" · ")}
               </div>
             </div>
-            <div style={{background:col.bg,color:col.tx,fontSize:13,fontWeight:800,padding:"6px 14px",borderRadius:22,flexShrink:0,whiteSpace:"nowrap"}}>{col.lbl}</div>
+            <div style={{background:col.bg,color:col.tx,fontSize:11,fontWeight:800,padding:"4px 10px",borderRadius:20,flexShrink:0,border:"1px solid "+col.tx+"44",whiteSpace:"nowrap"}}>{col.lbl}</div>
           </div>
 
-          {/* 4 stats — grandes, lisibles, fond semi-transparent */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
+          {/* Ligne 2 : contrat restant */}
+          {jours!==null&&(
+            <div style={{display:"inline-flex",alignItems:"center",gap:5,background:"rgba(255,255,255,0.08)",borderRadius:8,padding:"4px 10px",marginBottom:14}}>
+              <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke={jours<=30?"#fde68a":"#7dd3fc"} strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span style={{fontSize:11,fontWeight:700,color:jours<=30?"#fde68a":"#7dd3fc"}}>{jours>=0?jours+" j restants":"Contrat expiré"}</span>
+            </div>
+          )}
+
+          {/* KPI row — 4 tuiles compactes */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:0,paddingBottom:16}}>
             {[
-              {label:"Entretiens effectués", val:effE, total:totalE, color:"#fff"},
-              {label:"Contrôles effectués",  val:effC, total:totalC, color:"#a5f3fc"},
-              {label:"Passages restants",    val:rest, total:total,  color:rest>0?"#fde68a":"#a7f3d0", big:true},
-              {label:"Mensualité",           val:(()=>{const {m11}=calcMensualites(client.prix||0);return m11;})(), suffix:"€/mois", color:"#a7f3d0"},
-            ].map(({label,val,total,color,suffix,big},i)=>(
-              <div key={i} style={{background:"rgba(255,255,255,0.08)",borderRadius:14,padding:"14px 16px"}}>
-                <div style={{fontSize:10,color:"#93c5fd",fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:.6}}>{label}</div>
-                <div style={{display:"flex",alignItems:"baseline",gap:4}}>
-                  <span style={{fontSize:big?32:28,fontWeight:900,color,lineHeight:1}}>{val}</span>
-                  {total!==undefined&&<span style={{fontSize:13,color:"rgba(255,255,255,0.45)",fontWeight:500}}>/{total}</span>}
-                  {suffix&&<span style={{fontSize:13,color:"rgba(255,255,255,0.6)",fontWeight:500}}>{suffix}</span>}
-                </div>
-                {total!==undefined&&total>0&&(
-                  <div style={{height:3,background:"rgba(255,255,255,0.15)",borderRadius:99,marginTop:8,overflow:"hidden"}}>
-                    <div style={{height:"100%",width:Math.min(100,val/total*100)+"%",background:color,borderRadius:99,transition:"width 1s"}}/>
-                  </div>
-                )}
+              {label:"Entretiens",val:`${effE}/${totalE}`,ok:effE>=totalE,sub:"effectués"},
+              {label:"Contrôles", val:`${effC}/${totalC}`,ok:effC>=totalC,sub:"effectués"},
+              {label:"Restants",  val:rest,ok:rest===0,accent:rest>0?"#fde68a":"#a7f3d0",sub:"passages"},
+              {label:"Mensualité",val:mensualite+"€",ok:true,accent:"#a7f3d0",sub:"/mois"},
+            ].map(({label,val,ok,accent,sub},i)=>(
+              <div key={i} style={{background:"rgba(255,255,255,0.07)",borderRadius:10,padding:"10px 6px",textAlign:"center",border:"1px solid rgba(255,255,255,0.06)"}}>
+                <div style={{fontSize:9,color:"rgba(255,255,255,0.45)",fontWeight:700,textTransform:"uppercase",letterSpacing:.4,marginBottom:3}}>{label}</div>
+                <div style={{fontSize:i===2?20:16,fontWeight:900,color:accent||(ok?"#a7f3d0":"#fde68a"),lineHeight:1}}>{val}</div>
+                <div style={{fontSize:9,color:"rgba(255,255,255,0.3)",marginTop:2}}>{sub}</div>
               </div>
             ))}
           </div>
+
+          {/* Barre de progression globale */}
+          <div style={{height:3,background:"rgba(255,255,255,0.1)",margin:"0 0 0"}}>
+            <div style={{height:"100%",width:pct+"%",background:"linear-gradient(90deg,#0891b2,#a7f3d0)",transition:"width 1s ease",borderRadius:"0 99px 99px 0"}}/>
+          </div>
         </div>
 
-        {/* TABS */}
-        <div style={{background:"#fff",display:"flex",borderBottom:"1.5px solid #f1f5f9",overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-          {[["historique","Historique"],["infos","Infos"],["saisons","Planning"],["passages","Rapports"],["rdvs","RDV"],["livraisons","Livraisons"],["carnet","Carnet"]].map(([id,l])=>(
-            <button key={id} onClick={()=>setTab(id)} style={{flexShrink:0,padding:"14px 16px",border:"none",cursor:"pointer",fontWeight:tab===id?800:500,fontSize:13,fontFamily:"inherit",background:"transparent",color:tab===id?DS.blue:"#94a3b8",borderBottom:tab===id?"2px solid "+DS.blue:"2px solid transparent",transition:"all .15s",whiteSpace:"nowrap"}}>{l}</button>
+        {/* TABS — scrollables, compacts */}
+        <div style={{background:"#fff",display:"flex",borderBottom:"1px solid #f1f5f9",overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}>
+          {TABS.map(({id,label,ico})=>(
+            <button key={id} onClick={()=>setTab(id)}
+              style={{flexShrink:0,padding:"10px 14px",border:"none",cursor:"pointer",fontWeight:tab===id?800:500,fontSize:12,fontFamily:"inherit",background:"transparent",color:tab===id?"#0891b2":"#94a3b8",borderBottom:tab===id?"2.5px solid #0891b2":"2.5px solid transparent",transition:"all .12s",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:4,WebkitTapHighlightColor:"transparent"}}>
+              <span style={{fontSize:13}}>{ico}</span>{label}
+            </button>
           ))}
         </div>
       </div>
 
-      {/* Contenu */}
-      <div style={{paddingTop:20}}>
+      {/* ══════════════════ CONTENU TABS ══════════════════ */}
+      <div style={{paddingTop:16}}>
 
-      {/* Tab: Infos */}
-      {tab==="infos" && (
-        <div className="fade-in">
-          {[
-            {ico:Ico.phone(16,DS.blue),l:"Téléphone",v:client.tel,href:client.tel?"tel:"+client.tel:null},
-            {ico:Ico.mail(16,DS.blue),l:"Email",v:client.email,href:client.email?"mailto:"+client.email:null},
-            {ico:Ico.pin(16,DS.blue),l:"Adresse",v:client.adresse},
-            {ico:Ico.pool(16,DS.blue),l:"Bassin",v:[client.bassin,client.volume?client.volume+" m³":null].filter(Boolean).join(" — ")},
-            {ico:Ico.calendar(16,DS.blue),l:"Début contrat",v:client.dateDebut?new Date(client.dateDebut).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}):null},
-            {ico:Ico.calendar(16,DS.orange),l:"Fin contrat",v:client.dateFin?new Date(client.dateFin).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}):null},
-          ].filter(r=>r.v).map((r,i,arr)=>(
-            <div key={r.l} style={{display:"flex",gap:16,padding:"16px 0",alignItems:"center",borderBottom:i<arr.length-1?"1px solid #f1f5f9":"none"}}>
-              <div style={{width:42,height:42,borderRadius:12,background:"#f0f9ff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{r.ico}</div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.6,marginBottom:3}}>{r.l}</div>
-                {r.href?<a href={r.href} style={{fontSize:15,color:DS.blue,fontWeight:700,textDecoration:"none"}}>{r.v}</a>:<div style={{fontSize:15,color:"#0f172a",fontWeight:600}}>{r.v}</div>}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {tab==="saisons" && <div className="fade-in">
-        {(()=>{
-          // Année de référence du contrat = année de dateDebut
-          // Si le contrat chevauche 2 années civiles, on filtre par la plage dateDebut→dateFin
-          const contractStart = client.dateDebut ? client.dateDebut.slice(0,10) : null;
-          const contractEnd = client.dateFin ? client.dateFin.slice(0,10) : null;
-          // Année de départ du contrat (ex: 2025 pour un contrat sept.2025→août.2026)
-          const contractYear = contractStart ? parseInt(contractStart.slice(0,4)) : YEAR_NOW;
-          const label = contractStart && contractEnd
-            ? `${new Date(contractStart).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})} → ${new Date(contractEnd).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})}`
-            : MOIS_L[moisCourant];
-          const mpmRaw = client.moisParMois || client.saisons || {};
-          const mpmPlan = getPlanningMois(mpmRaw);
-          // Passages manuels stockés sur le client : { "YYYY-MM": n, ... }
-          const manuelMap = client.passagesManuel || {};
-          const toggleManuel = (mKey) => {
-            if (!onUpdateClient) return;
-            const cur = manuelMap[mKey] || 0;
-            const planForKey = (() => {
-              const mm = parseInt(mKey.split("-")[1]);
-              return (mpmPlan[mm]?.e||0) + (mpmPlan[mm]?.c||0);
-            })();
-            // Cycle : 0 → 1 → 2 … → planT → 0
-            const next = cur >= planForKey ? 0 : cur + 1;
-            const newManuel = { ...manuelMap };
-            if (next === 0) delete newManuel[mKey];
-            else newManuel[mKey] = next;
-            onUpdateClient({ ...client, passagesManuel: newManuel });
-          };
-          return <>
-        <div style={{fontSize:12,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
-          📅 <span>{label}</span>
-        </div>
-        <div style={{border:"1px solid "+DS.border,borderRadius:DS.radiusSm,overflow:"hidden"}}>
-          {[1,2,3,4,5,6,7,8,9,10,11,12].map((m,i)=>{
-            const planE = mpmPlan[m].e;
-            const planC = mpmPlan[m].c;
-            const planT = planE + planC;
-            const passM = passC.filter(p=>{
-              const d = new Date(p.date);
-              const dMois = d.getMonth()+1;
-              if (dMois !== m) return false;
-              if (contractStart && contractEnd) {
-                const ds = String(p.date).slice(0,10);
-                return ds >= contractStart && ds <= contractEnd;
-              }
-              return d.getFullYear() === YEAR_NOW;
-            });
-            const doneE = passM.filter(p=>isEntretienType(p.type)).length;
-            const doneC = passM.filter(p=>isControleType(p.type)).length;
-            const doneRapport = doneE + doneC;
-            // Déterminer l'année pour la clé mois (on utilise l'année du contrat si disponible)
-            const mKey = `${contractStart ? contractStart.slice(0,4) : YEAR_NOW}-${String(m).padStart(2,"0")}`;
-            const doneManuel = manuelMap[mKey] || 0;
-            const doneT = doneRapport + doneManuel;
-            const rest = Math.max(0, planT - doneT);
-            const sc = SAISONS_META[getSaison(m)] || SAISONS_META.ete;
-            const cur = m === MOIS_NOW;
-            const complet = planT > 0 && rest === 0;
-            const isSelMois = selectedMois === m;
-            return <div key={m}>
-            <div onClick={()=>passM.length>0?setSelectedMois(isSelMois?null:m):null} style={{display:"flex",alignItems:"center",padding:"9px 12px",borderBottom:(!isSelMois&&i<11)?"1px solid "+DS.border:"none",background:isSelMois?sc.bg:cur?sc.bg:i%2===0?DS.white:"#f9fafb",cursor:passM.length>0?"pointer":"default",transition:"background .15s"}}>
-              <div style={{width:4,height:22,borderRadius:2,background:sc.color,marginRight:8,flexShrink:0}}/>
-              <div style={{width:42,fontWeight:cur?800:600,fontSize:15,color:cur?sc.color:DS.mid}}>{MOIS[m]}</div>
-              <div style={{flex:1,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                {planE>0||doneE>0 ? <span style={{fontSize:15,fontWeight:700,color:doneT>=planE?DS.green:DS.blue}}>🔧 {doneT}/{planE+planC}</span> : null}
-                {planC>0&&planE===0 ? <span style={{fontSize:15,fontWeight:700,color:doneT>=planC?DS.green:DS.teal}}>💧 {doneT}/{planC}</span> : null}
-                {planT===0 && doneT===0 ? <span style={{fontSize:15,color:"#d1d5db"}}>—</span> : null}
-                {doneManuel>0 && <span style={{fontSize:10,fontWeight:700,color:"#7c3aed",background:"#f5f3ff",padding:"1px 6px",borderRadius:4,border:"1px solid #c4b5fd"}}>{doneManuel} manuel{doneManuel>1?"s":""}</span>}
-                {doneT>planT && planT>0 ? <span style={{fontSize:10,fontWeight:700,color:DS.blue,background:DS.blueSoft,padding:"1px 6px",borderRadius:4,border:"1px solid "+DS.border}}>+{doneT-planT} suppl.</span> : null}
-              </div>
-              <div style={{display:"flex",alignItems:"center",gap:6}}>
-                {planT>0 && <div style={{fontSize:13,fontWeight:700,color:rest>0?DS.orange:DS.green,background:rest>0?DS.orangeSoft:DS.greenSoft,padding:"2px 8px",borderRadius:6,minWidth:52,textAlign:"center"}}>{rest>0?rest+" rest.":"✓"}</div>}
-                {planT>0 && onUpdateClient && (
-                  <div style={{display:"flex",alignItems:"center",gap:3}}>
-                    {doneManuel>0 && (
-                      <button
-                        onClick={()=>{ const newManuel={...manuelMap}; if(doneManuel<=1) delete newManuel[mKey]; else newManuel[mKey]=doneManuel-1; onUpdateClient({...client,passagesManuel:newManuel}); }}
-                        title="Retirer un passage manuel"
-                        style={{width:26,height:26,borderRadius:7,border:"1.5px solid #c4b5fd",background:"#f5f3ff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"}}>
-                        <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="3" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                      </button>
-                    )}
-                    {doneManuel>0 && (
-                      <span style={{fontSize:13,fontWeight:800,color:"#7c3aed",minWidth:16,textAlign:"center"}}>{doneManuel}</span>
-                    )}
-                    <button
-                      onClick={()=>{ const newManuel={...manuelMap,[mKey]:(doneManuel||0)+1}; onUpdateClient({...client,passagesManuel:newManuel}); }}
-                      title="Ajouter un passage manuel"
-                      style={{width:26,height:26,borderRadius:7,border:"1.5px solid "+(doneManuel>0?"#c4b5fd":DS.border),background:doneManuel>0?"#f5f3ff":DS.white,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"}}>
-                      <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke={doneManuel>0?"#7c3aed":DS.mid} strokeWidth="3" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-            {isSelMois && passM.length>0 && (
-              <div style={{borderBottom:i<11?"1px solid "+DS.border:"none",background:"#f8fafc",padding:"8px 12px 12px",display:"flex",flexDirection:"column",gap:8}}>
-                {passM.sort((a,b)=>new Date(b.date)-new Date(a.date)).map(p=>{
-                  const phOk=p.ph>=7.0&&p.ph<=7.6;
-                  const clOk=p.chlore>=0.5&&p.chlore<=3.0;
-                  const isCtrl=isControleType(p.type);
-                  const rapportStatus=getRapportStatus(p);
-                  const rapportMeta=RAPPORT_STATUS[rapportStatus];
-                  return (
-                    <div key={p.id} style={{background:"#eef2f7",borderRadius:10,border:"1px solid "+DS.border,padding:"10px 12px"}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
-                        <div>
-                          <div style={{fontWeight:700,fontSize:13,color:DS.dark}}>{new Date(p.date).toLocaleDateString("fr",{day:"2-digit",month:"long"})}</div>
-                          <div style={{display:"flex",gap:5,marginTop:4,flexWrap:"wrap"}}>
-                            <Tag color={isCtrl?DS.teal:DS.blue}>{isCtrl?"💧":"🔧"} {p.type}</Tag>
-                            {p.ph&&<Tag color={phOk?DS.green:DS.red}>pH {p.ph}</Tag>}
-                            {p.chlore&&<Tag color={clOk?DS.green:DS.red}>Cl {p.chlore}</Tag>}
-                            <Tag color={rapportMeta.color} bg={rapportMeta.bg}>{rapportMeta.label}</Tag>
-                          </div>
-                        </div>
-                        {p.tech&&<span style={{fontSize:11,color:DS.mid}}>{p.tech}</span>}
-                      </div>
-                      <div style={{display:"flex",gap:5,paddingTop:8,borderTop:"1px solid "+DS.border,flexWrap:"wrap"}}>
-                        <button onClick={(e)=>{e.stopPropagation();setDetailPassageFiche(p);}} className="btn-hover" style={{flex:1,padding:"5px",borderRadius:8,background:"#eef2f7",border:"none",boxShadow:"3px 3px 6px rgba(166,210,220,0.5), -2px -2px 4px rgba(255,255,255,0.8)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:13,color:DS.dark,fontFamily:"inherit",fontWeight:700}}>{Ico.search(11,DS.mid)} Aperçu</button>
-                        <button onClick={(e)=>{e.stopPropagation();onEditPassage&&onEditPassage(p);}} className="btn-hover" style={{flex:1,padding:"5px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:13,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(11,DS.mid)} Modifier</button>
-                        <button onClick={(e)=>{e.stopPropagation();ouvrirRapport(p,client);}} className="btn-hover" style={{flex:1,padding:"5px",borderRadius:8,background:DS.blueSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:13,color:DS.blue,fontFamily:"inherit",fontWeight:700}}>{Ico.pdf(11,DS.blue)} Rapport</button>
-                        {onDeletePassage&&<button onClick={(e)=>{e.stopPropagation();showConfirm("Supprimer ce passage ?",()=>onDeletePassage(p.id));}} className="btn-hover" style={{padding:"5px 8px",borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(11,DS.red)}</button>}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            </div>;
-          })}
-        </div>
-        <div style={{display:"flex",justifyContent:"space-between",marginTop:10,padding:"10px 14px",background:"linear-gradient(135deg,#0891b2,#0e7490)",borderRadius:DS.radiusSm,boxShadow:"0 4px 12px rgba(8,145,178,0.3)"}}>
-          <span style={{color:"rgba(255,255,255,0.7)",fontSize:15,fontWeight:600}}>Total annuel</span>
-          <span style={{color:"#fff",fontSize:15,fontWeight:800}}>🔧 {totalE}  ·  💧 {totalC}  ·  {total} passages</span>
-        </div>
-        {Object.keys(manuelMap).length>0&&(
-          <div style={{marginTop:6,padding:"6px 12px",background:"#f5f3ff",borderRadius:DS.radiusSm,border:"1px solid #c4b5fd",fontSize:12,color:"#6d28d9",display:"flex",alignItems:"center",gap:6}}>
-            <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            Passages manuels : cliquer sur le bouton ✓ pour ajouter/retirer. Le compteur cycle de 0 jusqu'au nombre prévu.
-          </div>
-        )}
-          </>;
-        })()}
-      </div>}
-
-
-      {/* Tab: Timeline */}
+      {/* ── HISTORIQUE ── */}
       {tab==="historique" && (
         <div className="fade-in">
           {(()=>{
-            const passClient = passages.filter(p=>p.clientId===client.id);
+            const passClient2 = passages.filter(p=>p.clientId===client.id);
             const livClient  = (livraisons||[]).filter(l=>l.clientId===client.id);
             const rdvClient2 = (rdvs||[]).filter(r=>r.clientId===client.id);
-
             const events = [
-              ...(client.dateDebut?[{
-                date:client.dateDebut, title:"Début de contrat",
-                sub:client.formule+(client.prix?" · "+client.prix+"€/an":""),
-                dotColor:"#22d3ee", statusLabel:"Contrat", statusColor:"#0891b2",
-              }]:[]),
-              ...passClient.map(p=>({
-                date:p.date,
-                title:p.type||"Passage",
-                sub:[p.tech?"par "+p.tech:null, p.ph?"pH "+p.ph:null, p.chlore?"Cl "+p.chlore:null].filter(Boolean).join("  ·  "),
-                dotColor:isControleType(p.type)?"#0e7490":"#0891b2",
-                statusLabel:p.ok?"Effectué":"En cours",
-                statusColor:p.ok?"#059669":"#f59e0b",
-                _p:p,
-              })),
-              ...livClient.map(l=>({
-                date:l.date, title:"Livraison",
-                sub:[l.produits?.slice(0,2).join(", "), l.montant?l.montant+"€":null].filter(Boolean).join("  ·  "),
-                dotColor:"#f59e0b",
-                statusLabel:l.statut==="paye"?"Payé":l.statut==="facture"?"Facturé":"À facturer",
-                statusColor:l.statut==="paye"?"#059669":"#f59e0b",
-                _l:l,
-              })),
-              ...rdvClient2.map(r=>({
-                date:r.date, title:r.type||"Rendez-vous",
-                sub:[r.heure, r.duree?r.duree+" min":null].filter(Boolean).join("  ·  "),
-                dotColor:"#818cf8",
-                statusLabel:r.date>=TODAY?"À venir":"Passé",
-                statusColor:r.date>=TODAY?"#818cf8":"#94a3b8",
-                _r:r,
-              })),
+              ...(client.dateDebut?[{date:client.dateDebut,title:"Début de contrat",sub:client.formule+(client.prix?" · "+client.prix+"€/an":""),dot:"#22d3ee",badge:"Contrat",badgeColor:"#0891b2"}]:[]),
+              ...passClient2.map(p=>({date:p.date,title:p.type||"Passage",sub:[p.tech?"par "+p.tech:null,p.ph?"pH "+p.ph:null,p.chlore?"Cl "+p.chlore:null].filter(Boolean).join(" · "),dot:isControleType(p.type)?"#0e7490":"#0891b2",badge:p.ok?"Effectué":"En cours",badgeColor:p.ok?"#059669":"#f59e0b",_p:p})),
+              ...livClient.map(l=>({date:l.date,title:"Livraison",sub:[l.produits?.slice(0,2).join(", "),l.montant?l.montant+"€":null].filter(Boolean).join(" · "),dot:"#f59e0b",badge:l.statut==="paye"?"Payé":l.statut==="facture"?"Facturé":"À facturer",badgeColor:l.statut==="paye"?"#059669":"#f59e0b",_l:l})),
+              ...rdvClient2.map(r=>({date:r.date,title:r.type||"RDV",sub:[r.heure,r.duree?r.duree+" min":null].filter(Boolean).join(" · "),dot:"#818cf8",badge:r.date>=TODAY?"À venir":"Passé",badgeColor:r.date>=TODAY?"#818cf8":"#94a3b8",_r:r})),
             ].sort((a,b)=>b.date.localeCompare(a.date));
-
-            if(!events.length) return (
-              <div style={{textAlign:"center",padding:"48px 0",color:"#94a3b8",fontSize:15}}>Aucun historique</div>
-            );
-
-            // Grouper par mois
+            if(!events.length) return <div style={{textAlign:"center",padding:"48px 0",color:"#94a3b8",fontSize:14}}>Aucun historique</div>;
             const grouped={};
-            events.forEach(ev=>{
-              const d=new Date(ev.date);
-              const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
-              if(!grouped[key]) grouped[key]=[];
-              grouped[key].push(ev);
-            });
-
+            events.forEach(ev=>{ const d=new Date(ev.date); const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; if(!grouped[k]) grouped[k]=[]; grouped[k].push(ev); });
             return Object.keys(grouped).sort((a,b)=>b.localeCompare(a)).map(key=>{
               const [yr,mo]=key.split("-");
               return (
-                <div key={key} style={{marginBottom:28}}>
-                  {/* Label mois — bien visible */}
-                  <div style={{fontSize:13,fontWeight:800,color:"#0f172a",marginBottom:12,paddingBottom:8,borderBottom:"2px solid #f1f5f9"}}>
-                    {MOIS_L[parseInt(mo)]} {yr}
-                    <span style={{marginLeft:8,fontSize:11,color:"#94a3b8",fontWeight:500}}>{grouped[key].length} événement{grouped[key].length>1?"s":""}</span>
+                <div key={key} style={{marginBottom:24}}>
+                  <div style={{fontSize:11,fontWeight:800,color:"#0f172a",marginBottom:10,paddingBottom:6,borderBottom:"2px solid #f1f5f9",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                    <span>{MOIS_L[parseInt(mo)]} {yr}</span>
+                    <span style={{fontSize:10,color:"#94a3b8",fontWeight:500}}>{grouped[key].length} événement{grouped[key].length>1?"s":""}</span>
                   </div>
-
                   {grouped[key].map((ev,i)=>{
                     const d=new Date(ev.date);
+                    const clickable=!!(ev._p||ev._l||ev._r);
                     return (
-                      <div key={i}
-                        onClick={ev._p?()=>setDetailPassageFiche(ev._p):ev._l?()=>{setEditLiv(ev._l);setShowFormLiv(true);}:ev._r?()=>onEditRdv&&onEditRdv(ev._r):undefined}
-                        style={{display:"flex",alignItems:"center",gap:16,padding:"14px 0",borderBottom:i<grouped[key].length-1?"1px solid #f8fafc":"none",cursor:(ev._p||ev._l||ev._r)?"pointer":"default"}}>
-
-                        {/* Point couleur + date */}
-                        <div style={{width:48,flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-                          <div style={{width:14,height:14,borderRadius:"50%",background:ev.dotColor,flexShrink:0}}/>
-                          <div style={{fontSize:10,color:"#94a3b8",fontWeight:600,textAlign:"center",lineHeight:1.2}}>
-                            {d.toLocaleDateString("fr",{day:"2-digit",month:"short"})}
-                          </div>
+                      <div key={i} onClick={ev._p?()=>setDetailPassageFiche(ev._p):ev._l?()=>{setEditLiv(ev._l);setShowFormLiv(true);}:ev._r?()=>onEditRdv&&onEditRdv(ev._r):undefined}
+                        style={{display:"flex",alignItems:"center",gap:12,padding:"11px 0",borderBottom:i<grouped[key].length-1?"1px solid #f8fafc":"none",cursor:clickable?"pointer":"default"}}>
+                        <div style={{width:36,flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                          <div style={{width:10,height:10,borderRadius:"50%",background:ev.dot}}/>
+                          <div style={{fontSize:9,color:"#94a3b8",fontWeight:600,textAlign:"center",lineHeight:1.2}}>{d.toLocaleDateString("fr",{day:"2-digit",month:"short"})}</div>
                         </div>
-
-                        {/* Titre + sous-infos */}
                         <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:15,fontWeight:700,color:"#0f172a",marginBottom:4}}>{ev.title}</div>
-                          {ev.sub&&<div style={{fontSize:13,color:"#64748b",fontWeight:500}}>{ev.sub}</div>}
+                          <div style={{fontSize:13,fontWeight:700,color:"#0f172a",marginBottom:2}}>{ev.title}</div>
+                          {ev.sub&&<div style={{fontSize:11,color:"#64748b"}}>{ev.sub}</div>}
                         </div>
-
-                        {/* Statut */}
-                        <div style={{flexShrink:0,textAlign:"right"}}>
-                          <div style={{fontSize:13,fontWeight:700,color:ev.statusColor,whiteSpace:"nowrap"}}>{ev.statusLabel}</div>
-                          {(ev._p||ev._l||ev._r)&&<div style={{fontSize:11,color:"#cbd5e1",marginTop:2}}>Ouvrir →</div>}
+                        <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+                          <span style={{fontSize:10,fontWeight:700,color:ev.badgeColor,background:ev.badgeColor+"18",padding:"2px 7px",borderRadius:10,whiteSpace:"nowrap"}}>{ev.badge}</span>
+                          {clickable&&<svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>}
                         </div>
                       </div>
                     );
@@ -1737,107 +1541,249 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           })()}
         </div>
       )}
+
+      {/* ── PASSAGES / RAPPORTS ── */}
       {tab==="passages" && (
         <div className="fade-in">
-          <div style={{display:"flex",gap:8,marginBottom:12}}>
-            <button onClick={onAddPassage} className="btn-hover" style={{flex:1,padding:"11px",borderRadius:DS.radiusSm,background:DS.blueSoft,color:DS.blue,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontFamily:"inherit"}}>
-              {Ico.plus(13,DS.blue)} Saisir un passage
+          {/* Action bar */}
+          <div style={{display:"flex",gap:8,marginBottom:14}}>
+            <button onClick={onAddPassage} style={{flex:1,height:44,borderRadius:12,background:"linear-gradient(135deg,#0284c7,#0891b2)",border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6,boxShadow:"0 2px 8px rgba(8,145,178,0.35)",WebkitTapHighlightColor:"transparent"}}>
+              {Ico.plus(13,"#fff")} Nouveau passage
             </button>
             {passC.length>0&&onDeletePassage&&(
-              <button onClick={()=>showConfirm(`Supprimer TOUS les ${passC.length} passages de ce client ?`, ()=>passC.forEach(p=>onDeletePassage(p.id)))}
-                style={{padding:"11px 14px",borderRadius:DS.radiusSm,background:DS.redSoft,border:"1px solid #fca5a5",cursor:"pointer",fontWeight:700,fontSize:13,color:DS.red,fontFamily:"inherit",display:"flex",alignItems:"center",gap:5}}>
-                {Ico.trash(13,DS.red)} Tout supprimer
+              <button onClick={()=>showConfirm(`Supprimer TOUS les ${passC.length} passages ?`,()=>passC.forEach(p=>onDeletePassage(p.id)))}
+                style={{height:44,width:44,borderRadius:12,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                {Ico.trash(14,DS.red)}
               </button>
             )}
           </div>
           {passC.length===0
-            ? <div style={{textAlign:"center",color:DS.mid,padding:30,fontSize:15}}>Aucun passage enregistré</div>
+            ? <div style={{textAlign:"center",color:DS.mid,padding:32,fontSize:14}}>Aucun passage enregistré</div>
             : passC.map(p=>{
               const phOk=p.ph>=7.0&&p.ph<=7.6;
               const clOk=p.chlore>=0.5&&p.chlore<=3.0;
-              const isCtrl = isControleType(p.type);
-              const rapportStatus = getRapportStatus(p);
-              const rapportMeta = RAPPORT_STATUS[rapportStatus];
+              const isCtrl=isControleType(p.type);
+              const rapportStatus=getRapportStatus(p);
+              const rapportMeta=RAPPORT_STATUS[rapportStatus];
               return (
-                <Card key={p.id} style={{marginBottom:10}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
-                    <div>
-                      <div style={{fontWeight:700,fontSize:15,color:DS.dark}}>{new Date(p.date).toLocaleDateString("fr",{day:"2-digit",month:"long"})}</div>
-                      <div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap"}}>
-                        <Tag color={isCtrl?DS.teal:DS.blue}>{isCtrl?"💧":"🔧"} {p.type}</Tag>
-                        {p.ph&&<Tag color={phOk?DS.green:DS.red}>pH {p.ph}</Tag>}
-                        {p.chlore&&<Tag color={clOk?DS.green:DS.red}>Cl {p.chlore}</Tag>}
-                        <Tag color={rapportMeta.color} bg={rapportMeta.bg}>{rapportMeta.label}</Tag>
+                <div key={p.id} style={{background:"#fff",borderRadius:14,border:"1px solid #f1f5f9",marginBottom:8,overflow:"hidden",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
+                  {/* Header passage */}
+                  <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px 8px"}}>
+                    <div style={{width:36,height:36,borderRadius:10,background:isCtrl?"#ecfdf5":"#eff6ff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:16}}>
+                      {isCtrl?"💧":"🔧"}
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:800,color:"#0f172a"}}>{p.type||"Entretien"}</div>
+                      <div style={{fontSize:11,color:"#64748b",marginTop:1}}>
+                        {new Date(p.date).toLocaleDateString("fr",{weekday:"short",day:"2-digit",month:"short",year:"numeric"})}
+                        {p.tech&&<span style={{marginLeft:6,color:"#94a3b8"}}>· {p.tech}</span>}
                       </div>
                     </div>
-                    {p.tech&&<span style={{fontSize:15,color:DS.mid,display:"flex",alignItems:"center",gap:3}}>{Ico.user(10,DS.mid)} {p.tech}</span>}
+                    {/* Mesures compactes */}
+                    <div style={{display:"flex",gap:5,flexShrink:0}}>
+                      {p.ph&&<div style={{background:phOk?"#dcfce7":"#fef2f2",borderRadius:6,padding:"3px 7px",textAlign:"center"}}>
+                        <div style={{fontSize:8,color:phOk?"#166534":"#b91c1c",fontWeight:700}}>pH</div>
+                        <div style={{fontSize:13,fontWeight:900,color:phOk?"#166534":"#b91c1c",lineHeight:1}}>{p.ph}</div>
+                      </div>}
+                      {p.chlore&&<div style={{background:clOk?"#dcfce7":"#fef2f2",borderRadius:6,padding:"3px 7px",textAlign:"center"}}>
+                        <div style={{fontSize:8,color:clOk?"#166534":"#b91c1c",fontWeight:700}}>Cl</div>
+                        <div style={{fontSize:13,fontWeight:900,color:clOk?"#166534":"#b91c1c",lineHeight:1}}>{p.chlore}</div>
+                      </div>}
+                    </div>
                   </div>
-                  {(p.photoArrivee||p.photoDepart) && (
-                    <div style={{display:"flex",gap:6,marginBottom:8}}>
-                      {p.photoArrivee && (<div style={{flex:1,position:"relative"}}><img src={p.photoArrivee} alt="Arrivée" style={{width:"100%",height:60,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border}}/><span style={{position:"absolute",bottom:3,left:4,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.5)",borderRadius:4,padding:"1px 5px"}}>Arrivée</span></div>)}
-                      {p.photoDepart && (<div style={{flex:1,position:"relative"}}><img src={p.photoDepart} alt="Départ" style={{width:"100%",height:60,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border}}/><span style={{position:"absolute",bottom:3,left:4,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.5)",borderRadius:4,padding:"1px 5px"}}>Départ</span></div>)}
+
+                  {/* Photos */}
+                  {(p.photoArrivee||p.photoDepart)&&(
+                    <div style={{display:"flex",gap:4,padding:"0 14px 8px"}}>
+                      {p.photoArrivee&&<div style={{flex:1,position:"relative"}}><img src={p.photoArrivee} alt="" style={{width:"100%",height:52,objectFit:"cover",borderRadius:8}}/><span style={{position:"absolute",bottom:2,left:4,fontSize:8,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.5)",borderRadius:3,padding:"1px 4px"}}>Arrivée</span></div>}
+                      {p.photoDepart&&<div style={{flex:1,position:"relative"}}><img src={p.photoDepart} alt="" style={{width:"100%",height:52,objectFit:"cover",borderRadius:8}}/><span style={{position:"absolute",bottom:2,left:4,fontSize:8,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.5)",borderRadius:3,padding:"1px 4px"}}>Départ</span></div>}
                     </div>
                   )}
-                  
-                  
-                  <div style={{display:"flex",gap:5,paddingTop:8,borderTop:"1px solid "+DS.border,flexWrap:"wrap",width:"100%"}}>
-                    <div onClick={(e)=>e.stopPropagation()} style={{flex:"1 1 160px"}}>
-                      <RapportStatusPicker
-                        compact
-                        value={rapportStatus}
-                        onChange={(next)=>onUpdatePassageStatus?.({
-                          ...p,
-                          rapportStatut: next,
-                          rapportEnvoyeAt: next==="envoye" ? (p.rapportEnvoyeAt || new Date().toISOString()) : null,
-                        })}
-                      />
-                    </div>
-                    <button onClick={(e)=>{e.stopPropagation();setDetailPassageFiche(p);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:"#eef2f7",border:"none",boxShadow:"3px 3px 6px rgba(166,210,220,0.5), -2px -2px 4px rgba(255,255,255,0.8)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.dark,fontFamily:"inherit",fontWeight:700}}>{Ico.search(12,DS.mid)} Aperçu</button>
-                    <button onClick={()=>onEditPassage&&onEditPassage(p)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(12,DS.mid)} Modifier</button>
-                    <button onClick={(e)=>{e.stopPropagation();ouvrirRapport(p,client);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.blueSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.blue,fontFamily:"inherit",fontWeight:700}}>{Ico.pdf(12,DS.blue)} Rapport</button>
-                    {client.email&&<button onClick={(e)=>{e.stopPropagation();envoyerEmail(p,client,onUpdatePassageStatus);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.green,fontFamily:"inherit",fontWeight:700}}>{Ico.send(12,DS.green)} Email</button>}
-                    {onDeletePassage&&<button onClick={(e)=>{e.stopPropagation();showConfirm("Supprimer ce passage ?",()=>onDeletePassage(p.id));}} className="btn-hover" style={{padding:"6px 8px",borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(12,DS.red)}</button>}
+
+                  {/* Statut rapport */}
+                  <div style={{padding:"0 14px 8px"}} onClick={e=>e.stopPropagation()}>
+                    <RapportStatusPicker compact value={rapportStatus} onChange={(next)=>onUpdatePassageStatus?.({...p,rapportStatut:next,rapportEnvoyeAt:next==="envoye"?(p.rapportEnvoyeAt||new Date().toISOString()):null})}/>
                   </div>
-                </Card>
+
+                  {/* Boutons d'action — rangée compacte */}
+                  <div style={{display:"flex",borderTop:"1px solid #f8fafc"}}>
+                    {[
+                      {label:"Aperçu",  ico:Ico.search(12,DS.mid),  bg:"#f8fafc", color:DS.dark,   onClick:()=>setDetailPassageFiche(p)},
+                      {label:"Modifier",ico:Ico.edit(12,DS.mid),    bg:"#f8fafc", color:DS.mid,    onClick:()=>onEditPassage&&onEditPassage(p)},
+                      {label:"Rapport", ico:Ico.pdf(12,DS.blue),    bg:"#eff6ff", color:DS.blue,   onClick:()=>ouvrirRapport(p,client)},
+                      ...(client.email?[{label:"Email",ico:Ico.send(12,DS.green),bg:"#f0fdf4",color:DS.green,onClick:()=>envoyerEmail(p,client,onUpdatePassageStatus)}]:[]),
+                      ...(onDeletePassage?[{label:"",ico:Ico.trash(12,DS.red),bg:"#fef2f2",color:DS.red,onClick:()=>showConfirm("Supprimer ce passage ?",()=>onDeletePassage(p.id))}]:[]),
+                    ].map((btn,i,arr)=>(
+                      <button key={i} onClick={e=>{e.stopPropagation();btn.onClick();}}
+                        style={{flex:btn.label?"1":null,width:btn.label?null:40,padding:"9px 4px",background:btn.bg,border:"none",borderRight:i<arr.length-1?"1px solid #f1f5f9":"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,fontWeight:700,color:btn.color,fontFamily:"inherit",WebkitTapHighlightColor:"transparent",transition:"opacity .1s",minHeight:38}}>
+                        {btn.ico}{btn.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               );
             })
           }
         </div>
       )}
 
+      {/* ── PLANNING (SAISONS) ── */}
+      {tab==="saisons" && <div className="fade-in">
+        {(()=>{
+          const mpmRaw = client.moisParMois || client.saisons || {};
+          const mpmPlan = getPlanningMois(mpmRaw);
+          const manuelMap = client.passagesManuel || {};
+          const label = contractStart && contractEnd
+            ? `${new Date(contractStart).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})} → ${new Date(contractEnd).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})}`
+            : "Année en cours";
+          return <>
+          <div style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>📅 {label}</div>
+          <div style={{border:"1px solid "+DS.border,borderRadius:12,overflow:"hidden"}}>
+          {[1,2,3,4,5,6,7,8,9,10,11,12].map((m,i)=>{
+            const planE=mpmPlan[m].e, planC=mpmPlan[m].c, planT=planE+planC;
+            const passM=passC.filter(p=>{
+              const d=new Date(p.date), dMois=d.getMonth()+1;
+              if(dMois!==m) return false;
+              if(contractStart&&contractEnd){ const ds=String(p.date).slice(0,10); return ds>=contractStart&&ds<=contractEnd; }
+              return d.getFullYear()===YEAR_NOW;
+            });
+            const mKey=`${contractStart?contractStart.slice(0,4):YEAR_NOW}-${String(m).padStart(2,"0")}`;
+            const doneManuel=manuelMap[mKey]||0;
+            const doneT=passM.length+doneManuel;
+            const rest2=Math.max(0,planT-doneT);
+            const sc=SAISONS_META[getSaison(m)]||SAISONS_META.ete;
+            const cur=m===MOIS_NOW;
+            const isSelMois=selectedMois===m;
+            return <div key={m}>
+              <div onClick={()=>passM.length>0?setSelectedMois(isSelMois?null:m):null}
+                style={{display:"flex",alignItems:"center",padding:"9px 12px",borderBottom:(!isSelMois&&i<11)?"1px solid "+DS.border:"none",background:cur?sc.bg+"88":isSelMois?sc.bg:i%2===0?"#fff":"#fafafa",cursor:passM.length>0?"pointer":"default"}}>
+                <div style={{width:3,height:20,borderRadius:2,background:sc.color,marginRight:8,flexShrink:0}}/>
+                <div style={{width:34,fontWeight:cur?800:600,fontSize:13,color:cur?sc.color:DS.mid}}>{MOIS[m]}</div>
+                <div style={{flex:1,display:"flex",gap:6,alignItems:"center"}}>
+                  {planT>0?<span style={{fontSize:13,fontWeight:700,color:doneT>=planT?DS.green:DS.blue}}>{doneT}/{planT}</span>:<span style={{fontSize:13,color:"#d1d5db"}}>—</span>}
+                  {doneManuel>0&&<span style={{fontSize:9,fontWeight:700,color:"#7c3aed",background:"#f5f3ff",padding:"1px 5px",borderRadius:4}}>{doneManuel}m</span>}
+                  {doneT>planT&&planT>0&&<span style={{fontSize:9,fontWeight:700,color:DS.blue,background:DS.blueSoft,padding:"1px 5px",borderRadius:4}}>+{doneT-planT}</span>}
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  {planT>0&&<div style={{fontSize:11,fontWeight:700,color:rest2>0?DS.orange:DS.green,background:rest2>0?DS.orangeSoft:DS.greenSoft,padding:"2px 8px",borderRadius:6,minWidth:46,textAlign:"center"}}>{rest2>0?rest2+" rest.":"✓"}</div>}
+                  {planT>0&&onUpdateClient&&(
+                    <div style={{display:"flex",alignItems:"center",gap:2}}>
+                      {doneManuel>0&&<button onClick={e=>{e.stopPropagation();const nm={...manuelMap};if(doneManuel<=1)delete nm[mKey];else nm[mKey]=doneManuel-1;onUpdateClient({...client,passagesManuel:nm});}} style={{width:24,height:24,borderRadius:6,border:"1.5px solid #c4b5fd",background:"#f5f3ff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="3" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      </button>}
+                      {doneManuel>0&&<span style={{fontSize:11,fontWeight:800,color:"#7c3aed",minWidth:14,textAlign:"center"}}>{doneManuel}</span>}
+                      <button onClick={e=>{e.stopPropagation();onUpdateClient({...client,passagesManuel:{...manuelMap,[mKey]:(doneManuel||0)+1}});}} style={{width:24,height:24,borderRadius:6,border:"1.5px solid "+(doneManuel>0?"#c4b5fd":DS.border),background:doneManuel>0?"#f5f3ff":"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke={doneManuel>0?"#7c3aed":DS.mid} strokeWidth="3" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {isSelMois&&passM.length>0&&(
+                <div style={{background:"#f8fafc",padding:"8px 12px",borderBottom:i<11?"1px solid "+DS.border:"none",display:"flex",flexDirection:"column",gap:6}}>
+                  {passM.sort((a,b)=>new Date(b.date)-new Date(a.date)).map(p=>{
+                    const phOk=p.ph>=7&&p.ph<=7.6;const clOk=p.chlore>=0.5&&p.chlore<=3;
+                    return (
+                      <div key={p.id} style={{background:"#fff",borderRadius:10,padding:"9px 11px",border:"1px solid #f1f5f9"}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                          <div style={{fontSize:12,fontWeight:700,color:DS.dark}}>{new Date(p.date).toLocaleDateString("fr",{day:"2-digit",month:"long"})} {p.tech&&<span style={{color:DS.mid,fontWeight:500}}>· {p.tech}</span>}</div>
+                          <div style={{display:"flex",gap:4}}>
+                            {p.ph&&<span style={{fontSize:10,fontWeight:700,color:phOk?DS.green:DS.red,background:phOk?DS.greenSoft:DS.redSoft,padding:"1px 5px",borderRadius:4}}>pH {p.ph}</span>}
+                            {p.chlore&&<span style={{fontSize:10,fontWeight:700,color:clOk?DS.green:DS.red,background:clOk?DS.greenSoft:DS.redSoft,padding:"1px 5px",borderRadius:4}}>Cl {p.chlore}</span>}
+                          </div>
+                        </div>
+                        <div style={{display:"flex",gap:4}}>
+                          <button onClick={e=>{e.stopPropagation();setDetailPassageFiche(p);}} style={{flex:1,padding:"5px",borderRadius:7,background:"#f1f5f9",border:"none",cursor:"pointer",fontSize:11,fontWeight:700,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:3}}>{Ico.search(10,DS.mid)} Aperçu</button>
+                          <button onClick={e=>{e.stopPropagation();onEditPassage&&onEditPassage(p);}} style={{flex:1,padding:"5px",borderRadius:7,background:"#f1f5f9",border:"none",cursor:"pointer",fontSize:11,fontWeight:700,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:3}}>{Ico.edit(10,DS.mid)} Modifier</button>
+                          <button onClick={e=>{e.stopPropagation();ouvrirRapport(p,client);}} style={{flex:1,padding:"5px",borderRadius:7,background:DS.blueSoft,border:"none",cursor:"pointer",fontSize:11,fontWeight:700,color:DS.blue,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:3}}>{Ico.pdf(10,DS.blue)} Rapport</button>
+                          {onDeletePassage&&<button onClick={e=>{e.stopPropagation();showConfirm("Supprimer ?",()=>onDeletePassage(p.id));}} style={{padding:"5px 7px",borderRadius:7,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(10,DS.red)}</button>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>;
+          })}
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",marginTop:8,padding:"8px 14px",background:"linear-gradient(135deg,#0891b2,#0e7490)",borderRadius:10,boxShadow:"0 2px 8px rgba(8,145,178,0.25)"}}>
+            <span style={{color:"rgba(255,255,255,0.7)",fontSize:12,fontWeight:600}}>Total annuel</span>
+            <span style={{color:"#fff",fontSize:12,fontWeight:800}}>🔧 {totalE} · 💧 {totalC} · {total} passages</span>
+          </div>
+          </>;
+        })()}
+      </div>}
+
+      {/* ── INFOS ── */}
+      {tab==="infos" && (
+        <div className="fade-in">
+          {/* Contact rapide */}
+          {(client.tel||client.email)&&(
+            <div style={{display:"flex",gap:8,marginBottom:16}}>
+              {client.tel&&<a href={"tel:"+client.tel} style={{flex:1,height:44,borderRadius:12,background:"#eff6ff",border:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:13,fontWeight:700,color:DS.blue,textDecoration:"none",WebkitTapHighlightColor:"transparent"}}>
+                {Ico.phone(14,DS.blue)} Appeler
+              </a>}
+              {client.email&&<a href={"mailto:"+client.email} style={{flex:1,height:44,borderRadius:12,background:"#f0fdf4",border:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:13,fontWeight:700,color:DS.green,textDecoration:"none",WebkitTapHighlightColor:"transparent"}}>
+                {Ico.mail(14,DS.green)} Email
+              </a>}
+            </div>
+          )}
+          <div style={{background:"#fff",borderRadius:14,border:"1px solid #f1f5f9",overflow:"hidden"}}>
+          {[
+            {ico:Ico.phone(15,DS.blue),l:"Téléphone",v:client.tel,href:client.tel?"tel:"+client.tel:null},
+            {ico:Ico.mail(15,DS.blue),l:"Email",v:client.email,href:client.email?"mailto:"+client.email:null},
+            {ico:Ico.pin(15,DS.blue),l:"Adresse",v:client.adresse},
+            {ico:Ico.pool(15,DS.blue),l:"Bassin",v:[client.bassin,client.volume?client.volume+" m³":null].filter(Boolean).join(" — ")},
+            {ico:Ico.euro(15,DS.blue),l:"Tarif annuel",v:client.prix?client.prix+"€/an":null},
+            {ico:Ico.calendar(15,DS.blue),l:"Début contrat",v:client.dateDebut?new Date(client.dateDebut).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}):null},
+            {ico:Ico.calendar(15,jours!==null&&jours<=30?DS.orange:DS.blue),l:"Fin contrat",v:client.dateFin?new Date(client.dateFin).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}):null},
+          ].filter(r=>r.v).map((r,i,arr)=>(
+            <div key={r.l} style={{display:"flex",gap:12,padding:"13px 16px",alignItems:"center",borderBottom:i<arr.length-1?"1px solid #f8fafc":"none"}}>
+              <div style={{width:34,height:34,borderRadius:9,background:"#f0f9ff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{r.ico}</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:2}}>{r.l}</div>
+                {r.href?<a href={r.href} style={{fontSize:13,color:DS.blue,fontWeight:700,textDecoration:"none"}}>{r.v}</a>:<div style={{fontSize:13,color:"#0f172a",fontWeight:600}}>{r.v}</div>}
+              </div>
+            </div>
+          ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── RDV ── */}
       {tab==="rdvs" && (
         <div className="fade-in">
-          <button onClick={onAddRdv} className="btn-hover" style={{width:"100%",marginBottom:12,padding:"11px",borderRadius:DS.radiusSm,background:DS.purpleSoft,color:DS.purple,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontFamily:"inherit"}}>
-            {Ico.plus(13,DS.purple)} Ajouter un RDV
+          <button onClick={onAddRdv} style={{width:"100%",height:44,marginBottom:12,borderRadius:12,background:"linear-gradient(135deg,#6d28d9,#7c3aed)",border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontFamily:"inherit",boxShadow:"0 2px 8px rgba(109,40,217,0.3)",WebkitTapHighlightColor:"transparent"}}>
+            {Ico.plus(13,"#fff")} Nouveau RDV
           </button>
           {rdvClient.length===0
-            ? <div style={{textAlign:"center",color:DS.mid,padding:32,fontSize:15}}>Aucun rendez-vous pour ce client</div>
+            ? <div style={{textAlign:"center",color:DS.mid,padding:32,fontSize:14}}>Aucun rendez-vous</div>
             : rdvClient.map(r=>{
-              const d = new Date(r.date);
-              const isToday = r.date===TODAY;
-              const isPast = r.date<TODAY;
+              const d=new Date(r.date);
+              const isToday=r.date===TODAY;
+              const isPast=r.date<TODAY;
               return (
-                <div key={r.id} style={{background:isPast?DS.light:DS.white,borderRadius:DS.radiusSm,border:"1.5px solid "+(isToday?DS.purple:DS.border),padding:"12px 14px",marginBottom:8,opacity:isPast?0.7:1}}>
-                  <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
-                    <div style={{width:46,textAlign:"center",flexShrink:0,background:isToday?DS.purpleSoft:DS.light,borderRadius:10,padding:"6px 4px"}}>
-                      <div style={{fontSize:9,fontWeight:700,color:isToday?DS.purple:DS.mid,textTransform:"uppercase"}}>{d.toLocaleDateString("fr",{weekday:"short"})}</div>
-                      <div style={{fontSize:20,fontWeight:900,color:isToday?DS.purple:DS.dark,lineHeight:1}}>{d.getDate()}</div>
-                      <div style={{fontSize:9,color:DS.mid}}>{MOIS[d.getMonth()+1]}</div>
+                <div key={r.id} style={{background:isPast?"#fafafa":"#fff",borderRadius:12,border:"1.5px solid "+(isToday?"#7c3aed":"#f1f5f9"),padding:"12px 14px",marginBottom:8,opacity:isPast?0.65:1,boxShadow:isToday?"0 0 0 3px #ede9fe":undefined}}>
+                  <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+                    <div style={{width:42,textAlign:"center",flexShrink:0,background:isToday?DS.purpleSoft:"#f8fafc",borderRadius:9,padding:"5px 3px"}}>
+                      <div style={{fontSize:8,fontWeight:700,color:isToday?DS.purple:DS.mid,textTransform:"uppercase"}}>{d.toLocaleDateString("fr",{weekday:"short"})}</div>
+                      <div style={{fontSize:18,fontWeight:900,color:isToday?DS.purple:DS.dark,lineHeight:1}}>{d.getDate()}</div>
+                      <div style={{fontSize:8,color:DS.mid}}>{MOIS[d.getMonth()+1]}</div>
                     </div>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontWeight:800,fontSize:15,color:DS.dark}}>{r.type}</div>
-                      <div style={{fontSize:15,color:DS.mid,marginTop:2,display:"flex",gap:8}}>
+                      <div style={{fontWeight:800,fontSize:13,color:DS.dark}}>{r.type}</div>
+                      <div style={{fontSize:12,color:DS.mid,marginTop:2,display:"flex",gap:6}}>
                         {r.heure&&<span style={{fontWeight:600,color:DS.purple}}>{r.heure}</span>}
                         {r.duree&&<span>{r.duree} min</span>}
                       </div>
-                      {r.description&&<div style={{fontSize:15,color:DS.mid,marginTop:4}}>{r.description}</div>}
-                      {isToday&&<div style={{marginTop:5}}><Tag color={DS.purple}>Aujourd'hui</Tag></div>}
+                      {r.description&&<div style={{fontSize:11,color:DS.mid,marginTop:3}}>{r.description}</div>}
                     </div>
+                    {isToday&&<span style={{fontSize:9,fontWeight:800,color:DS.purple,background:DS.purpleSoft,padding:"2px 7px",borderRadius:8}}>Aujourd'hui</span>}
                   </div>
-                  <div style={{display:"flex",gap:6,marginTop:10,paddingTop:8,borderTop:"1px solid "+DS.border}}>
-                    <button onClick={()=>onEditRdv&&onEditRdv(r)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(12,DS.mid)} Modifier</button>
-                    <button onClick={()=>exportRdvToICS(r,client)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.purpleSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.purple,fontFamily:"inherit",fontWeight:700}}>{Ico.download(12,DS.purple)} Calendrier</button>
-                    <button onClick={()=>showConfirm("Supprimer ce RDV ?",()=>onDeleteRdv&&onDeleteRdv(r.id))} style={{width:32,borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(12,DS.red)}</button>
+                  <div style={{display:"flex",gap:6,marginTop:10,paddingTop:8,borderTop:"1px solid #f8fafc"}}>
+                    <button onClick={()=>onEditRdv&&onEditRdv(r)} style={{flex:1,padding:"7px",borderRadius:8,background:"#f8fafc",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,fontWeight:700,color:DS.mid,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>{Ico.edit(11,DS.mid)} Modifier</button>
+                    <button onClick={()=>exportRdvToICS(r,client)} style={{flex:1,padding:"7px",borderRadius:8,background:DS.purpleSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,fontWeight:700,color:DS.purple,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>{Ico.download(11,DS.purple)} Calendrier</button>
+                    <button onClick={()=>showConfirm("Supprimer ce RDV ?",()=>onDeleteRdv&&onDeleteRdv(r.id))} style={{width:34,borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",WebkitTapHighlightColor:"transparent"}}>{Ico.trash(11,DS.red)}</button>
                   </div>
                 </div>
               );
@@ -1848,49 +1794,49 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
 
       {tab==="livraisons" && (
         <div className="fade-in">
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:14}}>
+          {/* Stats rapides */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,marginBottom:12}}>
             {Object.entries(STATUT_LIV).map(([k,s])=>{
-              const n = livraisons.filter(l=>l.statut===k).length;
-              return (
-                <div key={k} style={{background:s.bg,borderRadius:DS.radiusSm,padding:"10px 8px",textAlign:"center",border:"1px solid "+s.color+"33"}}>
-                  <div style={{fontSize:20,fontWeight:900,color:s.color}}>{n}</div>
-                  <div style={{fontSize:15,color:s.color,fontWeight:700,marginTop:2}}>{s.label}</div>
-                </div>
-              );
+              const n=livraisons.filter(l=>l.statut===k).length;
+              return (<div key={k} style={{background:s.bg,borderRadius:10,padding:"8px 6px",textAlign:"center",border:"1px solid "+s.color+"33"}}>
+                <div style={{fontSize:18,fontWeight:900,color:s.color}}>{n}</div>
+                <div style={{fontSize:10,color:s.color,fontWeight:700,marginTop:1}}>{s.label}</div>
+              </div>);
             })}
           </div>
-          <button onClick={()=>{setEditLiv(null);setShowFormLiv(true);}} className="btn-hover" style={{width:"100%",marginBottom:12,padding:"11px",borderRadius:DS.radiusSm,background:DS.blueSoft,color:DS.blue,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontFamily:"inherit"}}>
-            {Ico.plus(13,DS.blue)} Ajouter une livraison
+          <button onClick={()=>{setEditLiv(null);setShowFormLiv(true);}} style={{width:"100%",height:44,marginBottom:12,borderRadius:12,background:"linear-gradient(135deg,#0284c7,#0891b2)",border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontFamily:"inherit",boxShadow:"0 2px 8px rgba(8,145,178,0.3)",WebkitTapHighlightColor:"transparent"}}>
+            {Ico.plus(13,"#fff")} Nouvelle livraison
           </button>
           {livraisons.length===0
-            ? <div style={{textAlign:"center",color:DS.mid,padding:24,fontSize:15}}>Aucune livraison enregistrée</div>
+            ? <div style={{textAlign:"center",color:DS.mid,padding:24,fontSize:14}}>Aucune livraison</div>
             : livraisons.sort((a,b)=>new Date(b.date)-new Date(a.date)).map(l=>{
-              const s = STATUT_LIV[l.statut]||STATUT_LIV.aFacturer;
+              const s=STATUT_LIV[l.statut]||STATUT_LIV.aFacturer;
               return (
-                <Card key={l.id} style={{marginBottom:10}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
-                    <div>
-                      <div style={{fontWeight:700,fontSize:15,color:DS.dark}}>{new Date(l.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"})}</div>
-                      {l.produits&&l.produits.length>0&&<div style={{fontSize:15,color:DS.mid,marginTop:3}}>{l.produits.join(", ")}</div>}
-                      {l.description&&<div style={{fontSize:15,color:DS.mid,marginTop:2}}>{l.description}</div>}
-                      {l.montant&&<div style={{fontSize:15,fontWeight:800,color:DS.dark,marginTop:4}}>{Number(l.montant).toLocaleString("fr")} €</div>}
+                <div key={l.id} style={{background:"#fff",borderRadius:12,border:"1px solid #f1f5f9",marginBottom:8,overflow:"hidden",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
+                  <div style={{padding:"12px 14px 8px",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:700,fontSize:13,color:DS.dark}}>{new Date(l.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"})}</div>
+                      {l.produits&&l.produits.length>0&&<div style={{fontSize:11,color:DS.mid,marginTop:2}}>{l.produits.join(", ")}</div>}
+                      {l.description&&<div style={{fontSize:11,color:DS.mid,marginTop:1}}>{l.description}</div>}
+                      {l.montant&&<div style={{fontSize:15,fontWeight:900,color:DS.dark,marginTop:4}}>{Number(l.montant).toLocaleString("fr")} €</div>}
                     </div>
-                    <Tag color={s.color}>{s.label}</Tag>
+                    <span style={{fontSize:10,fontWeight:700,color:s.color,background:s.bg,padding:"2px 8px",borderRadius:8,flexShrink:0,border:"1px solid "+s.color+"44"}}>{s.label}</span>
                   </div>
-                  <div style={{display:"flex",gap:6,marginBottom:8}}>
+                  {/* Statut picker compact */}
+                  <div style={{display:"flex",gap:4,padding:"0 14px 8px"}}>
                     {Object.entries(STATUT_LIV).map(([k,sv])=>(
-                      <button key={k} onClick={()=>onUpdateStatutLivraison(l.id,k)} style={{flex:1,padding:"6px 4px",borderRadius:8,border:"1.5px solid "+(l.statut===k?sv.color:DS.border),background:l.statut===k?sv.bg:DS.white,cursor:"pointer",fontSize:15,fontWeight:700,color:l.statut===k?sv.color:DS.mid,fontFamily:"inherit",transition:"all .15s"}}>{sv.label}</button>
+                      <button key={k} onClick={()=>onUpdateStatutLivraison(l.id,k)} style={{flex:1,padding:"5px 2px",borderRadius:7,border:"1.5px solid "+(l.statut===k?sv.color:DS.border),background:l.statut===k?sv.bg:"#fff",cursor:"pointer",fontSize:10,fontWeight:700,color:l.statut===k?sv.color:DS.mid,fontFamily:"inherit"}}>{sv.label}</button>
                     ))}
                   </div>
-                  <div style={{display:"flex",gap:6,paddingTop:8,borderTop:"1px solid "+DS.border}}>
-                    <button onClick={()=>{setEditLiv(l);setShowFormLiv(true);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(12,DS.mid)} Modifier</button>
+                  <div style={{display:"flex",borderTop:"1px solid #f8fafc"}}>
+                    <button onClick={()=>{setEditLiv(l);setShowFormLiv(true);}} style={{flex:1,padding:"8px",background:"#f8fafc",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,fontWeight:700,color:DS.mid,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>{Ico.edit(11,DS.mid)} Modifier</button>
                     {client.email
-                      ? <button onClick={()=>envoyerEmailLivraison(l, client)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.green,fontFamily:"inherit",fontWeight:700}}>{Ico.send(12,DS.green)} Email</button>
-                      : <div style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:DS.mid,fontWeight:500,gap:4}}>{Ico.mail(11,DS.mid)} Pas d'email</div>
+                      ?<button onClick={()=>envoyerEmailLivraison(l,client)} style={{flex:1,padding:"8px",background:"#f0fdf4",border:"none",borderLeft:"1px solid #f8fafc",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,fontWeight:700,color:DS.green,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>{Ico.send(11,DS.green)} Email</button>
+                      :<div style={{flex:1}}/>
                     }
-                    <button onClick={()=>showConfirm("Supprimer cette livraison ?",()=>onDeleteLivraison(l.id))} style={{width:32,borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(12,DS.red)}</button>
+                    <button onClick={()=>showConfirm("Supprimer ?",()=>onDeleteLivraison(l.id))} style={{width:38,padding:"8px",background:"#fef2f2",border:"none",borderLeft:"1px solid #f8fafc",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",WebkitTapHighlightColor:"transparent"}}>{Ico.trash(11,DS.red)}</button>
                   </div>
-                </Card>
+                </div>
               );
             })
           }
@@ -1902,130 +1848,88 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
       )}
       {detailPassageFiche && <PassageDetailModal passage={detailPassageFiche} client={client} onClose={()=>setDetailPassageFiche(null)}/>}
 
-      {/* Action buttons */}
-      <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:20,paddingTop:16,borderTop:"1px solid "+DS.border}}>
-        {/* Suivi statut signature */}
-        {(() => {
-          const contrat = contratClient;
-          if (!contrat) return (
-            <div style={{background:DS.light,border:"1px solid "+DS.border,borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
-              {Ico.contract(13,DS.mid)}
-              <span style={{fontSize:15,fontWeight:600,color:DS.mid}}>Aucun contrat envoyé</span>
+      {/* ══════ BARRE D'ACTION FLOTTANTE ══════ */}
+      <div style={{marginTop:20,paddingTop:14,borderTop:"1px solid #f1f5f9"}}>
+        {/* Statut contrat */}
+        {(()=>{
+          const ct=contratClient;
+          if(!ct) return null;
+          const cfg={
+            signe_complet:{bg:"#f0fdf4",border:"#6ee7b7",color:DS.green,label:"✅ Contrat co-signé",sub:"Signé le "+new Date(ct.signedAt||0).toLocaleDateString("fr")},
+            signe_client: {bg:"#eff6ff",border:"#93c5fd",color:DS.blue,label:"📝 Client signé",sub:"En attente de votre signature"},
+            signe:        {bg:"#f0fdf4",border:"#6ee7b7",color:DS.green,label:"✅ Contrat signé",sub:""},
+          }[ct.statut]||{bg:"#fff7ed",border:"#fed7aa",color:DS.orange,label:"📨 En attente de signature",sub:""};
+          return <div style={{background:cfg.bg,border:"1px solid "+cfg.border,borderRadius:10,padding:"8px 12px",display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:12,fontWeight:800,color:cfg.color}}>{cfg.label}</div>
+              {cfg.sub&&<div style={{fontSize:10,color:DS.mid,marginTop:1}}>{cfg.sub}</div>}
             </div>
-          );
-          if (contrat.statut==="signe_complet") return (
-            <div style={{background:DS.greenSoft,border:"1px solid #6ee7b7",borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
-              {Ico.check(14,DS.green)}
-              <div>
-                <div style={{fontSize:15,fontWeight:800,color:DS.green}}>✅ Contrat co-signé — Terminé</div>
-                <div style={{fontSize:15,color:"#047857",marginTop:2}}>Signé le {new Date(contrat.signedAt).toLocaleDateString("fr")}</div>
-              </div>
-            </div>
-          );
-          if (contrat.statut==="signe_client") return (
-            <div style={{background:DS.blueSoft,border:"1px solid "+DS.blue+"44",borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
-              {Ico.clock(13,DS.blue)}
-              <div>
-                <div style={{fontSize:15,fontWeight:800,color:DS.blue}}>📝 Client signé — En attente de votre signature</div>
-                <div style={{fontSize:15,color:DS.mid,marginTop:2}}>Signé par le client le {new Date(contrat.signedAt).toLocaleDateString("fr")}</div>
-              </div>
-            </div>
-          );
-          if (contrat.statut==="signe") return (
-            <div style={{background:DS.greenSoft,border:"1px solid #6ee7b7",borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
-              {Ico.check(14,DS.green)}
-              <div style={{fontSize:15,fontWeight:800,color:DS.green}}>✅ Contrat signé le {new Date(contrat.signedAt).toLocaleDateString("fr")}</div>
-            </div>
-          );
-          // Demande envoyée mais pas encore signée
-          return (
-            <div style={{background:DS.orangeSoft,border:"1px solid "+"#d97706"+"33",borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
-              {Ico.send(13,DS.orange)}
-              <div style={{fontSize:15,fontWeight:700,color:DS.orange}}>📨 Demande envoyée — En attente de signature</div>
-            </div>
-          );
+          </div>;
         })()}
+
+        {/* Boutons principaux */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:8}}>
-          <button onClick={()=>{ ouvrirContrat(client, contratClient?.signaturePrestataire||"", contratClient?.signatureClient||""); if(!contratClient?.statut && onUpdateContrat) onUpdateContrat("CT-"+client.id, { clientId:client.id, statut:"cree" }); }} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,boxShadow:"0 2px 8px rgba(2,132,199,0.3)"}}>
-            {Ico.contract(13,"#fff")} Contrat
+          <button onClick={()=>{ouvrirContrat(client,contratClient?.signaturePrestataire||"",contratClient?.signatureClient||"");if(!contratClient?.statut&&onUpdateContrat)onUpdateContrat("CT-"+client.id,{clientId:client.id,statut:"cree"});}}
+            style={{height:44,borderRadius:12,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,boxShadow:"0 2px 8px rgba(2,132,199,0.25)",WebkitTapHighlightColor:"transparent"}}>
+            {Ico.contract(12,"#fff")} Contrat
           </button>
-          <button onClick={()=>envoyerContratSignature(client)} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:contratClient?.statut==="signe_complet"?DS.greenSoft:contratClient?.statut==="signe_client"?DS.blueSoft:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
-            {Ico.sign(13,contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff")}
-            {contratClient?.statut==="signe_complet"?"Signé":contratClient?.statut==="signe_client"?"En attente":"Envoyer"}
+          <button onClick={()=>envoyerContratSignature(client)}
+            style={{height:44,borderRadius:12,background:contratClient?.statut==="signe_complet"?DS.greenSoft:contratClient?.statut==="signe_client"?DS.blueSoft:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,WebkitTapHighlightColor:"transparent"}}>
+            {Ico.sign(12,contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff")}
+            {contratClient?.statut==="signe_complet"?"Signé":contratClient?.statut==="signe_client"?"Attente":"Envoyer"}
           </button>
-          <button onClick={onEdit} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:"#eef2f7",border:"none",boxShadow:"4px 4px 8px rgba(166,210,220,0.6), -3px -3px 7px rgba(255,255,255,0.9)",cursor:"pointer",fontWeight:700,fontSize:15,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
-            {Ico.edit(13,DS.dark)} Modifier
+          <button onClick={onEdit}
+            style={{height:44,borderRadius:12,background:"#f1f5f9",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,WebkitTapHighlightColor:"transparent"}}>
+            {Ico.edit(12,DS.dark)} Modifier
           </button>
-          <button onClick={onDelete} className="btn-hover" style={{width:44,height:44,borderRadius:DS.radiusSm,background:DS.redSoft,border:"1px solid #fca5a5",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <button onClick={onDelete}
+            style={{width:44,height:44,borderRadius:12,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",WebkitTapHighlightColor:"transparent"}}>
             {Ico.trash(14,DS.red)}
           </button>
         </div>
       </div>
 
-      {/* Tab: Carnet d'entretien */}
+      {/* ── CARNET ── */}
       {tab==="carnet" && (()=>{
-        const code = generateCarnetCode(client.id);
-        const carnetUrl = window.location.origin + window.location.pathname + "?carnet=" + code;
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=8&data=${encodeURIComponent(carnetUrl)}`;
+        const code=generateCarnetCode(client.id);
+        const carnetUrl=window.location.origin+window.location.pathname+"?carnet="+code;
+        const qrUrl=`https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=8&data=${encodeURIComponent(carnetUrl)}`;
         return (
           <div className="fade-in" style={{paddingTop:4}}>
-            {/* QR + Code */}
-            <div style={{background:"#f8fafc",borderRadius:18,padding:20,border:"1px solid #f1f5f9",marginBottom:16}}>
-              <div style={{display:"flex",gap:18,alignItems:"center"}}>
-                {/* QR Code */}
-                <div style={{width:100,height:100,borderRadius:14,overflow:"hidden",flexShrink:0,border:"1px solid #e2e8f0",background:"#fff"}}>
-                  <img src={qrUrl} alt="QR Code" width={100} height={100} style={{display:"block"}}
-                    onError={e=>{e.target.style.display="none";}}/>
-                </div>
-                {/* Code + boutons */}
-                <div style={{flex:1}}>
-                  <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>Code d'accès client</div>
-                  <div style={{fontSize:26,fontWeight:900,color:"#1e3a5f",letterSpacing:5,marginBottom:12,fontFamily:"monospace"}}>{code}</div>
-                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                    <button onClick={()=>{try{navigator.clipboard.writeText(carnetUrl);toastSuccess("Lien copié !");}catch{}}} style={{padding:"8px 14px",background:"#1e3a5f",border:"none",borderRadius:10,fontSize:12,fontWeight:700,color:"#fff",cursor:"pointer",fontFamily:"inherit"}}>
-                      Copier le lien
-                    </button>
-                    <button onClick={()=>{
-                      const w=window.open("","_blank");
-                      w.document.write(`<html><body style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;background:#f8fafc;gap:16px;padding:32px">
-                        <div style="font-size:22px;font-weight:900;color:#1e3a5f">Carnet BRIBLUE</div>
-                        <div style="font-size:14px;color:#64748b">${client.nom}</div>
-                        <img src="${qrUrl}" width="200" height="200"/>
-                        <div style="font-size:32px;font-weight:900;letter-spacing:6px;color:#0891b2">${code}</div>
-                        <div style="font-size:11px;color:#94a3b8;text-align:center">Scannez le QR code ou rendez-vous sur<br/>${carnetUrl}</div>
-                        <script>window.print();</script>
-                      </body></html>`);
-                      w.document.close();
-                    }} style={{padding:"8px 14px",background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:10,fontSize:12,fontWeight:700,color:"#0891b2",cursor:"pointer",fontFamily:"inherit"}}>
-                      Imprimer PDF
-                    </button>
-                  </div>
+            <div style={{background:"linear-gradient(135deg,#0c1f3f,#0e3460)",borderRadius:16,padding:18,marginBottom:14,display:"flex",gap:16,alignItems:"center"}}>
+              <div style={{width:88,height:88,borderRadius:12,overflow:"hidden",flexShrink:0,border:"3px solid rgba(255,255,255,0.1)",background:"#fff"}}>
+                <img src={qrUrl} alt="QR Code" width={88} height={88} style={{display:"block"}} onError={e=>{e.target.style.display="none";}}/>
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:9,color:"rgba(255,255,255,0.45)",fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Code d'accès</div>
+                <div style={{fontSize:22,fontWeight:900,color:"#7dd3fc",letterSpacing:4,fontFamily:"monospace",marginBottom:10}}>{code}</div>
+                <div style={{display:"flex",gap:6}}>
+                  <button onClick={()=>{try{navigator.clipboard.writeText(carnetUrl);toastSuccess("Lien copié !");}catch{}}} style={{flex:1,padding:"7px 6px",background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:8,fontSize:10,fontWeight:700,color:"#fff",cursor:"pointer",fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>
+                    Copier lien
+                  </button>
+                  <button onClick={()=>{const w=window.open("","_blank");w.document.write(`<html><body style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;background:#f8fafc;gap:16px;padding:32px"><div style="font-size:22px;font-weight:900;color:#1e3a5f">Carnet BRIBLUE</div><div style="font-size:14px;color:#64748b">${client.nom}</div><img src="${qrUrl}" width="200" height="200"/><div style="font-size:32px;font-weight:900;letter-spacing:6px;color:#0891b2">${code}</div><div style="font-size:11px;color:#94a3b8;text-align:center">Scannez le QR code ou rendez-vous sur<br/>${carnetUrl}</div><script>window.print();<\/script></body></html>`);w.document.close();}} style={{flex:1,padding:"7px 6px",background:"rgba(8,145,178,0.25)",border:"1px solid rgba(8,145,178,0.4)",borderRadius:8,fontSize:10,fontWeight:700,color:"#7dd3fc",cursor:"pointer",fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>
+                    Imprimer
+                  </button>
                 </div>
               </div>
             </div>
-
-            {/* Ce que voit le client */}
-            <div style={{borderRadius:14,padding:14,background:"#f0fdf4",border:"1px solid #bbf7d0",marginBottom:10}}>
-              <div style={{fontSize:11,fontWeight:800,color:"#166534",marginBottom:8}}>Le client voit uniquement :</div>
-              {["Ses interventions effectuées","pH, chlore, température","Date et type d'entretien"].map(t=>(
-                <div key={t} style={{display:"flex",alignItems:"center",gap:7,marginBottom:4}}>
-                  <div style={{width:16,height:16,borderRadius:8,background:"#dcfce7",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    <svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <div style={{background:"#f0fdf4",borderRadius:12,padding:"10px 12px",border:"1px solid #bbf7d0"}}>
+                <div style={{fontSize:10,fontWeight:800,color:"#166534",marginBottom:6}}>✅ Visible client</div>
+                {["Interventions effectuées","pH, chlore, température","Date et type d'entretien"].map(t=>(
+                  <div key={t} style={{fontSize:10,color:"#166534",marginBottom:3,display:"flex",gap:5,alignItems:"center"}}>
+                    <svg width={8} height={8} viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>{t}
                   </div>
-                  <span style={{fontSize:12,color:"#166534",fontWeight:600}}>{t}</span>
-                </div>
-              ))}
-            </div>
-            <div style={{borderRadius:14,padding:14,background:"#fff7ed",border:"1px solid #fed7aa"}}>
-              <div style={{fontSize:11,fontWeight:800,color:"#9a3412",marginBottom:8}}>Invisible pour le client :</div>
-              {["Prix et tarifs","Notes privées","Autres clients","Statut contrat"].map(t=>(
-                <div key={t} style={{display:"flex",alignItems:"center",gap:7,marginBottom:4}}>
-                  <div style={{width:16,height:16,borderRadius:8,background:"#ffedd5",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    <svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="#ea580c" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                ))}
+              </div>
+              <div style={{background:"#fff7ed",borderRadius:12,padding:"10px 12px",border:"1px solid #fed7aa"}}>
+                <div style={{fontSize:10,fontWeight:800,color:"#9a3412",marginBottom:6}}>🔒 Caché</div>
+                {["Prix et tarifs","Notes privées","Autres clients","Statut contrat"].map(t=>(
+                  <div key={t} style={{fontSize:10,color:"#9a3412",marginBottom:3,display:"flex",gap:5,alignItems:"center"}}>
+                    <svg width={8} height={8} viewBox="0 0 24 24" fill="none" stroke="#ea580c" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>{t}
                   </div>
-                  <span style={{fontSize:12,color:"#9a3412",fontWeight:600}}>{t}</span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         );
