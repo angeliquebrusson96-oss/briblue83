@@ -339,7 +339,7 @@ function alerteClient(c, passages) {
   if (retard) return "orange";
 
   // Mois EN COURS dans la plage du contrat
-  const effCurPlan = (mpmEff[moisCur]?.e||0) + (mpmEff[moisCur]?.c||0);
+  const effCurPlan = (mpmPlan[moisCur]?.e||0) + (mpmPlan[moisCur]?.c||0);
   if (effCurPlan > 0) {
     const moisCurStr = `${yearCur}-${String(moisCur).padStart(2,'0')}-01`;
     const inRange = (!cs || moisCurStr >= cs.slice(0,8)+'01') && (!ce || moisCurStr <= ce);
