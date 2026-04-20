@@ -2432,13 +2432,18 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
     photos:[],
     ok:false,
     rapportStatut:"saisie",
+    // SAV / Devis
+    descriptionSAV:"", equipementSAV:[], piecesSAV:"", urgenceDevis:"",
   };
   const isEdit = !!initial?.id;
   const isMobile = useIsMobile();
   const [f,setF]=useState(isEdit ? {...EMPTY,...initial, rapportStatut:getRapportStatus(initial)} : EMPTY);
   const [step,setStep]=useState(1);
   useEffect(()=>{ const el=document.querySelector('[data-modal-body="1"]'); if(el) el.scrollTop=0; },[step]);
-  const STEPS=6;
+  const isSAV = f.type==="SAV";
+  const isDevis = f.type==="Demande de devis";
+  const isSimplified = isSAV || isDevis;
+  const STEPS = isSimplified ? 3 : 6;
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
 
   const ph=Number(f.tPH)||Number(f.ph);
@@ -2446,21 +2451,32 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
 
   const handleSave = () => {
     if(!f.clientId||!f.date) return alert("Client et date requis");
+    const isSAVsave = f.type==="SAV";
+    const isDevissave = f.type==="Demande de devis";
+    const isSimplifiedSave = isSAVsave || isDevissave;
     const passage = {
       ...f,
       id: isEdit ? f.id : uid(),
-      ph:ph||f.tPH||f.ph||"",
-      chlore:cl||f.tChlore||f.chloreLibre||"",
+      ph: isSimplifiedSave ? "" : (ph||f.tPH||f.ph||""),
+      chlore: isSimplifiedSave ? "" : (cl||f.tChlore||f.chloreLibre||""),
       rapportStatut: normalizeRapportStatus(f.rapportStatut || (f.ok ? "cree" : "saisie")),
-      actions:[
-        f.corrChlore&&`Chlore: ${f.corrChlore}`,
-        f.corrPH&&`pH: ${f.corrPH}`,
-        f.corrAlgicide&&`Algicide: ${f.corrAlgicide}`,
-        f.corrChloreChoc&&`Chlore choc: ${f.corrChloreChoc}`,
-        f.corrAlcafix&&`Alcafix: ${f.corrAlcafix}`,
-        f.corrAutre&&f.corrAutre,
-      ].filter(Boolean).join(", ") || "",
-      obs: f.commentaires,
+      actions: isSimplifiedSave
+        ? [
+            isSAVsave && f.descriptionSAV && `Panne: ${f.descriptionSAV}`,
+            isSAVsave && f.equipementSAV?.length && `Équipements: ${f.equipementSAV.join(", ")}`,
+            isSAVsave && f.piecesSAV && `Pièces: ${f.piecesSAV}`,
+            isDevissave && f.descriptionSAV && `Devis: ${f.descriptionSAV}`,
+            isDevissave && f.urgenceDevis && `Urgence: ${f.urgenceDevis}`,
+          ].filter(Boolean).join(" | ") || ""
+        : [
+            f.corrChlore&&`Chlore: ${f.corrChlore}`,
+            f.corrPH&&`pH: ${f.corrPH}`,
+            f.corrAlgicide&&`Algicide: ${f.corrAlgicide}`,
+            f.corrChloreChoc&&`Chlore choc: ${f.corrChloreChoc}`,
+            f.corrAlcafix&&`Alcafix: ${f.corrAlcafix}`,
+            f.corrAutre&&f.corrAutre,
+          ].filter(Boolean).join(", ") || "",
+      obs: isSimplifiedSave ? (f.descriptionSAV || f.commentaires || "") : f.commentaires,
     };
     onSave(passage);
     // Auto-créer une livraison si produits livrés
@@ -2494,7 +2510,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
     // 6. Signatures — stylo plume
     (c="currentColor",s=16) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.85 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/><path d="M15 5l4 4"/></svg>,
   ];
-  const STEP_INFO = [
+  const STEP_INFO_FULL = [
     {ic:STEP_ICONS[0],l:isMobile?"Interv.":"Intervention",color:"#0891b2"},
     {ic:STEP_ICONS[1],l:isMobile?"Analyses":"Analyses eau",color:"#0891b2"},
     {ic:STEP_ICONS[2],l:isMobile?"Bassin":"État bassin",color:"#059669"},
@@ -2502,6 +2518,19 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
     {ic:STEP_ICONS[4],l:"Clôture",color:"#b45309"},
     {ic:STEP_ICONS[5],l:isMobile?"Sign.":"Signatures",color:"#059669"},
   ];
+  const SAV_ICON = (c="currentColor",s=16) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17" strokeWidth="2.5"/></svg>;
+  const DEVIS_ICON = (c="currentColor",s=16) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>;
+  const STEP_INFO_SAV = [
+    {ic:STEP_ICONS[0],l:isMobile?"Interv.":"Intervention",color:"#0891b2"},
+    {ic:SAV_ICON,l:isMobile?"Panne":"Détail panne",color:"#dc2626"},
+    {ic:STEP_ICONS[5],l:isMobile?"Sign.":"Clôture",color:"#059669"},
+  ];
+  const STEP_INFO_DEVIS = [
+    {ic:STEP_ICONS[0],l:isMobile?"Interv.":"Intervention",color:"#0891b2"},
+    {ic:DEVIS_ICON,l:isMobile?"Devis":"Détail devis",color:"#7c3aed"},
+    {ic:STEP_ICONS[5],l:isMobile?"Sign.":"Clôture",color:"#059669"},
+  ];
+  const STEP_INFO = isSAV ? STEP_INFO_SAV : isDevis ? STEP_INFO_DEVIS : STEP_INFO_FULL;
 
   const Stepper = () => {
     const pct = Math.round((step-1)/STEPS*100);
@@ -2666,10 +2695,12 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                 {v:"Visite technique",ico:Ico.brush,col:"#4f46e5",bg:"#eef2ff"},
                 {v:"Bassin en rattrapage",ico:Ico.chemicals,col:"#b45309",bg:"#fef3c7"},
                 {v:"Fin de rattrapage",ico:Ico.check,col:"#059669",bg:"#d1fae5"},
+                {v:"SAV",ico:(s,c)=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17" strokeWidth="2.5"/></svg>,col:"#dc2626",bg:"#fef2f2"},
+                {v:"Demande de devis",ico:(s,c)=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/><path d="M9 9h1"/></svg>,col:"#7c3aed",bg:"#f5f3ff"},
               ].map(({v,ico,col,bg})=>{
                 const sel=f.type===v;
                 return (
-                  <button key={v} onClick={()=>set("type",v)} className="btn-hover" style={{display:"flex",alignItems:"center",gap:11,padding:"11px 14px",borderRadius:12,border:`1.5px solid ${sel?col:DS.border}`,background:sel?bg:DS.white,cursor:"pointer",textAlign:"left",fontFamily:"inherit",transition:"all .2s",boxShadow:sel?`0 2px 10px ${col}22`:"none"}}>
+                  <button key={v} onClick={()=>{set("type",v);setStep(1);}} className="btn-hover" style={{display:"flex",alignItems:"center",gap:11,padding:"11px 14px",borderRadius:12,border:`1.5px solid ${sel?col:DS.border}`,background:sel?bg:DS.white,cursor:"pointer",textAlign:"left",fontFamily:"inherit",transition:"all .2s",boxShadow:sel?`0 2px 10px ${col}22`:"none"}}>
                     <div style={{width:32,height:32,borderRadius:9,background:sel?col:"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .2s"}}>
                       {ico(15,sel?"#fff":DS.mid)}
                     </div>
@@ -2752,7 +2783,58 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
         </div>
       )}
 
-      {step===2 && (
+      {step===2 && isSimplified && (
+        <div className="fade-in">
+          <div style={{display:"flex",flexDirection:"column",gap:16}}>
+            <div>
+              <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>{isSAV?"Description de la panne":"Description des travaux demandés"}</span>
+              <textarea value={f.descriptionSAV||""} onChange={e=>set("descriptionSAV",e.target.value)}
+                placeholder={isSAV?"Décrivez le problème constaté, le symptôme, l'équipement concerné..":"Décrivez les travaux souhaités, les équipements à installer ou remplacer..."}
+                style={{width:"100%",padding:"12px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:13,minHeight:120,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark}}/>
+            </div>
+            {isSAV && (
+              <div>
+                <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>Équipement concerné</span>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  {["Pompe","Filtre","Volet","Robot","Électrolyseur","Régulateur pH","Chauffage","Autre"].map(eq=>{
+                    const sel=(f.equipementSAV||[]).includes(eq);
+                    return <button key={eq} onClick={()=>{ const arr=f.equipementSAV||[]; set("equipementSAV",sel?arr.filter(x=>x!==eq):[...arr,eq]); }} className="btn-hover" style={{padding:"10px 12px",borderRadius:10,border:"1.5px solid "+(sel?"#dc2626":DS.border),background:sel?"#fef2f2":DS.white,cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:sel?700:400,color:sel?"#dc2626":DS.mid,textAlign:"left",transition:"all .2s"}}>{eq}</button>;
+                  })}
+                </div>
+              </div>
+            )}
+            {isSAV && (
+              <div>
+                <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>Pièces remplacées / utilisées</span>
+                <textarea value={f.piecesSAV||""} onChange={e=>set("piecesSAV",e.target.value)}
+                  placeholder="Ex: Joint pompe x2, filtre cartouche, ..."
+                  style={{width:"100%",padding:"10px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:13,minHeight:70,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark}}/>
+              </div>
+            )}
+            {isDevis && (
+              <div>
+                <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>Urgence</span>
+                <div style={{display:"flex",gap:8}}>
+                  {[{v:"Normale",col:"#059669",bg:"#d1fae5"},{v:"Rapide",col:"#b45309",bg:"#fef3c7"},{v:"Urgente",col:"#dc2626",bg:"#fef2f2"}].map(({v,col,bg})=>{
+                    const sel=f.urgenceDevis===v;
+                    return <button key={v} onClick={()=>set("urgenceDevis",v)} className="btn-hover" style={{flex:1,padding:"10px",borderRadius:10,border:"1.5px solid "+(sel?col:DS.border),background:sel?bg:DS.white,cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:sel?700:500,color:sel?col:DS.mid,transition:"all .2s"}}>{v}</button>;
+                  })}
+                </div>
+              </div>
+            )}
+            <div>
+              <OuiNon label={isSAV?"Devis pour les pièces ?":"Visite de chiffrage nécessaire ?"} value={f.devis} onChange={v=>set("devis",v)}/>
+            </div>
+            <div>
+              <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:4}}>Commentaires</span>
+              <textarea value={f.commentaires||""} onChange={e=>set("commentaires",e.target.value)} placeholder="Informations complémentaires..."
+                style={{width:"100%",padding:"11px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:13,minHeight:80,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark}}/>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {step===2 && !isSimplified && (
         <div className="fade-in">
           {(()=>{
             const okCount = [
@@ -2822,7 +2904,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
         </div>
       )}
 
-      {step===3 && (
+      {step===3 && !isSimplified && (
         <div className="fade-in">
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16}}>
             <div style={{display:"flex",flexDirection:"column",gap:16}}>
@@ -2860,7 +2942,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
       )}
 
       {/* ÉTAPE 4 — Correctifs avec Alcafix */}
-      {step===4 && (
+      {step===4 && !isSimplified && (
         <div className="fade-in">
           <div style={{background:`linear-gradient(135deg,#7c3aed08,#7c3aed12)`,borderRadius:DS.radius,padding:18,border:"1px solid #7c3aed18",marginBottom:16}}>
             <div style={{fontSize:11,fontWeight:800,color:"#4f46e5",textTransform:"uppercase",letterSpacing:.8,marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
@@ -2896,16 +2978,16 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
         </div>
       )}
 
-      {step===5 && (
+      {(step===5 || (isSimplified && step===3)) && (
         <div className="fade-in">
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16}}>
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
-              <OuiNon label="Prise d'échantillon ?" value={f.priseEchantillon} onChange={v=>set("priseEchantillon",v)}/>
-              <div>
+              {!isSimplified && <OuiNon label="Prise d'échantillon ?" value={f.priseEchantillon} onChange={v=>set("priseEchantillon",v)}/>}
+              {!isSimplified && <div>
                 <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:4}}>Commentaires</span>
                 <textarea value={f.commentaires} onChange={e=>set("commentaires",e.target.value)} placeholder="Anomalies, recommandations..."
                   style={{width:"100%",padding:"11px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:13,minHeight:100,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,transition:"all .2s"}}/>
-              </div>
+              </div>}
               <OuiNon label="Livraison de produits ?" value={f.livraisonProduits} onChange={v=>set("livraisonProduits",v)}/>
               {f.livraisonProduits && (
                 <>
@@ -3011,7 +3093,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
         </div>
       )}
 
-      {step===6 && (
+      {step===6 && !isSimplified && (
         <div className="fade-in">
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16,marginBottom:16}}>
             <SignaturePad label="Signature du technicien" value={f.signatureTech} onChange={v=>set("signatureTech",v)}/>
