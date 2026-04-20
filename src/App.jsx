@@ -396,7 +396,7 @@ function exportRdvToICS(rdv, client) {
     client && client.adresse ? "Adresse: " + client.adresse : "",
   ].filter(Boolean).join("\\n");
 
-  const summary = "BRIBLUE - " + (rdv.type || "RDV") + (client ? " - " + (client.nom || "") : "");
+  const summary = "BRIBLUE - " + (rdv.type || "Rendez-vous") + (client ? " - " + (client.nom || "") : "");
   const locationLine = client && client.adresse ? "LOCATION:" + client.adresse : "";
 
   const ics = [
@@ -474,7 +474,7 @@ const DS = {
   shadowIn: "inset 3px 3px 6px rgba(166,210,220,0.5), inset -2px -2px 5px rgba(255,255,255,0.8)",
   nmShadow: "4px 4px 8px rgba(166,210,220,0.6), -3px -3px 7px rgba(255,255,255,0.9)",
   nmShadowSm: "3px 3px 6px rgba(166,210,220,0.5), -2px -2px 5px rgba(255,255,255,0.85)",
-  font: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
+  font: "'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
 };
 
 const AC = {
@@ -505,10 +505,10 @@ function getRapportStatus(p) {
 // STYLES GLOBAUX INJECTS
 const GlobalStyles = () => (
   <style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap');
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     html { scroll-behavior: smooth; }
-    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #e8f4f8; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+    body { font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #eef2f7; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
     input, select, textarea, button { font-family: inherit; }
     input, select, textarea { background: #f4f9fb !important; color: #0f172a !important; -webkit-text-fill-color: #0f172a !important; color-scheme: light; border-color: #d0e8f0 !important; }
     input::placeholder, textarea::placeholder { color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important; }
@@ -1448,7 +1448,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
       {/* Stats row */}
       <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(2,minmax(0,1fr))":"repeat(4,minmax(0,1fr))",gap:8,marginTop:14,marginBottom:14,width:"100%"}}>
         {/* Entretiens */}
-        <div style={{borderRadius:10,background:DS.white,border:"1px solid #e5e7eb",padding:"10px 8px",display:"flex",flexDirection:"column",gap:4}}>
+        <div style={{borderRadius:10,background:"#eef2f7",border:"1px solid #e5e7eb",padding:"10px 8px",display:"flex",flexDirection:"column",gap:4}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <span style={{fontSize:9,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5}}>Entretiens</span>
             <span style={{width:20,height:20,borderRadius:6,background:"#f0f9ff",display:"flex",alignItems:"center",justifyContent:"center"}}>🔧</span>
@@ -1459,7 +1459,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           </div>
         </div>
         {/* Contrôles */}
-        <div style={{borderRadius:10,background:DS.white,border:"1px solid #e5e7eb",padding:"10px 8px",display:"flex",flexDirection:"column",gap:4}}>
+        <div style={{borderRadius:10,background:"#eef2f7",border:"1px solid #e5e7eb",padding:"10px 8px",display:"flex",flexDirection:"column",gap:4}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <span style={{fontSize:9,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5}}>Contrôles</span>
             <span style={{width:20,height:20,borderRadius:6,background:"#f0f9ff",display:"flex",alignItems:"center",justifyContent:"center"}}>💧</span>
@@ -1483,7 +1483,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           </div>
         </div>
         {/* Mensualité */}
-        <div style={{borderRadius:10,background:DS.white,border:"1px solid #e5e7eb",padding:"10px 8px",display:"flex",flexDirection:"column",gap:4}}>
+        <div style={{borderRadius:10,background:"#eef2f7",border:"1px solid #e5e7eb",padding:"10px 8px",display:"flex",flexDirection:"column",gap:4}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <span style={{fontSize:9,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5}}>Mensualité</span>
             <span style={{width:20,height:20,borderRadius:6,background:"#f0fdf4",display:"flex",alignItems:"center",justifyContent:"center"}}>💶</span>
@@ -1501,7 +1501,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
 
       {/* Tabs */}
       <div style={{display:"flex",gap:0,marginBottom:16,background:DS.light,borderRadius:DS.radiusSm,padding:3}}>
-        {[["infos","Infos"],["saisons","Planning"],["passages",isMobile?"Fiches":"Fiches Entretien"],["rdvs","RDV"],["livraisons","Livraisons"]].map(([id,l])=>(
+        {[["infos","Infos"],["saisons","Planning"],["passages",isMobile?"Fiches":"Fiches Entretien"],["rdvs","Rendez-vous"],["livraisons","Livraisons"]].map(([id,l])=>(
           <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"9px 4px",borderRadius:10,border:"none",cursor:"pointer",fontWeight:tab===id?800:600,fontSize:15,fontFamily:"inherit",background:tab===id?DS.white:"transparent",color:tab===id?DS.dark:DS.mid,boxShadow:tab===id?"0 1px 4px rgba(0,0,0,0.08)":"none",transition:"all .25s"}}>{l}</button>
         ))}
       </div>
@@ -1517,7 +1517,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
             {ico:Ico.calendar(13,DS.blue),l:"Début",v:client.dateDebut?new Date(client.dateDebut).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}):null},
             {ico:Ico.calendar(13,DS.orange),l:"Fin",v:client.dateFin?new Date(client.dateFin).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}):null},
           ].filter(r=>r.v).map(r=>(
-            <div key={r.l} style={{display:"flex",gap:12,padding:"10px 14px",background:DS.white,borderRadius:10,alignItems:"center",border:"1px solid "+DS.border}}>
+            <div key={r.l} style={{display:"flex",gap:12,padding:"10px 14px",background:"#eef2f7",borderRadius:10,alignItems:"center",border:"1px solid "+DS.border}}>
               <div style={{width:32,height:32,borderRadius:8,background:DS.blueSoft,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{r.ico}</div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,color:DS.mid,fontWeight:600,textTransform:"uppercase",letterSpacing:.5}}>{r.l}</div>
@@ -1633,7 +1633,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                   const rapportStatus=getRapportStatus(p);
                   const rapportMeta=RAPPORT_STATUS[rapportStatus];
                   return (
-                    <div key={p.id} style={{background:DS.white,borderRadius:10,border:"1px solid "+DS.border,padding:"10px 12px"}}>
+                    <div key={p.id} style={{background:"#eef2f7",borderRadius:10,border:"1px solid "+DS.border,padding:"10px 12px"}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
                         <div>
                           <div style={{fontWeight:700,fontSize:13,color:DS.dark}}>{new Date(p.date).toLocaleDateString("fr",{day:"2-digit",month:"long"})}</div>
@@ -1883,14 +1883,14 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           );
         })()}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:8}}>
-          <button onClick={()=>{ ouvrirContrat(client, contratClient?.signaturePrestataire||"", contratClient?.signatureClient||""); if(!contratClient?.statut && onUpdateContrat) onUpdateContrat("CT-"+client.id, { clientId:client.id, statut:"prepare" }); }} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,boxShadow:"0 2px 8px rgba(2,132,199,0.3)"}}>
+          <button onClick={()=>{ ouvrirContrat(client, contratClient?.signaturePrestataire||"", contratClient?.signatureClient||""); if(!contratClient?.statut && onUpdateContrat) onUpdateContrat("CT-"+client.id, { clientId:client.id, statut:"cree" }); }} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,boxShadow:"0 2px 8px rgba(2,132,199,0.3)"}}>
             {Ico.contract(13,"#fff")} Contrat
           </button>
           <button onClick={()=>envoyerContratSignature(client)} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:contratClient?.statut==="signe_complet"?DS.greenSoft:contratClient?.statut==="signe_client"?DS.blueSoft:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
             {Ico.sign(13,contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff")}
             {contratClient?.statut==="signe_complet"?"Signé":contratClient?.statut==="signe_client"?"En attente":"Envoyer"}
           </button>
-          <button onClick={onEdit} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:DS.white,border:"1.5px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:15,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
+          <button onClick={onEdit} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:"#eef2f7",border:"1.5px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:15,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
             {Ico.edit(13,DS.dark)} Modifier
           </button>
           <button onClick={onDelete} className="btn-hover" style={{width:44,height:44,borderRadius:DS.radiusSm,background:DS.redSoft,border:"1px solid #fca5a5",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -2098,7 +2098,7 @@ function genererContratHTML(client, sigPrestataire="", sigClient="") {
 
   return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Contrat BRIBLUE — ${client.nom}</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Inter',system-ui,sans-serif;font-size:12px;color:#1e293b;background:#fff}
 .page{max-width:780px;margin:0 auto;padding:32px}
@@ -2345,7 +2345,7 @@ function genererHTMLRapport(passage, client) {
   return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"/>
 <title>Rapport BRIBLUE — ${client?.nom||""} — ${d}</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap');
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Inter',system-ui,sans-serif;font-size:13px;color:#1e293b;background:#f8fafc;padding:0}
   .page{max-width:780px;margin:0 auto;padding:24px;background:#fff}
@@ -3350,7 +3350,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
               <RapportStatusPicker value={f.rapportStatut} onChange={v=>set("rapportStatut",v)} />
             </div>
             <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:10}}>
-              <button onClick={()=>ouvrirRapport(f,client)} className="btn-hover" style={{padding:"14px",borderRadius:DS.radiusSm,background:DS.white,border:"1.5px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:14,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              <button onClick={()=>ouvrirRapport(f,client)} className="btn-hover" style={{padding:"14px",borderRadius:DS.radiusSm,background:"#eef2f7",border:"1.5px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:14,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
                 {Ico.pdf(18,DS.dark)} Télécharger PDF
               </button>
               {client?.email ? (
@@ -3495,7 +3495,7 @@ function CalendrierInteractif({ passages, rdvs, clients, onClientClick, onEditPa
                 const c=clients.find(x=>x.id===p.clientId);
                 const isCtrl=isControleType(p.type);
                 return (
-                  <div key={p.id} onClick={()=>onEditPassage&&onEditPassage(p)} className="card-hover" style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:DS.white,borderRadius:8,marginBottom:4,border:"1.5px solid "+DS.blue+"33",cursor:"pointer"}}>
+                  <div key={p.id} onClick={()=>onEditPassage&&onEditPassage(p)} className="card-hover" style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:"#eef2f7",borderRadius:8,marginBottom:4,border:"1.5px solid "+DS.blue+"33",cursor:"pointer"}}>
                     <Avatar nom={c?.nom||"?"} size={30} photo={c?.photoPiscine}/>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontWeight:700,fontSize:12,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c?.nom||p.clientId}</div>
@@ -3518,7 +3518,7 @@ function CalendrierInteractif({ passages, rdvs, clients, onClientClick, onEditPa
               {dayRdvs.map(r=>{
                 const c=clients.find(x=>x.id===r.clientId);
                 return (
-                  <div key={r.id} onClick={()=>onEditRdv&&onEditRdv(r)} className="card-hover" style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:DS.white,borderRadius:8,marginBottom:4,border:"none",cursor:"pointer"}}>
+                  <div key={r.id} onClick={()=>onEditRdv&&onEditRdv(r)} className="card-hover" style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:"#eef2f7",borderRadius:8,marginBottom:4,border:"none",cursor:"pointer"}}>
                     <div style={{width:30,textAlign:"center",flexShrink:0}}>
                       <div style={{fontSize:13,fontWeight:900,color:DS.purple}}>{r.heure||"--:--"}</div>
                     </div>
@@ -3823,8 +3823,8 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
 
   const CONTRAT_STATUTS = [
     { key:"aucun",         label:"Aucun contrat",         color:"#9ca3af", bg:"#f9fafb", border:"#e5e7eb" },
-    { key:"cree",          label:"🆕 Contrat créé",       color:"#6366f1", bg:"#eef2ff", border:"#a5b4fc" },
-    { key:"prepare",       label:"📋 Contrat préparé",    color:"#6b7280", bg:"#f3f4f6", border:"#d1d5db" },
+    { key:"cree",          label:"📄 Contrat créé",       color:"#0891b2", bg:"#e0f2fe", border:"#7dd3fc" },
+    
     { key:"demande_envoyee",label:"📨 Contrat envoyé",    color:"#0891b2", bg:"#f0f9ff", border:"#bae6fd" },
     { key:"signe_client",  label:"📝 En attente co-sign.", color:"#4f46e5", bg:"#eef2ff", border:"#a5b4fc" },
     { key:"signe_complet", label:"✅ Contrat signé",      color:"#059669", bg:"#f0fdf4", border:"#86efac" },
@@ -3847,7 +3847,7 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
 
   const setStatut = (clientId, key) => {
     const contractId = "CT-"+clientId;
-    if (onUpdateContrat) onUpdateContrat(contractId, { clientId, statut: key });
+    if (onUpdateContrat) onUpdateContrat(contractId, { clientId, statut: key === "prepare" ? "cree" : key });
     setOpenPicker(null);
   };
 
@@ -3858,7 +3858,7 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
           <div style={{width:32,height:32,borderRadius:8,background:"rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.clients(16,"#fff")}</div>
           <div><div style={{fontSize:18,fontWeight:800,color:"#fff"}}>{totalAll}</div><div style={{fontSize:10,color:"rgba(255,255,255,0.6)"}}>Clients</div></div>
         </div>
-        {alertCount>0&&<div style={{background:DS.white,borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8,border:"1px solid #fecaca"}}>
+        {alertCount>0&&<div style={{background:"#eef2f7",borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8,border:"1px solid #fecaca"}}>
           <div style={{width:32,height:32,borderRadius:8,background:"#fff1f2",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.alert(15,DS.red)}</div>
           <div><div style={{fontSize:18,fontWeight:800,color:DS.red}}>{alertCount}</div><div style={{fontSize:11,color:DS.red,fontWeight:600}}>Alertes</div></div>
         </div>}
@@ -3867,9 +3867,9 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
         <div style={{flex:1,position:"relative"}}>
           <div style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}>{Ico.search(16,"#94a3b8")}</div>
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher…"
-            style={{width:"100%",padding:"11px 14px 11px 40px",borderRadius:DS.radius,border:"1.5px solid "+DS.border,fontSize:13,outline:"none",boxSizing:"border-box",background:DS.white,color:DS.dark,fontFamily:"inherit"}}/>
+            style={{width:"100%",padding:"11px 14px 11px 40px",borderRadius:DS.radius,border:"none",fontSize:13,outline:"none",boxSizing:"border-box",background:"#eef2f7",boxShadow:"inset 3px 3px 6px rgba(166,210,220,0.45), inset -2px -2px 5px rgba(255,255,255,0.8)",color:DS.dark,fontFamily:"inherit"}}/>
         </div>
-        <BtnPrimary onClick={onAdd} bg={DS.blue} icon={Ico.userPlus(14,"#fff")} style={{flexShrink:0,padding:"10px 16px",fontSize:13,borderRadius:DS.radiusSm}}>
+        <BtnPrimary onClick={onAdd} bg={DS.blueGrad} icon={Ico.userPlus(14,"#fff")} style={{flexShrink:0,padding:"10px 16px",fontSize:13,borderRadius:14,boxShadow:"4px 4px 12px rgba(8,145,178,0.3)"}}>
           {!isMobile && "Nouveau"}
         </BtnPrimary>
       </div>
@@ -3889,7 +3889,7 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
           const accentColor=al==="rouge"?DS.red:al==="jaune"?"#d97706":al==="orange"?"#d97706":DS.green;
           return (
             <div key={c.id} onClick={()=>onClientClick(c)} className="fade-in card-hover"
-              style={{animationDelay:`${idx*0.03}s`,background:DS.white,borderRadius:DS.radius,
+              style={{animationDelay:`${idx*0.03}s`,background:"#eef2f7",borderRadius:DS.radius,
                 overflow:openPicker===c.id?"visible":"hidden",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",
                 border:"1px solid "+DS.border,borderTop:"2px solid "+accentColor,
                 cursor:"pointer",display:"flex",flexDirection:"column",position:"relative",zIndex:openPicker===c.id?999:1}}>
@@ -3939,7 +3939,7 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
                         <svg width={8} height={8} viewBox="0 0 24 24" fill="none" stroke={meta.color} strokeWidth="3" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
                       </button>
                       {isOpen&&(
-                        <div onClick={e=>e.stopPropagation()} style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,background:DS.white,borderRadius:8,boxShadow:"0 4px 20px rgba(0,0,0,0.15)",border:"1px solid "+DS.border,zIndex:100,overflow:"auto",maxHeight:220}}>
+                        <div onClick={e=>e.stopPropagation()} style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,background:"#eef2f7",borderRadius:8,boxShadow:"0 4px 20px rgba(0,0,0,0.15)",border:"1px solid "+DS.border,zIndex:100,overflow:"auto",maxHeight:220}}>
                           {CONTRAT_STATUTS.map(s=>(
                             <button key={s.key} onClick={()=>setStatut(c.id,s.key)}
                               style={{width:"100%",display:"flex",alignItems:"center",gap:6,padding:"7px 10px",background:meta.key===s.key?s.bg:DS.white,border:"none",cursor:"pointer",fontFamily:"inherit",borderBottom:"1px solid "+DS.light}}>
@@ -4564,7 +4564,7 @@ export default function App() {
   if(!ready) return (
     <>
     <GlobalStyles/>
-    <div style={{height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:DS.bg,gap:16,fontFamily:"'Inter', -apple-system, system-ui, sans-serif"}}>
+    <div style={{height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"#eef2f7",gap:16,fontFamily:"'Inter', -apple-system, system-ui, sans-serif"}}>
       <div className="scale-in" style={{width:80,height:80,borderRadius:24,background:"#0891b2",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 12px 40px rgba(12,18,34,0.35)"}}>{Ico.wave(42,"white")}</div>
       <div style={{fontWeight:900,fontSize:24,color:DS.blue,letterSpacing:-0.5}}>BRIBLUE</div>
       <div style={{color:DS.mid,fontSize:13}}>Chargement…</div>
@@ -4576,7 +4576,7 @@ export default function App() {
     { id:"dashboard", l:"Accueil", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?DS.blue:"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M5 16c2 2 4 2 6 0s4-2 6 0" opacity={a?1:0.4}/><path d="M9 21V14h6v7"/></svg> },
     { id:"clients",   l:"Clients", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?DS.blue:"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a4 4 0 014-4h8a4 4 0 014 4v2"/></svg> },
     { id:"interventions", l:"Fiches Entretien", icon:(a)=><IconFiche size={22} color={a?DS.blue:"#94a3b8"}/> },
-    { id:"rdv", l:"RDV", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#818cf8":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="12" cy="15" r="2.5" fill={a?"#818cf8":"none"}/></svg> },
+    { id:"rdv", l:"Rendez-vous", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#818cf8":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="12" cy="15" r="2.5" fill={a?"#818cf8":"none"}/></svg> },
   ];
 
   const PAGE_LABELS = { dashboard:`Bonjour Dorian 👋`, clients:"Clients", passages:"Fiches Entretien", interventions:"Fiches Entretien", rdv:"Rendez-vous" };
@@ -4584,7 +4584,7 @@ export default function App() {
   return (
     <>
     <GlobalStyles/>
-    <div style={{minHeight:"100vh",background:DS.bg,fontFamily:"'Inter', -apple-system, system-ui, sans-serif",maxWidth:isMobile?640:1280,margin:"0 auto",position:"relative",display:"flex",flexDirection:"column",overflowX:"hidden",width:"100%"}}>
+    <div style={{minHeight:"100vh",background:"#eef2f7",fontFamily:"'Inter', -apple-system, system-ui, sans-serif",maxWidth:isMobile?640:1280,margin:"0 auto",position:"relative",display:"flex",flexDirection:"column",overflowX:"hidden",width:"100%"}}>
       {/* HEADER — Soft UI */}
       <div style={{background:"#eef2f7",padding:isMobile?"10px 14px":"10px 28px",display:"flex",alignItems:"center",gap:isMobile?8:14,position:"sticky",top:0,zIndex:50,boxShadow:"0 4px 16px rgba(166,210,220,0.5)",width:"100%",boxSizing:"border-box"}}>
 
@@ -4611,13 +4611,7 @@ export default function App() {
             {nbStockBas>0&&<span style={{position:"absolute",top:-4,right:-4,minWidth:18,height:18,borderRadius:9,background:"#ef4444",color:"#fff",fontSize:10,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 4px"}}>{nbStockBas}</span>}
           </button>
 
-          {nbAlertes>0&&(
-            <button onClick={()=>setShowModalAlertes(true)} style={{position:"relative",width:isMobile?44:undefined,height:isMobile?44:40,padding:isMobile?0:"0 16px",display:"flex",alignItems:"center",justifyContent:"center",gap:7,borderRadius:isMobile?14:20,background:"#eef2f7",border:"none",cursor:"pointer",flexShrink:0,fontFamily:"inherit",boxShadow:DS.nmShadow}}>
-              <svg width={isMobile?22:16} height={isMobile?22:16} viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
-              {!isMobile&&<span style={{fontSize:12,fontWeight:600,color:"#f59e0b"}}>Alertes</span>}
-              <span style={{position:"absolute",top:-4,right:-4,minWidth:18,height:18,borderRadius:9,background:"#ef4444",color:"#fff",fontSize:10,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 4px"}}>{nbAlertes}</span>
-            </button>
-          )}
+
 
           {isMobile&&(
             <button onClick={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} style={{width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:14,background:"#eef2f7",border:"none",cursor:"pointer",flexShrink:0,boxShadow:DS.nmShadow}}>
@@ -4787,7 +4781,7 @@ export default function App() {
                           <div style={{fontSize:10,fontWeight:800,color:col.tx,textTransform:"uppercase",letterSpacing:.8,marginBottom:7}}>Mois en retard</div>
                           <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
                             {moisEnRetard.map(({m,restE,restC})=>(
-                              <div key={m} style={{background:DS.white,border:"1.5px solid "+col.bd,borderRadius:8,padding:"5px 9px",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                              <div key={m} style={{background:"#eef2f7",border:"1.5px solid "+col.bd,borderRadius:8,padding:"5px 9px",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
                                 <span style={{fontSize:11,fontWeight:800,color:DS.dark}}>{MOIS[m]}</span>
                                 <div style={{display:"flex",gap:5}}>
                                   {restE>0&&<span style={{fontSize:10,fontWeight:700,color:DS.blue}}>🔧 {restE}</span>}
