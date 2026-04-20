@@ -126,6 +126,83 @@ function migrateMois(data) {
 }
 function getMoisVal(mpm, m) { const d = migrateMois(mpm); return d[m] || d[String(m)] || {entretien:0,controle:0}; }
 
+// ═══════════════════════════════════════════════════════════
+// DÉDUCTION AUTOMATIQUE : passage ⭐ non prévu
+// Si en mois M les passages effectués > planning, l'excédent
+// est déduit du mois précédent ou suivant qui a un déficit.
+// Retourne { moisParMoisEffectif, deductions }
+// deductions = [{moisExtra, moisDeduit, typeLabel, n}]
+// ═══════════════════════════════════════════════════════════
+function computeDeductions(mpm, passagesClient, contractStart, contractEnd) {
+  const yearRef = contractStart ? parseInt(contractStart.slice(0,4)) : YEAR_NOW;
+
+  // Pour chaque mois, calculer passages effectués dans la plage contrat
+  const done = {}; // done[m] = {e, c}
+  for (let m = 1; m <= 12; m++) {
+    const passM = passagesClient.filter(p => {
+      const d = new Date(p.date);
+      if (d.getMonth()+1 !== m) return false;
+      if (contractStart && contractEnd) {
+        const ds = String(p.date).slice(0,10);
+        return ds >= contractStart && ds <= contractEnd;
+      }
+      return d.getFullYear() === yearRef;
+    });
+    done[m] = {
+      e: passM.filter(p => isEntretienType(p.type)).length,
+      c: passM.filter(p => isControleType(p.type)).length,
+    };
+  }
+
+  // Planning prévu
+  const plan = {};
+  for (let m = 1; m <= 12; m++) {
+    const v = getMoisVal(mpm, m);
+    plan[m] = { e: v.entretien, c: v.controle };
+  }
+
+  // Copie modifiable du planning effectif (pour affichage après déduction)
+  const eff = {};
+  for (let m = 1; m <= 12; m++) eff[m] = { e: plan[m].e, c: plan[m].c };
+
+  const deductions = [];
+
+  for (let m = 1; m <= 12; m++) {
+    const extraE = Math.max(0, done[m].e - plan[m].e);
+    const extraC = Math.max(0, done[m].c - plan[m].c);
+
+    // Pour chaque type (E puis C), chercher mois précédent ou suivant avec déficit
+    const tryDeduce = (type, extra) => {
+      let remaining = extra;
+      // Cherche mois précédent (m-1) puis suivant (m+1)
+      for (const candidate of [m - 1, m + 1]) {
+        if (candidate < 1 || candidate > 12 || remaining <= 0) continue;
+        const planVal = type === 'e' ? plan[candidate].e : plan[candidate].c;
+        const doneVal = type === 'e' ? done[candidate].e : done[candidate].c;
+        const deficit = Math.max(0, planVal - doneVal);
+        if (deficit > 0) {
+          const n = Math.min(remaining, deficit);
+          // On "crédite" le mois candidat : son planning effectif diminue du déficit comblé
+          if (type === 'e') eff[candidate].e = Math.max(0, eff[candidate].e - n);
+          else eff[candidate].c = Math.max(0, eff[candidate].c - n);
+          deductions.push({
+            moisExtra: m,
+            moisDeduit: candidate,
+            typeLabel: type === 'e' ? '🔧 Entretien' : '💧 Contrôle',
+            n,
+          });
+          remaining -= n;
+        }
+      }
+    };
+    if (extraE > 0) tryDeduce('e', extraE);
+    if (extraC > 0) tryDeduce('c', extraC);
+  }
+
+  return { moisParMoisEffectif: eff, deductions };
+}
+
+
 const CLIENTS_INIT = [
   { id:"C001", nom:"GAMBIN IMMO - COPRO O GARDEN", tel:"", email:"", adresse:"", bassin:"Liner", volume:0, formule:"Confort+", prix:2418, prixPassageE:78, prixPassageC:0, dateDebut:"2025-09-29", dateFin:"2026-09-29", photoPiscine:"", moisParMois:{1:{entretien:1,controle:0},2:{entretien:2,controle:0},3:{entretien:2,controle:0},4:{entretien:2,controle:0},5:{entretien:2,controle:0},6:{entretien:4,controle:0},7:{entretien:4,controle:0},8:{entretien:4,controle:0},9:{entretien:4,controle:0},10:{entretien:2,controle:0},11:{entretien:2,controle:0},12:{entretien:2,controle:0}} },
   { id:"C002", nom:"Mme HAMMER", tel:"", email:"", adresse:"", bassin:"Liner", volume:0, formule:"Confort", prix:2210, prixPassageE:85, prixPassageC:0, dateDebut:"2026-03-01", dateFin:"2027-03-01", photoPiscine:"", moisParMois:{1:{entretien:1,controle:0},2:{entretien:1,controle:0},3:{entretien:2,controle:0},4:{entretien:2,controle:0},5:{entretien:2,controle:0},6:{entretien:4,controle:0},7:{entretien:4,controle:0},8:{entretien:4,controle:0},9:{entretien:4,controle:0},10:{entretien:1,controle:0},11:{entretien:1,controle:0},12:{entretien:1,controle:0}} },
@@ -303,34 +380,36 @@ function alerteClient(c, passages) {
     return new Date(p.date).getFullYear() === yearCur;
   });
 
+  // Calcul avec déductions automatiques (passages ⭐ non prévus)
+  const { moisParMoisEffectif: mpmEff } = computeDeductions(mpm, passContrat, cs, ce);
+
   // Ne vérifier que les mois qui sont DANS la plage du contrat ET passés
   let retard = false;
   for (let m = 1; m < moisCur; m++) {
-    const prev = (mpm[m]?.entretien||0) + (mpm[m]?.controle||0);
-    if (prev === 0) continue;
-    // Vérifier que ce mois est bien dans la plage du contrat
+    const effPlan = (mpmEff[m]?.e||0) + (mpmEff[m]?.c||0);
+    if (effPlan === 0) continue;
     const moisStr = `${yearCur}-${String(m).padStart(2,'0')}-01`;
-    if (cs && moisStr < cs.slice(0,8)+'01') continue; // mois avant le début du contrat
-    if (ce && moisStr > ce) continue; // mois après la fin
-    const eff = passContrat.filter(p => {
+    if (cs && moisStr < cs.slice(0,8)+'01') continue;
+    if (ce && moisStr > ce) continue;
+    const done = passContrat.filter(p => {
       const d = new Date(p.date);
       return d.getMonth()+1 === m && d.getFullYear() === yearCur;
     }).length;
-    if (eff < prev) { retard = true; break; }
+    if (done < effPlan) { retard = true; break; }
   }
   if (retard) return "orange";
 
   // Mois EN COURS dans la plage du contrat
-  const prevCur = (mpm[moisCur]?.entretien||0) + (mpm[moisCur]?.controle||0);
-  if (prevCur > 0) {
+  const effCurPlan = (mpmEff[moisCur]?.e||0) + (mpmEff[moisCur]?.c||0);
+  if (effCurPlan > 0) {
     const moisCurStr = `${yearCur}-${String(moisCur).padStart(2,'0')}-01`;
     const inRange = (!cs || moisCurStr >= cs.slice(0,8)+'01') && (!ce || moisCurStr <= ce);
     if (inRange) {
-      const effCur = passContrat.filter(p => {
+      const doneCur = passContrat.filter(p => {
         const d = new Date(p.date);
         return d.getMonth()+1 === moisCur && d.getFullYear() === yearCur;
       }).length;
-      if (effCur < prevCur) return "aFaire";
+      if (doneCur < effCurPlan) return "aFaire";
     }
   }
 
@@ -1507,15 +1586,16 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           const label = contractStart && contractEnd
             ? `${new Date(contractStart).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})} → ${new Date(contractEnd).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})}`
             : MOIS_L[moisCourant];
+          const mpmRaw = client.moisParMois || client.saisons || {};
+          const { moisParMoisEffectif: mpmEff, deductions } = computeDeductions(mpmRaw, passC, contractStart, contractEnd);
           return <>
         <div style={{fontSize:12,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
           📅 <span>{label}</span>
         </div>
         <div style={{border:"1px solid "+DS.border,borderRadius:DS.radiusSm,overflow:"hidden"}}>
           {[1,2,3,4,5,6,7,8,9,10,11,12].map((m,i)=>{
-            const mpm = client.moisParMois || client.saisons || {};
-            const prevE = getEntretienMois(mpm, m);
-            const prevC = getControleMois(mpm, m);
+            const prevE = getMoisVal(mpmRaw, m).entretien;
+            const prevC = getMoisVal(mpmRaw, m).controle;
             const prevT = prevE + prevC;
             // Filtrer les passages dans la plage du contrat pour ce mois
             const passM = passC.filter(p=>{
@@ -1530,22 +1610,35 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
             });
             const doneE = passM.filter(p=>isEntretienType(p.type)).length;
             const doneC = passM.filter(p=>isControleType(p.type)).length;
-            const rest = Math.max(0, prevT - doneE - doneC);
             const extraE = Math.max(0, doneE - prevE);
             const extraC = Math.max(0, doneC - prevC);
             const hasExtra = extraE > 0 || extraC > 0;
+            // Planning effectif après déduction
+            const effE = mpmEff[m].e;
+            const effC = mpmEff[m].c;
+            const effT = effE + effC;
+            const rest = Math.max(0, effT - doneE - doneC);
+            // Déductions qui impactent ce mois
+            const dedM = deductions.filter(d=>d.moisDeduit===m);
+            const dedSource = deductions.filter(d=>d.moisExtra===m);
             const sc = SAISONS_META[getSaison(m)] || SAISONS_META.ete;
             const cur = m === MOIS_NOW;
-            return <div key={m} style={{display:"flex",alignItems:"center",padding:"9px 12px",borderBottom:i<11?"1px solid "+DS.border:"none",background:cur?sc.bg:i%2===0?DS.white:"#f9fafb"}}>
-              <div style={{width:4,height:22,borderRadius:2,background:sc.color,marginRight:8,flexShrink:0}}/>
-              <div style={{width:42,fontWeight:cur?800:600,fontSize:15,color:cur?sc.color:DS.mid}}>{MOIS[m]}</div>
+            const wasDedFrom = dedM.length > 0; // ce mois a absorbé un extra d'un autre mois
+            return <div key={m} style={{display:"flex",alignItems:"center",padding:"9px 12px",borderBottom:i<11?"1px solid "+DS.border:"none",background:cur?sc.bg:wasDedFrom?"#fefce8":i%2===0?DS.white:"#f9fafb"}}>
+              <div style={{width:4,height:22,borderRadius:2,background:wasDedFrom?"#f59e0b":sc.color,marginRight:8,flexShrink:0}}/>
+              <div style={{width:42,fontWeight:cur?800:600,fontSize:15,color:cur?sc.color:wasDedFrom?"#b45309":DS.mid}}>{MOIS[m]}</div>
               <div style={{flex:1,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                {prevE>0 ? <span style={{fontSize:15,fontWeight:700,color:doneE>=prevE?DS.green:DS.blue}}>🔧 {doneE}/{prevE}</span> : doneE>0 ? <span style={{fontSize:15,fontWeight:700,color:DS.blue}}>🔧 {doneE}/0</span> : null}
-                {prevC>0 ? <span style={{fontSize:15,fontWeight:700,color:doneC>=prevC?DS.green:DS.teal}}>💧 {doneC}/{prevC}</span> : doneC>0 ? <span style={{fontSize:15,fontWeight:700,color:DS.teal}}>💧 {doneC}/0</span> : null}
+                {prevE>0||doneE>0 ? <span style={{fontSize:15,fontWeight:700,color:doneE>=effE?DS.green:DS.blue}}>🔧 {doneE}/{effE}{prevE!==effE?<sup style={{fontSize:10,color:"#b45309"}}> ({prevE}→{effE})</sup>:null}</span> : null}
+                {prevC>0||doneC>0 ? <span style={{fontSize:15,fontWeight:700,color:doneC>=effC?DS.green:DS.teal}}>💧 {doneC}/{effC}{prevC!==effC?<sup style={{fontSize:10,color:"#b45309"}}> ({prevC}→{effC})</sup>:null}</span> : null}
                 {prevT===0 && doneE===0 && doneC===0 ? <span style={{fontSize:15,color:"#d1d5db"}}>—</span> : null}
-                {hasExtra && <span title={`${extraE+extraC} passage${extraE+extraC>1?"s":""} non prévu${extraE+extraC>1?"s":""}`} style={{fontSize:15,lineHeight:1}}>⭐</span>}
+                {hasExtra && <span title={`${extraE+extraC} passage${extraE+extraC>1?"s":""} non prévu — déduit sur mois adjacent`} style={{fontSize:15,lineHeight:1}}>⭐</span>}
+                {dedM.map((d,i)=>(
+                  <span key={i} title={`${d.typeLabel} déduit depuis ${MOIS[d.moisExtra]}`} style={{fontSize:10,fontWeight:700,color:"#b45309",background:"#fef3c7",padding:"1px 6px",borderRadius:4,border:"1px solid #fcd34d"}}>
+                    ← {MOIS[d.moisExtra]}
+                  </span>
+                ))}
               </div>
-              {prevT>0 ? <div style={{fontSize:15,fontWeight:700,color:rest>0?DS.orange:DS.green,background:rest>0?DS.orangeSoft:DS.greenSoft,padding:"2px 8px",borderRadius:6}}>{rest>0?rest+" rest.":"✓"}</div> : null}
+              {effT>0 ? <div style={{fontSize:15,fontWeight:700,color:rest>0?DS.orange:DS.green,background:rest>0?DS.orangeSoft:DS.greenSoft,padding:"2px 8px",borderRadius:6}}>{rest>0?rest+" rest.":"✓"}</div> : null}
             </div>;
           })}
         </div>
@@ -1553,7 +1646,17 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           <span style={{color:"rgba(255,255,255,0.7)",fontSize:15,fontWeight:600}}>Total annuel</span>
           <span style={{color:"#fff",fontSize:15,fontWeight:800}}>🔧 {totalE}  ·  💧 {totalC}  ·  {total} passages</span>
         </div>
-        <div style={{marginTop:8,fontSize:15,color:DS.mid,display:"flex",alignItems:"center",gap:5}}>⭐ = passage non prévu au planning</div>
+        {deductions.length>0&&(
+          <div style={{marginTop:8,padding:"8px 12px",background:"#fffbeb",borderRadius:DS.radiusSm,border:"1px solid #fcd34d"}}>
+            <div style={{fontSize:11,fontWeight:800,color:"#b45309",textTransform:"uppercase",letterSpacing:.7,marginBottom:5}}>⭐ Déductions automatiques</div>
+            {deductions.map((d,i)=>(
+              <div key={i} style={{fontSize:12,color:"#92400e",marginBottom:2}}>
+                {d.typeLabel} de <strong>{MOIS[d.moisExtra]}</strong> déduit sur <strong>{MOIS[d.moisDeduit]}</strong> ({d.n} passage{d.n>1?"s":""})
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{marginTop:8,fontSize:15,color:DS.mid,display:"flex",alignItems:"center",gap:5}}>⭐ = passage non prévu — déduit automatiquement sur mois adjacent</div>
           </>;
         })()}
       </div>}
