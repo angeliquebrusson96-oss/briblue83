@@ -1420,14 +1420,14 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
       <div style={{margin:isMobile?"-18px -20px 0":"-24px -28px 0"}}>
 
         {/* Bandeau couleur avec nom */}
-        <div style={{background:"#0891b2",padding:"24px 20px 20px"}}>
+        <div style={{background:"#1e3a5f",padding:"24px 20px 20px"}}>
           {/* Nom + statut */}
           <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,marginBottom:20}}>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:20,fontWeight:900,color:"#fff",lineHeight:1.2,marginBottom:6}}>{client.nom}</div>
               <div style={{fontSize:13,color:"rgba(255,255,255,0.75)",fontWeight:500}}>
                 {[client.formule,client.bassin].filter(Boolean).join(" · ")}
-                {jours!==null&&<span style={{marginLeft:8,fontWeight:700,color:jours<=30?"#fde68a":"rgba(255,255,255,0.9)"}}>{jours>=0?jours+"j restants":"Expiré"}</span>}
+                {jours!==null&&<span style={{marginLeft:8,fontWeight:700,color:jours<=30?"#fde68a":"#bfdbfe"}}>{jours>=0?jours+"j restants":"Expiré"}</span>}
               </div>
             </div>
             <div style={{background:col.bg,color:col.tx,fontSize:13,fontWeight:800,padding:"6px 14px",borderRadius:22,flexShrink:0,whiteSpace:"nowrap"}}>{col.lbl}</div>
@@ -1441,8 +1441,8 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
               {label:"Passages restants",    val:rest, total:total,  color:rest>0?"#fde68a":"#a7f3d0", big:true},
               {label:"Mensualité",           val:(()=>{const {m11}=calcMensualites(client.prix||0);return m11;})(), suffix:"€/mois", color:"#a7f3d0"},
             ].map(({label,val,total,color,suffix,big},i)=>(
-              <div key={i} style={{background:"rgba(0,0,0,0.15)",borderRadius:14,padding:"14px 16px"}}>
-                <div style={{fontSize:11,color:"rgba(255,255,255,0.6)",fontWeight:600,marginBottom:6,textTransform:"uppercase",letterSpacing:.5}}>{label}</div>
+              <div key={i} style={{background:"rgba(255,255,255,0.08)",borderRadius:14,padding:"14px 16px"}}>
+                <div style={{fontSize:10,color:"#93c5fd",fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:.6}}>{label}</div>
                 <div style={{display:"flex",alignItems:"baseline",gap:4}}>
                   <span style={{fontSize:big?32:28,fontWeight:900,color,lineHeight:1}}>{val}</span>
                   {total!==undefined&&<span style={{fontSize:13,color:"rgba(255,255,255,0.45)",fontWeight:500}}>/{total}</span>}
@@ -1667,6 +1667,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                 dotColor:"#f59e0b",
                 statusLabel:l.statut==="paye"?"Payé":l.statut==="facture"?"Facturé":"À facturer",
                 statusColor:l.statut==="paye"?"#059669":"#f59e0b",
+                _l:l,
               })),
               ...rdvClient2.map(r=>({
                 date:r.date, title:r.type||"Rendez-vous",
@@ -1674,6 +1675,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                 dotColor:"#818cf8",
                 statusLabel:r.date>=TODAY?"À venir":"Passé",
                 statusColor:r.date>=TODAY?"#818cf8":"#94a3b8",
+                _r:r,
               })),
             ].sort((a,b)=>b.date.localeCompare(a.date));
 
@@ -1704,8 +1706,8 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                     const d=new Date(ev.date);
                     return (
                       <div key={i}
-                        onClick={ev._p?()=>setDetailPassageFiche(ev._p):undefined}
-                        style={{display:"flex",alignItems:"center",gap:16,padding:"14px 0",borderBottom:i<grouped[key].length-1?"1px solid #f8fafc":"none",cursor:ev._p?"pointer":"default"}}>
+                        onClick={ev._p?()=>setDetailPassageFiche(ev._p):ev._l?()=>{setEditLiv(ev._l);setShowFormLiv(true);}:ev._r?()=>onEditRdv&&onEditRdv(ev._r):undefined}
+                        style={{display:"flex",alignItems:"center",gap:16,padding:"14px 0",borderBottom:i<grouped[key].length-1?"1px solid #f8fafc":"none",cursor:(ev._p||ev._l||ev._r)?"pointer":"default"}}>
 
                         {/* Point couleur + date */}
                         <div style={{width:48,flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
@@ -1724,7 +1726,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                         {/* Statut */}
                         <div style={{flexShrink:0,textAlign:"right"}}>
                           <div style={{fontSize:13,fontWeight:700,color:ev.statusColor,whiteSpace:"nowrap"}}>{ev.statusLabel}</div>
-                          {ev._p&&<div style={{fontSize:11,color:"#cbd5e1",marginTop:2}}>Appuyer →</div>}
+                          {(ev._p||ev._l||ev._r)&&<div style={{fontSize:11,color:"#cbd5e1",marginTop:2}}>Ouvrir →</div>}
                         </div>
                       </div>
                     );
