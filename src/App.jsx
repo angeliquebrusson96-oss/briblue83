@@ -4549,7 +4549,43 @@ function generateCarnetCode(clientId) {
 }
 
 function CarnetPublic({ code, allClients, allPassages }) {
-  const client = allClients.find(c=>generateCarnetCode(c.id)===code.toUpperCase());
+  const [loadedClients, setLoadedClients] = useState(null);
+  const [loadedPassages, setLoadedPassages] = useState(null);
+
+  // Charger les données depuis Supabase directement (sans login)
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase.from("app_data").select("data").eq("id", 1).single();
+        if (data?.data) {
+          const c = data.data["bb_clients_v2"];
+          const p = data.data["bb_passages_v2"];
+          setLoadedClients(c && c.length ? c : CLIENTS_INIT);
+          setLoadedPassages(p && p.length ? p : PASSAGES_INIT);
+        } else {
+          setLoadedClients(CLIENTS_INIT);
+          setLoadedPassages(PASSAGES_INIT);
+        }
+      } catch {
+        setLoadedClients(CLIENTS_INIT);
+        setLoadedPassages(PASSAGES_INIT);
+      }
+    })();
+  }, []);
+
+  // Afficher un loader pendant le chargement Supabase
+  if (loadedClients === null) return (
+    <div style={{minHeight:"100vh",background:"#f8fafc",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,fontFamily:"'Nunito',system-ui,sans-serif"}}>
+      <div style={{width:44,height:44,border:"4px solid #e2e8f0",borderTop:"4px solid #0891b2",borderRadius:"50%",animation:"spin 0.8s linear infinite",marginBottom:16}}/>
+      <div style={{fontSize:14,color:"#64748b",fontWeight:600}}>Chargement du carnet…</div>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
+
+  const effectiveClients = loadedClients;
+  const effectivePassages = loadedPassages || [];
+
+  const client = effectiveClients.find(c=>generateCarnetCode(c.id)===code.toUpperCase());
   if (!client) return (
     <div style={{minHeight:"100vh",background:"#f8fafc",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,fontFamily:"'Nunito',system-ui,sans-serif"}}>
       <div style={{width:60,height:60,borderRadius:18,background:"#fee2e2",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:16}}>
@@ -4561,7 +4597,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
   );
 
   // Uniquement les passages effectués (ok=true)
-  const passClient = allPassages
+  const passClient = effectivePassages
     .filter(p=>p.clientId===client.id && p.ok)
     .sort((a,b)=>new Date(b.date)-new Date(a.date));
 
