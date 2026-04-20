@@ -555,10 +555,10 @@ function Modal({ title, onClose, children, wide }) {
     return ()=>{ document.body.style.overflow = prev; };
   },[]);
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:200,display:"flex",alignItems:isMobile?"flex-end":"center",justifyContent:"center"}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:200,display:"flex",alignItems:isMobile?"flex-end":"center",justifyContent:"center",padding:isMobile?"0":"12px"}}>
       <div className={isMobile?"slide-up":"scale-in"}
         style={{background:DS.white,borderRadius:isMobile?"20px 20px 0 0":DS.radiusLg,
-          width:"100%",maxWidth:wide?720:560,
+          width:"100%",maxWidth:isMobile?"100%":wide?720:560,
           maxHeight:isMobile?"92dvh":"88vh",
           display:"flex",flexDirection:"column",
           boxShadow:DS.shadowLg,overflowY:"hidden",
@@ -750,7 +750,7 @@ function FormClient({ initial, clients, onSave, onClose }) {
         <PhotoPicker value={f.photoPiscine||""} onChange={v=>set("photoPiscine",v)} compact/>
       </Section>
       <Section title="Contrat">
-        <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr 1fr",gap:12}}>
+        <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"1fr 1fr 1fr",gap:8}}>
           <Select label="Formule" value={f.formule} onChange={e=>set("formule",e.target.value)} options={["VAC","VAC+","Confort","Confort+"]}/>
           <div/>
           {!isMobile&&<div/>}
@@ -797,7 +797,7 @@ function FormClient({ initial, clients, onSave, onClose }) {
             );
           })}
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:12}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginTop:12}}>
           <Input label="Prix/passage entretien (€)" type="number" style={{fontSize:16}} value={f.prixPassageE||""} onChange={e=>set("prixPassageE",+e.target.value||0)}/>
           <Input label="Prix/passage contrôle (€)" type="number" style={{fontSize:16}} value={f.prixPassageC||""} onChange={e=>set("prixPassageC",+e.target.value||0)}/>
         </div>
@@ -1066,7 +1066,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
               <div><div style={{fontWeight:700,fontSize:13,color:DS.dark}}>{selectedClient.nom}</div><div style={{fontSize:11,color:DS.mid}}>{selectedClient.formule}</div></div>
             </div>
           )}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10}}>
             <div>
               <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>Date *</span>
               <input type="date" value={f.date} onChange={e=>set("date",e.target.value)}
@@ -1145,7 +1145,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
                   <span style={{fontSize:13,color:DS.mid,fontWeight:600}}>Ajouter des photos</span>
                   <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={addPhotos}/>
                 </label>
-              : <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+              : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:8}}>
                   {(f.photos||[]).map((ph,i)=>(
                     <div key={i} style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid "+DS.border}}>
                       <img src={ph} alt={`Photo ${i+1}`} style={{width:"100%",height:80,objectFit:"cover",display:"block"}}/>
@@ -1230,7 +1230,7 @@ function FormRdv({ initial, clients, onSave, onClose }) {
         </div>
       </Section>
       <Section title="Date & heure">
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:10}}>
           <Input label="Date *" type="date" value={f.date} onChange={e=>set("date",e.target.value)}/>
           <Input label="Heure" type="time" value={f.heure} onChange={e=>set("heure",e.target.value)}/>
           <Input label="Durée (min)" type="number" style={{fontSize:16}} value={f.duree} onChange={e=>set("duree",e.target.value)}/>
@@ -1515,7 +1515,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                   )}
                   
                   
-                  <div style={{display:"flex",gap:6,paddingTop:8,borderTop:"1px solid "+DS.border,flexWrap:"wrap"}}>
+                  <div style={{display:"flex",gap:5,paddingTop:8,borderTop:"1px solid "+DS.border,flexWrap:"wrap",width:"100%"}}>
                     <div onClick={(e)=>e.stopPropagation()} style={{flex:"1 1 160px"}}>
                       <RapportStatusPicker
                         compact
@@ -2625,7 +2625,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                 ))}
               </select>
             ) : (
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,maxHeight:220,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:8,maxHeight:220,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
                 {clients.map(c=>{
                   const sel=f.clientId===c.id;
                   return (
@@ -2718,7 +2718,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                         <span style={{fontSize:13,color:DS.mid,fontWeight:600}}>Appuyez pour ajouter des photos</span>
                         <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={addPhotos}/>
                       </label>
-                    : <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                    : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:8}}>
                         {filledPhotos.map(p=>(
                           <div key={p.key} style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid "+DS.border}}>
                             <img src={p.val} alt={p.label} style={{width:"100%",height:90,objectFit:"cover",display:"block"}}/>
@@ -2814,7 +2814,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
               {/* Qualité eau — chips visuels colorés */}
               <div>
                 <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:8}}>Qualité de l'eau</span>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:6}}>
                   {[
                     {v:"Cristalline",icon:"💎",color:"#0891b2",bg:"#e0f7fa"},
                     {v:"Trouble",icon:"🌫️",color:"#64748b",bg:"#f1f5f9"},
@@ -2969,7 +2969,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                             <span style={{fontSize:13,color:DS.mid,fontWeight:600}}>Ajouter des photos au départ</span>
                             <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={addDepart}/>
                           </label>
-                        : <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                        : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:8}}>
                             {filledDepart.map(p=>(
                               <div key={p.key} style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid "+DS.border}}>
                                 <img src={p.val} alt={p.label} style={{width:"100%",height:90,objectFit:"cover",display:"block"}}/>
@@ -3007,7 +3007,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
               <div style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>
                 Photos jointes ({[f.photoArrivee,f.photoDepart,...(f.photos||[])].filter(Boolean).length}/5)
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:8}}>
                 {f.photoArrivee && (<div style={{position:"relative"}}><img src={f.photoArrivee} alt="Arrivée" style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Arrivée</span></div>)}
                 {(f.photos||[]).map((ph,i)=>ph?(<div key={i} style={{position:"relative"}}><img src={ph} alt={`Photo ${i+2}`} style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Photo {i+2}</span></div>):null)}
                 {f.photoDepart && (<div style={{position:"relative"}}><img src={f.photoDepart} alt="Départ" style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Départ</span></div>)}
@@ -3411,7 +3411,7 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
       </div>
 
       {/* Action buttons */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:10,marginBottom:14}}>
         <BtnPrimary onClick={onAddPassage} bg="#0891b2" icon={Ico.clipboard(14,"#fff")} style={{width:"100%",fontSize:13,padding:"11px 8px",borderRadius:10}}>Passage</BtnPrimary>
         <BtnPrimary onClick={()=>onAddLivraison()} bg="#0891b2" icon={Ico.truck(14,"#fff")} style={{width:"100%",fontSize:13,padding:"11px 8px",borderRadius:10}}>Livraison</BtnPrimary>
         <BtnPrimary onClick={onAddRdv} bg="#0891b2" icon={Ico.rdv(14,"#fff")} style={{width:"100%",fontSize:13,padding:"11px 8px",borderRadius:10}}>RDV</BtnPrimary>
@@ -3581,7 +3581,7 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
                   </div>
                   <Tag color={col.tx} bg={col.bg} style={{fontSize:9,fontWeight:700,flexShrink:0,padding:"2px 6px"}}>{col.lbl}</Tag>
                 </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:3}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:3}}>
                   <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"#f8fafc",border:"1px solid "+DS.border}}>
                     <div style={{fontSize:13,fontWeight:800,color:DS.blue}}>{eE}<span style={{fontSize:9,color:DS.mid}}>/{tE}</span></div>
                     <div style={{fontSize:9,color:DS.mid}}>Entret.</div>
@@ -3697,7 +3697,7 @@ function PassageDetailModal({ passage, client, onClose }) {
       {/* Analyses */}
       {(passage.chloreLibre||passage.ph||passage.alcalinite||passage.stabilisant||passage.tChlore||passage.tPH||passage.tSel||passage.tPhosphate||passage.tStabilisant) && (
         <Block title="Analyses eau" icon="💧" color={DS.teal}>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:0}}>
             {passage.tChlore!==""&&passage.tChlore!==null&&passage.tChlore!==undefined&&<Row label="Chlore (appareil)" value={val(passage.tChlore,"ppm")} color={+passage.tChlore>=0.5&&+passage.tChlore<=3?DS.green:DS.red}/>}
             {passage.tPH!==""&&passage.tPH!==null&&passage.tPH!==undefined&&<Row label="pH (appareil)" value={val(passage.tPH)} color={+passage.tPH>=7.0&&+passage.tPH<=7.6?DS.green:DS.red}/>}
             {passage.tSel!==""&&passage.tSel!==null&&passage.tSel!==undefined&&<Row label="Sel" value={val(passage.tSel,"g/L")}/>}
@@ -3725,7 +3725,7 @@ function PassageDetailModal({ passage, client, onClose }) {
       {/* Correctifs */}
       {(passage.corrChlore||passage.corrPH||passage.corrSel||passage.corrAlgicide||passage.corrAlcafix||passage.corrAutre) && (
         <Block title="Correctifs apportés" icon="⚗️" color={DS.purple}>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:0}}>
             {passage.corrChlore&&<Row label="Chlore" value={passage.corrChlore}/>}
             {passage.corrPH&&<Row label="pH" value={passage.corrPH}/>}
             {passage.corrSel&&<Row label="Sel" value={passage.corrSel}/>}
@@ -3767,7 +3767,7 @@ function PassageDetailModal({ passage, client, onClose }) {
       {/* Signatures */}
       {(passage.signatureTech||passage.signatureClient)&&(
         <Block title="Signatures" icon="✍️" color={DS.mid}>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12}}>
             {passage.signatureTech&&<div><div style={{fontSize:10,fontWeight:700,color:DS.mid,marginBottom:6}}>TECHNICIEN</div><img src={passage.signatureTech} style={{width:"100%",maxHeight:60,objectFit:"contain",borderRadius:8,border:"1px solid "+DS.border,background:"#fafafa"}}/></div>}
             {passage.signatureClient&&<div><div style={{fontSize:10,fontWeight:700,color:DS.mid,marginBottom:6}}>CLIENT</div><img src={passage.signatureClient} style={{width:"100%",maxHeight:60,objectFit:"contain",borderRadius:8,border:"1px solid "+DS.border,background:"#fafafa"}}/></div>}
           </div>
@@ -3859,7 +3859,7 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                     )}
                     
                     
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginTop:10,paddingTop:10,borderTop:"1px solid "+DS.border}}>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:6,marginTop:10,paddingTop:10,borderTop:"1px solid "+DS.border}}>
                       <button onClick={()=>setDetailPassage(p)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.light,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.dark,fontFamily:"inherit",fontWeight:700}}>
                         {Ico.search(13,DS.mid)} Aperçu
                       </button>
