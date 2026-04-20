@@ -1501,7 +1501,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
 
       {/* Tabs */}
       <div style={{display:"flex",gap:4,marginBottom:16,background:"#e4ecf2",borderRadius:16,padding:4}}>
-        {[["infos","Infos"],["saisons","Planning"],["passages",isMobile?"Fiches":"Fiches Entretien"],["rdvs","Rendez-vous"],["livraisons","Livraisons"]].map(([id,l])=>(
+        {[["infos","Infos"],["saisons","Planning"],["passages","Rapports"],["timeline","Timeline"],["rdvs","RDV"],["livraisons","Livraisons"]].map(([id,l])=>(
           <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"8px 4px",borderRadius:12,border:"none",cursor:"pointer",fontWeight:tab===id?700:500,fontSize:12,fontFamily:"inherit",background:tab===id?"#eef2f7":"transparent",color:tab===id?DS.blue:DS.mid,boxShadow:tab===id?"4px 4px 8px rgba(166,210,220,0.55), -3px -3px 6px rgba(255,255,255,0.85)":"none",transition:"all .2s"}}>{l}</button>
         ))}
       </div>
@@ -1674,6 +1674,97 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
         })()}
       </div>}
 
+
+      {/* Tab: Timeline */}
+      {tab==="timeline" && (
+        <div className="fade-in" style={{display:"flex",flexDirection:"column",gap:0,position:"relative"}}>
+          {/* Ligne verticale */}
+          <div style={{position:"absolute",left:20,top:8,bottom:8,width:3,background:"linear-gradient(180deg,#06b6d4,#0891b2 60%,#dde8f0)",borderRadius:99,zIndex:0}}/>
+          {(()=>{
+            // Fusionner passages + livraisons + rdvs en timeline triée
+            const passClient = passages.filter(p=>p.clientId===client.id);
+            const livClient = (livraisons||[]).filter(l=>l.clientId===client.id);
+            const rdvClient2 = (rdvs||[]).filter(r=>r.clientId===client.id);
+            const events = [
+              // Contrat créé
+              ...(client.dateDebut ? [{
+                date: client.dateDebut,
+                type: "contrat",
+                icon: "📄",
+                color: DS.blue,
+                bg: DS.blueSoft,
+                title: "Contrat démarré",
+                sub: client.formule + (client.prix ? " · " + client.prix + "€/an" : ""),
+              }] : []),
+              // Passages
+              ...passClient.map(p => ({
+                date: p.date,
+                type: "passage",
+                icon: p.type?.toLowerCase().includes("contrôle") ? "💧" : "🔧",
+                color: p.type?.toLowerCase().includes("contrôle") ? "#0e7490" : DS.blue,
+                bg: p.type?.toLowerCase().includes("contrôle") ? "#e0f2fe" : DS.blueSoft,
+                title: p.type || "Passage",
+                sub: [p.tech ? "Par " + p.tech : null, p.ph ? "pH " + p.ph : null, p.chlore ? "Cl " + p.chlore : null].filter(Boolean).join(" · "),
+                ok: p.ok,
+                id: p.id,
+                _p: p,
+              })),
+              // Livraisons
+              ...livClient.map(l => ({
+                date: l.date,
+                type: "livraison",
+                icon: "🚚",
+                color: "#f59e0b",
+                bg: "#fffbeb",
+                title: "Livraison",
+                sub: [l.produits?.join(", "), l.montant ? l.montant + "€" : null].filter(Boolean).join(" · "),
+              })),
+              // RDVs passés
+              ...rdvClient2.filter(r=>r.date<TODAY).map(r => ({
+                date: r.date,
+                type: "rdv",
+                icon: "📅",
+                color: DS.purple,
+                bg: DS.purpleSoft,
+                title: r.type || "Rendez-vous",
+                sub: r.heure ? r.heure + (r.duree ? " · " + r.duree + " min" : "") : "",
+              })),
+            ].sort((a,b) => b.date.localeCompare(a.date));
+
+            if (events.length === 0) return (
+              <div style={{textAlign:"center",padding:"40px 20px",color:DS.mid,fontSize:14}}>
+                Aucun événement pour ce client
+              </div>
+            );
+
+            return events.map((ev, i) => (
+              <div key={i} style={{display:"flex",gap:14,alignItems:"flex-start",paddingBottom:16,position:"relative",zIndex:1}}>
+                {/* Pastille */}
+                <div style={{width:44,height:44,borderRadius:14,background:ev.bg,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,boxShadow:"4px 4px 8px rgba(166,210,220,0.55), -3px -3px 6px rgba(255,255,255,0.85)",border:"2px solid #fff"}}>
+                  {ev.icon}
+                </div>
+                {/* Contenu */}
+                <div style={{flex:1,background:"#eef2f7",borderRadius:14,padding:"10px 14px",boxShadow:"4px 4px 8px rgba(166,210,220,0.5), -3px -3px 6px rgba(255,255,255,0.85)",minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
+                    <span style={{fontWeight:700,fontSize:14,color:ev.color}}>{ev.title}</span>
+                    <span style={{fontSize:11,color:DS.mid,fontWeight:600,flexShrink:0}}>
+                      {new Date(ev.date).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})}
+                    </span>
+                  </div>
+                  {ev.sub && <div style={{fontSize:12,color:DS.mid,marginTop:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ev.sub}</div>}
+                  {ev.type==="passage" && ev._p && (
+                    <div style={{display:"flex",gap:6,marginTop:8}}>
+                      <button onClick={(e)=>{e.stopPropagation();ouvrirRapport(ev._p,client);}} style={{padding:"5px 10px",borderRadius:8,background:"#eef2f7",border:"none",cursor:"pointer",fontSize:11,fontWeight:700,color:DS.blue,fontFamily:"inherit",boxShadow:"3px 3px 5px rgba(166,210,220,0.5), -2px -2px 4px rgba(255,255,255,0.8)",display:"flex",alignItems:"center",gap:4}}>
+                        {Ico.pdf(10,DS.blue)} Rapport PDF
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ));
+          })()}
+        </div>
+      )}
       {tab==="passages" && (
         <div className="fade-in">
           <div style={{display:"flex",gap:8,marginBottom:12}}>
@@ -2802,7 +2893,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
   const clientSel = clients.find(c=>c.id===f.clientId);
 
   return (
-    <Modal title={isEdit ? "Modifier le passage" : "Fiche Entretien"} onClose={onClose} wide>
+    <Modal title={isEdit ? "Modifier le passage" : "Rapport"} onClose={onClose} wide>
       {/* Bandeau client sélectionné */}
       {clientSel && (
         <div style={{margin:"-24px -28px 16px",marginTop:isMobile?"-18px":"-24px",marginLeft:isMobile?"-20px":"-28px",marginRight:isMobile?"-20px":"-28px",position:"relative",overflow:"hidden"}}>
@@ -2832,7 +2923,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
             <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
               <div style={{background:"rgba(5,150,105,0.2)",border:"1px solid rgba(5,150,105,0.4)",borderRadius:8,padding:"4px 10px",display:"flex",alignItems:"center",gap:5}}>
                 {Ico.pool(13,"#6ee7b7")}
-                <span style={{fontSize:10,fontWeight:700,color:"#6ee7b7"}}>Entretien</span>
+                <span style={{fontSize:10,fontWeight:700,color:"#6ee7b7"}}>Rapport</span>
               </div>
               <div style={{fontSize:10,color:"rgba(255,255,255,0.4)",fontWeight:500}}>{clientSel.adresse?.split(",").pop()?.trim()||""}</div>
             </div>
@@ -4128,10 +4219,10 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
 
   return (
     <div>
-      {/* Header Fiches Entretien avec logo */}
+      {/* Header Rapports avec logo */}
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
         <IconFiche size={26} color="#0891b2"/>
-        <span style={{fontWeight:800,fontSize:17,color:DS.dark}}>Fiches Entretien</span>
+        <span style={{fontWeight:800,fontSize:17,color:DS.dark}}>Rapports</span>
       </div>
       <div style={{display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
         <div style={{display:"flex",gap:6,flex:1,background:DS.light,borderRadius:DS.radius,padding:4}}>
@@ -4147,7 +4238,7 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
         </div>
         <button onClick={onAdd} className="btn-hover" style={{flexShrink:0,padding:"9px 12px",background:DS.blue,border:"none",borderRadius:DS.radiusSm,cursor:"pointer",display:"flex",alignItems:"center",gap:7,fontFamily:"inherit",fontWeight:700,fontSize:13,color:"#fff"}}>
           <IconFiche size={16} color="#fff"/>
-          Fiche Entretien
+          Rapport
         </button>
       </div>
       {filtered.length===0
@@ -4575,11 +4666,11 @@ export default function App() {
   const NAV = [
     { id:"dashboard", l:"Accueil", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?DS.blue:"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M5 16c2 2 4 2 6 0s4-2 6 0" opacity={a?1:0.4}/><path d="M9 21V14h6v7"/></svg> },
     { id:"clients",   l:"Clients", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?DS.blue:"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a4 4 0 014-4h8a4 4 0 014 4v2"/></svg> },
-    { id:"interventions", l:"Fiches Entretien", icon:(a)=><IconFiche size={22} color={a?DS.blue:"#94a3b8"}/> },
+    { id:"interventions", l:"Rapports", icon:(a)=><IconFiche size={22} color={a?DS.blue:"#94a3b8"}/> },
     { id:"rdv", l:"Rendez-vous", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#818cf8":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="12" cy="15" r="2.5" fill={a?"#818cf8":"none"}/></svg> },
   ];
 
-  const PAGE_LABELS = { dashboard:`Bonjour Dorian 👋`, clients:"Clients", passages:"Fiches Entretien", interventions:"Fiches Entretien", rdv:"Rendez-vous" };
+  const PAGE_LABELS = { dashboard:`Bonjour Dorian 👋`, clients:"Clients", passages:"Rapports", interventions:"Rapports", rdv:"Rendez-vous" };
 
   return (
     <>
@@ -4621,7 +4712,7 @@ export default function App() {
 
           <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} style={{width:isMobile?44:undefined,height:isMobile?44:40,padding:isMobile?0:"0 18px",display:"flex",alignItems:"center",justifyContent:"center",gap:7,borderRadius:isMobile?14:20,background:"linear-gradient(135deg,#06b6d4,#0891b2)",border:"none",cursor:"pointer",flexShrink:0,fontFamily:"inherit",boxShadow:"4px 4px 12px rgba(8,145,178,0.35), -2px -2px 6px rgba(255,255,255,0.6)"}}>
             <svg width={isMobile?22:16} height={isMobile?22:16} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
-            {!isMobile&&<span style={{fontSize:12,fontWeight:700,color:"#fff",whiteSpace:"nowrap"}}>Entretien</span>}
+            {!isMobile&&<span style={{fontSize:12,fontWeight:700,color:"#fff",whiteSpace:"nowrap"}}>Rapport</span>}
           </button>
 
           <button onClick={handleLogout} style={{width:isMobile?44:40,height:isMobile?44:40,borderRadius:14,background:"#eef2f7",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:DS.nmShadow}}>
