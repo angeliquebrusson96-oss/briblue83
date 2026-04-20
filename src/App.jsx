@@ -1373,7 +1373,7 @@ function FormRdv({ initial, clients, onSave, onClose }) {
 }
 
 // FICHE CLIENT (avec diffrenciation Entretien/Contrle)
-function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[], contrats={}, onUpdateContrat, onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onDeletePassage, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
+function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[], contrats={}, onUpdateContrat, onUpdateClient, onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onDeletePassage, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
   const [tab, setTab] = useState("infos");
   const [detailPassageFiche, setDetailPassageFiche] = useState(null);
   const [showFormLiv, setShowFormLiv] = useState(false);
@@ -1530,6 +1530,22 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
             : MOIS_L[moisCourant];
           const mpmRaw = client.moisParMois || client.saisons || {};
           const mpmPlan = getPlanningMois(mpmRaw);
+          // Passages manuels stockés sur le client : { "YYYY-MM": n, ... }
+          const manuelMap = client.passagesManuel || {};
+          const toggleManuel = (mKey) => {
+            if (!onUpdateClient) return;
+            const cur = manuelMap[mKey] || 0;
+            const planForKey = (() => {
+              const mm = parseInt(mKey.split("-")[1]);
+              return (mpmPlan[mm]?.e||0) + (mpmPlan[mm]?.c||0);
+            })();
+            // Cycle : 0 → 1 → 2 … → planT → 0
+            const next = cur >= planForKey ? 0 : cur + 1;
+            const newManuel = { ...manuelMap };
+            if (next === 0) delete newManuel[mKey];
+            else newManuel[mKey] = next;
+            onUpdateClient({ ...client, passagesManuel: newManuel });
+          };
           return <>
         <div style={{fontSize:12,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
           📅 <span>{label}</span>
@@ -1551,20 +1567,39 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
             });
             const doneE = passM.filter(p=>isEntretienType(p.type)).length;
             const doneC = passM.filter(p=>isControleType(p.type)).length;
-            const doneT = doneE + doneC;
+            const doneRapport = doneE + doneC;
+            // Déterminer l'année pour la clé mois (on utilise l'année du contrat si disponible)
+            const mKey = `${contractStart ? contractStart.slice(0,4) : YEAR_NOW}-${String(m).padStart(2,"0")}`;
+            const doneManuel = manuelMap[mKey] || 0;
+            const doneT = doneRapport + doneManuel;
             const rest = Math.max(0, planT - doneT);
             const sc = SAISONS_META[getSaison(m)] || SAISONS_META.ete;
             const cur = m === MOIS_NOW;
+            const complet = planT > 0 && rest === 0;
             return <div key={m} style={{display:"flex",alignItems:"center",padding:"9px 12px",borderBottom:i<11?"1px solid "+DS.border:"none",background:cur?sc.bg:i%2===0?DS.white:"#f9fafb"}}>
               <div style={{width:4,height:22,borderRadius:2,background:sc.color,marginRight:8,flexShrink:0}}/>
               <div style={{width:42,fontWeight:cur?800:600,fontSize:15,color:cur?sc.color:DS.mid}}>{MOIS[m]}</div>
               <div style={{flex:1,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                {planE>0||doneE>0 ? <span style={{fontSize:15,fontWeight:700,color:doneE>=planE?DS.green:DS.blue}}>🔧 {doneE}/{planE}</span> : null}
-                {planC>0||doneC>0 ? <span style={{fontSize:15,fontWeight:700,color:doneC>=planC?DS.green:DS.teal}}>💧 {doneC}/{planC}</span> : null}
+                {planE>0||doneE>0 ? <span style={{fontSize:15,fontWeight:700,color:doneT>=planE?DS.green:DS.blue}}>🔧 {doneT}/{planE+planC}</span> : null}
+                {planC>0&&planE===0 ? <span style={{fontSize:15,fontWeight:700,color:doneT>=planC?DS.green:DS.teal}}>💧 {doneT}/{planC}</span> : null}
                 {planT===0 && doneT===0 ? <span style={{fontSize:15,color:"#d1d5db"}}>—</span> : null}
-                {doneT>planT ? <span style={{fontSize:10,fontWeight:700,color:DS.blue,background:DS.blueSoft,padding:"1px 6px",borderRadius:4,border:"1px solid "+DS.border}}>+{doneT-planT} suppl.</span> : null}
+                {doneManuel>0 && <span style={{fontSize:10,fontWeight:700,color:"#7c3aed",background:"#f5f3ff",padding:"1px 6px",borderRadius:4,border:"1px solid #c4b5fd"}}>{doneManuel} manuel{doneManuel>1?"s":""}</span>}
+                {doneT>planT && planT>0 ? <span style={{fontSize:10,fontWeight:700,color:DS.blue,background:DS.blueSoft,padding:"1px 6px",borderRadius:4,border:"1px solid "+DS.border}}>+{doneT-planT} suppl.</span> : null}
               </div>
-              {planT>0 ? <div style={{fontSize:15,fontWeight:700,color:rest>0?DS.orange:DS.green,background:rest>0?DS.orangeSoft:DS.greenSoft,padding:"2px 8px",borderRadius:6}}>{rest>0?rest+" rest.":"✓"}</div> : null}
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                {planT>0 && <div style={{fontSize:13,fontWeight:700,color:rest>0?DS.orange:DS.green,background:rest>0?DS.orangeSoft:DS.greenSoft,padding:"2px 8px",borderRadius:6,minWidth:52,textAlign:"center"}}>{rest>0?rest+" rest.":"✓"}</div>}
+                {planT>0 && onUpdateClient && (
+                  <button
+                    onClick={()=>toggleManuel(mKey)}
+                    title={doneManuel>0?`${doneManuel} passage(s) manuel(s) — cliquer pour modifier`:"Marquer un passage manuel"}
+                    style={{width:30,height:30,borderRadius:8,border:"1.5px solid "+(doneManuel>0?"#7c3aed":DS.border),background:doneManuel>0?"#f5f3ff":DS.white,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"}}>
+                    {doneManuel>0
+                      ? <span style={{fontSize:13,fontWeight:800,color:"#7c3aed"}}>{doneManuel}</span>
+                      : <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={DS.mid} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    }
+                  </button>
+                )}
+              </div>
             </div>;
           })}
         </div>
@@ -1572,6 +1607,12 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           <span style={{color:"rgba(255,255,255,0.7)",fontSize:15,fontWeight:600}}>Total annuel</span>
           <span style={{color:"#fff",fontSize:15,fontWeight:800}}>🔧 {totalE}  ·  💧 {totalC}  ·  {total} passages</span>
         </div>
+        {Object.keys(manuelMap).length>0&&(
+          <div style={{marginTop:6,padding:"6px 12px",background:"#f5f3ff",borderRadius:DS.radiusSm,border:"1px solid #c4b5fd",fontSize:12,color:"#6d28d9",display:"flex",alignItems:"center",gap:6}}>
+            <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Passages manuels : cliquer sur le bouton ✓ pour ajouter/retirer. Le compteur cycle de 0 jusqu'au nombre prévu.
+          </div>
+        )}
           </>;
         })()}
       </div>}
@@ -4619,7 +4660,7 @@ export default function App() {
       {/* MODALS */}
       {ficheClient&&(()=>{
         const latest=clients.find(c=>c.id===ficheClient.id)||ficheClient;
-        return <FicheClient client={latest} passages={passages} livraisons={livraisons.filter(l=>l.clientId===latest.id)} rdvs={rdvs} produitsStock={Object.keys(stock)} contrats={contrats} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onSaveLivraison={saveLivraison} onDeleteLivraison={deleteLivraison} onUpdateStatutLivraison={updateStatutLivraison} onClose={()=>setFicheClient(null)} onEdit={()=>{setEditClient(latest);setShowFormClient(true);setFicheClient(null);}} onDelete={()=>deleteClient(latest.id)} onDeletePassage={deletePassage} onAddPassage={()=>openAddPassageFromClient(latest.id)} onEditPassage={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddRdv={()=>{setEditRdv({clientId:latest.id});setShowFormRdv(true);}} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} onDeleteRdv={deleteRdv}/>;
+        return <FicheClient client={latest} passages={passages} livraisons={livraisons.filter(l=>l.clientId===latest.id)} rdvs={rdvs} produitsStock={Object.keys(stock)} contrats={contrats} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onUpdateClient={c=>{ setClients(prev=>{ const next=prev.map(x=>x.id===c.id?c:x); saveClients(next); return next; }); setFicheClient(c); }} onSaveLivraison={saveLivraison} onDeleteLivraison={deleteLivraison} onUpdateStatutLivraison={updateStatutLivraison} onClose={()=>setFicheClient(null)} onEdit={()=>{setEditClient(latest);setShowFormClient(true);setFicheClient(null);}} onDelete={()=>deleteClient(latest.id)} onDeletePassage={deletePassage} onAddPassage={()=>openAddPassageFromClient(latest.id)} onEditPassage={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddRdv={()=>{setEditRdv({clientId:latest.id});setShowFormRdv(true);}} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} onDeleteRdv={deleteRdv}/>;
       })()}
 
       {showFormClient&&<FormClient initial={editClient} clients={clients} onSave={saveClient} onClose={()=>{setShowFormClient(false);setEditClient(null);}}/>}
