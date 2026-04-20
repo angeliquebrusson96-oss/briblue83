@@ -524,6 +524,77 @@ const GlobalStyles = () => (
   `}</style>
 );
 
+
+// ═══════════════════════════════════════════
+// SYSTÈME TOAST + CONFIRM (remplace alert/confirm)
+// ═══════════════════════════════════════════
+const toastListeners = [];
+function subscribeToast(fn) { toastListeners.push(fn); return ()=>{ const i=toastListeners.indexOf(fn); if(i>=0) toastListeners.splice(i,1); }; }
+function showToast(msg, type="info") { toastListeners.forEach(fn=>fn({msg, type, id:Date.now()+Math.random()})); }
+function toastSuccess(msg) { showToast(msg,"success"); }
+function toastError(msg)   { showToast(msg,"error"); }
+function toastInfo(msg)    { showToast(msg,"info"); }
+function toastWarn(msg)    { showToast(msg,"warn"); }
+
+const confirmListeners = [];
+function subscribeConfirm(fn) { confirmListeners.push(fn); return ()=>{ const i=confirmListeners.indexOf(fn); if(i>=0) confirmListeners.splice(i,1); }; }
+function showConfirm(msg, onOk, onCancel) { confirmListeners.forEach(fn=>fn({msg, onOk, onCancel, id:Date.now()+Math.random()})); }
+
+function ToastContainer() {
+  const [toasts, setToasts] = useState([]);
+  useEffect(()=>{
+    return subscribeToast(t=>{
+      setToasts(p=>[...p,t]);
+      setTimeout(()=>setToasts(p=>p.filter(x=>x.id!==t.id)), 3800);
+    });
+  },[]);
+  const STYLES = {
+    success:{bg:"#ecfdf5",border:"#6ee7b7",icon:"✅",color:"#065f46"},
+    error:  {bg:"#fef2f2",border:"#fca5a5",icon:"❌",color:"#991b1b"},
+    warn:   {bg:"#fffbeb",border:"#fcd34d",icon:"⚠️",color:"#92400e"},
+    info:   {bg:"#eff6ff",border:"#93c5fd",icon:"ℹ️",color:"#1e40af"},
+  };
+  if(!toasts.length) return null;
+  return (
+    <div style={{position:"fixed",top:16,left:"50%",transform:"translateX(-50%)",zIndex:99999,display:"flex",flexDirection:"column",gap:8,minWidth:280,maxWidth:"92vw",pointerEvents:"none"}}>
+      {toasts.map(t=>{
+        const s=STYLES[t.type]||STYLES.info;
+        return (
+          <div key={t.id} className="scale-in" style={{display:"flex",alignItems:"center",gap:10,padding:"12px 18px",borderRadius:14,background:s.bg,border:"1.5px solid "+s.border,boxShadow:"0 8px 32px rgba(0,0,0,0.13)",pointerEvents:"all",fontFamily:"Inter,sans-serif"}}>
+            <span style={{fontSize:17,flexShrink:0}}>{s.icon}</span>
+            <span style={{fontSize:13,fontWeight:600,color:s.color,lineHeight:1.4}}>{t.msg}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ConfirmModal() {
+  const [item, setItem] = useState(null);
+  useEffect(()=>{
+    return subscribeConfirm(c=>setItem(c));
+  },[]);
+  if(!item) return null;
+  const handle = (ok) => {
+    setItem(null);
+    if(ok && item.onOk) item.onOk();
+    if(!ok && item.onCancel) item.onCancel();
+  };
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:99998,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>handle(false)}>
+      <div className="scale-in" onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:18,padding:"28px 24px",maxWidth:360,width:"100%",boxShadow:"0 20px 60px rgba(0,0,0,0.2)",fontFamily:"Inter,sans-serif"}}>
+        <div style={{fontSize:36,textAlign:"center",marginBottom:12}}>🗑️</div>
+        <div style={{fontSize:15,fontWeight:700,color:"#0c1222",textAlign:"center",marginBottom:8,lineHeight:1.4}}>{item.msg}</div>
+        <div style={{display:"flex",gap:10,marginTop:20}}>
+          <button onClick={()=>handle(false)} style={{flex:1,padding:"12px",borderRadius:10,background:"#f1f5f9",border:"1.5px solid #e2e8f0",cursor:"pointer",fontWeight:700,fontSize:14,color:"#64748b",fontFamily:"inherit"}}>Annuler</button>
+          <button onClick={()=>handle(true)} style={{flex:1,padding:"12px",borderRadius:10,background:"linear-gradient(135deg,#ef4444,#dc2626)",border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#fff",fontFamily:"inherit",boxShadow:"0 4px 14px #dc262644"}}>Supprimer</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // COMPOSANTS DE BASE
 function Avatar({ nom, size=40, photo }) {
   if (photo) return <img src={photo} alt={nom} style={{width:size,height:size,borderRadius:size*0.3,objectFit:"cover",flexShrink:0,border:"2px solid "+DS.border}}/>;
@@ -882,7 +953,7 @@ function FormClient({ initial, clients, onSave, onClose }) {
       </Section>
       <div style={{display:"flex",gap:10}}>
         <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
-        <BtnPrimary onClick={()=>{ if(!f.nom.trim()) return alert("Nom requis"); const prixCalc=totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0); onSave({...f, prix:prixCalc}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
+        <BtnPrimary onClick={()=>{ if(!f.nom.trim()){ toastWarn("Nom du client requis"); return; } const prixCalc=totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0); onSave({...f, prix:prixCalc}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
       </div>
     </Modal>
   );
@@ -941,7 +1012,7 @@ async function envoyerEmailLivraison(livraison, client) {
   const RESEND_API_KEY = "re_FLTMeUdh_vL8QGqJhP2C293WEVCm9c7rh";
   const FROM = "rapport-piscine@briblue83.com";
 
-  if (!client?.email) { alert("Aucun email renseigné pour ce client."); return; }
+  if (!client?.email) { toastWarn("Aucun email renseigné pour ce client."); return; }
 
   const dateStr = new Date(livraison.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"});
   const filename = `BonLivraison_BRIBLUE_${client?.nom?.replace(/\s/g,"_")||"client"}_${livraison.date}.html`;
@@ -967,13 +1038,13 @@ async function envoyerEmailLivraison(livraison, client) {
     const data = await res.json();
 
     if (res.ok) {
-      alert(`✅ Email envoyé avec succès à ${client.email} !\n\nLe bon de livraison est en pièce jointe.`);
+      toastSuccess(`Email envoyé à ${client.email} !`);
     } else {
       console.error("Resend error:", data);
-      alert(`❌ Erreur envoi : ${data?.message || JSON.stringify(data)}`);
+      toastError(`Erreur envoi : ${data?.message || JSON.stringify(data)}`);
     }
   } catch(err) {
-    alert(`❌ Erreur réseau : ${err.message}`);
+    toastError(`Erreur réseau : ${err.message}`);
   }
 }
 
@@ -1207,7 +1278,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
               style={{padding:"11px 20px",borderRadius:DS.radiusSm,background:(STEP_INFO[step]||STEP_INFO[STEPS-1]).color,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,boxShadow:`0 3px 10px ${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}33`}}>
               {(STEP_INFO[step]||STEP_INFO[STEPS-1]).l} {Ico.next(13,"#fff")}
             </button>
-          : <button onClick={()=>{if(!f.clientId)return alert("Client requis");if(!f.date)return alert("Date requise");onSave({...f,id:isEdit?f.id:uid()});}}
+          : <button onClick={()=>{if(!f.clientId){ toastWarn("Client requis"); return; } if(!f.date){ toastWarn("Date requise"); return; }onSave({...f,id:isEdit?f.id:uid()});}}
               style={{padding:"11px 20px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#059669,#0d9488)",border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,boxShadow:"0 3px 10px rgba(5,150,105,0.3)"}}>
               {Ico.save(14,"#fff")} Enregistrer
             </button>
@@ -1274,7 +1345,7 @@ function FormRdv({ initial, clients, onSave, onClose }) {
       </Section>
       <div style={{display:"flex",gap:10}}>
         <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
-        <BtnPrimary onClick={()=>{ if(!f.date) return alert("Date requise"); onSave({...f,id:isEdit?f.id:uid()}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
+        <BtnPrimary onClick={()=>{ if(!f.date){ toastWarn("Date requise"); return; } onSave({...f,id:isEdit?f.id:uid()}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
       </div>
     </Modal>
   );
@@ -1494,7 +1565,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
               {Ico.plus(13,DS.blue)} Saisir un passage
             </button>
             {passC.length>0&&onDeletePassage&&(
-              <button onClick={()=>{if(confirm(`Supprimer TOUS les ${passC.length} passages de ce client ?`))passC.forEach(p=>onDeletePassage(p.id));}}
+              <button onClick={()=>showConfirm(`Supprimer TOUS les ${passC.length} passages de ce client ?`, ()=>passC.forEach(p=>onDeletePassage(p.id)))}
                 style={{padding:"11px 14px",borderRadius:DS.radiusSm,background:DS.redSoft,border:"1px solid #fca5a5",cursor:"pointer",fontWeight:700,fontSize:13,color:DS.red,fontFamily:"inherit",display:"flex",alignItems:"center",gap:5}}>
                 {Ico.trash(13,DS.red)} Tout supprimer
               </button>
@@ -1546,7 +1617,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                     <button onClick={()=>onEditPassage&&onEditPassage(p)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(12,DS.mid)} Modifier</button>
                     <button onClick={(e)=>{e.stopPropagation();ouvrirRapport(p,client);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.blueSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.blue,fontFamily:"inherit",fontWeight:700}}>{Ico.pdf(12,DS.blue)} Rapport</button>
                     {client.email&&<button onClick={(e)=>{e.stopPropagation();envoyerEmail(p,client,onUpdatePassageStatus);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.green,fontFamily:"inherit",fontWeight:700}}>{Ico.send(12,DS.green)} Email</button>}
-                    {onDeletePassage&&<button onClick={(e)=>{e.stopPropagation();if(confirm("Supprimer ce passage ?"))onDeletePassage(p.id);}} className="btn-hover" style={{padding:"6px 8px",borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(12,DS.red)}</button>}
+                    {onDeletePassage&&<button onClick={(e)=>{e.stopPropagation();showConfirm("Supprimer ce passage ?",()=>onDeletePassage(p.id));}} className="btn-hover" style={{padding:"6px 8px",borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(12,DS.red)}</button>}
                   </div>
                 </Card>
               );
@@ -1587,7 +1658,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                   <div style={{display:"flex",gap:6,marginTop:10,paddingTop:8,borderTop:"1px solid "+DS.border}}>
                     <button onClick={()=>onEditRdv&&onEditRdv(r)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(12,DS.mid)} Modifier</button>
                     <button onClick={()=>exportRdvToICS(r,client)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.purpleSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.purple,fontFamily:"inherit",fontWeight:700}}>{Ico.download(12,DS.purple)} Calendrier</button>
-                    <button onClick={()=>{if(confirm("Supprimer ce RDV ?"))onDeleteRdv&&onDeleteRdv(r.id);}} style={{width:32,borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(12,DS.red)}</button>
+                    <button onClick={()=>showConfirm("Supprimer ce RDV ?",()=>onDeleteRdv&&onDeleteRdv(r.id))} style={{width:32,borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(12,DS.red)}</button>
                   </div>
                 </div>
               );
@@ -1638,7 +1709,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                       ? <button onClick={()=>envoyerEmailLivraison(l, client)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.green,fontFamily:"inherit",fontWeight:700}}>{Ico.send(12,DS.green)} Email</button>
                       : <div style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:DS.mid,fontWeight:500,gap:4}}>{Ico.mail(11,DS.mid)} Pas d'email</div>
                     }
-                    <button onClick={()=>{if(confirm("Supprimer cette livraison ?"))onDeleteLivraison(l.id);}} style={{width:32,borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(12,DS.red)}</button>
+                    <button onClick={()=>showConfirm("Supprimer cette livraison ?",()=>onDeleteLivraison(l.id))} style={{width:32,borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(12,DS.red)}</button>
                   </div>
                 </Card>
               );
@@ -2061,10 +2132,10 @@ function ouvrirContrat(client, sigPrestataire="", sigClient="") {
 }
 
 async function envoyerContratSignature(client) {
-  if (!client?.email) { alert("Aucun email renseigné pour ce client."); return; }
+  if (!client?.email) { toastWarn("Aucun email renseigné pour ce client."); return; }
 
   // Confirmation avant envoi
-  if (!confirm(`Envoyer le contrat à signer à :\n\n${client.nom}\n${client.email}\n\nConfirmer ?`)) return;
+  // confirm replaced by modal — called from button directly
 
   const sigLink = `${window.location.origin}/sign.html?clientId=${client.id}&contractId=CT-${client.id}`;
   const dateStr = new Date().toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"});
@@ -2122,11 +2193,11 @@ async function envoyerContratSignature(client) {
           }),
         });
       } catch(e) {}
-      alert(`✅ Email envoyé à ${client.email} !\n\nLe client recevra un lien pour signer son contrat.`);
+      toastSuccess(`Contrat envoyé à ${client.email} !`);
     }
-    else alert(`❌ Erreur : ${data?.message}`);
+    else toastError(`Erreur : ${data?.message}`);
   } catch(err) {
-    alert(`❌ Erreur réseau : ${err.message}`);
+    toastError(`Erreur réseau : ${err.message}`);
   }
 }
 
@@ -2320,7 +2391,7 @@ function ouvrirRapport(passage, client) {
 async function envoyerEmail(passage, client, onSent) {
   const FROM = "rapport-piscine@briblue83.com";
 
-  if (!client?.email) { alert("Aucun email renseigné pour ce client."); return; }
+  if (!client?.email) { toastWarn("Aucun email renseigné pour ce client."); return; }
 
   const dateStr = new Date(passage.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"});
   const htmlRapport = genererHTMLRapport(passage, client);
@@ -2374,14 +2445,14 @@ async function envoyerEmail(passage, client, onSent) {
 
     if (res.ok) {
       if (onSent) onSent({ ...passage, rapportStatut: "envoye", rapportEnvoyeAt: new Date().toISOString() });
-      alert(`✅ Email envoyé avec succès à ${client.email} !`);
+      toastSuccess(`Fiche envoyée à ${client.email} !`);
     } else {
       console.error("Resend error:", data);
-      alert(`❌ Erreur envoi : ${data?.message || JSON.stringify(data)}`);
+      toastError(`Erreur envoi : ${data?.message || JSON.stringify(data)}`);
     }
   } catch(err) {
     console.error("Fetch error:", err);
-    alert(`❌ Erreur réseau : ${err.message}`);
+    toastError(`Erreur réseau : ${err.message}`);
   }
 }
 
@@ -2450,7 +2521,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
   const cl=Number(f.tChlore)||Number(f.chloreLibre);
 
   const handleSave = () => {
-    if(!f.clientId||!f.date) return alert("Client et date requis");
+    if(!f.clientId||!f.date){ toastWarn("Client et date requis"); return; }
     const isSAVsave = f.type==="SAV";
     const isDevissave = f.type==="Demande de devis";
     const isSimplifiedSave = isSAVsave || isDevissave;
@@ -3978,7 +4049,7 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                       <button onClick={()=>onEdit(p)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>
                         {Ico.edit(13,DS.mid)} Modifier
                       </button>
-                      <button onClick={()=>{if(confirm("Supprimer ce passage ?"))onDelete(p.id)}} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.red,fontFamily:"inherit",fontWeight:700}}>
+                      <button onClick={()=>showConfirm("Supprimer ce passage ?",()=>onDelete(p.id))} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.red,fontFamily:"inherit",fontWeight:700}}>
                         {Ico.trash(13,DS.red)} Supprimer
                       </button>
                     </div>
@@ -4043,7 +4114,7 @@ function PageRdv({ clients, rdvs, onAdd, onEdit, onDelete }) {
                     <div style={{display:"flex",gap:6,marginTop:10,paddingTop:8,borderTop:"1px solid "+DS.border}}>
                       <button onClick={()=>onEdit(r)} className="btn-hover" style={{flex:1,padding:"7px",borderRadius:10,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(13,DS.mid)} Modifier</button>
                       <button onClick={()=>exportRdvToICS(r,c)} className="btn-hover" style={{flex:1,padding:"7px",borderRadius:10,background:DS.purpleSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.purple,fontFamily:"inherit",fontWeight:700}}>{Ico.download(13,DS.purple)} Calendrier</button>
-                      <button onClick={()=>{if(confirm("Supprimer ce RDV ?"))onDelete(r.id)}} className="btn-hover" style={{width:34,height:34,borderRadius:10,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(13,DS.red)}</button>
+                      <button onClick={()=>showConfirm("Supprimer ce RDV ?",()=>onDelete(r.id))} className="btn-hover" style={{width:34,height:34,borderRadius:10,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(13,DS.red)}</button>
                     </div>
                   </div>
                 </div>
@@ -4156,7 +4227,7 @@ function ModalStock({ stock, onClose, onUpdateStock, onAddProduit, onDeleteProdu
                   <button onClick={()=>onUpdateStock(p, qty+1)} style={{width:28,height:28,borderRadius:8,border:"1px solid "+DS.blue,background:DS.blueSoft,cursor:"pointer",fontSize:16,fontWeight:700,color:DS.blue,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
                 </div>
                 {!PRODUITS_DEFAUT.includes(p) && (
-                  <button onClick={()=>{if(confirm(`Supprimer "${p}" du stock ?`))onDeleteProduit(p);}} style={{width:28,height:28,borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(12,DS.red)}</button>
+                  <button onClick={()=>showConfirm(`Supprimer "${p}" du stock ?`,()=>onDeleteProduit(p))} style={{width:28,height:28,borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(12,DS.red)}</button>
                 )}
               </div>
             );
@@ -4250,7 +4321,7 @@ export default function App() {
           playNotifSound();
           const cli = clients.find(cl => cl.id === newSig.clientId);
           const msg = newSig.statut === "signe_complet" ? `✅ Contrat co-signé par ${cli?.nom||newSig.clientId} !` : `📝 ${cli?.nom||newSig.clientId} a signé son contrat — votre signature est requise.`;
-          if (cli) alert(msg);
+          if (cli) toastInfo(msg);
         }
         return ct;
       });
@@ -4275,7 +4346,7 @@ export default function App() {
   const handleLogout = useCallback(()=>{ try{sessionStorage.removeItem("bb_auth");}catch{} setLoggedIn(false);setReady(false);setClients([]);setPassages([]);setLivraisons([]);setRdvs([]); },[]);
 
   const saveClient = useCallback(c=>{ setClients(prev=>{ const next=prev.find(x=>x.id===c.id)?prev.map(x=>x.id===c.id?c:x):[...prev,c]; saveClients(next); return next; }); setShowFormClient(false);setEditClient(null);setFicheClient(c); },[saveClients]);
-  const deleteClient = useCallback(id=>{ if(!confirm("Supprimer ce client ?"))return; setClients(prev=>{ const next=prev.filter(x=>x.id!==id); saveClients(next); return next; }); setPassages(prev=>{ const next=prev.filter(x=>x.clientId!==id); savePassages(next); return next; }); setFicheClient(null); },[saveClients,savePassages]);
+  const deleteClient = useCallback(id=>{ showConfirm("Supprimer ce client et tous ses passages ?", ()=>{ setClients(prev=>{ const next=prev.filter(x=>x.id!==id); saveClients(next); return next; }); setPassages(prev=>{ const next=prev.filter(x=>x.clientId!==id); savePassages(next); return next; }); setFicheClient(null); }); },[saveClients,savePassages]);
   const savePassage = useCallback(p=>{ setPassages(prev=>{ const next=prev.find(x=>x.id===p.id)?prev.map(x=>x.id===p.id?p:x):[...prev,p]; savePassages(next); return next; }); setShowFormPassage(false);setEditPassage(null); },[savePassages]);
   const updatePassageRapportStatus = useCallback((passageMaj) => {
     setPassages(prev => prev.map(x => x.id === passageMaj.id ? { ...x, ...passageMaj } : x));
@@ -4323,7 +4394,9 @@ export default function App() {
   const nbAlertes = useMemo(()=>clients.filter(c=>alerteClient(c,passages)!=="ok").length,[clients,passages]);
   const nbAFacturer = useMemo(()=>livraisons.filter(l=>l.statut==="aFacturer").length,[livraisons]);
 
-  if(!loggedIn) return <><GlobalStyles/><LoginScreen onLogin={handleLogin}/></>;
+  if(!loggedIn) return <><GlobalStyles/>
+      <ToastContainer/>
+      <ConfirmModal/><LoginScreen onLogin={handleLogin}/></>;
 
   if(!ready) return (
     <>
