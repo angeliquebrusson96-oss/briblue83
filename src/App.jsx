@@ -4267,6 +4267,8 @@ export default function App() {
   const [showFormRdv, setShowFormRdv] = useState(false);
   const [editRdv, setEditRdv] = useState(null);
   const [showModalAlertes, setShowModalAlertes] = useState(false);
+  const [dismissedAlertes, setDismissedAlertes] = useState(()=>{ try{ return JSON.parse(localStorage.getItem("briblue_dismissed_alertes")||"[]"); }catch{return [];} });
+  const dismissAlerte = (clientId) => { setDismissedAlertes(prev=>{ const next=[...new Set([...prev,clientId])]; try{ localStorage.setItem("briblue_dismissed_alertes", JSON.stringify(next)); }catch{} return next; }); };
   const prevTaskCount = useRef(0);
   const isMobile = useIsMobile();
 
@@ -4391,7 +4393,7 @@ export default function App() {
 
   const openAddClient = useCallback(()=>{ setEditClient(null); setShowFormClient(true); },[]);
 
-  const nbAlertes = useMemo(()=>clients.filter(c=>alerteClient(c,passages)!=="ok").length,[clients,passages]);
+  const nbAlertes = useMemo(()=>clients.filter(c=>alerteClient(c,passages)!=="ok"&&!dismissedAlertes.includes(c.id)).length,[clients,passages,dismissedAlertes]);
   const nbAFacturer = useMemo(()=>livraisons.filter(l=>l.statut==="aFacturer").length,[livraisons]);
 
   if(!loggedIn) return <><GlobalStyles/>
@@ -4446,31 +4448,31 @@ export default function App() {
             <div style={{width:7,height:7,borderRadius:"50%",background:online?"#4ade80":"#f87171",boxShadow:online?"0 0 6px #4ade80":"0 0 6px #f87171"}}/>
             {pendingCount>0&&<span style={{fontSize:10,fontWeight:700,color:"#fde68a"}}>{pendingCount}</span>}
           </div>
-          <button onClick={()=>setShowImport(true)} title="Import Connecteam" style={{width:isMobile?28:34,height:isMobile?28:34,borderRadius:8,background:"rgba(255,255,255,0.15)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <button onClick={()=>setShowImport(true)} title="Import Connecteam" style={{width:isMobile?36:42,height:isMobile?36:42,borderRadius:10,background:"rgba(255,255,255,0.15)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           </button>
           {/* Stock */}
-          <button onClick={()=>setShowStock(true)} className="btn-hover" title="Stock produits" style={{position:"relative",width:isMobile?28:34,height:isMobile?28:34,borderRadius:8,background:"rgba(255,255,255,0.15)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-            {Ico.cart(16,"rgba(255,255,255,0.85)")}
-            {nbStockBas>0&&<span style={{position:"absolute",top:-3,right:-3,minWidth:16,height:16,borderRadius:8,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px"}}>{nbStockBas}</span>}
+          <button onClick={()=>setShowStock(true)} className="btn-hover" title="Stock produits" style={{position:"relative",width:isMobile?36:42,height:isMobile?36:42,borderRadius:10,background:"rgba(255,255,255,0.15)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            {Ico.cart(20,"rgba(255,255,255,0.85)")}
+            {nbStockBas>0&&<span style={{position:"absolute",top:-4,right:-4,minWidth:18,height:18,borderRadius:9,background:"#ef4444",color:"#fff",fontSize:10,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 4px"}}>{nbStockBas}</span>}
           </button>
           {/* Alertes */}
           {nbAlertes>0&&(
-            <button onClick={()=>setShowModalAlertes(true)} className="btn-hover" title="Alertes" style={{position:"relative",width:isMobile?28:34,height:isMobile?28:34,borderRadius:8,background:"rgba(255,255,255,0.15)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              {Ico.alert(16,"rgba(255,255,255,0.85)")}
-              <span style={{position:"absolute",top:-3,right:-3,minWidth:16,height:16,borderRadius:8,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px"}}>{nbAlertes}</span>
+            <button onClick={()=>setShowModalAlertes(true)} className="btn-hover" title="Alertes" style={{position:"relative",width:isMobile?36:42,height:isMobile?36:42,borderRadius:10,background:"rgba(255,255,255,0.15)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              {Ico.alert(20,"rgba(255,255,255,0.85)")}
+              <span style={{position:"absolute",top:-4,right:-4,minWidth:18,height:18,borderRadius:9,background:"#ef4444",color:"#fff",fontSize:10,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 4px"}}>{nbAlertes}</span>
             </button>
           )}
           {/* Nouveau passage */}
-          <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} className="btn-hover" title="Fiche Entretien" style={{height:isMobile?28:34,padding:isMobile?"0 6px":"0 10px",borderRadius:8,background:"rgba(255,255,255,0.15)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:5,flexShrink:0}}>
-            <IconFiche size={16} color="#fff"/>
-            {!isMobile&&<span style={{fontSize:12,fontWeight:700,color:"rgba(255,255,255,0.9)"}}>Fiche Entretien</span>}
+          <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} className="btn-hover" title="Fiche Entretien" style={{height:isMobile?36:42,padding:isMobile?"0 10px":"0 16px",borderRadius:10,background:"rgba(255,255,255,0.2)",border:"1.5px solid rgba(255,255,255,0.3)",cursor:"pointer",display:"flex",alignItems:"center",gap:7,flexShrink:0}}>
+            <IconFiche size={20} color="#fff"/>
+            {!isMobile&&<span style={{fontSize:13,fontWeight:800,color:"#fff",letterSpacing:.2}}>Fiche Entretien</span>}
           </button>
           {/* Séparateur vertical */}
           <div style={{width:1,height:20,background:"rgba(255,255,255,0.2)",flexShrink:0}}/>
           {/* Déconnexion */}
-          <button onClick={handleLogout} className="btn-hover" title="Déconnexion" style={{width:isMobile?28:34,height:isMobile?28:34,borderRadius:8,background:"rgba(255,255,255,0.08)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <button onClick={handleLogout} className="btn-hover" title="Déconnexion" style={{width:isMobile?36:42,height:isMobile?36:42,borderRadius:10,background:"rgba(255,255,255,0.08)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            <svg width={19} height={19} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           </button>
         </div>
       </div>
@@ -4566,11 +4568,17 @@ export default function App() {
 
       {/* MODAL ALERTES */}
       {showModalAlertes&&(()=>{
-        const alertes = clients.filter(c=>alerteClient(c,passages)!=="ok");
+        const alertes = clients.filter(c=>alerteClient(c,passages)!=="ok"&&!dismissedAlertes.includes(c.id));
         return (
           <Modal title={`Alertes (${alertes.length})`} onClose={()=>setShowModalAlertes(false)}>
+            {dismissedAlertes.length>0&&(
+              <button onClick={()=>{ setDismissedAlertes([]); try{localStorage.removeItem("briblue_dismissed_alertes");}catch{} }} style={{display:"flex",alignItems:"center",gap:6,marginBottom:12,padding:"7px 14px",borderRadius:8,background:"#f1f5f9",border:"1.5px solid #e2e8f0",cursor:"pointer",fontSize:12,fontWeight:700,color:"#64748b",fontFamily:"inherit"}}>
+                <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                Restaurer {dismissedAlertes.length} alerte{dismissedAlertes.length>1?"s":""} masquée{dismissedAlertes.length>1?"s":""}
+              </button>
+            )}
             {alertes.length===0
-              ? <div style={{textAlign:"center",color:DS.mid,padding:32,fontSize:13}}>Aucune alerte en cours</div>
+              ? <div style={{textAlign:"center",color:DS.mid,padding:32,fontSize:13}}>{dismissedAlertes.length>0?"Toutes les alertes sont masquées":"Aucune alerte en cours"}</div>
               : <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 {alertes.map(c=>{
                   const al=alerteClient(c,passages); const col=AC[al]; const j=daysUntil(c.dateFin);
@@ -4594,8 +4602,12 @@ export default function App() {
                     if(restE > 0 || restC > 0) moisEnRetard.push({m, restE, restC});
                   }
                   return (
-                    <div key={c.id} onClick={()=>{setShowModalAlertes(false);setFicheClient(c);}} className="card-hover" style={{background:col.bg,borderRadius:DS.radius,border:"1.5px solid "+col.bd,cursor:"pointer",overflow:"hidden"}}>
-                      <div style={{display:"flex",alignItems:"center",gap:12,padding:"14px 16px"}}>
+                    <div key={c.id} style={{background:col.bg,borderRadius:DS.radius,border:"1.5px solid "+col.bd,overflow:"hidden",position:"relative"}}>
+                      <button onClick={(e)=>{e.stopPropagation();dismissAlerte(c.id);}} title="Masquer cette alerte" style={{position:"absolute",top:8,right:8,zIndex:2,width:26,height:26,borderRadius:8,background:"rgba(0,0,0,0.08)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} className="btn-hover">
+                        <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      </button>
+                      <div onClick={()=>{setShowModalAlertes(false);setFicheClient(c);}} className="card-hover" style={{cursor:"pointer"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:12,padding:"14px 16px",paddingRight:40}}>
                         <Avatar nom={c.nom} size={42} photo={c.photoPiscine}/>
                         <div style={{flex:1,minWidth:0}}>
                           <div style={{fontWeight:800,fontSize:14,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
@@ -4627,6 +4639,7 @@ export default function App() {
                           </div>
                         </div>
                       )}
+                      </div>
                     </div>
                   );
                 })}
