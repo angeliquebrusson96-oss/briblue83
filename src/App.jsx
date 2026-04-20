@@ -4509,6 +4509,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
   const last = passClient[0]||null;
 
   return (
+    <>
     <div style={{minHeight:"100vh",background:"#f8fafc",fontFamily:"'Nunito',system-ui,sans-serif",maxWidth:480,margin:"0 auto"}}>
       {/* HEADER */}
       <div style={{background:"#0891b2",padding:"22px 20px 18px"}}>
@@ -4608,9 +4609,11 @@ function CarnetPublic({ code, allClients, allPassages }) {
       </div>
 
       {/* MODALE DÉTAIL INTERVENTION */}
+    </div>
+
       {selectedPassage&&(
         <div onClick={()=>setSelectedPassage(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:1000,padding:0}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"22px 22px 0 0",width:"100%",maxWidth:480,padding:"24px 20px 36px",boxShadow:"0 -8px 40px rgba(0,0,0,0.18)"}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"22px 22px 0 0",width:"100%",maxWidth:480,padding:"24px 20px 0",boxShadow:"0 -8px 40px rgba(0,0,0,0.18)",maxHeight:"85vh",overflowY:"auto",WebkitOverflowScrolling:"touch",paddingBottom:"max(36px, env(safe-area-inset-bottom, 36px))"}}>
             {/* Handle */}
             <div style={{width:40,height:4,background:"#e2e8f0",borderRadius:2,margin:"0 auto 20px"}}/>
             {/* Type + date */}
@@ -4671,7 +4674,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
 
             {/* Technicien */}
             {selectedPassage.tech&&(
-              <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8,marginBottom:8}}>
                 <div style={{width:28,height:28,borderRadius:"50%",background:"#0891b2",display:"flex",alignItems:"center",justifyContent:"center"}}>
                   <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 </div>
@@ -4684,7 +4687,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 // ── FIN CARNET ──────────────────────────────────────────────────────────────
