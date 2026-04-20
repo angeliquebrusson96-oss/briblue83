@@ -673,7 +673,7 @@ function Modal({ title, onClose, children, wide }) {
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.35)",zIndex:200,display:"flex",alignItems:isMobile?"flex-end":"center",justifyContent:"center",padding:isMobile?"0":"12px"}}>
       <div className={isMobile?"slide-up":"scale-in"}
-        style={{background:"#eef2f7",borderRadius:isMobile?"24px 24px 0 0":DS.radiusLg,
+        style={{background:"#eef2f7",borderRadius:isMobile?"28px 28px 0 0":DS.radiusLg,
           width:"100%",maxWidth:isMobile?"100%":wide?720:560,
           maxHeight:isMobile?"92dvh":"88vh",
           display:"flex",flexDirection:"column",
@@ -718,7 +718,7 @@ function ProgressBar({ value, max, color=DS.blue, height=6 }) {
 
 function Card({ children, style={}, onClick, className="", id }) {
   return (
-    <div id={id} onClick={onClick} className={onClick?"card-hover":className} style={{background:"#eef2f7",borderRadius:DS.radius,padding:"16px 18px",boxShadow:DS.nmShadow,border:"none",cursor:onClick?"pointer":"default",transition:"all .2s",...style}}>{children}</div>
+    <div id={id} onClick={onClick} className={onClick?"card-hover":className} style={{background:"#eef2f7",borderRadius:18,padding:"16px 18px",boxShadow:"5px 5px 12px rgba(166,210,220,0.6), -4px -4px 9px rgba(255,255,255,0.9)",border:"none",cursor:onClick?"pointer":"default",transition:"all .2s",...style}}>{children}</div>
   );
 }
 
@@ -1425,21 +1425,21 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           </div>
         )}
         {/* Bloc infos client */}
-        <div style={{background:"#1e2937",padding:"14px 18px"}}>
+        <div style={{background:"linear-gradient(135deg,#0891b2 0%,#06b6d4 100%)",padding:"14px 18px 18px"}}>
           <div style={{display:"flex",alignItems:"center",gap:14}}>
             <Avatar nom={client.nom} size={54} photo={null}/>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontWeight:900,fontSize:17,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:-0.3}}>{client.nom}</div>
               <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap",alignItems:"center"}}>
-                <span style={{background:"rgba(56,189,248,0.2)",color:"#7dd3fc",fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:20,border:"1px solid rgba(56,189,248,0.3)"}}>{client.formule}</span>
-                {client.bassin&&<span style={{background:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.7)",fontSize:11,fontWeight:600,padding:"3px 8px",borderRadius:20}}>{client.bassin}{client.volume?" · "+client.volume+"m³":""}</span>}
+                <span style={{background:"rgba(255,255,255,0.2)",color:"#fff",fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:20,border:"1px solid rgba(255,255,255,0.35)"}}>{client.formule}</span>
+                {client.bassin&&<span style={{background:"rgba(255,255,255,0.15)",color:"rgba(255,255,255,0.9)",fontSize:11,fontWeight:600,padding:"3px 8px",borderRadius:20}}>{client.bassin}{client.volume?" · "+client.volume+"m³":""}</span>}
               </div>
             </div>
             <div style={{flexShrink:0}}>
               <div style={{background:col.bg,color:col.tx,fontSize:12,fontWeight:800,padding:"6px 12px",borderRadius:20,border:"1px solid "+col.bd+"55",textAlign:"center"}}>
                 {col.lbl}
               </div>
-              {jours!==null&&<div style={{fontSize:11,color:"rgba(255,255,255,0.55)",textAlign:"center",marginTop:3}}>{jours>=0?jours+"j restants":"Expiré !"}</div>}
+              {jours!==null&&<div style={{fontSize:11,color:"rgba(255,255,255,0.8)",textAlign:"center",marginTop:3}}>{jours>=0?jours+"j restants":"Expiré !"}</div>}
             </div>
           </div>
         </div>
@@ -1448,24 +1448,24 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
       {/* Stats row */}
       <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(2,minmax(0,1fr))":"repeat(4,minmax(0,1fr))",gap:8,marginTop:14,marginBottom:14,width:"100%"}}>
         {/* Entretiens */}
-        <div style={{borderRadius:10,background:"#eef2f7",border:"1px solid #e5e7eb",padding:"10px 8px",display:"flex",flexDirection:"column",gap:4}}>
+        <div style={{borderRadius:14,background:"#eef2f7",border:"none",boxShadow:"5px 5px 10px rgba(166,210,220,0.6), -4px -4px 8px rgba(255,255,255,0.9)",padding:"12px 10px",display:"flex",flexDirection:"column",gap:4}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <span style={{fontSize:9,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5}}>Entretiens</span>
             <span style={{width:20,height:20,borderRadius:6,background:"#f0f9ff",display:"flex",alignItems:"center",justifyContent:"center"}}>🔧</span>
           </div>
           <div style={{fontSize:18,fontWeight:900,color:DS.blue,lineHeight:1}}>{effE}<span style={{fontSize:11,color:DS.mid,fontWeight:400}}>/{totalE}</span></div>
-          <div style={{height:3,background:"#e5e7eb",borderRadius:99,overflow:"hidden"}}>
+          <div style={{height:3,background:"#dde8f0",borderRadius:99,overflow:"hidden"}}>
             <div style={{height:"100%",width:`${totalE>0?Math.min(100,effE/totalE*100):0}%`,background:DS.blue,borderRadius:99,transition:"width .5s"}}/>
           </div>
         </div>
         {/* Contrôles */}
-        <div style={{borderRadius:10,background:"#eef2f7",border:"1px solid #e5e7eb",padding:"10px 8px",display:"flex",flexDirection:"column",gap:4}}>
+        <div style={{borderRadius:14,background:"#eef2f7",border:"none",boxShadow:"5px 5px 10px rgba(166,210,220,0.6), -4px -4px 8px rgba(255,255,255,0.9)",padding:"12px 10px",display:"flex",flexDirection:"column",gap:4}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <span style={{fontSize:9,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5}}>Contrôles</span>
             <span style={{width:20,height:20,borderRadius:6,background:"#f0f9ff",display:"flex",alignItems:"center",justifyContent:"center"}}>💧</span>
           </div>
           <div style={{fontSize:18,fontWeight:900,color:"#0e7490",lineHeight:1}}>{effC}<span style={{fontSize:11,color:DS.mid,fontWeight:400}}>/{totalC}</span></div>
-          <div style={{height:3,background:"#e5e7eb",borderRadius:99,overflow:"hidden"}}>
+          <div style={{height:3,background:"#dde8f0",borderRadius:99,overflow:"hidden"}}>
             <div style={{height:"100%",width:`${totalC>0?Math.min(100,effC/totalC*100):0}%`,background:"#0e7490",borderRadius:99,transition:"width .5s"}}/>
           </div>
         </div>
@@ -1478,12 +1478,12 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           <div style={{fontSize:18,fontWeight:900,color:pct>=100?DS.green:rest>5?"#b45309":DS.blue,lineHeight:1}}>
             {rest>0?rest:pct}<span style={{fontSize:11,fontWeight:400,color:DS.mid}}>{rest>0?" pass.":"%"}</span>
           </div>
-          <div style={{height:3,background:"#e5e7eb",borderRadius:99,overflow:"hidden"}}>
+          <div style={{height:3,background:"#dde8f0",borderRadius:99,overflow:"hidden"}}>
             <div style={{height:"100%",width:`${pct}%`,background:pct>=100?"#059669":"#0891b2",borderRadius:99,transition:"width .5s"}}/>
           </div>
         </div>
         {/* Mensualité */}
-        <div style={{borderRadius:10,background:"#eef2f7",border:"1px solid #e5e7eb",padding:"10px 8px",display:"flex",flexDirection:"column",gap:4}}>
+        <div style={{borderRadius:14,background:"#eef2f7",border:"none",boxShadow:"5px 5px 10px rgba(166,210,220,0.6), -4px -4px 8px rgba(255,255,255,0.9)",padding:"12px 10px",display:"flex",flexDirection:"column",gap:4}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <span style={{fontSize:9,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5}}>Mensualité</span>
             <span style={{width:20,height:20,borderRadius:6,background:"#f0fdf4",display:"flex",alignItems:"center",justifyContent:"center"}}>💶</span>
@@ -1500,9 +1500,9 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
       </div>
 
       {/* Tabs */}
-      <div style={{display:"flex",gap:0,marginBottom:16,background:DS.light,borderRadius:DS.radiusSm,padding:3}}>
+      <div style={{display:"flex",gap:4,marginBottom:16,background:"#e4ecf2",borderRadius:16,padding:4}}>
         {[["infos","Infos"],["saisons","Planning"],["passages",isMobile?"Fiches":"Fiches Entretien"],["rdvs","Rendez-vous"],["livraisons","Livraisons"]].map(([id,l])=>(
-          <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"9px 4px",borderRadius:10,border:"none",cursor:"pointer",fontWeight:tab===id?800:600,fontSize:15,fontFamily:"inherit",background:tab===id?DS.white:"transparent",color:tab===id?DS.dark:DS.mid,boxShadow:tab===id?"0 1px 4px rgba(0,0,0,0.08)":"none",transition:"all .25s"}}>{l}</button>
+          <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"8px 4px",borderRadius:12,border:"none",cursor:"pointer",fontWeight:tab===id?700:500,fontSize:12,fontFamily:"inherit",background:tab===id?"#eef2f7":"transparent",color:tab===id?DS.blue:DS.mid,boxShadow:tab===id?"4px 4px 8px rgba(166,210,220,0.55), -3px -3px 6px rgba(255,255,255,0.85)":"none",transition:"all .2s"}}>{l}</button>
         ))}
       </div>
 
@@ -1517,7 +1517,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
             {ico:Ico.calendar(13,DS.blue),l:"Début",v:client.dateDebut?new Date(client.dateDebut).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}):null},
             {ico:Ico.calendar(13,DS.orange),l:"Fin",v:client.dateFin?new Date(client.dateFin).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}):null},
           ].filter(r=>r.v).map(r=>(
-            <div key={r.l} style={{display:"flex",gap:12,padding:"10px 14px",background:"#eef2f7",borderRadius:10,alignItems:"center",border:"1px solid "+DS.border}}>
+            <div key={r.l} style={{display:"flex",gap:12,padding:"12px 16px",background:"#eef2f7",borderRadius:14,alignItems:"center",border:"none",boxShadow:"4px 4px 8px rgba(166,210,220,0.55), -3px -3px 6px rgba(255,255,255,0.85)"}}>
               <div style={{width:32,height:32,borderRadius:8,background:DS.blueSoft,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{r.ico}</div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,color:DS.mid,fontWeight:600,textTransform:"uppercase",letterSpacing:.5}}>{r.l}</div>
@@ -1647,7 +1647,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                         {p.tech&&<span style={{fontSize:11,color:DS.mid}}>{p.tech}</span>}
                       </div>
                       <div style={{display:"flex",gap:5,paddingTop:8,borderTop:"1px solid "+DS.border,flexWrap:"wrap"}}>
-                        <button onClick={(e)=>{e.stopPropagation();setDetailPassageFiche(p);}} className="btn-hover" style={{flex:1,padding:"5px",borderRadius:8,background:DS.light,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:13,color:DS.dark,fontFamily:"inherit",fontWeight:700}}>{Ico.search(11,DS.mid)} Aperçu</button>
+                        <button onClick={(e)=>{e.stopPropagation();setDetailPassageFiche(p);}} className="btn-hover" style={{flex:1,padding:"5px",borderRadius:8,background:"#eef2f7",border:"none",boxShadow:"3px 3px 6px rgba(166,210,220,0.5), -2px -2px 4px rgba(255,255,255,0.8)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:13,color:DS.dark,fontFamily:"inherit",fontWeight:700}}>{Ico.search(11,DS.mid)} Aperçu</button>
                         <button onClick={(e)=>{e.stopPropagation();onEditPassage&&onEditPassage(p);}} className="btn-hover" style={{flex:1,padding:"5px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:13,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(11,DS.mid)} Modifier</button>
                         <button onClick={(e)=>{e.stopPropagation();ouvrirRapport(p,client);}} className="btn-hover" style={{flex:1,padding:"5px",borderRadius:8,background:DS.blueSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:13,color:DS.blue,fontFamily:"inherit",fontWeight:700}}>{Ico.pdf(11,DS.blue)} Rapport</button>
                         {onDeletePassage&&<button onClick={(e)=>{e.stopPropagation();showConfirm("Supprimer ce passage ?",()=>onDeletePassage(p.id));}} className="btn-hover" style={{padding:"5px 8px",borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(11,DS.red)}</button>}
@@ -1660,7 +1660,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
             </div>;
           })}
         </div>
-        <div style={{display:"flex",justifyContent:"space-between",marginTop:10,padding:"8px 12px",background:DS.dark,borderRadius:DS.radiusSm}}>
+        <div style={{display:"flex",justifyContent:"space-between",marginTop:10,padding:"10px 14px",background:"linear-gradient(135deg,#0891b2,#0e7490)",borderRadius:DS.radiusSm,boxShadow:"0 4px 12px rgba(8,145,178,0.3)"}}>
           <span style={{color:"rgba(255,255,255,0.7)",fontSize:15,fontWeight:600}}>Total annuel</span>
           <span style={{color:"#fff",fontSize:15,fontWeight:800}}>🔧 {totalE}  ·  💧 {totalC}  ·  {total} passages</span>
         </div>
@@ -1729,7 +1729,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                         })}
                       />
                     </div>
-                    <button onClick={(e)=>{e.stopPropagation();setDetailPassageFiche(p);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.dark,fontFamily:"inherit",fontWeight:700}}>{Ico.search(12,DS.mid)} Aperçu</button>
+                    <button onClick={(e)=>{e.stopPropagation();setDetailPassageFiche(p);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:"#eef2f7",border:"none",boxShadow:"3px 3px 6px rgba(166,210,220,0.5), -2px -2px 4px rgba(255,255,255,0.8)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.dark,fontFamily:"inherit",fontWeight:700}}>{Ico.search(12,DS.mid)} Aperçu</button>
                     <button onClick={()=>onEditPassage&&onEditPassage(p)} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>{Ico.edit(12,DS.mid)} Modifier</button>
                     <button onClick={(e)=>{e.stopPropagation();ouvrirRapport(p,client);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.blueSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.blue,fontFamily:"inherit",fontWeight:700}}>{Ico.pdf(12,DS.blue)} Rapport</button>
                     {client.email&&<button onClick={(e)=>{e.stopPropagation();envoyerEmail(p,client,onUpdatePassageStatus);}} className="btn-hover" style={{flex:1,padding:"6px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:15,color:DS.green,fontFamily:"inherit",fontWeight:700}}>{Ico.send(12,DS.green)} Email</button>}
@@ -1890,7 +1890,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
             {Ico.sign(13,contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff")}
             {contratClient?.statut==="signe_complet"?"Signé":contratClient?.statut==="signe_client"?"En attente":"Envoyer"}
           </button>
-          <button onClick={onEdit} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:"#eef2f7",border:"1.5px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:15,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
+          <button onClick={onEdit} className="btn-hover" style={{padding:"12px 6px",borderRadius:DS.radiusSm,background:"#eef2f7",border:"none",boxShadow:"4px 4px 8px rgba(166,210,220,0.6), -3px -3px 7px rgba(255,255,255,0.9)",cursor:"pointer",fontWeight:700,fontSize:15,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
             {Ico.edit(13,DS.dark)} Modifier
           </button>
           <button onClick={onDelete} className="btn-hover" style={{width:44,height:44,borderRadius:DS.radiusSm,background:DS.redSoft,border:"1px solid #fca5a5",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -3647,7 +3647,7 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
       {/* Widget passages du mois — redesigné */}
       <div style={{marginBottom:14,borderRadius:DS.radius,overflow:"hidden",boxShadow:DS.nmShadow,border:"none"}}>
         {/* Header */}
-        <div style={{background:"#eef2f7",padding:"14px 18px",borderBottom:"1px solid "+DS.border}}>
+        <div style={{background:"#eef2f7",padding:"14px 18px 12px",borderBottom:"1px solid #dde8f0"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div>
               <div style={{fontWeight:800,fontSize:16,color:DS.dark,letterSpacing:-0.5}}>{MOIS_L[moisCourant]} {YEAR_NOW}</div>
@@ -3677,7 +3677,7 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
                   <span style={{fontSize:11,color:DS.mid,fontWeight:600}}>Avancement global</span>
                   <span style={{fontSize:12,fontWeight:800,color:pct>=100?DS.green:"#b45309"}}>{pct}%</span>
                 </div>
-                <div style={{height:4,background:"rgba(255,255,255,0.15)",borderRadius:99,overflow:"hidden"}}>
+                <div style={{height:5,background:"#dde8f0",borderRadius:99,overflow:"hidden",boxShadow:"inset 1px 1px 3px rgba(166,210,220,0.4)"}}>
                   <div style={{height:"100%",width:`${pct}%`,background:pct>=100?"#34d399":"linear-gradient(90deg,#fbbf24,#f59e0b)",borderRadius:99,transition:"width .5s"}}/>
                 </div>
               </div>
@@ -3695,7 +3695,7 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
                   style={{display:"flex",alignItems:"center",gap:10,padding:"11px 16px",
                     borderBottom:i<Math.min(tachesRestantes.length,showAllTaches?999:PREVIEW)-1?"1px solid "+DS.border:"none",
                     cursor:"pointer",background:"#eef2f7",transition:"background .15s"}}
-                  onMouseEnter={e=>e.currentTarget.style.background="#e0ecf4"}
+                  onMouseEnter={e=>e.currentTarget.style.background="#e4eef5"}
                   onMouseLeave={e=>e.currentTarget.style.background="#eef2f7"}>
                   <Avatar nom={client.nom} size={36} photo={client.photoPiscine}/>
                   <div style={{flex:1,minWidth:0}}>
@@ -3854,12 +3854,12 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
   return (
     <div>
       <div style={{display:"flex",gap:8,marginBottom:14}}>
-        <div style={{flex:1,background:"#0891b2",borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:32,height:32,borderRadius:8,background:"rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.clients(16,"#fff")}</div>
+        <div style={{flex:1,background:"linear-gradient(135deg,#0891b2,#06b6d4)",borderRadius:16,padding:"14px 16px",display:"flex",alignItems:"center",gap:10,boxShadow:"4px 4px 12px rgba(8,145,178,0.35), -2px -2px 6px rgba(255,255,255,0.5)"}}>
+          <div style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.clients(16,"#fff")}</div>
           <div><div style={{fontSize:18,fontWeight:800,color:"#fff"}}>{totalAll}</div><div style={{fontSize:10,color:"rgba(255,255,255,0.6)"}}>Clients</div></div>
         </div>
         {alertCount>0&&<div style={{background:"#eef2f7",borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8,border:"1px solid #fecaca"}}>
-          <div style={{width:32,height:32,borderRadius:8,background:"#fff1f2",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.alert(15,DS.red)}</div>
+          <div style={{width:36,height:36,borderRadius:10,background:"#fee2e2",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.alert(15,DS.red)}</div>
           <div><div style={{fontSize:18,fontWeight:800,color:DS.red}}>{alertCount}</div><div style={{fontSize:11,color:DS.red,fontWeight:600}}>Alertes</div></div>
         </div>}
       </div>
@@ -4636,7 +4636,7 @@ export default function App() {
         <>
           {/* TITRE mobile */}
           <div style={{padding:"16px 16px 4px"}}>
-            <h2 style={{margin:0,fontSize:20,fontWeight:900,color:DS.dark,letterSpacing:-0.5}}>{PAGE_LABELS[page]}</h2>
+            <h2 style={{margin:0,fontSize:22,fontWeight:900,color:DS.dark,letterSpacing:-0.5}}>{PAGE_LABELS[page]}</h2>
             {page==="dashboard"&&<p style={{margin:"2px 0 0",color:DS.mid,fontSize:12,fontWeight:500}}>Aujourd'hui tâchons de ne rien oublier ;)</p>}
           </div>
           <div style={{padding:"6px 16px 110px",overflowX:"hidden"}}>
@@ -4681,7 +4681,7 @@ export default function App() {
           <div style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",minWidth:0}}>
             <div style={{padding:"20px 32px 80px",maxWidth:860,margin:"0 auto"}}>
               <div style={{marginBottom:16}}>
-                <h2 style={{margin:0,fontSize:24,fontWeight:900,color:DS.dark,letterSpacing:-0.5}}>{PAGE_LABELS[page]}</h2>
+                <h2 style={{margin:0,fontSize:26,fontWeight:900,color:DS.dark,letterSpacing:-0.5}}>{PAGE_LABELS[page]}</h2>
                 {page==="dashboard"&&<p style={{margin:"2px 0 0",color:DS.mid,fontSize:13,fontWeight:500}}>Aujourd'hui tâchons de ne rien oublier ;)</p>}
               </div>
               {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}}/>}
