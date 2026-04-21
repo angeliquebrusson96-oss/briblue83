@@ -190,24 +190,34 @@ const STATUT_LIV = {
   paye:      { label:"Payé",       color:"#059669", bg:"#d1fae5" },
 };
 
-// RESPONSIVE HOOK — Safari/iOS compatible
-function useIsMobile() {
-  const [m, setM] = useState(() => {
-    try { return window.innerWidth < 768; } catch { return false; }
-  });
+// ═══════════════════════════════════════════════════════
+// PLATFORM DETECTION — iOS / Android / PC adaptatif
+// ═══════════════════════════════════════════════════════
+function detectPlatform() {
+  try {
+    const ua = navigator.userAgent || "";
+    const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const isAndroid = /Android/.test(ua);
+    const isMobile = window.innerWidth < 768 || isIOS || isAndroid;
+    const isTablet = !isMobile && window.innerWidth < 1024;
+    return { isIOS, isAndroid, isMobile, isTablet, isDesktop: !isMobile && !isTablet };
+  } catch { return { isIOS:false, isAndroid:false, isMobile:false, isTablet:false, isDesktop:true }; }
+}
+
+function usePlatform() {
+  const [p, setP] = useState(detectPlatform);
   useEffect(()=>{
-    const h = () => setM(window.innerWidth < 768);
+    const h = () => setP(detectPlatform());
     window.addEventListener("resize", h, {passive:true});
     window.addEventListener("orientationchange", h, {passive:true});
-    // iOS Safari: déclencher au chargement complet
-    window.addEventListener("load", h, {once:true,passive:true});
-    return ()=>{
-      window.removeEventListener("resize", h);
-      window.removeEventListener("orientationchange", h);
-    };
+    window.addEventListener("load", h, {once:true, passive:true});
+    return ()=>{ window.removeEventListener("resize", h); window.removeEventListener("orientationchange", h); };
   },[]);
-  return m;
+  return p;
 }
+
+// Alias rétrocompat
+function useIsMobile() { return usePlatform().isMobile; }
 
 function useOnlineStatus() {
   const [online, setOnline] = useState(navigator.onLine);
@@ -222,22 +232,15 @@ function useOnlineStatus() {
   return { online, pendingCount };
 }
 
-// STORAGE — Firebase Firestore + cache localStorage TTL 30min
-const CACHE_TTL_MS = 30 * 60 * 1000;
-async function load(key, fallback) {
-  try { const c=localStorage.getItem("briblue_"+key),ts=localStorage.getItem("briblue_ts_"+key); if(c&&ts&&(Date.now()-Number(ts))<CACHE_TTL_MS) return JSON.parse(c); } catch {}
-  try {
-    if (key==="bb_passages_v2") {
-      const passages=await loadAllPassages();
-      if(passages.length>0){try{localStorage.setItem("briblue_"+key,JSON.stringify(passages));localStorage.setItem("briblue_ts_"+key,String(Date.now()));}catch{} return passages;}
-      try{const ls=localStorage.getItem("briblue_"+key);if(ls)return JSON.parse(ls);}catch{} return fallback;
-    }
-    const snap=await getDoc(APP_DOC);
-    if(snap.exists()){const allData=snap.data();if(key in allData){const val=allData[key];try{localStorage.setItem("briblue_"+key,JSON.stringify(val));localStorage.setItem("briblue_ts_"+key,String(Date.now()));}catch{} return val;}}
-    try{const ls=localStorage.getItem("briblue_"+key);if(ls)return JSON.parse(ls);}catch{} return fallback;
-  } catch {
-    try{const ls=localStorage.getItem("briblue_"+key);if(ls)return JSON.parse(ls);}catch{} return fallback;
-  }
+// STORAGE — Firebase + cache TTL 30min
+const CACHE_TTL_MS=30*60*1000;
+async function load(key,fallback){
+  try{const c=localStorage.getItem("briblue_"+key),ts=localStorage.getItem("briblue_ts_"+key);if(c&&ts&&(Date.now()-Number(ts))<CACHE_TTL_MS)return JSON.parse(c);}catch{}
+  try{
+    if(key==="bb_passages_v2"){const passages=await loadAllPassages();if(passages.length>0){try{localStorage.setItem("briblue_"+key,JSON.stringify(passages));localStorage.setItem("briblue_ts_"+key,String(Date.now()));}catch{}return passages;}try{const ls=localStorage.getItem("briblue_"+key);if(ls)return JSON.parse(ls);}catch{}return fallback;}
+    const snap=await getDoc(APP_DOC);if(snap.exists()){const allData=snap.data();if(key in allData){const val=allData[key];try{localStorage.setItem("briblue_"+key,JSON.stringify(val));localStorage.setItem("briblue_ts_"+key,String(Date.now()));}catch{}return val;}}
+    try{const ls=localStorage.getItem("briblue_"+key);if(ls)return JSON.parse(ls);}catch{}return fallback;
+  }catch{try{const ls=localStorage.getItem("briblue_"+key);if(ls)return JSON.parse(ls);}catch{}return fallback;}
 }
 
 // Queue hors-ligne
@@ -287,7 +290,7 @@ if (typeof window !== 'undefined') {
   });
 }
 
-async function save(key, val) {
+async function save(key,val){
   try{localStorage.setItem("briblue_"+key,JSON.stringify(val));localStorage.setItem("briblue_ts_"+key,String(Date.now()));}catch{}
 
   if (!navigator.onLine) {
@@ -825,263 +828,83 @@ const GlobalStyles = () => (
 // ═══════════════════════════════════════════════════════════════
 // TOUR GUIDE — Aide interactive avec spotlight + flèches animées
 // ═══════════════════════════════════════════════════════════════
-
 const TOUR_STEPS = [
-  {
-    id: "welcome",
-    title: "👋 Bienvenue dans BRIBLUE !",
-    desc: "Ce tutoriel va vous montrer les fonctions clés de l'application en 8 étapes. Tapez ➡️ pour continuer.",
-    target: null, // pas de spotlight, juste modale centrale
-    arrow: null,
-  },
-  {
-    id: "nav_clients",
-    title: "👥 Onglet Clients",
-    desc: "Accédez à toute votre liste de clients. Tapez un client pour voir sa fiche complète, son contrat et ses passages.",
-    target: "tour-nav-clients",
-    arrow: "bottom",
-  },
-  {
-    id: "nav_rapports",
-    title: "📋 Onglet Rapports",
-    desc: "Consultez et gérez tous les passages effectués. Filtrez par client, par mois, ou par type d'intervention.",
-    target: "tour-nav-rapports",
-    arrow: "bottom",
-  },
-  {
-    id: "nav_rdv",
-    title: "📅 Rendez-vous",
-    desc: "Planifiez et suivez vos rendez-vous. Visualisez votre planning de la semaine en un coup d'œil.",
-    target: "tour-nav-rdv",
-    arrow: "bottom",
-  },
-  {
-    id: "btn_rapport",
-    title: "🔧 Nouveau rapport",
-    desc: "Ce bouton bleu lance le formulaire de passage. Saisissez les mesures eau, photos, produits utilisés — tout est sauvegardé automatiquement.",
-    target: "tour-btn-rapport",
-    arrow: "top",
-  },
-  {
-    id: "btn_livraison",
-    title: "🚚 Livraison produits",
-    desc: "Enregistrez une livraison de produits à un client. Le stock est mis à jour automatiquement.",
-    target: "tour-btn-livraison",
-    arrow: "top",
-  },
-  {
-    id: "btn_stock",
-    title: "📦 Gestion du stock",
-    desc: "Visualisez votre stock de produits. Un badge rouge s'affiche quand un produit est en rupture.",
-    target: "tour-btn-stock",
-    arrow: "top",
-  },
-  {
-    id: "btn_logout",
-    title: "🔒 Déconnexion",
-    desc: "Ce bouton rouge vous déconnecte de l'application. Vos données sont toujours sauvegardées dans Firebase.",
-    target: "tour-btn-logout",
-    arrow: "top",
-  },
-  {
-    id: "done",
-    title: "🎉 Vous êtes prêt !",
-    desc: "Vous connaissez maintenant les bases de BRIBLUE. N'hésitez pas à relancer ce tutoriel depuis le bouton ❓ en haut à droite.",
-    target: null,
-    arrow: null,
-  },
+  { id:"welcome", title:"👋 Bienvenue dans BRIBLUE !", desc:"Ce tutoriel vous montre les fonctions clés en 8 étapes. Tapez Suivant pour commencer.", target:null, arrow:null },
+  { id:"nav_clients", title:"👥 Onglet Clients", desc:"Accédez à votre liste de clients. Tapez un client pour sa fiche, contrat et passages.", target:"tour-nav-clients", arrow:"bottom" },
+  { id:"nav_rapports", title:"📋 Onglet Rapports", desc:"Consultez tous les passages. Filtrez par client, mois ou type d'intervention.", target:"tour-nav-interventions", arrow:"bottom" },
+  { id:"nav_rdv", title:"📅 Rendez-vous", desc:"Planifiez et suivez vos rendez-vous. Visualisez votre planning d'un coup d'œil.", target:"tour-nav-rdv", arrow:"bottom" },
+  { id:"btn_rapport", title:"🔧 Nouveau rapport", desc:"Ce bouton lance le formulaire de passage : mesures eau, photos, produits — tout sauvegardé automatiquement.", target:"tour-btn-rapport", arrow:"top" },
+  { id:"btn_livraison", title:"🚚 Livraison produits", desc:"Enregistrez une livraison. Le stock est mis à jour automatiquement.", target:"tour-btn-livraison", arrow:"top" },
+  { id:"btn_stock", title:"📦 Gestion du stock", desc:"Visualisez votre stock. Un badge rouge s'affiche quand un produit est en rupture.", target:"tour-btn-stock", arrow:"top" },
+  { id:"btn_logout", title:"🔒 Déconnexion", desc:"Ce bouton rouge vous déconnecte. Vos données sont toujours sauvegardées dans Firebase.", target:"tour-btn-logout", arrow:"top" },
+  { id:"done", title:"🎉 Vous êtes prêt !", desc:"Vous connaissez les bases de BRIBLUE. Relancez ce tutoriel avec le bouton ? en haut à droite.", target:null, arrow:null },
 ];
 
 function TourGuide({ onClose }) {
   const [step, setStep] = useState(0);
   const [targetRect, setTargetRect] = useState(null);
   const [visible, setVisible] = useState(false);
-
   const current = TOUR_STEPS[step];
-  const isFirst = step === 0;
-  const isLast = step === TOUR_STEPS.length - 1;
+  const isFirst = step===0, isLast = step===TOUR_STEPS.length-1;
 
-  // Mesurer la cible à chaque changement d'étape
-  useEffect(() => {
-    setVisible(false);
-    setTargetRect(null);
-    const timer = setTimeout(() => {
+  useEffect(()=>{
+    setVisible(false); setTargetRect(null);
+    const t = setTimeout(()=>{
       if (current.target) {
         const el = document.getElementById(current.target);
-        if (el) {
-          const r = el.getBoundingClientRect();
-          setTargetRect({ top: r.top, left: r.left, width: r.width, height: r.height });
-          // Scroll pour que l'élément soit visible
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
+        if (el) { const r=el.getBoundingClientRect(); setTargetRect({top:r.top,left:r.left,width:r.width,height:r.height}); el.scrollIntoView({behavior:"smooth",block:"center"}); }
       }
       setVisible(true);
     }, 200);
-    return () => clearTimeout(timer);
-  }, [step, current.target]);
+    return ()=>clearTimeout(t);
+  },[step, current.target]);
 
-  const next = () => { if (!isLast) setStep(s => s + 1); else onClose(); };
-  const prev = () => { if (!isFirst) setStep(s => s - 1); };
+  const next = () => isLast ? onClose() : setStep(s=>s+1);
+  const prev = () => !isFirst && setStep(s=>s-1);
+  const pad = 10;
 
-  // Calcul position de la bulle selon la flèche
   const getBubbleStyle = () => {
-    if (!targetRect || !current.target) {
-      return { position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", maxWidth: 320, zIndex: 100010 };
-    }
-    const MARGIN = 18;
-    const PAD = 16;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const bw = Math.min(300, vw - 40);
-
+    if (!targetRect||!current.target) return {position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",maxWidth:320,zIndex:100010};
+    const MARGIN=18, vw=window.innerWidth, vh=window.innerHeight, bw=Math.min(300,vw-40);
     let top, left;
-
-    if (current.arrow === "bottom") {
-      // bulle en DESSUS de la cible
-      top = targetRect.top - 170 - MARGIN;
-      left = Math.max(PAD, Math.min(targetRect.left + targetRect.width/2 - bw/2, vw - bw - PAD));
-      if (top < PAD) { top = targetRect.top + targetRect.height + MARGIN; }
-    } else {
-      // bulle en DESSOUS de la cible
-      top = targetRect.top + targetRect.height + MARGIN;
-      left = Math.max(PAD, Math.min(targetRect.left + targetRect.width/2 - bw/2, vw - bw - PAD));
-      if (top + 180 > vh) { top = targetRect.top - 180 - MARGIN; }
-    }
-
-    return { position: "fixed", top, left, width: bw, zIndex: 100010 };
+    if (current.arrow==="bottom") { top=targetRect.top-170-MARGIN; left=Math.max(16,Math.min(targetRect.left+targetRect.width/2-bw/2,vw-bw-16)); if(top<16){top=targetRect.top+targetRect.height+MARGIN;} }
+    else { top=targetRect.top+targetRect.height+MARGIN; left=Math.max(16,Math.min(targetRect.left+targetRect.width/2-bw/2,vw-bw-16)); if(top+180>vh){top=targetRect.top-180-MARGIN;} }
+    return {position:"fixed",top,left,width:bw,zIndex:100010};
   };
 
-  // Position flèche SVG entre la bulle et la cible
-  const getArrowStyle = () => {
-    if (!targetRect || !current.arrow) return null;
-    const cx = targetRect.left + targetRect.width / 2;
-    const cy = targetRect.top + targetRect.height / 2;
-    return { position: "fixed", left: cx - 20, top: cy - 20, zIndex: 100011, pointerEvents: "none" };
-  };
+  const spotStyle = targetRect ? {position:"fixed",top:targetRect.top-pad,left:targetRect.left-pad,width:targetRect.width+pad*2,height:targetRect.height+pad*2,borderRadius:16,boxShadow:"0 0 0 9999px rgba(8,18,40,0.72)",zIndex:100005,pointerEvents:"none",transition:"all .35s cubic-bezier(.22,1,.36,1)",border:"2.5px solid rgba(6,182,212,0.85)",animation:"tourPulse 1.8s ease-in-out infinite"} : null;
 
-  const pad = 10; // padding spotlight
-  const spotStyle = targetRect ? {
-    position: "fixed",
-    top: targetRect.top - pad,
-    left: targetRect.left - pad,
-    width: targetRect.width + pad * 2,
-    height: targetRect.height + pad * 2,
-    borderRadius: 16,
-    boxShadow: "0 0 0 9999px rgba(8,18,40,0.72)",
-    zIndex: 100005,
-    pointerEvents: "none",
-    transition: "all .35s cubic-bezier(.22,1,.36,1)",
-    border: "2.5px solid rgba(6,182,212,0.85)",
-    animation: "tourPulse 1.8s ease-in-out infinite",
-  } : null;
-
-  const bubbleStyle = getBubbleStyle();
-  const arrowPos = getArrowStyle();
+  const arrowPos = targetRect && current.arrow ? {position:"fixed",left:targetRect.left+targetRect.width/2-22,top:targetRect.top+targetRect.height/2-22,zIndex:100011,pointerEvents:"none"} : null;
 
   return (
     <>
-      {/* Overlay sombre global quand pas de cible */}
-      {!targetRect && (
-        <div style={{ position:"fixed", inset:0, background:"rgba(8,18,40,0.75)", zIndex:100004 }} onClick={onClose}/>
-      )}
-
-      {/* Spotlight sur la cible */}
-      {spotStyle && <div style={spotStyle}/>}
-
-      {/* Flèche animée pointant vers la cible */}
-      {arrowPos && targetRect && (
+      {!targetRect&&<div style={{position:"fixed",inset:0,background:"rgba(8,18,40,0.75)",zIndex:100004}} onClick={onClose}/>}
+      {spotStyle&&<div style={spotStyle}/>}
+      {arrowPos&&targetRect&&(
         <div style={arrowPos}>
           <svg width={44} height={44} viewBox="0 0 44 44" style={{animation:"tourBounce 0.9s ease-in-out infinite"}}>
-            {current.arrow === "bottom" ? (
-              // flèche vers le bas (cible est en dessous de la bulle)
-              <>
-                <path d="M22 4 L22 30" stroke="#06b6d4" strokeWidth="3" strokeLinecap="round"/>
-                <path d="M12 22 L22 34 L32 22" stroke="#06b6d4" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-              </>
-            ) : (
-              // flèche vers le haut (cible est au-dessus)
-              <>
-                <path d="M22 40 L22 14" stroke="#06b6d4" strokeWidth="3" strokeLinecap="round"/>
-                <path d="M12 22 L22 10 L32 22" stroke="#06b6d4" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-              </>
-            )}
-            <circle cx="22" cy={current.arrow==="bottom"?34:10} r="4" fill="#06b6d4"/>
+            {current.arrow==="bottom"?<><path d="M22 4 L22 30" stroke="#06b6d4" strokeWidth="3" strokeLinecap="round"/><path d="M12 22 L22 34 L32 22" stroke="#06b6d4" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none"/><circle cx="22" cy="34" r="4" fill="#06b6d4"/></>:<><path d="M22 40 L22 14" stroke="#06b6d4" strokeWidth="3" strokeLinecap="round"/><path d="M12 22 L22 10 L32 22" stroke="#06b6d4" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none"/><circle cx="22" cy="10" r="4" fill="#06b6d4"/></>}
           </svg>
         </div>
       )}
-
-      {/* Bulle de dialogue */}
-      {visible && (
-        <div style={{
-          ...bubbleStyle,
-          background: "linear-gradient(145deg,#0c1f3e,#0a1628)",
-          borderRadius: 20,
-          padding: "20px 18px 16px",
-          boxShadow: "0 24px 60px rgba(0,0,0,0.6), 0 0 0 1.5px rgba(6,182,212,0.35)",
-          fontFamily: "'Nunito', system-ui, sans-serif",
-          animation: "tourSlide .28s cubic-bezier(.22,1,.36,1) both",
-        }}>
-          {/* Indicateur étapes */}
-          <div style={{display:"flex", gap:5, marginBottom:14, justifyContent:"center"}}>
-            {TOUR_STEPS.map((_,i) => (
-              <div key={i} style={{
-                width: i===step ? 22 : 7, height:7, borderRadius:4,
-                background: i===step ? "#06b6d4" : i<step ? "rgba(6,182,212,0.4)" : "rgba(255,255,255,0.15)",
-                transition:"all .3s ease",
-              }}/>
-            ))}
+      {visible&&(
+        <div style={{...getBubbleStyle(),background:"linear-gradient(145deg,#0c1f3e,#0a1628)",borderRadius:20,padding:"20px 18px 16px",boxShadow:"0 24px 60px rgba(0,0,0,0.6),0 0 0 1.5px rgba(6,182,212,0.35)",fontFamily:"'Nunito',system-ui,sans-serif",animation:"tourSlide .28s cubic-bezier(.22,1,.36,1) both"}}>
+          <div style={{display:"flex",gap:5,marginBottom:14,justifyContent:"center"}}>
+            {TOUR_STEPS.map((_,i)=>(<div key={i} style={{width:i===step?22:7,height:7,borderRadius:4,background:i===step?"#06b6d4":i<step?"rgba(6,182,212,0.4)":"rgba(255,255,255,0.15)",transition:"all .3s ease"}}/>))}
           </div>
-
-          {/* Titre */}
-          <div style={{fontSize:16, fontWeight:800, color:"#f0f9ff", marginBottom:8, lineHeight:1.3}}>
-            {current.title}
-          </div>
-
-          {/* Description */}
-          <div style={{fontSize:13, color:"rgba(186,230,253,0.9)", lineHeight:1.55, marginBottom:16}}>
-            {current.desc}
-          </div>
-
-          {/* Boutons nav */}
-          <div style={{display:"flex", gap:8, alignItems:"center"}}>
-            {!isFirst && (
-              <button onClick={prev} style={{
-                flex:1, padding:"10px", borderRadius:12, border:"1.5px solid rgba(6,182,212,0.3)",
-                background:"transparent", color:"rgba(186,230,253,0.8)", fontSize:13, fontWeight:700,
-                cursor:"pointer", fontFamily:"inherit",
-              }}>← Retour</button>
-            )}
-            <button onClick={next} style={{
-              flex:2, padding:"10px", borderRadius:12, border:"none",
-              background:"linear-gradient(135deg,#06b6d4,#0891b2)", color:"#fff",
-              fontSize:13, fontWeight:800, cursor:"pointer", fontFamily:"inherit",
-              boxShadow:"0 4px 16px rgba(6,182,212,0.4)",
-            }}>
-              {isLast ? "✓ Terminer" : "Suivant →"}
-            </button>
-            <button onClick={onClose} style={{
-              width:36, height:36, borderRadius:10, border:"none",
-              background:"rgba(255,255,255,0.07)", color:"rgba(186,230,253,0.6)",
-              fontSize:16, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
-            }}>✕</button>
+          <div style={{fontSize:16,fontWeight:800,color:"#f0f9ff",marginBottom:8,lineHeight:1.3}}>{current.title}</div>
+          <div style={{fontSize:13,color:"rgba(186,230,253,0.9)",lineHeight:1.55,marginBottom:16}}>{current.desc}</div>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            {!isFirst&&<button onClick={prev} style={{flex:1,padding:"10px",borderRadius:12,border:"1.5px solid rgba(6,182,212,0.3)",background:"transparent",color:"rgba(186,230,253,0.8)",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>← Retour</button>}
+            <button onClick={next} style={{flex:2,padding:"10px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#06b6d4,#0891b2)",color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit",boxShadow:"0 4px 16px rgba(6,182,212,0.4)"}}>{isLast?"✓ Terminer":"Suivant →"}</button>
+            <button onClick={onClose} style={{width:36,height:36,borderRadius:10,border:"none",background:"rgba(255,255,255,0.07)",color:"rgba(186,230,253,0.6)",fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
           </div>
         </div>
       )}
-
-      {/* CSS animations injectées */}
       <style>{`
-        @keyframes tourPulse {
-          0%,100% { box-shadow: 0 0 0 9999px rgba(8,18,40,0.72), 0 0 0 4px rgba(6,182,212,0.5); }
-          50%      { box-shadow: 0 0 0 9999px rgba(8,18,40,0.72), 0 0 0 8px rgba(6,182,212,0.2); }
-        }
-        @keyframes tourBounce {
-          0%,100% { transform: translateY(0); }
-          50%      { transform: translateY(6px); }
-        }
-        @keyframes tourSlide {
-          from { opacity:0; transform: translateY(10px) scale(0.96); }
-          to   { opacity:1; transform: translateY(0)   scale(1); }
-        }
+        @keyframes tourPulse{0%,100%{box-shadow:0 0 0 9999px rgba(8,18,40,0.72),0 0 0 4px rgba(6,182,212,0.5);}50%{box-shadow:0 0 0 9999px rgba(8,18,40,0.72),0 0 0 8px rgba(6,182,212,0.2);}}
+        @keyframes tourBounce{0%,100%{transform:translateY(0);}50%{transform:translateY(6px);}}
+        @keyframes tourSlide{from{opacity:0;transform:translateY(10px) scale(0.96);}to{opacity:1;transform:translateY(0) scale(1);}}
       `}</style>
     </>
   );
@@ -4758,150 +4581,329 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
 // PAGE CLIENTS
 function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClientClick, onAdd }) {
   const [search, setSearch] = useState("");
-  const isMobile = useIsMobile();
-  const filtered = useMemo(()=>clients.filter(c=>c.nom.toLowerCase().includes(search.toLowerCase())||c.adresse?.toLowerCase().includes(search.toLowerCase())),[clients,search]);
+  const [viewMode, setViewMode] = useState("grid"); // grid | list
+  const [filterAlert, setFilterAlert] = useState("all"); // all | ok | warning | urgent
+  const platform = usePlatform();
+  const { isMobile, isDesktop } = platform;
+
+  const filtered = useMemo(()=>{
+    let r = clients.filter(c =>
+      c.nom.toLowerCase().includes(search.toLowerCase()) ||
+      (c.adresse||"").toLowerCase().includes(search.toLowerCase())
+    );
+    if (filterAlert === "ok") r = r.filter(c => alerteClient(c,passages) === "ok");
+    if (filterAlert === "warning") r = r.filter(c => ["jaune","orange","aFaire"].includes(alerteClient(c,passages)));
+    if (filterAlert === "urgent") r = r.filter(c => alerteClient(c,passages) === "rouge");
+    return r;
+  },[clients,search,passages,filterAlert]);
+
   const totalAll = clients.length;
   const alertCount = clients.filter(c=>alerteClient(c,passages)!=="ok").length;
+  const urgentCount = clients.filter(c=>alerteClient(c,passages)==="rouge").length;
+  const okCount = clients.filter(c=>alerteClient(c,passages)==="ok").length;
 
   const CONTRAT_STATUTS = [
-    { key:"aucun",         label:"Aucun contrat",         color:"#9ca3af", bg:"#f9fafb", border:"#e5e7eb" },
-    { key:"cree",          label:"📄 Contrat créé",       color:"#0891b2", bg:"#e0f2fe", border:"#7dd3fc" },
-    
-    { key:"demande_envoyee",label:"📨 Contrat envoyé",    color:"#0891b2", bg:"#f0f9ff", border:"#bae6fd" },
-    { key:"signe_client",  label:"📝 En attente co-sign.", color:"#4f46e5", bg:"#eef2ff", border:"#a5b4fc" },
-    { key:"signe_complet", label:"✅ Contrat signé",      color:"#059669", bg:"#f0fdf4", border:"#86efac" },
-    { key:"renouveler",    label:"🔄 À renouveler",       color:"#b45309", bg:"#fef3c7", border:"#fcd34d" },
-    { key:"suspendu",      label:"⏸ Suspendu",            color:"#dc2626", bg:"#fff1f2", border:"#fda4af" },
+    { key:"aucun",          label:"Aucun contrat",         color:"#9ca3af", bg:"#f9fafb", border:"#e5e7eb" },
+    { key:"cree",           label:"📄 Contrat créé",       color:"#0891b2", bg:"#e0f2fe", border:"#7dd3fc" },
+    { key:"demande_envoyee",label:"📨 Contrat envoyé",     color:"#0891b2", bg:"#f0f9ff", border:"#bae6fd" },
+    { key:"signe_client",   label:"📝 En attente co-sign.",color:"#4f46e5", bg:"#eef2ff", border:"#a5b4fc" },
+    { key:"signe_complet",  label:"✅ Contrat signé",      color:"#059669", bg:"#f0fdf4", border:"#86efac" },
+    { key:"renouveler",     label:"🔄 À renouveler",       color:"#b45309", bg:"#fef3c7", border:"#fcd34d" },
+    { key:"suspendu",       label:"⏸ Suspendu",            color:"#dc2626", bg:"#fff1f2", border:"#fda4af" },
   ];
-
-  const [openPicker, setOpenPicker] = useState(null); // clientId du picker ouvert
+  const [openPicker, setOpenPicker] = useState(null);
 
   const getContrat = (clientId) =>
-    contrats["CT-"+clientId]
-    || Object.values(contrats).find(c=>c.clientId===clientId)
-    || null;
+    contrats["CT-"+clientId] || Object.values(contrats).find(c=>c.clientId===clientId) || null;
 
   const getStatutMeta = (clientId) => {
     const ct = getContrat(clientId);
-    const key = ct?.statut || "aucun";
-    return CONTRAT_STATUTS.find(s=>s.key===key) || CONTRAT_STATUTS[0];
+    return CONTRAT_STATUTS.find(s=>s.key===(ct?.statut||"aucun")) || CONTRAT_STATUTS[0];
   };
 
   const setStatut = (clientId, key) => {
-    const contractId = "CT-"+clientId;
-    if (onUpdateContrat) onUpdateContrat(contractId, { clientId, statut: key === "prepare" ? "cree" : key });
+    if (onUpdateContrat) onUpdateContrat("CT-"+clientId, { clientId, statut: key==="prepare"?"cree":key });
     setOpenPicker(null);
   };
 
+  // Cols grille selon plateforme
+  const gridCols = isDesktop ? "repeat(3,1fr)" : isMobile ? "1fr" : "repeat(2,1fr)";
+
   return (
     <div>
-      <div style={{display:"flex",gap:8,marginBottom:14}}>
-        <div style={{flex:1,background:"linear-gradient(135deg,#0891b2,#06b6d4)",borderRadius:16,padding:"14px 16px",display:"flex",alignItems:"center",gap:10,boxShadow:"4px 4px 12px rgba(8,145,178,0.35), -2px -2px 6px rgba(255,255,255,0.5)"}}>
-          <div style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.clients(16,"#fff")}</div>
-          <div><div style={{fontSize:18,fontWeight:800,color:"#fff"}}>{totalAll}</div><div style={{fontSize:10,color:"rgba(255,255,255,0.6)"}}>Clients</div></div>
-        </div>
-        {alertCount>0&&<div style={{background:"#eef2f7",borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8,border:"1px solid #fecaca"}}>
-          <div style={{width:36,height:36,borderRadius:10,background:"#fee2e2",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.alert(15,DS.red)}</div>
-          <div><div style={{fontSize:18,fontWeight:800,color:DS.red}}>{alertCount}</div><div style={{fontSize:11,color:DS.red,fontWeight:600}}>Alertes</div></div>
-        </div>}
+      {/* ── STATS BAR ── */}
+      <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+        {[
+          { label:"Total", value:totalAll,    color:DS.blue,   grad:"linear-gradient(135deg,#0891b2,#06b6d4)", icon:"👥", filter:"all" },
+          { label:"OK",    value:okCount,     color:DS.green,  grad:"linear-gradient(135deg,#059669,#34d399)", icon:"✅", filter:"ok" },
+          { label:"Alerte",value:alertCount,  color:"#d97706", grad:"linear-gradient(135deg,#f59e0b,#f97316)", icon:"⚠️", filter:"warning" },
+          { label:"Urgent",value:urgentCount, color:DS.red,    grad:"linear-gradient(135deg,#be123c,#e11d48)", icon:"🚨", filter:"urgent" },
+        ].map(s=>(
+          <button key={s.filter} onClick={()=>setFilterAlert(filterAlert===s.filter?"all":s.filter)}
+            style={{flex:1,minWidth:60,border:"none",cursor:"pointer",borderRadius:14,padding:"12px 8px",
+              background: filterAlert===s.filter ? s.grad : "#eef2f7",
+              boxShadow: filterAlert===s.filter
+                ? "4px 4px 12px rgba(0,0,0,0.18),-2px -2px 6px rgba(255,255,255,0.4)"
+                : "4px 4px 8px rgba(166,210,220,0.6),-3px -3px 7px rgba(255,255,255,0.9)",
+              transition:"all .2s",fontFamily:"inherit",
+            }}>
+            <div style={{fontSize:18,marginBottom:2}}>{s.icon}</div>
+            <div style={{fontSize:16,fontWeight:900,color:filterAlert===s.filter?"#fff":s.color,lineHeight:1}}>{s.value}</div>
+            <div style={{fontSize:10,fontWeight:600,color:filterAlert===s.filter?"rgba(255,255,255,0.8)":DS.mid,marginTop:2}}>{s.label}</div>
+          </button>
+        ))}
       </div>
-      <div style={{display:"flex",gap:10,marginBottom:14}}>
+
+      {/* ── BARRE RECHERCHE + ACTIONS ── */}
+      <div style={{display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
         <div style={{flex:1,position:"relative"}}>
-          <div style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}>{Ico.search(16,"#94a3b8")}</div>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher…"
-            style={{width:"100%",padding:"11px 14px 11px 40px",borderRadius:DS.radius,border:"none",fontSize:13,outline:"none",boxSizing:"border-box",background:"#eef2f7",boxShadow:"inset 3px 3px 6px rgba(166,210,220,0.45), inset -2px -2px 5px rgba(255,255,255,0.8)",color:DS.dark,fontFamily:"inherit"}}/>
+          <div style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}>{Ico.search(15,"#94a3b8")}</div>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher un client…"
+            style={{width:"100%",padding:"11px 14px 11px 38px",borderRadius:DS.radius,border:"none",fontSize:13,
+              outline:"none",boxSizing:"border-box",background:"#eef2f7",color:DS.dark,fontFamily:"inherit",
+              boxShadow:"inset 3px 3px 6px rgba(166,210,220,0.45),inset -2px -2px 5px rgba(255,255,255,0.8)"}}/>
+          {search && <button onClick={()=>setSearch("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:14,color:DS.mid}}>✕</button>}
+        </div>
+        {/* Toggle vue grille/liste */}
+        <div style={{display:"flex",borderRadius:12,overflow:"hidden",boxShadow:"inset 3px 3px 6px rgba(166,210,220,0.4),inset -2px -2px 5px rgba(255,255,255,0.8)",background:"#eef2f7",flexShrink:0}}>
+          {[{v:"grid",ico:"⊞"},{v:"list",ico:"☰"}].map(({v,ico})=>(
+            <button key={v} onClick={()=>setViewMode(v)} style={{width:36,height:36,border:"none",cursor:"pointer",
+              background: viewMode===v ? DS.blueGrad : "transparent",
+              color: viewMode===v ? "#fff" : DS.mid, fontSize:16, borderRadius:10,
+              transition:"all .2s", fontFamily:"inherit"}}>
+              {ico}
+            </button>
+          ))}
         </div>
         <BtnPrimary onClick={onAdd} bg={DS.blueGrad} icon={Ico.userPlus(14,"#fff")} style={{flexShrink:0,padding:"10px 16px",fontSize:13,borderRadius:14,boxShadow:"4px 4px 12px rgba(8,145,178,0.3)"}}>
           {!isMobile && "Nouveau"}
         </BtnPrimary>
       </div>
-      {filtered.length===0&&<div style={{textAlign:"center",color:DS.mid,padding:40,fontSize:13}}>Aucun client trouvé</div>}
-      <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:10}}>
-        {filtered.map((c,idx)=>{
-          const al=alerteClient(c,passages); const col=AC[al];
-          const mpm=c.moisParMois||c.saisons||{};
-          const tE=totalAnnuel(mpm,"entretien"), tC=totalAnnuel(mpm,"controle"), tot=tE+tC;
-          const cs=c.dateDebut?c.dateDebut.slice(0,10):null; const ce=c.dateFin?c.dateFin.slice(0,10):null;
-          const inC=(p)=>{const ds=String(p.date).slice(0,10);return cs&&ce?ds>=cs&&ds<=ce:new Date(p.date).getFullYear()===YEAR_NOW;};
-          const eE=passages.filter(p=>p.clientId===c.id&&inC(p)&&isEntretienType(p.type)).length;
-          const eC=passages.filter(p=>p.clientId===c.id&&inC(p)&&isControleType(p.type)).length;
-          const eff=eE+eC;
-          const pct=tot>0?Math.round(eff/tot*100):0;
-          const rest=Math.max(0,tot-eff);
-          const accentColor=al==="rouge"?DS.red:al==="jaune"?"#d97706":al==="orange"?"#d97706":DS.green;
-          return (
-            <div key={c.id} onClick={()=>onClientClick(c)} className="fade-in card-hover"
-              style={{animationDelay:`${idx*0.03}s`,background:"#eef2f7",borderRadius:DS.radius,
-                overflow:openPicker===c.id?"visible":"hidden",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",
-                border:"1px solid "+DS.border,borderTop:"2px solid "+accentColor,
-                cursor:"pointer",display:"flex",flexDirection:"column",position:"relative",zIndex:openPicker===c.id?999:1}}>
-              {c.photoPiscine&&(
-                <div style={{height:72,background:`url(${c.photoPiscine}) center/cover`,position:"relative",flexShrink:0}}>
-                  <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,transparent 40%,rgba(0,0,0,0.35))"}}/>
-                </div>
-              )}
-              <div style={{padding:"12px",flex:1,display:"flex",flexDirection:"column",gap:7}}>
-                <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
-                  <Avatar nom={c.nom} size={34}/>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontWeight:700,fontSize:13,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
-                    <div style={{display:"flex",gap:4,marginTop:3,flexWrap:"wrap"}}>
-                      <span style={{background:"#f1f5f9",color:DS.mid,padding:"1px 7px",borderRadius:20,fontWeight:600,fontSize:10,border:"1px solid "+DS.border}}>{c.formule}</span>
-                      {c.bassin&&<span style={{background:DS.light,color:DS.mid,padding:"1px 6px",borderRadius:20,fontWeight:500,fontSize:10}}>{c.bassin}</span>}
+
+      {/* ── Compteur résultats ── */}
+      {search && <div style={{fontSize:12,color:DS.mid,marginBottom:10,fontWeight:600}}>
+        {filtered.length} résultat{filtered.length!==1?"s":""} pour « {search} »
+      </div>}
+
+      {filtered.length===0 && (
+        <div style={{textAlign:"center",padding:48,color:DS.mid}}>
+          <div style={{fontSize:36,marginBottom:12}}>🔍</div>
+          <div style={{fontSize:14,fontWeight:700}}>Aucun client trouvé</div>
+          <div style={{fontSize:12,marginTop:4}}>Essayez un autre terme de recherche</div>
+        </div>
+      )}
+
+      {/* ══ VUE GRILLE ══ */}
+      {viewMode==="grid" && (
+        <div style={{display:"grid",gridTemplateColumns:gridCols,gap:isMobile?10:14}}>
+          {filtered.map((c,idx)=>{
+            const al=alerteClient(c,passages); const col=AC[al];
+            const mpm=c.moisParMois||c.saisons||{};
+            const tE=totalAnnuel(mpm,"entretien"), tC=totalAnnuel(mpm,"controle"), tot=tE+tC;
+            const cs=c.dateDebut?c.dateDebut.slice(0,10):null; const ce=c.dateFin?c.dateFin.slice(0,10):null;
+            const inC=(p)=>{const ds=String(p.date).slice(0,10);return cs&&ce?ds>=cs&&ds<=ce:new Date(p.date).getFullYear()===YEAR_NOW;};
+            const clientPassages = passages.filter(p=>p.clientId===c.id&&inC(p));
+            const eE=clientPassages.filter(p=>isEntretienType(p.type)).length;
+            const eC=clientPassages.filter(p=>isControleType(p.type)).length;
+            const eff=eE+eC; const pct=tot>0?Math.round(eff/tot*100):0; const rest=Math.max(0,tot-eff);
+            const accentColor=al==="rouge"?DS.red:al==="jaune"?"#d97706":al==="orange"?"#ea7c0a":al==="aFaire"?DS.blue:DS.green;
+            // Dernier passage
+            const lastP = clientPassages.sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+            const lastDate = lastP ? new Date(lastP.date).toLocaleDateString("fr-FR",{day:"2-digit",month:"short"}) : null;
+            const meta = getStatutMeta(c.id);
+            const isOpen = openPicker===c.id;
+            const j = daysUntil(c.dateFin);
+
+            return (
+              <div key={c.id} onClick={()=>onClientClick(c)} className="fade-in card-hover"
+                style={{animationDelay:`${idx*0.025}s`,background:"#eef2f7",borderRadius:18,
+                  overflow:isOpen?"visible":"hidden",
+                  boxShadow:"5px 5px 12px rgba(166,210,220,0.7),-4px -4px 10px rgba(255,255,255,0.9)",
+                  border:"none", borderLeft:`4px solid ${accentColor}`,
+                  cursor:"pointer",display:"flex",flexDirection:"column",position:"relative",zIndex:isOpen?999:1}}>
+
+                {/* Photo piscine */}
+                {c.photoPiscine ? (
+                  <div style={{height:isMobile?80:90,background:`url(${c.photoPiscine}) center/cover`,position:"relative",flexShrink:0,borderRadius:"14px 14px 0 0"}}>
+                    <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,transparent 30%,rgba(8,18,40,0.65))",borderRadius:"14px 14px 0 0"}}/>
+                    {/* Badge alerte flottant sur photo */}
+                    <div style={{position:"absolute",top:8,right:8}}>
+                      <Tag color={col.tx} bg={col.bg} style={{fontSize:9,fontWeight:700,padding:"2px 7px",boxShadow:"0 2px 8px rgba(0,0,0,0.2)"}}>{col.lbl}</Tag>
+                    </div>
+                    {lastDate && <div style={{position:"absolute",bottom:6,left:8,fontSize:10,color:"rgba(255,255,255,0.85)",fontWeight:600}}>📅 {lastDate}</div>}
+                  </div>
+                ) : (
+                  <div style={{height:isMobile?56:64,background:`linear-gradient(135deg,${accentColor}22,${accentColor}08)`,borderRadius:"14px 14px 0 0",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 14px",flexShrink:0}}>
+                    <div style={{width:38,height:38,borderRadius:12,background:`${accentColor}25`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🏊</div>
+                    <Tag color={col.tx} bg={col.bg} style={{fontSize:9,fontWeight:700,padding:"2px 7px"}}>{col.lbl}</Tag>
+                  </div>
+                )}
+
+                <div style={{padding:"11px 13px",flex:1,display:"flex",flexDirection:"column",gap:8}}>
+                  {/* Nom + avatar */}
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <Avatar nom={c.nom} size={32}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:800,fontSize:13,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
+                      <div style={{display:"flex",gap:4,marginTop:2,flexWrap:"wrap",alignItems:"center"}}>
+                        <span style={{background:DS.blueSoft,color:DS.blue,padding:"1px 7px",borderRadius:20,fontWeight:700,fontSize:10}}>{c.formule}</span>
+                        {c.bassin&&<span style={{background:"#f1f5f9",color:DS.mid,padding:"1px 6px",borderRadius:20,fontWeight:500,fontSize:10}}>{c.bassin}</span>}
+                      </div>
                     </div>
                   </div>
-                  <Tag color={col.tx} bg={col.bg} style={{fontSize:9,fontWeight:700,flexShrink:0,padding:"2px 6px"}}>{col.lbl}</Tag>
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:3}}>
-                  <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"#f8fafc",border:"1px solid "+DS.border}}>
-                    <div style={{fontSize:13,fontWeight:800,color:DS.blue}}>{eE}<span style={{fontSize:9,color:DS.mid}}>/{tE}</span></div>
-                    <div style={{fontSize:9,color:DS.mid}}>Entret.</div>
-                  </div>
-                  <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"#f8fafc",border:"1px solid "+DS.border}}>
-                    <div style={{fontSize:13,fontWeight:800,color:DS.teal}}>{eC}<span style={{fontSize:9,color:DS.mid}}>/{tC}</span></div>
-                    <div style={{fontSize:9,color:DS.mid}}>Contrôl.</div>
-                  </div>
-                  <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"#f8fafc",border:"1px solid "+DS.border}}>
-                    <div style={{fontSize:13,fontWeight:800,color:rest>0?"#b45309":DS.green}}>{pct}<span style={{fontSize:9,color:DS.mid}}>%</span></div>
-                    <div style={{fontSize:9,color:DS.mid}}>{rest>0?rest+" rest.":"À jour"}</div>
-                  </div>
-                </div>
-                {tot>0&&<div style={{height:3,background:DS.light,borderRadius:99,overflow:"hidden"}}>
-                  <div style={{height:"100%",width:`${pct}%`,background:pct>=100?"#059669":pct>=50?"#0891b2":"#f59e0b",borderRadius:99}}/>
-                </div>}
-                {/* Badge statut contrat — cliquable */}
-                {(()=>{
-                  const meta = getStatutMeta(c.id);
-                  const isOpen = openPicker===c.id;
-                  return (
-                    <div style={{position:"relative"}}>
-                      <button onClick={e=>{e.stopPropagation();setOpenPicker(isOpen?null:c.id);}}
-                        style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"4px 8px",borderRadius:6,background:meta.bg,border:"1px solid "+meta.border,cursor:"pointer",fontFamily:"inherit"}}>
-                        <span style={{fontSize:10,fontWeight:700,color:meta.color}}>{meta.label}</span>
-                        <svg width={8} height={8} viewBox="0 0 24 24" fill="none" stroke={meta.color} strokeWidth="3" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-                      </button>
-                      {isOpen&&(
-                        <div onClick={e=>e.stopPropagation()} style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,background:"#eef2f7",borderRadius:8,boxShadow:"0 4px 20px rgba(0,0,0,0.15)",border:"1px solid "+DS.border,zIndex:100,overflow:"auto",maxHeight:220}}>
-                          {CONTRAT_STATUTS.map(s=>(
-                            <button key={s.key} onClick={()=>setStatut(c.id,s.key)}
-                              style={{width:"100%",display:"flex",alignItems:"center",gap:6,padding:"7px 10px",background:meta.key===s.key?s.bg:DS.white,border:"none",cursor:"pointer",fontFamily:"inherit",borderBottom:"1px solid "+DS.light}}>
-                              <span style={{fontSize:11,fontWeight:meta.key===s.key?700:500,color:meta.key===s.key?s.color:DS.dark}}>{s.label}</span>
-                              {meta.key===s.key&&<svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke={s.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft:"auto"}}><polyline points="20 6 9 17 4 12"/></svg>}
-                            </button>
-                          ))}
+
+                  {/* Barre progression + stats */}
+                  {tot>0 && <>
+                    <div>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                        <span style={{fontSize:10,fontWeight:700,color:DS.mid}}>Avancement contrat</span>
+                        <span style={{fontSize:11,fontWeight:800,color:pct>=100?DS.green:pct>=60?DS.blue:"#f59e0b"}}>{pct}%</span>
+                      </div>
+                      <div style={{height:6,background:"#dde8ef",borderRadius:99,overflow:"hidden"}}>
+                        <div style={{height:"100%",width:`${Math.min(pct,100)}%`,
+                          background:pct>=100?"linear-gradient(90deg,#059669,#34d399)":pct>=60?"linear-gradient(90deg,#0891b2,#06b6d4)":"linear-gradient(90deg,#f59e0b,#fb923c)",
+                          borderRadius:99,transition:"width .6s ease"}}/>
+                      </div>
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:4}}>
+                      {[
+                        {label:"Entret.",val:eE,tot:tE,color:DS.blue},
+                        {label:"Contrôl.",val:eC,tot:tC,color:DS.teal},
+                        {label:rest>0?"Restants":"À jour",val:rest>0?rest:eff,tot:tot,color:rest>0?"#f59e0b":DS.green,raw:rest>0?`${rest} rest.`:`✓ ${eff}/${tot}`},
+                      ].map(({label,val,tot:t,color,raw})=>(
+                        <div key={label} style={{textAlign:"center",padding:"5px 2px",borderRadius:8,background:"rgba(238,242,247,0.8)",boxShadow:"inset 2px 2px 4px rgba(166,210,220,0.3),inset -1px -1px 3px rgba(255,255,255,0.8)"}}>
+                          <div style={{fontSize:12,fontWeight:800,color}}>{raw||`${val}`}<span style={{fontSize:9,color:DS.mid,fontWeight:500}}>/{t}</span></div>
+                          <div style={{fontSize:9,color:DS.mid,fontWeight:600,marginTop:1}}>{label}</div>
                         </div>
-                      )}
+                      ))}
                     </div>
-                  );
-                })()}
+                  </>}
+
+                  {/* Fin de contrat */}
+                  {j!==null && j>=0 && j<=60 && (
+                    <div style={{display:"flex",alignItems:"center",gap:5,padding:"4px 8px",borderRadius:8,background:j<=30?"#fff1f2":"#fffbeb",border:`1px solid ${j<=30?"#fda4af":"#fcd34d"}`}}>
+                      <span style={{fontSize:11}}>{j<=7?"🔴":j<=30?"🟠":"🟡"}</span>
+                      <span style={{fontSize:10,fontWeight:700,color:j<=30?DS.red:"#b45309"}}>Contrat expire dans {j}j</span>
+                    </div>
+                  )}
+
+                  {/* Badge contrat cliquable */}
+                  {(()=>{
+                    const isO = openPicker===c.id;
+                    return (
+                      <div style={{position:"relative"}}>
+                        <button onClick={e=>{e.stopPropagation();setOpenPicker(isO?null:c.id);}}
+                          style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
+                            padding:"5px 9px",borderRadius:8,background:meta.bg,border:`1px solid ${meta.border}`,
+                            cursor:"pointer",fontFamily:"inherit",transition:"all .15s"}}>
+                          <span style={{fontSize:10,fontWeight:700,color:meta.color}}>{meta.label}</span>
+                          <svg width={8} height={8} viewBox="0 0 24 24" fill="none" stroke={meta.color} strokeWidth="3" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>
+                        {isO && (
+                          <div onClick={e=>e.stopPropagation()} style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,background:"#eef2f7",borderRadius:10,boxShadow:"0 8px 24px rgba(0,0,0,0.15)",border:"1px solid "+DS.border,zIndex:100,overflow:"auto",maxHeight:220}}>
+                            {CONTRAT_STATUTS.map(s=>(
+                              <button key={s.key} onClick={()=>setStatut(c.id,s.key)}
+                                style={{width:"100%",display:"flex",alignItems:"center",gap:6,padding:"8px 10px",background:meta.key===s.key?s.bg:DS.white,border:"none",borderBottom:"1px solid "+DS.light,cursor:"pointer",fontFamily:"inherit"}}>
+                                <span style={{fontSize:11,fontWeight:meta.key===s.key?700:500,color:meta.key===s.key?s.color:DS.dark}}>{s.label}</span>
+                                {meta.key===s.key&&<svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke={s.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft:"auto"}}><polyline points="20 6 9 17 4 12"/></svg>}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ══ VUE LISTE ══ */}
+      {viewMode==="list" && (
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {filtered.map((c,idx)=>{
+            const al=alerteClient(c,passages); const col=AC[al];
+            const mpm=c.moisParMois||c.saisons||{};
+            const tE=totalAnnuel(mpm,"entretien"), tC=totalAnnuel(mpm,"controle"), tot=tE+tC;
+            const cs=c.dateDebut?c.dateDebut.slice(0,10):null; const ce=c.dateFin?c.dateFin.slice(0,10):null;
+            const inC=(p)=>{const ds=String(p.date).slice(0,10);return cs&&ce?ds>=cs&&ds<=ce:new Date(p.date).getFullYear()===YEAR_NOW;};
+            const clientPassages=passages.filter(p=>p.clientId===c.id&&inC(p));
+            const eff=clientPassages.length; const pct=tot>0?Math.round(eff/tot*100):0;
+            const accentColor=al==="rouge"?DS.red:al==="jaune"?"#d97706":al==="orange"?"#ea7c0a":al==="aFaire"?DS.blue:DS.green;
+            const lastP=clientPassages.sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+            const lastDate=lastP?new Date(lastP.date).toLocaleDateString("fr-FR",{day:"2-digit",month:"short"}):null;
+            const meta=getStatutMeta(c.id);
+            const j=daysUntil(c.dateFin);
+
+            return (
+              <div key={c.id} onClick={()=>onClientClick(c)} className="fade-in card-hover"
+                style={{animationDelay:`${idx*0.02}s`,background:"#eef2f7",borderRadius:14,
+                  boxShadow:"4px 4px 10px rgba(166,210,220,0.65),-3px -3px 8px rgba(255,255,255,0.9)",
+                  borderLeft:`4px solid ${accentColor}`,cursor:"pointer",
+                  display:"flex",alignItems:"center",gap:12,padding:"12px 14px",
+                  position:"relative",zIndex:openPicker===c.id?999:1,overflow:openPicker===c.id?"visible":"hidden"}}>
+
+                {/* Avatar */}
+                <Avatar nom={c.nom} size={40} photo={c.photoPiscine?undefined:undefined}/>
+
+                {/* Infos principales */}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+                    <span style={{fontWeight:800,fontSize:14,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</span>
+                    <Tag color={col.tx} bg={col.bg} style={{fontSize:9,flexShrink:0,padding:"1px 6px"}}>{col.lbl}</Tag>
+                  </div>
+                  <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                    <span style={{fontSize:10,fontWeight:600,color:DS.blue,background:DS.blueSoft,padding:"1px 7px",borderRadius:20}}>{c.formule}</span>
+                    {c.bassin&&<span style={{fontSize:10,color:DS.mid}}>{c.bassin}</span>}
+                    {lastDate&&<span style={{fontSize:10,color:DS.mid}}>• Dernière visite {lastDate}</span>}
+                  </div>
+                </div>
+
+                {/* Progression + contrat expiry */}
+                {!isMobile && tot>0 && (
+                  <div style={{minWidth:120,textAlign:"center"}}>
+                    <div style={{fontSize:11,fontWeight:700,color:pct>=100?DS.green:pct>=60?DS.blue:"#f59e0b",marginBottom:3}}>{pct}% <span style={{color:DS.mid,fontWeight:500,fontSize:10}}>{eff}/{tot} passages</span></div>
+                    <div style={{height:5,background:"#dde8ef",borderRadius:99,overflow:"hidden"}}>
+                      <div style={{height:"100%",width:`${Math.min(pct,100)}%`,background:pct>=100?"#059669":pct>=60?"#0891b2":"#f59e0b",borderRadius:99}}/>
+                    </div>
+                  </div>
+                )}
+
+                {/* Statut contrat + alerte expiry */}
+                <div style={{display:"flex",flexDirection:"column",gap:4,alignItems:"flex-end",flexShrink:0}}>
+                  <button onClick={e=>{e.stopPropagation();setOpenPicker(openPicker===c.id?null:c.id);}}
+                    style={{padding:"4px 8px",borderRadius:7,background:meta.bg,border:`1px solid ${meta.border}`,cursor:"pointer",fontFamily:"inherit",fontSize:10,fontWeight:700,color:meta.color,whiteSpace:"nowrap"}}>
+                    {meta.label}
+                    <svg style={{marginLeft:4,verticalAlign:"middle"}} width={7} height={7} viewBox="0 0 24 24" fill="none" stroke={meta.color} strokeWidth="3" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+                  </button>
+                  {j!==null&&j>=0&&j<=30&&(
+                    <span style={{fontSize:9,fontWeight:700,color:DS.red,background:"#fff1f2",padding:"2px 6px",borderRadius:6}}>⚠ {j}j</span>
+                  )}
+                </div>
+
+                {/* Picker contrat en vue liste */}
+                {openPicker===c.id&&(
+                  <div onClick={e=>e.stopPropagation()} style={{position:"absolute",top:"calc(100% + 4px)",right:0,width:220,background:"#eef2f7",borderRadius:10,boxShadow:"0 8px 24px rgba(0,0,0,0.15)",border:"1px solid "+DS.border,zIndex:100,overflow:"auto",maxHeight:220}}>
+                    {CONTRAT_STATUTS.map(s=>(
+                      <button key={s.key} onClick={()=>setStatut(c.id,s.key)}
+                        style={{width:"100%",display:"flex",alignItems:"center",gap:6,padding:"8px 10px",background:meta.key===s.key?s.bg:DS.white,border:"none",borderBottom:"1px solid "+DS.light,cursor:"pointer",fontFamily:"inherit"}}>
+                        <span style={{fontSize:11,fontWeight:meta.key===s.key?700:500,color:meta.key===s.key?s.color:DS.dark}}>{s.label}</span>
+                        {meta.key===s.key&&<svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke={s.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft:"auto"}}><polyline points="20 6 9 17 4 12"/></svg>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
+
 
 // MODAL APERCU PASSAGE
 function PassageDetailModal({ passage, client, onClose }) {
@@ -6112,23 +6114,12 @@ export default function App() {
       const ct=snap.data()["bb_contrats_v1"];
       if(!ct) return;
       setContrats(prev=>{
-        for(const k of Object.keys(ct)){
-          const newC=ct[k],oldC=prev[k];
-          if(!oldC) continue;
-          if(newC.statut!==oldC.statut&&(newC.statut==="signe_client"||newC.statut==="signe_complet")){
-            playNotifSound();
-            const cli=clients.find(cl=>cl.id===newC.clientId);
-            const nomCli=cli?.nom||newC.clientId;
-            const isComplet=newC.statut==="signe_complet";
-            toastInfo(isComplet?`✅ Contrat co-signé par ${nomCli} !`:`📝 ${nomCli} a signé — votre signature est requise.`);
-            sendLocalNotification(isComplet?"✅ Contrat co-signé !":"📝 Signature requise",isComplet?`${nomCli} a co-signé.`:`${nomCli} a signé — votre tour !`,{tag:"briblue-contrat-"+newC.clientId,requireInteraction:!isComplet});
-          }
-        }
+        for(const k of Object.keys(ct)){const newC=ct[k],oldC=prev[k];if(!oldC)continue;if(newC.statut!==oldC.statut&&(newC.statut==="signe_client"||newC.statut==="signe_complet")){playNotifSound();const cli=clients.find(cl=>cl.id===newC.clientId);const nomCli=cli?.nom||newC.clientId;const isComplet=newC.statut==="signe_complet";toastInfo(isComplet?`✅ Contrat co-signé par ${nomCli} !`:`📝 ${nomCli} a signé — votre signature est requise.`);sendLocalNotification(isComplet?"✅ Contrat co-signé !":"📝 Signature requise",isComplet?`${nomCli} a co-signé.`:`${nomCli} a signé — votre tour !`,{tag:"briblue-contrat-"+newC.clientId,requireInteraction:!isComplet});}}
         try{localStorage.setItem("briblue_bb_contrats_v1",JSON.stringify(ct));localStorage.setItem("briblue_ts_bb_contrats_v1",String(Date.now()));}catch{}
         return ct;
       });
-    },(e)=>console.warn("onSnapshot error:",e));
-    return ()=>unsub();
+    },(e)=>console.warn("onSnapshot:",e));
+    return()=>unsub();
   },[ready,clients]);
 
   // Notification son + système quand nouvelles tâches apparaissent
@@ -6290,11 +6281,10 @@ export default function App() {
             {!isMobile&&<span style={{fontSize:12,fontWeight:700,color:"#fff",whiteSpace:"nowrap"}}>Rapport</span>}
           </button>
 
-          {/* Aide — ❓ */}
-          <button id="tour-btn-aide" onClick={()=>setShowTour(true)} title="Aide interactive" style={{width:isMobile?40:40,height:isMobile?40:40,borderRadius:12,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"3px 3px 10px rgba(109,40,217,0.35),-2px -2px 6px rgba(255,255,255,0.6)"}}>
-            <span style={{fontSize:isMobile?17:15,fontWeight:900,color:"#fff",lineHeight:1}}>?</span>
+          {/* Aide */}
+          <button id="tour-btn-aide" onClick={()=>setShowTour(true)} title="Aide interactive" style={{width:isMobile?40:40,height:40,borderRadius:12,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"3px 3px 10px rgba(109,40,217,0.35),-2px -2px 6px rgba(255,255,255,0.6)"}}>
+            <span style={{fontSize:16,fontWeight:900,color:"#fff",lineHeight:1}}>?</span>
           </button>
-
           {/* Déconnexion — rouge */}
           <button id="tour-btn-logout" onClick={handleLogout} title="Déconnexion" style={{width:isMobile?40:40,height:isMobile?40:40,borderRadius:12,background:"linear-gradient(135deg,#be123c,#e11d48)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"3px 3px 10px rgba(190,18,60,0.35),-2px -2px 6px rgba(255,255,255,0.6)"}}>
             <svg width={isMobile?17:15} height={isMobile?17:15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -6574,7 +6564,7 @@ export default function App() {
       })()}
       <ToastContainer/>
       <ConfirmModal/>
-      {showTour && <TourGuide onClose={()=>setShowTour(false)}/>}
+      {showTour&&<TourGuide onClose={()=>setShowTour(false)}/>}
     </div>
     </>
   );
