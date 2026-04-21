@@ -222,8 +222,8 @@ function useOnlineStatus() {
   return { online, pendingCount };
 }
 
-// STORAGE — Firebase + cache TTL 30min
-const CACHE_TTL_MS=30*60*1000;
+// STORAGE — Firebase + cache TTL 24h (important pour iOS : localStorage prioritaire au rechargement)
+const CACHE_TTL_MS=24*60*60*1000;
 async function load(key,fallback){
   try{const c=localStorage.getItem("briblue_"+key),ts=localStorage.getItem("briblue_ts_"+key);if(c&&ts&&(Date.now()-Number(ts))<CACHE_TTL_MS)return JSON.parse(c);}catch{}
   try{if(key==="bb_passages_v2"){const passages=await loadAllPassages();if(passages.length>0){try{localStorage.setItem("briblue_"+key,JSON.stringify(passages));localStorage.setItem("briblue_ts_"+key,String(Date.now()));}catch{}return passages;}try{const ls=localStorage.getItem("briblue_"+key);if(ls)return JSON.parse(ls);}catch{}return fallback;}
@@ -235,9 +235,10 @@ async function load(key,fallback){
 // Queue hors-ligne
 const offlineQueue = { pending: {} };
 
-// Debounce timers par clé — une seule écriture Firebase toutes les 3s max
+// Debounce timers par clé — 0ms sur iOS (Safari tue la page trop vite), 800ms ailleurs
 const _debounceTimers = {};
-const FIREBASE_DEBOUNCE_MS = 800;
+const isIOS = typeof navigator !== 'undefined' && /iP(hone|ad|od)/.test(navigator.userAgent);
+const FIREBASE_DEBOUNCE_MS = isIOS ? 0 : 800;
 
 async function saveToFirebase(key, val) {
   if (key === "bb_passages_v2" && Array.isArray(val)) {
@@ -268,19 +269,23 @@ async function flushOfflineQueue() {
 
 if (typeof window !== 'undefined') {
   const flushAll = () => {
+    // Annuler tous les debounces en attente
     Object.keys(_debounceTimers).forEach(key => {
       clearTimeout(_debounceTimers[key]);
       delete _debounceTimers[key];
     });
+    // Envoyer immédiatement à Firebase (sans await — iOS ne peut pas attendre)
     Object.keys(offlineQueue.pending).forEach(key => {
       saveToFirebase(key, offlineQueue.pending[key]).catch(()=>{});
     });
   };
   window.addEventListener('beforeunload', flushAll);
-  // Safari iOS tue beforeunload — visibilitychange est fiable
+  // Safari iOS ignore beforeunload — visibilitychange est le seul événement fiable
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') flushAll();
   });
+  // Également au pagehide (iOS PWA / Safari)
+  window.addEventListener('pagehide', flushAll);
   window.addEventListener('online', () => { flushOfflineQueue(); });
 }
 
