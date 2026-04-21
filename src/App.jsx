@@ -381,6 +381,30 @@ function calcMensualites(prixAnnuel) {
 const MOIS_NOW = new Date().getMonth() + 1;
 const YEAR_NOW = new Date().getFullYear();
 
+// ─── Helpers champs passage (globaux) ────────────────────────────────────────
+const getPH  = p => { const v = p.tPH || p.ph; return v && Number(v)>0 ? Number(v) : null; };
+const getCL  = p => { const v = p.tChlore || p.chloreLibre || p.chlore; return v && Number(v)>0 ? Number(v) : null; };
+const getTemp = p => { const v = p.temperature; return v && Number(v)>0 ? Number(v) : null; };
+const getResumePassage = p => {
+  const parts = [];
+  if (p.actions) parts.push(p.actions);
+  else {
+    const corr = [
+      p.corrChlore   && "Chlore: "+p.corrChlore,
+      p.corrPH       && "pH: "+p.corrPH,
+      p.corrAlgicide && "Algicide: "+p.corrAlgicide,
+      p.corrAlcafix  && "Alcafix: "+p.corrAlcafix,
+      p.corrSel      && "Sel: "+p.corrSel,
+      p.corrAutre    && p.corrAutre,
+    ].filter(Boolean);
+    if (corr.length) parts.push("Produits: "+corr.join(", "));
+  }
+  if (p.obs && p.obs !== p.actions) parts.push(p.obs);
+  if (p.commentaires && p.commentaires !== p.obs) parts.push(p.commentaires);
+  return parts.join(" · ") || null;
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
 
 // ICS EXPORT
 function exportRdvToICS(rdv, client) {
@@ -2960,27 +2984,23 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
           {/* Motif décoratif */}
           <div style={{position:"absolute",top:-30,right:-30,width:140,height:140,borderRadius:70,background:"rgba(56,189,248,0.08)",pointerEvents:"none"}}/>
           <div style={{position:"absolute",bottom:-20,left:-20,width:100,height:100,borderRadius:50,background:"rgba(14,165,233,0.06)",pointerEvents:"none"}}/>
-          <div style={{position:"relative",padding:"16px 20px",display:"flex",alignItems:"center",gap:14}}>
-            <div style={{position:"relative"}}>
-              <Avatar nom={clientSel.nom} size={48}/>
-              <div style={{position:"absolute",bottom:-3,right:-3,width:16,height:16,borderRadius:8,background:DS.green,border:"2px solid #0c1222",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                {Ico.check(8,"#fff")}
-              </div>
+          <div style={{position:"relative",padding:"12px 16px",display:"flex",alignItems:"center",gap:10,flexWrap:"nowrap"}}>
+            {/* Icône pool compact */}
+            <div style={{width:36,height:36,borderRadius:10,background:"rgba(8,145,178,0.25)",border:"1px solid rgba(56,189,248,0.3)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              {Ico.pool(16,"#38bdf8")}
             </div>
+            {/* Nom + badges — prend tout l'espace disponible */}
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontWeight:900,fontSize:15,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:-0.3}}>{clientSel.nom}</div>
-              <div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap"}}>
-                <span style={{background:"rgba(56,189,248,0.2)",color:"#7dd3fc",fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:6,border:"1px solid rgba(56,189,248,0.3)"}}>{clientSel.formule}</span>
-                {clientSel.bassin&&<span style={{background:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.7)",fontSize:10,fontWeight:600,padding:"2px 8px",borderRadius:6}}>{clientSel.bassin}{clientSel.volume?" "+clientSel.volume+"m³":""}</span>}
-                <span style={{background:"rgba(14,165,233,0.25)",color:"#38bdf8",fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:6,border:"1px solid rgba(14,165,233,0.3)"}}>{new Date(f.date).toLocaleDateString("fr",{weekday:"short",day:"2-digit",month:"short"})}</span>
+              <div style={{fontWeight:900,fontSize:isMobile?14:16,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:-0.3,lineHeight:1.2}}>{clientSel.nom}</div>
+              <div style={{display:"flex",gap:5,marginTop:4,flexWrap:"nowrap",overflow:"hidden"}}>
+                <span style={{background:"rgba(56,189,248,0.2)",color:"#7dd3fc",fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:5,border:"1px solid rgba(56,189,248,0.3)",whiteSpace:"nowrap",flexShrink:0}}>{clientSel.formule}</span>
+                {clientSel.bassin&&<span style={{background:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.65)",fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:5,whiteSpace:"nowrap",flexShrink:0}}>{clientSel.bassin}</span>}
               </div>
             </div>
-            <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
-              <div style={{background:"rgba(5,150,105,0.2)",border:"1px solid rgba(5,150,105,0.4)",borderRadius:8,padding:"4px 10px",display:"flex",alignItems:"center",gap:5}}>
-                {Ico.pool(13,"#6ee7b7")}
-                <span style={{fontSize:10,fontWeight:700,color:"#6ee7b7"}}>Rapport</span>
-              </div>
-              <div style={{fontSize:10,color:"rgba(255,255,255,0.4)",fontWeight:500}}>{clientSel.adresse?.split(",").pop()?.trim()||""}</div>
+            {/* Date à droite */}
+            <div style={{flexShrink:0,textAlign:"center",background:"rgba(14,165,233,0.2)",border:"1px solid rgba(14,165,233,0.3)",borderRadius:8,padding:"5px 10px"}}>
+              <div style={{fontSize:10,fontWeight:800,color:"#38bdf8",whiteSpace:"nowrap"}}>{new Date(f.date).toLocaleDateString("fr",{day:"2-digit",month:"short"})}</div>
+              <div style={{fontSize:9,color:"rgba(255,255,255,0.45)",marginTop:1}}>{new Date(f.date).toLocaleDateString("fr",{weekday:"short"})}</div>
             </div>
           </div>
         </div>
@@ -4516,7 +4536,8 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
         : <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {filtered.map((p,idx)=>{
             const c=clients.find(x=>x.id===p.clientId);
-            const phOk=p.ph>=7&&p.ph<=7.6, clOk=p.chlore>=0.5&&p.chlore<=3;
+            const _ph=getPH(p), _cl=getCL(p);
+            const phOk=_ph>=7&&_ph<=7.6, clOk=_cl>=0.5&&_cl<=3;
             const isCtrl = isControleType(p.type);
             const rapportStatus = getRapportStatus(p);
             const rapportMeta = RAPPORT_STATUS[rapportStatus];
@@ -4543,8 +4564,8 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                           {isCtrl ? Ico.drop(11,DS.teal) : Ico.wrench(11,DS.blue)} {p.type}
                         </span>
                       </Tag>
-                      {p.ph&&<Tag color={phOk?DS.green:DS.red} style={{fontSize:11}}>pH {getPH(p)}</Tag>}
-                      {p.chlore&&<Tag color={clOk?DS.green:DS.red} style={{fontSize:11}}>Cl {getCL(p)}</Tag>}
+                      {_ph&&<Tag color={phOk?DS.green:DS.red} style={{fontSize:11}}>pH {_ph}</Tag>}
+                      {_cl&&<Tag color={clOk?DS.green:DS.red} style={{fontSize:11}}>Cl {_cl}</Tag>}
                       <Tag color={rapportMeta.color} bg={rapportMeta.bg} style={{fontSize:11}}>{rapportMeta.label}</Tag>
                     </div>
                     {(p.photoArrivee||p.photoDepart) && (
@@ -4777,39 +4798,10 @@ function CarnetPublicInline({ client, passages }) {
   const last = passClient[0] || null;
   const F = "system-ui,-apple-system,sans-serif";
 
-  // Normalise pH et chlore depuis tous les champs possibles
-  const getPH = p => {
-    const v = p.tPH || p.ph;
-    return v && Number(v) > 0 ? Number(v) : null;
-  };
-  const getCL = p => {
-    const v = p.tChlore || p.chloreLibre || p.chlore;
-    return v && Number(v) > 0 ? Number(v) : null;
-  };
   const phOk = v => v >= 7 && v <= 7.6;
   const clOk = v => v >= 0.5 && v <= 3;
   const fmtDate = (d, opts) => new Date(d).toLocaleDateString("fr", opts);
-
-  // Résumé lisible du passage
-  const getResume = p => {
-    const parts = [];
-    if (p.actions) parts.push(p.actions);
-    else {
-      const corr = [
-        p.corrChlore && "Chlore: " + p.corrChlore,
-        p.corrPH && "pH: " + p.corrPH,
-        p.corrAlgicide && "Algicide: " + p.corrAlgicide,
-        p.corrAlcafix && "Alcafix: " + p.corrAlcafix,
-        p.corrSel && "Sel: " + p.corrSel,
-        p.corrAutre && p.corrAutre,
-      ].filter(Boolean);
-      if (corr.length) parts.push("Produits: " + corr.join(", "));
-    }
-    if (p.obs && p.obs !== p.actions) parts.push(p.obs);
-    if (p.commentaires && p.commentaires !== p.obs) parts.push(p.commentaires);
-    return parts.join(" · ") || null;
-  };
-
+  const getResume = getResumePassage;
   const isCtrl = p => p.type && p.type.toLowerCase().includes("contrôle");
 
   return (
@@ -5131,28 +5123,8 @@ function CarnetPublic({ code, allClients, allPassages }) {
   const last = passClient[0]||null;
   const F = "system-ui,-apple-system,sans-serif";
 
-  // helpers — lit les nouveaux champs ET les anciens
-  const getPH   = p => { const v = p.tPH || p.ph; return v && Number(v)>0 ? Number(v) : null; };
-  const getCL   = p => { const v = p.tChlore || p.chloreLibre || p.chlore; return v && Number(v)>0 ? Number(v) : null; };
-  const getTemp = p => { const v = p.temperature; return v && Number(v)>0 ? Number(v) : null; };
-  const getResume = p => {
-    const parts = [];
-    if (p.actions) parts.push(p.actions);
-    else {
-      const corr = [
-        p.corrChlore   && "Chlore: "+p.corrChlore,
-        p.corrPH       && "pH: "+p.corrPH,
-        p.corrAlgicide && "Algicide: "+p.corrAlgicide,
-        p.corrAlcafix  && "Alcafix: "+p.corrAlcafix,
-        p.corrSel      && "Sel: "+p.corrSel,
-        p.corrAutre    && p.corrAutre,
-      ].filter(Boolean);
-      if (corr.length) parts.push("Produits: "+corr.join(", "));
-    }
-    if (p.obs && p.obs !== p.actions) parts.push(p.obs);
-    if (p.commentaires && p.commentaires !== p.obs) parts.push(p.commentaires);
-    return parts.join(" · ") || null;
-  };
+  // helpers globaux réutilisés
+  const getResume = getResumePassage;
   const phOk  = v => v>=7 && v<=7.6;
   const clOk  = v => v>=0.5 && v<=3;
   const fmtDate = (d,opts) => new Date(d).toLocaleDateString("fr",opts);
