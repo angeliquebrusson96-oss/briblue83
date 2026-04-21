@@ -905,7 +905,7 @@ function ToastContainer() {
   };
   if(!toasts.length) return null;
   return (
-    <div style={{position:"fixed",top:16,left:"50%",transform:"translateX(-50%)",zIndex:99999,display:"flex",flexDirection:"column",gap:8,minWidth:280,maxWidth:"92vw",pointerEvents:"none"}}>
+    <div style={{position:"fixed",top:"calc(env(safe-area-inset-top, 0px) + 56px)",left:"50%",transform:"translateX(-50%)",zIndex:99999,display:"flex",flexDirection:"column",gap:8,minWidth:280,maxWidth:"92vw",pointerEvents:"none"}}>
       {toasts.map(t=>{
         const s=STYLES[t.type]||STYLES.info;
         return (
@@ -1038,7 +1038,7 @@ function Modal({ title, onClose, children, wide }) {
     };
   },[]);
   // maxHeight fallback: dvh non supporté sur vieux Safari → vh
-  const maxH = isMobile ? "min(92dvh,92vh)" : "min(88dvh,88vh)";
+  const maxH = isMobile ? "min(96dvh,96vh)" : "min(88dvh,88vh)";
   return (
     <div
       style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.4)",zIndex:200,display:"flex",alignItems:isMobile?"flex-end":"center",justifyContent:"center",padding:isMobile?"0":"12px",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}}
@@ -1233,7 +1233,11 @@ function FormClient({ initial, clients, onSave, onClose }) {
           <Input label="Email" type="email" value={f.email} onChange={e=>set("email",e.target.value)}/>
           <div style={{gridColumn:"1/-1"}}><Input label="Adresse" value={f.adresse} onChange={e=>set("adresse",e.target.value)}/></div>
           <Select label="Type bassin" value={f.bassin} onChange={e=>set("bassin",e.target.value)} options={["Liner","Béton","Coque polyester","PVC armé","Hors-sol","Autre"]}/>
-          <Input label="Volume (m³)" type="number" style={{fontSize:16}} value={f.volume} onChange={e=>set("volume",+e.target.value)}/>
+          <div style={{display:"flex",flexDirection:"column",gap:5}}>
+            <span style={{fontSize:13,fontWeight:600,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>Volume (m³)</span>
+            <input type="number" inputMode="decimal" value={f.volume||""} onChange={e=>set("volume",+e.target.value)}
+              style={{padding:"11px 14px",borderRadius:DS.radiusSm,border:"none",fontSize:18,fontWeight:800,color:DS.dark,background:"#eef2f7",boxShadow:"inset 3px 3px 6px rgba(166,210,220,0.45),inset -2px -2px 5px rgba(255,255,255,0.8)",outline:"none",width:"100%",boxSizing:"border-box",touchAction:"manipulation",fontFamily:"inherit"}}/>
+          </div>
         </div>
       </Section>
       <Section title="Photo de la piscine">
@@ -1271,15 +1275,15 @@ function FormClient({ initial, clients, onSave, onClose }) {
                 <div style={{flex:1,display:"flex",alignItems:"center",gap:12}}>
                   <div style={{display:"flex",alignItems:"center",gap:4}}>
                     <span style={{fontSize:15,color:DS.blue}}>🔧</span>
-                    <button onClick={()=>setMoisVal(m,"entretien",mv.entretien-1)} style={{width:24,height:24,borderRadius:6,border:"none",background:"#eef2f7",boxShadow:DS.nmShadowSm,cursor:"pointer",fontSize:15,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
-                    <span style={{fontSize:16,fontWeight:900,color:DS.blue,minWidth:16,textAlign:"center"}}>{mv.entretien}</span>
-                    <button onClick={()=>setMoisVal(m,"entretien",mv.entretien+1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.blue,background:DS.blueSoft,cursor:"pointer",fontSize:15,fontWeight:700,color:DS.blue,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                    <button onClick={()=>setMoisVal(m,"entretien",mv.entretien-1)} style={{width:38,height:38,borderRadius:10,border:"none",background:"#eef2f7",boxShadow:DS.nmShadowSm,cursor:"pointer",fontSize:18,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center",touchAction:"manipulation"}}>−</button>
+                    <span style={{fontSize:18,fontWeight:900,color:DS.blue,minWidth:24,textAlign:"center"}}>{mv.entretien}</span>
+                    <button onClick={()=>setMoisVal(m,"entretien",mv.entretien+1)} style={{width:38,height:38,borderRadius:10,border:"1px solid "+DS.blue,background:DS.blueSoft,cursor:"pointer",fontSize:18,fontWeight:700,color:DS.blue,display:"flex",alignItems:"center",justifyContent:"center",touchAction:"manipulation"}}>+</button>
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:4}}>
                     <span style={{fontSize:15,color:DS.teal}}>💧</span>
-                    <button onClick={()=>setMoisVal(m,"controle",mv.controle-1)} style={{width:24,height:24,borderRadius:6,border:"none",background:"#eef2f7",boxShadow:DS.nmShadowSm,cursor:"pointer",fontSize:15,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
-                    <span style={{fontSize:16,fontWeight:900,color:DS.teal,minWidth:16,textAlign:"center"}}>{mv.controle}</span>
-                    <button onClick={()=>setMoisVal(m,"controle",mv.controle+1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.teal,background:DS.tealSoft,cursor:"pointer",fontSize:15,fontWeight:700,color:DS.teal,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                    <button onClick={()=>setMoisVal(m,"controle",mv.controle-1)} style={{width:38,height:38,borderRadius:10,border:"none",background:"#eef2f7",boxShadow:DS.nmShadowSm,cursor:"pointer",fontSize:18,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center",touchAction:"manipulation"}}>−</button>
+                    <span style={{fontSize:18,fontWeight:900,color:DS.teal,minWidth:24,textAlign:"center"}}>{mv.controle}</span>
+                    <button onClick={()=>setMoisVal(m,"controle",mv.controle+1)} style={{width:38,height:38,borderRadius:10,border:"1px solid "+DS.teal,background:DS.tealSoft,cursor:"pointer",fontSize:18,fontWeight:700,color:DS.teal,display:"flex",alignItems:"center",justifyContent:"center",touchAction:"manipulation"}}>+</button>
                   </div>
                 </div>
                 <div style={{fontSize:15,fontWeight:700,color:mv.entretien+mv.controle>0?DS.dark:DS.border,minWidth:20,textAlign:"right"}}>{mv.entretien+mv.controle>0?mv.entretien+mv.controle:"—"}</div>
@@ -1287,9 +1291,17 @@ function FormClient({ initial, clients, onSave, onClose }) {
             );
           })}
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginTop:12}}>
-          <Input label="Prix/passage entretien (€)" type="number" style={{fontSize:16}} value={f.prixPassageE||""} onChange={e=>set("prixPassageE",+e.target.value||0)}/>
-          <Input label="Prix/passage contrôle (€)" type="number" style={{fontSize:16}} value={f.prixPassageC||""} onChange={e=>set("prixPassageC",+e.target.value||0)}/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:14}}>
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            <span style={{fontSize:12,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>🔧 Prix entretien (€)</span>
+            <input type="number" inputMode="decimal" value={f.prixPassageE||""} onChange={e=>set("prixPassageE",+e.target.value||0)}
+              style={{padding:"14px 16px",borderRadius:12,border:"2px solid "+DS.blue+"44",fontSize:20,fontWeight:800,color:DS.blue,background:"#eff9ff",outline:"none",width:"100%",boxSizing:"border-box",touchAction:"manipulation",fontFamily:"inherit"}}/>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            <span style={{fontSize:12,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>💧 Prix contrôle (€)</span>
+            <input type="number" inputMode="decimal" value={f.prixPassageC||""} onChange={e=>set("prixPassageC",+e.target.value||0)}
+              style={{padding:"14px 16px",borderRadius:12,border:"2px solid "+DS.teal+"44",fontSize:20,fontWeight:800,color:DS.teal,background:"#effcff",outline:"none",width:"100%",boxSizing:"border-box",touchAction:"manipulation",fontFamily:"inherit"}}/>
+          </div>
         </div>
         {/* Récap tarification auto */}
         <div style={{marginTop:12,background:"#0891b2",borderRadius:DS.radiusSm,padding:"14px 16px",color:"#fff"}}>
@@ -2587,7 +2599,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
     {showCarnetPreview&&(
       <div style={{position:"fixed",inset:0,zIndex:9999,background:"#f0f4f8",display:"flex",flexDirection:"column",overflow:"hidden"}}>
         {/* Barre fermeture */}
-        <div style={{position:"sticky",top:0,zIndex:10,background:"rgba(12,31,63,0.96)",backdropFilter:"blur(8px)",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",boxShadow:"0 2px 12px rgba(0,0,0,0.3)"}}>
+        <div style={{position:"sticky",top:0,zIndex:10,background:"rgba(12,31,63,0.96)",backdropFilter:"blur(8px)",paddingTop:"calc(env(safe-area-inset-top,0px) + 10px)",paddingBottom:10,paddingLeft:16,paddingRight:16,display:"flex",alignItems:"center",justifyContent:"space-between",boxShadow:"0 2px 12px rgba(0,0,0,0.3)"}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <svg width={16} height={11} viewBox="0 0 32 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2.5" strokeLinecap="round">
               <path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/>
@@ -3368,11 +3380,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
           ].filter(Boolean).join(", ") || "",
       obs: isSimplifiedSave ? (f.descriptionSAV || f.commentaires || "") : f.commentaires,
     };
-    try {
-      await onSave(passage);
-    } finally {
-      setSavingPassage(false);
-    }
+    try { await onSave(passage); } finally { setSavingPassage(false); }
     setShowConfirmSave(false);
     // Auto-créer une livraison si produits livrés
     if (f.livraisonProduits && (f.produitsLivres?.length > 0 || f.livraisonAutre) && onSaveLivraison) {
@@ -4318,62 +4326,63 @@ function CalendrierInteractif({ passages, rdvs, clients, onClientClick, onEditPa
 
 // ALERTES COLLAPSIBLE
 function AlertesBlock({ alertes, passages, onClientClick }) {
-  const [open, setOpen] = useState(false);
-  const preview = alertes.slice(0, 2);
-  const isMobile = useIsMobile();
+  const [showAll, setShowAll] = useState(false);
+  const displayed = showAll ? alertes : alertes.slice(0, 3);
   return (
-    <div style={{borderRadius:DS.radius,border:"1px solid "+DS.red+"33",background:DS.white,overflow:"hidden",boxShadow:DS.shadow,marginBottom:0}}>
-      {/* Header cliquable */}
-      <div onClick={()=>setOpen(o=>!o)} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 16px",cursor:"pointer",background:DS.redSoft}}>
-        <IcoBubble ico={Ico.alert(14,DS.red)} color={DS.red} size={30}/>
-        <span style={{flex:1,fontWeight:800,fontSize:15,color:DS.red}}>⚠️ {alertes.length} Alerte{alertes.length>1?"s":""}</span>
-        <div style={{width:28,height:28,borderRadius:8,background:DS.red+"18",display:"flex",alignItems:"center",justifyContent:"center",transition:"transform .2s",transform:open?"rotate(45deg)":"none"}}>
-          {open
-            ? <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={DS.red} strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            : <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={DS.red} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          }
+    <div style={{marginBottom:0}}>
+      {/* Titre section */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+        <div style={{display:"flex",alignItems:"center",gap:7}}>
+          <div style={{width:8,height:8,borderRadius:4,background:DS.red}}/>
+          <span style={{fontSize:12,fontWeight:800,color:DS.red,textTransform:"uppercase",letterSpacing:.8}}>
+            {alertes.length} Alerte{alertes.length>1?"s":""}
+          </span>
         </div>
+        {alertes.length>3&&(
+          <button onClick={()=>setShowAll(v=>!v)} style={{fontSize:11,fontWeight:700,color:DS.blue,background:"none",border:"none",cursor:"pointer",fontFamily:"inherit"}}>
+            {showAll?"Réduire":"Voir tout"}
+          </button>
+        )}
       </div>
-      {/* Aperçu 2 lignes quand fermé */}
-      {!open && (
-        <div style={{padding:"8px 16px 10px"}}>
-          {preview.map(c=>{
-            const al=alerteClient(c,passages); const col=AC[al];
-            return (
-              <div key={c.id} onClick={()=>onClientClick(c)} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 0",borderBottom:"1px solid "+DS.border,cursor:"pointer"}}>
-                <Avatar nom={c.nom} size={28} photo={c.photoPiscine}/>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontWeight:700,fontSize:13,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
+      {/* Cartes */}
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {displayed.map(c=>{
+          const al=alerteClient(c,passages); const col=AC[al]; const j=daysUntil(c.dateFin);
+          const passM=passages.filter(p=>{
+            if(p.clientId!==c.id) return false;
+            const d=new Date(p.date);
+            return d.getMonth()+1===MOIS_NOW && d.getFullYear()===YEAR_NOW;
+          });
+          const prevMois=(getMoisVal(c.moisParMois||c.saisons||{},MOIS_NOW).entretien||0)+(getMoisVal(c.moisParMois||c.saisons||{},MOIS_NOW).controle||0);
+          const doneMois=passM.length;
+          return (
+            <div key={c.id} onClick={()=>onClientClick(c)}
+              style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",
+                borderRadius:14,background:"#eef2f7",cursor:"pointer",
+                border:"1.5px solid "+col.tx+"33",
+                borderLeft:"4px solid "+col.tx,
+                boxShadow:"3px 3px 8px rgba(166,210,220,0.5),-2px -2px 5px rgba(255,255,255,0.85)",
+                transition:"all .15s"}}>
+              <Avatar nom={c.nom} size={40} photo={c.photoPiscine}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:800,fontSize:13,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:3}}>{c.nom}</div>
+                <div style={{fontSize:11,color:col.tx,fontWeight:700}}>
+                  {al==="rouge"?`Contrat expire dans ${j}j`
+                   :al==="jaune"?`Expire dans ${j} jours`
+                   :al==="orange"?"Passages en retard"
+                   :`Ce mois : ${doneMois}/${prevMois} passages`}
                 </div>
-                <Tag color={col.tx}>{col.lbl}</Tag>
               </div>
-            );
-          })}
-          {alertes.length > 2 && (
-            <div onClick={()=>setOpen(true)} style={{textAlign:"center",paddingTop:8,fontSize:12,fontWeight:700,color:DS.red,cursor:"pointer"}}>
-              + {alertes.length-2} autre{alertes.length-2>1?"s":""} — Voir tout
+              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
+                <span style={{fontSize:10,fontWeight:800,color:col.tx,background:col.bg,padding:"3px 9px",borderRadius:20,border:"1px solid "+col.tx+"44"}}>{col.lbl}</span>
+                {prevMois>0&&(
+                  <span style={{fontSize:10,fontWeight:600,color:doneMois>=prevMois?DS.green:DS.orange}}>{doneMois}/{prevMois} ce mois</span>
+                )}
+              </div>
             </div>
-          )}
-        </div>
-      )}
-      {/* Liste complète quand ouvert */}
-      {open && (
-        <div style={{padding:"4px 16px 12px"}}>
-          {alertes.map(c=>{
-            const al=alerteClient(c,passages); const col=AC[al]; const j=daysUntil(c.dateFin);
-            return (
-              <div key={c.id} onClick={()=>onClientClick(c)} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid "+DS.border,cursor:"pointer"}}>
-                <Avatar nom={c.nom} size={36} photo={c.photoPiscine}/>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontWeight:700,fontSize:14,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
-                  <div style={{fontSize:12,color:DS.mid,marginTop:2}}>{al==="rouge"||al==="jaune"?`Expire dans ${j} jours`:"Passages en retard"}</div>
-                </div>
-                <Tag color={col.tx}>{col.lbl}</Tag>
-              </div>
-            );
-          })}
-        </div>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 }
