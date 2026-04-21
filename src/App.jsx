@@ -1,11 +1,21 @@
 // @ts-nocheck
-import { createClient } from '@supabase/supabase-js'
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { initializeApp } from "firebase/app";
+import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 
-const supabase = createClient(
-  "https://qhemxhnhbgdfvjqedwyi.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFoZW14aG5oYmdkZnZqcWVkd3lpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4ODMzMDksImV4cCI6MjA5MTQ1OTMwOX0.JFcwVtN5QM-kEJISjU4l5qy9O559qo45LM2v62A9rMM"
-);
+const firebaseConfig = {
+  apiKey: "AIzaSyCyRHh4hGaDYU1NumTrRJ-3KKuRxC8NU5k",
+  authDomain: "briblue-729de.firebaseapp.com",
+  projectId: "briblue-729de",
+  storageBucket: "briblue-729de.firebasestorage.app",
+  messagingSenderId: "683737993436",
+  appId: "1:683737993436:web:090e2615396d08c75fe419"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+const APP_DOC = doc(db, "briblue", "app_data");
+
 
 const BRAND_LOGO = `data:image/svg+xml;utf8,${encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" width="420" height="96" viewBox="0 0 420 96">
@@ -200,25 +210,17 @@ function useOnlineStatus() {
   return { online, pendingCount };
 }
 
-// STORAGE
+// STORAGE — Firebase Firestore
 async function load(key, fallback) {
   try {
-    const { data, error } = await supabase
-      .from("app_data")
-      .select("data")
-      .eq("id", 1)
-      .single();
-
-    if (error || !data?.data) {
-      try { const ls = localStorage.getItem("briblue_" + key); if (ls) return JSON.parse(ls); } catch {}
-      return fallback;
+    const snap = await getDoc(APP_DOC);
+    if (snap.exists()) {
+      const allData = snap.data();
+      if (key in allData) return allData[key];
     }
-
-    const allData = data.data;
-    if (key in allData) return allData[key];
-
+    // Fallback localStorage
     try { const ls = localStorage.getItem("briblue_" + key); if (ls) return JSON.parse(ls); } catch {}
-    return null;
+    return fallback;
   } catch {
     try { const ls = localStorage.getItem("briblue_" + key); if (ls) return JSON.parse(ls); } catch {}
     return fallback;
@@ -226,14 +228,14 @@ async function load(key, fallback) {
 }
 
 // Queue hors-ligne
-const offlineQueue = { pending: {}, flush: null };
+const offlineQueue = { pending: {} };
 
-async function saveToSupabase(key, val) {
-  const { error } = await supabase.rpc('patch_app_data', { p_key: key, p_val: val });
-  if (error) {
-    const { data: current } = await supabase.from("app_data").select("data").eq("id",1).single();
-    await supabase.from("app_data").upsert({ id:1, data:{...(current?.data||{}), [key]:val} });
-  }
+// Debounce timers par clé — une seule écriture Firebase toutes les 3s max
+const _debounceTimers = {};
+const FIREBASE_DEBOUNCE_MS = 3000;
+
+async function saveToFirebase(key, val) {
+  await setDoc(APP_DOC, { [key]: val }, { merge: true });
 }
 
 async function flushOfflineQueue() {
@@ -241,39 +243,52 @@ async function flushOfflineQueue() {
   if (!keys.length) return;
   for (const key of keys) {
     try {
-      await saveToSupabase(key, offlineQueue.pending[key]);
+      await saveToFirebase(key, offlineQueue.pending[key]);
       delete offlineQueue.pending[key];
     } catch {}
   }
 }
 
-// Écouter le retour de connexion
 if (typeof window !== 'undefined') {
-  window.addEventListener('online', () => {
-    flushOfflineQueue();
+  window.addEventListener('online', () => { flushOfflineQueue(); });
+  window.addEventListener('beforeunload', () => {
+    Object.keys(_debounceTimers).forEach(key => {
+      clearTimeout(_debounceTimers[key]);
+      delete _debounceTimers[key];
+    });
+    Object.keys(offlineQueue.pending).forEach(key => {
+      saveToFirebase(key, offlineQueue.pending[key]).catch(()=>{});
+    });
   });
 }
 
 async function save(key, val) {
-  // Toujours sauvegarder en mémoire locale d'abord
+  // 1. localStorage immédiat — jamais de perte
   try { localStorage.setItem('briblue_' + key, JSON.stringify(val)); } catch {}
-  
+
   if (!navigator.onLine) {
-    // Hors-ligne : stocker dans la queue
     offlineQueue.pending[key] = val;
     return;
   }
-  
-  // En ligne : envoyer directement
-  try {
-    await saveToSupabase(key, val);
-    // Vider la queue si items en attente
-    if (Object.keys(offlineQueue.pending).length > 0) flushOfflineQueue();
-  } catch {
-    // Erreur réseau : mettre en queue
-    offlineQueue.pending[key] = val;
-  }
+
+  // 2. Firebase debounced — regroupe les appels rapides en un seul
+  offlineQueue.pending[key] = val;
+
+  if (_debounceTimers[key]) clearTimeout(_debounceTimers[key]);
+
+  _debounceTimers[key] = setTimeout(async () => {
+    delete _debounceTimers[key];
+    const latest = offlineQueue.pending[key];
+    if (latest === undefined) return;
+    try {
+      await saveToFirebase(key, latest);
+      delete offlineQueue.pending[key];
+    } catch {
+      // reste en queue, réessayé au retour connexion
+    }
+  }, FIREBASE_DEBOUNCE_MS);
 }
+
 
 
 // UTILS
@@ -2684,22 +2699,7 @@ async function envoyerContratSignature(client) {
     });
     const data = await res.json();
     if (res.ok) {
-      // Marquer "demande_envoyee" dans Supabase
-      try {
-        const { createClient } = await import("@supabase/supabase-js").catch(()=>({createClient:null}));
-        // Sauvegarde locale dans l'état contrats via un appel à l'API
-        await fetch("/api/sign-contract", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contractId: "CT-" + client.id,
-            clientId: client.id,
-            signatureClient: "pending",
-            signedAt: new Date().toISOString(),
-            statut_override: "demande_envoyee",
-          }),
-        });
-      } catch(e) {}
+      // (signature tracking supprimé - géré localement)
       toastSuccess(`Contrat envoyé à ${client.email} !`);
     }
     else toastError(`Erreur : ${data?.message}`);
@@ -5357,10 +5357,11 @@ function CarnetPublic({ code, allClients, allPassages }) {
   const loadData = useCallback(async () => {
     setRefreshing(true);
     try {
-      const { data } = await supabase.from("app_data").select("data").eq("id", 1).single();
-      if (data?.data) {
-        const c = data.data["bb_clients_v2"];
-        const p = data.data["bb_passages_v2"];
+      const snap = await getDoc(APP_DOC);
+      if (snap.exists()) {
+        const d = snap.data();
+        const c = d["bb_clients_v2"];
+        const p = d["bb_passages_v2"];
         setLoadedClients(c && c.length ? c : CLIENTS_INIT);
         setLoadedPassages(p && p.length ? p : PASSAGES_INIT);
       } else {
