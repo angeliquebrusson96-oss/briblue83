@@ -3852,7 +3852,7 @@ function DashboardHero({ saisonNow, isMobile }) {
     const t = setInterval(() => {
       setVisible(false);
       setTimeout(() => { setIdx(i => (i + 1) % VDM_SHUFFLED.length); setVisible(true); }, 400);
-    }, 7000);
+    }, 12000);
     return () => clearInterval(t);
   }, []);
 
@@ -5671,6 +5671,17 @@ export default function App() {
             </button>
           )}
 
+          {isMobile&&(
+            <button onClick={openAddClient} title="Nouveau client" style={{width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:14,background:"linear-gradient(135deg,#7c3aed,#4f46e5)",border:"none",cursor:"pointer",flexShrink:0,boxShadow:"4px 4px 12px rgba(79,70,229,0.35), -2px -2px 6px rgba(255,255,255,0.6)"}}>
+              <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+                <line x1="19" y1="3" x2="19" y2="9"/>
+                <line x1="16" y1="6" x2="22" y2="6"/>
+              </svg>
+            </button>
+          )}
+
           <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} style={{width:isMobile?44:undefined,height:isMobile?44:40,padding:isMobile?0:"0 18px",display:"flex",alignItems:"center",justifyContent:"center",gap:7,borderRadius:isMobile?14:20,background:"linear-gradient(135deg,#06b6d4,#0891b2)",border:"none",cursor:"pointer",flexShrink:0,fontFamily:"inherit",boxShadow:"4px 4px 12px rgba(8,145,178,0.35), -2px -2px 6px rgba(255,255,255,0.6)"}}>
             <svg width={isMobile?22:16} height={isMobile?22:16} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
             {!isMobile&&<span style={{fontSize:12,fontWeight:700,color:"#fff",whiteSpace:"nowrap"}}>Rapport</span>}
@@ -5752,62 +5763,96 @@ export default function App() {
         <>
           <style>{`
             @keyframes navPop {
-              0%  { transform:scale(.78) translateY(4px); opacity:0; }
-              60% { transform:scale(1.08) translateY(-1px); opacity:1; }
+              0%  { transform:scale(.72) translateY(6px); opacity:0; }
+              55% { transform:scale(1.12) translateY(-2px); opacity:1; }
               100%{ transform:scale(1) translateY(0); opacity:1; }
             }
-            .nav-icon-active { animation: navPop .28s cubic-bezier(.22,1,.36,1) forwards; }
+            @keyframes navGlow {
+              0%,100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+              50%      { box-shadow: 0 0 16px 4px var(--accent-glow); }
+            }
+            @keyframes navSlideIn {
+              from { opacity:0; transform:translateY(2px) scaleX(0.6); }
+              to   { opacity:1; transform:translateY(0) scaleX(1); }
+            }
+            @keyframes navBubble {
+              0%   { transform:translateX(-50%) scale(0.6); opacity:0; }
+              60%  { transform:translateX(-50%) scale(1.05); opacity:1; }
+              100% { transform:translateX(-50%) scale(1); opacity:1; }
+            }
+            .nav-icon-active { animation: navPop .3s cubic-bezier(.34,1.56,.64,1) forwards; }
+            .nav-pill-active { animation: navSlideIn .25s cubic-bezier(.22,1,.36,1) forwards; }
+            .nav-bubble { animation: navBubble .3s cubic-bezier(.34,1.56,.64,1) forwards; }
           `}</style>
           <div style={{
             position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",
             width:"100%",maxWidth:640,
-            background:"rgba(238,242,247,0.96)",
-            backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",
-            display:"flex",alignItems:"center",
-            boxShadow:"0 -1px 0 rgba(166,210,220,0.6), 0 -8px 24px rgba(140,180,200,0.18)",
+            background:"rgba(232,240,248,0.97)",
+            backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",
+            display:"flex",alignItems:"flex-end",
+            boxShadow:"0 -1px 0 rgba(166,210,220,0.5), 0 -12px 32px rgba(120,170,200,0.22), 6px 0 12px rgba(166,210,220,0.3), -6px 0 12px rgba(255,255,255,0.8)",
             zIndex:50,
             paddingBottom:"env(safe-area-inset-bottom,0px)",
-            paddingTop:4,
+            borderTop:"1px solid rgba(255,255,255,0.7)",
           }}>
             {NAV.map(n=>{
               const active = page===n.id;
               const accentColor = n.id==="rdv" ? "#818cf8" : DS.blue;
+              const accentGlow = n.id==="rdv" ? "rgba(129,140,248,0.3)" : "rgba(8,145,178,0.3)";
               return (
                 <button key={n.id} onClick={()=>setPage(n.id)} style={{
                   flex:1,
-                  paddingTop:8,paddingBottom:10,
+                  paddingTop: active ? 6 : 10,
+                  paddingBottom:12,
                   border:"none",cursor:"pointer",background:"none",
-                  display:"flex",flexDirection:"column",alignItems:"center",gap:2,
+                  display:"flex",flexDirection:"column",alignItems:"center",gap:3,
                   WebkitTapHighlightColor:"transparent",
                   outline:"none",
                   position:"relative",
+                  transition:"padding .25s cubic-bezier(.22,1,.36,1)",
                 }}>
-                  {/* Pill active */}
+                  {/* Trait supérieur actif */}
                   {active && (
-                    <div style={{
+                    <div className="nav-pill-active" style={{
                       position:"absolute",
                       top:0,left:"50%",transform:"translateX(-50%)",
-                      width:36,height:3,
-                      background:`linear-gradient(90deg,${accentColor}00,${accentColor},${accentColor}00)`,
-                      borderRadius:"0 0 4px 4px",
+                      width:32,height:3,
+                      background:accentColor,
+                      borderRadius:"0 0 6px 6px",
+                      boxShadow:`0 2px 8px ${accentColor}88`,
+                      transformOrigin:"center",
+                    }}/>
+                  )}
+                  {/* Bulle active */}
+                  {active && (
+                    <div className="nav-bubble" style={{
+                      position:"absolute",
+                      top:6,left:"50%",transform:"translateX(-50%)",
+                      width:46,height:34,
+                      borderRadius:12,
+                      background:`linear-gradient(160deg,${accentColor}22,${accentColor}10)`,
+                      boxShadow:`inset 1px 1px 3px ${accentColor}20, inset -1px -1px 2px rgba(255,255,255,0.6)`,
+                      pointerEvents:"none",
                     }}/>
                   )}
                   {/* Icône */}
                   <div key={active?"a":"i"} className={active?"nav-icon-active":""} style={{
-                    width:36,height:36,borderRadius:11,
-                    background: active ? `${accentColor}18` : "transparent",
+                    width:40,height:32,borderRadius:11,
                     display:"flex",alignItems:"center",justifyContent:"center",
-                    transition:"background .2s",
+                    position:"relative",zIndex:1,
+                    filter: active ? `drop-shadow(0 2px 6px ${accentColor}66)` : "none",
+                    transition:"filter .2s",
                   }}>
                     {n.icon(active)}
                   </div>
                   {/* Label */}
                   <span style={{
-                    fontSize:9.5,
-                    fontWeight: active ? 700 : 500,
-                    color: active ? accentColor : "#b0bec5",
-                    letterSpacing:.1,
-                    transition:"color .15s",
+                    fontSize:active?10:9.5,
+                    fontWeight: active ? 800 : 500,
+                    color: active ? accentColor : "#a0b4c2",
+                    letterSpacing: active ? .2 : .1,
+                    transition:"all .2s",
+                    lineHeight:1,
                   }}>{n.l}</span>
                 </button>
               );
