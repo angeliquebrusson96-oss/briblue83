@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, getDocs, setDoc, collection } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCyRHh4hGaDYU1NumTrRJ-3KKuRxC8NU5k",
@@ -15,6 +15,20 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 const APP_DOC = doc(db, "briblue", "app_data");
+const NB_PASSAGE_CHUNKS = 3; // passages_0, passages_1, passages_2
+async function loadAllPassages() {
+  const all = [];
+  for (let i = 0; i < NB_PASSAGE_CHUNKS; i++) {
+    try {
+      const snap = await getDoc(doc(db, "briblue", "passages_" + i));
+      if (snap.exists()) {
+        const d = snap.data();
+        if (d.bb_passages_v2) all.push(...d.bb_passages_v2);
+      }
+    } catch {}
+  }
+  return all;
+}
 
 
 const BRAND_LOGO = `data:image/svg+xml;utf8,${encodeURIComponent(`
@@ -213,6 +227,13 @@ function useOnlineStatus() {
 // STORAGE — Firebase Firestore
 async function load(key, fallback) {
   try {
+    // Les passages sont dans des docs séparés (chunks)
+    if (key === "bb_passages_v2") {
+      const passages = await loadAllPassages();
+      if (passages.length > 0) return passages;
+      try { const ls = localStorage.getItem("briblue_" + key); if (ls) return JSON.parse(ls); } catch {}
+      return fallback;
+    }
     const snap = await getDoc(APP_DOC);
     if (snap.exists()) {
       const allData = snap.data();
@@ -235,6 +256,18 @@ const _debounceTimers = {};
 const FIREBASE_DEBOUNCE_MS = 3000;
 
 async function saveToFirebase(key, val) {
+  if (key === "bb_passages_v2" && Array.isArray(val)) {
+    // Sauvegarder les passages en chunks de 50
+    const CHUNK = 50;
+    const chunks = [];
+    for (let i = 0; i < val.length; i += CHUNK) chunks.push(val.slice(i, i + CHUNK));
+    for (let i = 0; i < chunks.length; i++) {
+      await setDoc(doc(db, "briblue", "passages_" + i), { bb_passages_v2: chunks[i] }, { merge: false });
+    }
+    // Mettre à jour le nombre de chunks dans le doc principal
+    await setDoc(APP_DOC, { bb_passages_chunks: chunks.length }, { merge: true });
+    return;
+  }
   await setDoc(APP_DOC, { [key]: val }, { merge: true });
 }
 
@@ -5358,15 +5391,15 @@ function CarnetPublic({ code, allClients, allPassages }) {
     setRefreshing(true);
     try {
       const snap = await getDoc(APP_DOC);
+      const passages = await loadAllPassages();
       if (snap.exists()) {
         const d = snap.data();
         const c = d["bb_clients_v2"];
-        const p = d["bb_passages_v2"];
         setLoadedClients(c && c.length ? c : CLIENTS_INIT);
-        setLoadedPassages(p && p.length ? p : PASSAGES_INIT);
+        setLoadedPassages(passages.length ? passages : PASSAGES_INIT);
       } else {
         setLoadedClients(CLIENTS_INIT);
-        setLoadedPassages(PASSAGES_INIT);
+        setLoadedPassages(passages.length ? passages : PASSAGES_INIT);
       }
     } catch {
       setLoadedClients(CLIENTS_INIT);
