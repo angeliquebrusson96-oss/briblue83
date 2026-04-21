@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createClient } from '@supabase/supabase-js'
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 
@@ -201,16 +202,18 @@ async function load(key, fallback) {
       .eq("id", 1)
       .single();
 
-    // Erreur réseau ou Supabase → retourner le fallback sans écraser
-    if (error || !data?.data) return fallback;
+    if (error || !data?.data) {
+      try { const ls = localStorage.getItem("briblue_" + key); if (ls) return JSON.parse(ls); } catch {}
+      return fallback;
+    }
 
     const allData = data.data;
-    // Clé présente → retourner sa valeur (même si tableau vide)
     if (key in allData) return allData[key];
-    // Clé absente (première utilisation) → retourner null pour signaler "jamais sauvegardé"
+
+    try { const ls = localStorage.getItem("briblue_" + key); if (ls) return JSON.parse(ls); } catch {}
     return null;
   } catch {
-    // Erreur JS → retourner fallback, ne pas écraser
+    try { const ls = localStorage.getItem("briblue_" + key); if (ls) return JSON.parse(ls); } catch {}
     return fallback;
   }
 }
@@ -1426,6 +1429,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
   ];
 
   return (
+    <>
     <Modal title="" onClose={onClose} wide>
       {/* ══════════════════ HERO HEADER ══════════════════ */}
       <div style={{margin:isMobile?"-18px -20px 0":"-24px -28px 0"}}>
@@ -1491,7 +1495,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
       {/* ══════════════════ CONTENU TABS ══════════════════ */}
       <div style={{paddingTop:16}}>
 
-      {/* ── HISTORIQUE ── */}
+      {/* -- HISTORIQUE -- */}
       {tab==="historique" && (
         <div className="fade-in">
           {(()=>{
@@ -1543,7 +1547,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
         </div>
       )}
 
-      {/* ── PASSAGES / RAPPORTS ── */}
+      {/* -- PASSAGES / RAPPORTS -- */}
       {tab==="passages" && (
         <div className="fade-in">
           {/* Action bar */}
@@ -1628,7 +1632,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
         </div>
       )}
 
-      {/* ── PLANNING (SAISONS) ── */}
+      {/* -- PLANNING (SAISONS) -- */}
       {tab==="saisons" && <div className="fade-in">
         {(()=>{
           const mpmRaw = client.moisParMois || client.saisons || {};
@@ -1715,7 +1719,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
         })()}
       </div>}
 
-      {/* ── INFOS ── */}
+      {/* -- INFOS -- */}
       {tab==="infos" && (
         <div className="fade-in">
           {/* Contact rapide */}
@@ -1789,7 +1793,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
         </div>
       )}
 
-      {/* ── RDV ── */}
+      {/* -- RDV -- */}
       {tab==="rdvs" && (
         <div className="fade-in">
           <button onClick={onAddRdv} style={{width:"100%",height:44,marginBottom:12,borderRadius:12,background:"linear-gradient(135deg,#6d28d9,#7c3aed)",border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontFamily:"inherit",boxShadow:"0 2px 8px rgba(109,40,217,0.3)",WebkitTapHighlightColor:"transparent"}}>
@@ -1887,7 +1891,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
       )}
       {detailPassageFiche && <PassageDetailModal passage={detailPassageFiche} client={client} onClose={()=>setDetailPassageFiche(null)}/>}
 
-      {/* ── CARNET ── */}
+      {/* -- CARNET -- */}
       {tab==="carnet" && (()=>{
         const code=generateCarnetCode(client.id);
         const carnetUrl=window.location.origin+window.location.pathname+"?carnet="+code;
@@ -1896,7 +1900,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
         return (
           <div className="fade-in" style={{display:"flex",flexDirection:"column",gap:14}}>
 
-            {/* ── BOUTON APERÇU CLIENT ── */}
+            {/* -- BOUTON APERÇU CLIENT -- */}
             <button onClick={()=>setShowCarnetPreview(true)}
               style={{width:"100%",height:52,borderRadius:16,background:"linear-gradient(135deg,#0891b2,#0e7490)",border:"none",cursor:"pointer",fontWeight:800,fontSize:14,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:10,boxShadow:"0 4px 16px rgba(8,145,178,0.35)",WebkitTapHighlightColor:"transparent"}}>
               <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -2016,7 +2020,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
       </div>{/* fin contenu */}
     </Modal>
 
-    {/* ── APERÇU CARNET CLIENT (plein écran) ── */}
+    {/* -- APERÇU CARNET CLIENT (plein écran) -- */}
     {showCarnetPreview&&(
       <div style={{position:"fixed",inset:0,zIndex:9999,background:"#f0f4f8",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
         {/* Barre fermeture */}
@@ -2038,6 +2042,8 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
         <CarnetPublicInline client={client} passages={passages}/>
       </div>
     )}
+    </>
+  );
 }
 
 // COMPOSANTS FORMULAIRE PASSAGE
@@ -4542,7 +4548,7 @@ function ModalStock({ stock, onClose, onUpdateStock, onAddProduit, onDeleteProdu
 }
 
 
-// ── CARNET INLINE (aperçu interne, données déjà chargées) ──────────────────
+// -- CARNET INLINE (aperçu interne, données déjà chargées) ------------------
 function CarnetPublicInline({ client, passages }) {
   const [selectedPassage, setSelectedPassage] = useState(null);
 
@@ -4560,7 +4566,7 @@ function CarnetPublicInline({ client, passages }) {
     <>
     <div style={{minHeight:"100vh",background:"#f0f4f8",fontFamily:F,maxWidth:480,margin:"0 auto",paddingBottom:40}}>
 
-      {/* ── HEADER gradient ── */}
+      {/* -- HEADER gradient -- */}
       <div style={{background:"linear-gradient(160deg,#0c1f3f 0%,#0e4a7a 70%,#0891b2 100%)",padding:"28px 22px 32px",position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",right:-50,top:-50,width:200,height:200,borderRadius:"50%",background:"rgba(56,189,248,0.07)"}}/>
         <div style={{position:"absolute",left:-30,bottom:-30,width:140,height:140,borderRadius:"50%",background:"rgba(255,255,255,0.03)"}}/>
@@ -4746,7 +4752,7 @@ function CarnetPublicInline({ client, passages }) {
   );
 }
 
-// ── CARNET PUBLIC (URL ?carnet=CODE) ─────────────────────────────────────────
+// -- CARNET PUBLIC (URL ?carnet=CODE) ----------------------------------------─
 function generateCarnetCode(clientId) {
   // Code court et mémorisable basé sur l'id client
   const hash = clientId.split("").reduce((a,c)=>((a<<5)-a)+c.charCodeAt(0)|0,0);
@@ -4814,7 +4820,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
     <>
     <div style={{minHeight:"100vh",background:"#f0f4f8",fontFamily:F,maxWidth:480,margin:"0 auto",paddingBottom:40}}>
 
-      {/* ── HEADER gradient ── */}
+      {/* -- HEADER gradient -- */}
       <div style={{background:"linear-gradient(160deg,#0c1f3f 0%,#0e4a7a 70%,#0891b2 100%)",padding:"28px 22px 32px",position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",right:-50,top:-50,width:200,height:200,borderRadius:"50%",background:"rgba(56,189,248,0.07)"}}/>
         <div style={{position:"absolute",left:-30,bottom:-30,width:140,height:140,borderRadius:"50%",background:"rgba(255,255,255,0.03)"}}/>
@@ -4866,7 +4872,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
 
       <div style={{padding:"0 16px",marginTop:-12}}>
 
-        {/* ── DERNIÈRE INTERVENTION ── */}
+        {/* -- DERNIÈRE INTERVENTION -- */}
         {last&&(
           <div style={{background:"#fff",borderRadius:20,padding:"18px 18px",marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)",border:"1px solid #e8f4f8"}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
@@ -4930,7 +4936,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
           </div>
         )}
 
-        {/* ── HISTORIQUE ── */}
+        {/* -- HISTORIQUE -- */}
         {passClient.length>1&&(
           <div>
             <div style={{fontSize:11,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:.8,marginBottom:10,paddingLeft:2}}>
@@ -4990,7 +4996,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
       </div>
     </div>
 
-    {/* ── BOTTOM SHEET DÉTAIL ── */}
+    {/* -- BOTTOM SHEET DÉTAIL -- */}
     {selectedPassage&&(
       <div onClick={()=>setSelectedPassage(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:1000,padding:0,backdropFilter:"blur(4px)"}}>
         <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,maxHeight:"90vh",overflowY:"auto",WebkitOverflowScrolling:"touch",boxShadow:"0 -12px 48px rgba(0,0,0,0.2)",paddingBottom:"max(32px,env(safe-area-inset-bottom,32px))"}}>
@@ -5063,7 +5069,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
     </>
   );
 }
-// ── FIN CARNET ──────────────────────────────────────────────────────────────
+// -- FIN CARNET --------------------------------------------------------------
 export default function App() {
   // Détection URL carnet public
   const [carnetCode] = useState(()=>{
@@ -5180,8 +5186,12 @@ export default function App() {
   const deleteClient = useCallback(id=>{ showConfirm("Supprimer ce client et tous ses passages ?", ()=>{ setClients(prev=>{ const next=prev.filter(x=>x.id!==id); saveClients(next); return next; }); setPassages(prev=>{ const next=prev.filter(x=>x.clientId!==id); savePassages(next); return next; }); setFicheClient(null); }); },[saveClients,savePassages]);
   const savePassage = useCallback(p=>{ setPassages(prev=>{ const next=prev.find(x=>x.id===p.id)?prev.map(x=>x.id===p.id?p:x):[...prev,p]; savePassages(next); return next; }); setShowFormPassage(false);setEditPassage(null); },[savePassages]);
   const updatePassageRapportStatus = useCallback((passageMaj) => {
-    setPassages(prev => prev.map(x => x.id === passageMaj.id ? { ...x, ...passageMaj } : x));
-  }, []);
+    setPassages(prev => {
+      const next = prev.map(x => x.id === passageMaj.id ? { ...x, ...passageMaj } : x);
+      savePassages(next);
+      return next;
+    });
+  }, [savePassages]);
   const deletePassage = useCallback(id=>{ setPassages(prev=>{ const next=prev.filter(x=>x.id!==id); savePassages(next); return next; }); },[savePassages]);
   const openAddPassageFromClient = useCallback(cid=>{ setEditPassage(null);setDefaultClientId(cid);setShowFormPassage(true); },[]);
   const openEditPassage = useCallback(p=>{ setEditPassage(p);setDefaultClientId(p.clientId);setShowFormPassage(true); },[]);
@@ -5530,7 +5540,7 @@ function ModalImportConnecteam({ clients, onImport, onClose }) {
       ressenti: Number(row[57])||0,
       signatureTech: row[58]&&row[58]!=="Image"?row[58]:"",
       chloreLibre:"", ph:"", alcalinite:"", stabilisant:"",
-      stabilisantHaut: fixNum(row[19]).toLowerCase()==="haut", presenceClient: null,
+      stabilisantHaut: String(row[19]||"").toLowerCase()==="haut", presenceClient: null,
       ok: true, rapportStatut: "cree",
     };
   };
@@ -5595,7 +5605,7 @@ function ModalImportConnecteam({ clients, onImport, onClose }) {
             dateDebut: new Date().toISOString().split("T")[0],
             dateFin: `${new Date().getFullYear()+1}-03-31`,
             photoPiscine:"", notesTarifaires:"",
-            moisParMois: {...Array.from({length:12},(_,i)=>i+1).reduce((a,m)=>({...a,[m]:{entretien:0,controle:0}}),{})},
+            moisParMois: Object.fromEntries([1,2,3,4,5,6,7,8,9,10,11,12].map(m=>[m,{entretien:0,controle:0}])),
           };
           newClients.push(newC);
           clientMap[nomConnecteam] = newC.id;
