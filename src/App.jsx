@@ -222,7 +222,7 @@ function useOnlineStatus() {
   return { online, pendingCount };
 }
 
-// STORAGE — Firebase + cache TTL 24h (important pour iOS : localStorage prioritaire au rechargement)
+// STORAGE — Firebase + cache TTL 24h (iOS : localStorage prioritaire même après rechargement)
 const CACHE_TTL_MS=24*60*60*1000;
 async function load(key,fallback){
   try{const c=localStorage.getItem("briblue_"+key),ts=localStorage.getItem("briblue_ts_"+key);if(c&&ts&&(Date.now()-Number(ts))<CACHE_TTL_MS)return JSON.parse(c);}catch{}
@@ -269,22 +269,19 @@ async function flushOfflineQueue() {
 
 if (typeof window !== 'undefined') {
   const flushAll = () => {
-    // Annuler tous les debounces en attente
     Object.keys(_debounceTimers).forEach(key => {
       clearTimeout(_debounceTimers[key]);
       delete _debounceTimers[key];
     });
-    // Envoyer immédiatement à Firebase (sans await — iOS ne peut pas attendre)
     Object.keys(offlineQueue.pending).forEach(key => {
       saveToFirebase(key, offlineQueue.pending[key]).catch(()=>{});
     });
   };
   window.addEventListener('beforeunload', flushAll);
-  // Safari iOS ignore beforeunload — visibilitychange est le seul événement fiable
+  // Safari iOS ignore beforeunload — visibilitychange + pagehide sont fiables
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') flushAll();
   });
-  // Également au pagehide (iOS PWA / Safari)
   window.addEventListener('pagehide', flushAll);
   window.addEventListener('online', () => { flushOfflineQueue(); });
 }
@@ -6150,38 +6147,38 @@ export default function App() {
   const saveClient = useCallback(c=>{ setClients(prev=>{ const next=prev.find(x=>x.id===c.id)?prev.map(x=>x.id===c.id?c:x):[...prev,c]; saveClients(next); return next; }); setShowFormClient(false);setEditClient(null);setFicheClient(c); },[saveClients]);
   const deleteClient = useCallback(id=>{ showConfirm("Supprimer ce client et tous ses passages ?", ()=>{ setClients(prev=>{ const next=prev.filter(x=>x.id!==id); saveClients(next); return next; }); setPassages(prev=>{ const next=prev.filter(x=>x.clientId!==id); savePassages(next); return next; }); setFicheClient(null); }); },[saveClients,savePassages]);
   const savePassage = useCallback(async p => {
-    // Calcul du prochain état passages
-    let nextPassages;
+    // IMPORTANT : calculer nextPassages AVANT setPassages (évite la race condition iOS)
+    // setPassages est async React — nextPassages dans la closure peut être undefined
     setPassages(prev => {
-      nextPassages = prev.find(x => x.id === p.id)
+      const nextPassages = prev.find(x => x.id === p.id)
         ? prev.map(x => x.id === p.id ? p : x)
         : [...prev, p];
-      return nextPassages;
-    });
-    // localStorage immédiat
-    try {
-      localStorage.setItem("briblue_bb_passages_v2", JSON.stringify(nextPassages));
-      localStorage.setItem("briblue_ts_bb_passages_v2", String(Date.now()));
-    } catch {}
-    // Firebase DIRECT — on attend la confirmation avant de retourner
-    if (navigator.onLine) {
+
+      // localStorage immédiat (synchrone) — filet de sécurité si Firebase rate
       try {
+        localStorage.setItem("briblue_bb_passages_v2", JSON.stringify(nextPassages));
+        localStorage.setItem("briblue_ts_bb_passages_v2", String(Date.now()));
+      } catch {}
+
+      // Firebase — direct sans debounce pour les passages
+      if (navigator.onLine) {
         const CHUNK = 50;
         const chunks = [];
         for (let i = 0; i < nextPassages.length; i += CHUNK) chunks.push(nextPassages.slice(i, i + CHUNK));
-        for (let i = 0; i < chunks.length; i++) {
-          await setDoc(doc(db, "briblue", "passages_" + i), { bb_passages_v2: chunks[i] }, { merge: false });
-        }
-        await setDoc(APP_DOC, { bb_passages_chunks: chunks.length }, { merge: true });
-      } catch {
-        // Firebase échoué — queue pour retry
+        Promise.all(
+          chunks.map((chunk, i) => setDoc(doc(db, "briblue", "passages_" + i), { bb_passages_v2: chunk }, { merge: false }))
+        ).then(() => setDoc(APP_DOC, { bb_passages_chunks: chunks.length }, { merge: true }))
+        .catch(() => {
+          offlineQueue.pending["bb_passages_v2"] = nextPassages;
+          toastWarn("Sauvegardé localement — sync en attente");
+        });
+      } else {
         offlineQueue.pending["bb_passages_v2"] = nextPassages;
-        toastWarn("Sauvegardé localement — sync en attente");
       }
-    } else {
-      offlineQueue.pending["bb_passages_v2"] = nextPassages;
-    }
-    // Fermer le formulaire SEULEMENT après confirmation Firebase
+
+      return nextPassages;
+    });
+
     setShowFormPassage(false);
     setEditPassage(null);
   }, []);
