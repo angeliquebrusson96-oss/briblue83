@@ -422,107 +422,6 @@ const YEAR_NOW = new Date().getFullYear();
 // ─── Helpers champs passage (globaux) ────────────────────────────────────────
 const getPH  = p => { const v = p.tPH || p.ph; return v && Number(v)>0 ? Number(v) : null; };
 const getCL  = p => { const v = p.tChlore || p.chloreLibre || p.chlore; return v && Number(v)>0 ? Number(v) : null; };
-
-// ══════════════════════════════════════════════
-// 🧠 MOTEUR IA — Analyse eau & score santé piscine
-// ══════════════════════════════════════════════
-function analyseEauIA(passage) {
-  const ph  = getPH(passage);
-  const cl  = getCL(passage);
-  const sel = Number(passage.tSel)||0;
-  const pho = Number(passage.tPhosphate)||0;
-  const sta = Number(passage.tStabilisant)||0;
-  const alerts = [];
-  let score = 100;
-
-  if (ph !== null) {
-    if      (ph < 6.8)  { alerts.push({lvl:"danger", msg:`pH trop bas (${ph}) → risque corrosion, yeux irrités`, conseil:"Ajouter du pH+ (carbonate de sodium)"}); score -= 25; }
-    else if (ph < 7.0)  { alerts.push({lvl:"warn",   msg:`pH bas (${ph}) → surveiller`, conseil:"Légère correction pH+"}); score -= 10; }
-    else if (ph > 7.8)  { alerts.push({lvl:"danger", msg:`pH trop élevé (${ph}) → chlore inefficace`, conseil:"Ajouter du pH- (acide sulfurique dilué)"}); score -= 25; }
-    else if (ph > 7.6)  { alerts.push({lvl:"warn",   msg:`pH légèrement élevé (${ph})`, conseil:"Légère correction pH-"}); score -= 8; }
-    else                  alerts.push({lvl:"ok", msg:`pH optimal (${ph})`, conseil:""});
-  }
-  if (cl !== null) {
-    if      (cl < 0.3)  { alerts.push({lvl:"danger", msg:`Chlore insuffisant (${cl} ppm) → risque bactéries`, conseil:"Choc chlore urgent + vérifier filtre"}); score -= 30; }
-    else if (cl < 0.5)  { alerts.push({lvl:"warn",   msg:`Chlore bas (${cl} ppm)`, conseil:"Augmenter légèrement le chlore"}); score -= 12; }
-    else if (cl > 3.0)  { alerts.push({lvl:"danger", msg:`Chlore excessif (${cl} ppm) → irritations`, conseil:"Arrêter le chlore, laisser baisser naturellement"}); score -= 20; }
-    else if (cl > 2.0)  { alerts.push({lvl:"warn",   msg:`Chlore élevé (${cl} ppm)`, conseil:"Réduire légèrement le dosage"}); score -= 6; }
-    else                  alerts.push({lvl:"ok", msg:`Chlore optimal (${cl} ppm)`, conseil:""});
-  }
-  if (sel > 0) {
-    if      (sel < 2.5) { alerts.push({lvl:"warn", msg:`Sel trop bas (${sel} g/L)`, conseil:"Ajouter du sel (objectif 3-4 g/L)"}); score -= 8; }
-    else if (sel > 6)   { alerts.push({lvl:"warn", msg:`Sel trop élevé (${sel} g/L)`, conseil:"Diluer en ajoutant de l'eau"}); score -= 8; }
-  }
-  if (pho > 0 && pho > 0.3) {
-    alerts.push({lvl:"warn", msg:`Phosphates élevés (${pho} mg/L) → algues favorisées`, conseil:"Traitement anti-phosphates"}); score -= 10;
-  }
-  if (sta > 0) {
-    if      (sta > 75)  { alerts.push({lvl:"warn", msg:`Stabilisant trop élevé (${sta} ppm) → chlore bloqué`, conseil:"Vidange partielle"}); score -= 12; }
-    else if (sta < 20 && cl !== null) { alerts.push({lvl:"warn", msg:`Stabilisant bas (${sta} ppm)`, conseil:"Ajouter de l'acide cyanurique"}); score -= 5; }
-  }
-
-  const hasMesures = ph!==null || cl!==null;
-  const scoreF = Math.max(0, Math.min(100, score));
-  const emoji = scoreF >= 90 ? "🏆" : scoreF >= 75 ? "✅" : scoreF >= 50 ? "⚠️" : "🚨";
-  const label = scoreF >= 90 ? "Excellente" : scoreF >= 75 ? "Bonne" : scoreF >= 50 ? "À surveiller" : "Critique";
-  const color = scoreF >= 90 ? "#059669" : scoreF >= 75 ? "#0891b2" : scoreF >= 50 ? "#f59e0b" : "#ef4444";
-
-  return { score: scoreF, emoji, label, color, alerts: alerts.filter(a=>a.lvl!=="ok"), hasMesures };
-}
-
-// Score santé moyen d'un client (sur ses N derniers passages avec mesures)
-function scoreClientPiscine(clientId, passages, n=3) {
-  const cp = passages
-    .filter(p => p.clientId === clientId && (getPH(p) || getCL(p)))
-    .sort((a,b) => new Date(b.date) - new Date(a.date))
-    .slice(0, n);
-  if (cp.length === 0) return null;
-  const avg = cp.reduce((s,p) => s + analyseEauIA(p).score, 0) / cp.length;
-  return Math.round(avg);
-}
-
-// Widget Score Santé inline
-function ScoreSante({ score, size=38, showLabel=true }) {
-  if (score === null) return null;
-  const color = score >= 90 ? "#059669" : score >= 75 ? "#0891b2" : score >= 50 ? "#f59e0b" : "#ef4444";
-  const bg    = score >= 90 ? "#f0fdf4" : score >= 75 ? "#e0f2fe" : score >= 50 ? "#fffbeb" : "#fff1f2";
-  const emoji = score >= 90 ? "🏆" : score >= 75 ? "✅" : score >= 50 ? "⚠️" : "🚨";
-  const circ = 2 * Math.PI * (size*0.4);
-  const pct  = score / 100;
-  return (
-    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <circle cx={size/2} cy={size/2} r={size*0.4} fill="none" stroke="#dde8f0" strokeWidth={size*0.1}/>
-        <circle cx={size/2} cy={size/2} r={size*0.4} fill="none" stroke={color} strokeWidth={size*0.1}
-          strokeDasharray={`${circ*pct} ${circ*(1-pct)}`}
-          strokeLinecap="round" strokeDashoffset={circ*0.25}
-          style={{transform:"rotate(-90deg)",transformOrigin:"center",transition:"stroke-dasharray .6s ease"}}/>
-        <text x={size/2} y={size/2+size*0.075} textAnchor="middle" fontSize={size*0.26} fontWeight="800" fill={color} fontFamily="inherit">{score}</text>
-      </svg>
-      {showLabel && <div style={{fontSize:9,fontWeight:700,color,background:bg,padding:"1px 6px",borderRadius:20}}>{emoji} Santé eau</div>}
-    </div>
-  );
-}
-
-// Bandeau alertes IA eau
-function AlertesIA({ analyse }) {
-  if (!analyse.hasMesures || analyse.alerts.length === 0) return null;
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:4,marginTop:8}}>
-      {analyse.alerts.map((a,i) => (
-        <div key={i} style={{display:"flex",gap:8,padding:"7px 10px",borderRadius:10,
-          background:a.lvl==="danger"?"#fff1f2":"#fffbeb",
-          border:`1px solid ${a.lvl==="danger"?"#fca5a5":"#fde68a"}`}}>
-          <span style={{fontSize:14,flexShrink:0}}>{a.lvl==="danger"?"🚨":"⚠️"}</span>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:11,fontWeight:700,color:a.lvl==="danger"?"#be123c":"#b45309",lineHeight:1.3}}>{a.msg}</div>
-            {a.conseil&&<div style={{fontSize:10,color:"#64748b",marginTop:1}}>💡 {a.conseil}</div>}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
 const getTemp = p => { const v = p.temperature; return v && Number(v)>0 ? Number(v) : null; };
 const getResumePassage = p => {
   const parts = [];
@@ -1879,46 +1778,234 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
         <div className="fade-in">
           {(()=>{
             const passClient2 = passages.filter(p=>p.clientId===client.id);
-            const livClient  = (livraisons||[]).filter(l=>l.clientId===client.id);
-            const rdvClient2 = (rdvs||[]).filter(r=>r.clientId===client.id);
+            const livClient   = (livraisons||[]).filter(l=>l.clientId===client.id);
+            const rdvClient2  = (rdvs||[]).filter(r=>r.clientId===client.id);
+
+            // Config visuelle par type d'événement
+            const EVT_CONFIG = {
+              entretien: { emoji:"🔧", color:"#0891b2", bg:"#e0f2fe", border:"#7dd3fc", label:"Entretien" },
+              controle:  { emoji:"💧", color:"#0e7490", bg:"#cffafe", border:"#67e8f9", label:"Contrôle" },
+              sav:       { emoji:"⚙️", color:"#7c3aed", bg:"#ede9fe", border:"#c4b5fd", label:"SAV" },
+              livraison: { emoji:"🚚", color:"#f59e0b", bg:"#fef3c7", border:"#fcd34d", label:"Livraison" },
+              rdv:       { emoji:"📅", color:"#818cf8", bg:"#eef2ff", border:"#a5b4fc", label:"RDV" },
+              contrat:   { emoji:"📋", color:"#06b6d4", bg:"#e0f2fe", border:"#67e8f9", label:"Contrat" },
+            };
+
+            const getEvtConfig = (type="") => {
+              const t = type.toLowerCase();
+              if (t.includes("contrôle")||t.includes("controle")) return EVT_CONFIG.controle;
+              if (t.includes("entretien")) return EVT_CONFIG.entretien;
+              if (t.includes("sav")||t.includes("dépann")) return EVT_CONFIG.sav;
+              return EVT_CONFIG.entretien;
+            };
+
             const events = [
-              ...(client.dateDebut?[{date:client.dateDebut,title:"Début de contrat",sub:client.formule+(client.prix?" · "+client.prix+"€/an":""),dot:"#22d3ee",badge:"Contrat",badgeColor:"#0891b2"}]:[]),
-              ...passClient2.map(p=>({date:p.date,title:p.type||"Passage",sub:[p.tech?"par "+p.tech:null,p.ph?"pH "+p.ph:null,p.chlore?"Cl "+p.chlore:null].filter(Boolean).join(" · "),dot:isControleType(p.type)?"#0e7490":"#0891b2",badge:p.ok?"Effectué":"En cours",badgeColor:p.ok?"#059669":"#f59e0b",_p:p})),
-              ...livClient.map(l=>({date:l.date,title:"Livraison",sub:[l.produits?.slice(0,2).join(", "),l.montant?l.montant+"€":null].filter(Boolean).join(" · "),dot:"#f59e0b",badge:l.statut==="paye"?"Payé":l.statut==="facture"?"Facturé":"À facturer",badgeColor:l.statut==="paye"?"#059669":"#f59e0b",_l:l})),
-              ...rdvClient2.map(r=>({date:r.date,title:r.type||"RDV",sub:[r.heure,r.duree?r.duree+" min":null].filter(Boolean).join(" · "),dot:"#818cf8",badge:r.date>=TODAY?"À venir":"Passé",badgeColor:r.date>=TODAY?"#818cf8":"#94a3b8",_r:r})),
+              ...(client.dateDebut?[{
+                date:client.dateDebut,
+                type:"contrat",
+                title:"Début de contrat",
+                sub:client.formule+(client.prix?" · "+client.prix+"€/an":""),
+                cfg:EVT_CONFIG.contrat,
+              }]:[]),
+              ...passClient2.map(p=>({
+                date:p.date,
+                type:"passage",
+                title:p.type||"Passage",
+                sub:p.tech?"par "+p.tech:"",
+                cfg:getEvtConfig(p.type),
+                badge:p.ok?"Effectué":"En cours",
+                badgeOk:!!p.ok,
+                ph:getPH(p), cl:getCL(p),
+                ia:analyseEauIA(p),
+                photos:!!(p.photoArrivee||p.photoDepart),
+                _p:p,
+              })),
+              ...livClient.map(l=>({
+                date:l.date,
+                type:"livraison",
+                title:"Livraison produits",
+                sub:(l.produits||[]).slice(0,3).join(", ")+(l.montant?" · "+l.montant+"€":""),
+                cfg:EVT_CONFIG.livraison,
+                badge:l.statut==="paye"?"Payé":l.statut==="facture"?"Facturé":"À facturer",
+                badgeOk:l.statut==="paye",
+                _l:l,
+              })),
+              ...rdvClient2.map(r=>({
+                date:r.date,
+                type:"rdv",
+                title:r.type||"Rendez-vous",
+                sub:[r.heure,r.duree?r.duree+" min":null].filter(Boolean).join(" · "),
+                cfg:EVT_CONFIG.rdv,
+                badge:r.date>=TODAY?"À venir":"Passé",
+                badgeOk:r.date>=TODAY,
+                _r:r,
+              })),
             ].sort((a,b)=>b.date.localeCompare(a.date));
-            if(!events.length) return <div style={{textAlign:"center",padding:"48px 0",color:"#94a3b8",fontSize:14}}>Aucun historique</div>;
+
+            if(!events.length) return (
+              <div style={{textAlign:"center",padding:"56px 0",color:"#94a3b8"}}>
+                <div style={{fontSize:48,marginBottom:12}}>📭</div>
+                <div style={{fontSize:14,fontWeight:700}}>Aucun historique</div>
+                <div style={{fontSize:12,marginTop:4}}>Les passages et livraisons apparaîtront ici</div>
+              </div>
+            );
+
+            // Grouper par mois
             const grouped={};
             events.forEach(ev=>{ const d=new Date(ev.date); const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; if(!grouped[k]) grouped[k]=[]; grouped[k].push(ev); });
+
             return Object.keys(grouped).sort((a,b)=>b.localeCompare(a)).map(key=>{
               const [yr,mo]=key.split("-");
+              const isCurrentMonth = parseInt(mo)===MOIS_NOW && parseInt(yr)===YEAR_NOW;
               return (
-                <div key={key} style={{marginBottom:24}}>
-                  <div style={{fontSize:11,fontWeight:800,color:"#0f172a",marginBottom:10,paddingBottom:6,borderBottom:"2px solid #f1f5f9",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                    <span>{MOIS_L[parseInt(mo)]} {yr}</span>
-                    <span style={{fontSize:10,color:"#94a3b8",fontWeight:500}}>{grouped[key].length} événement{grouped[key].length>1?"s":""}</span>
+                <div key={key} style={{marginBottom:28}}>
+                  {/* En-tête mois */}
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+                    <div style={{
+                      padding:"4px 14px",borderRadius:20,
+                      background:isCurrentMonth?"linear-gradient(135deg,#0891b2,#06b6d4)":"#eef2f7",
+                      color:isCurrentMonth?"#fff":DS.mid,
+                      fontSize:12,fontWeight:800,
+                      boxShadow:isCurrentMonth?"0 3px 10px rgba(8,145,178,0.35)":"3px 3px 6px rgba(166,210,220,0.5),-2px -2px 5px rgba(255,255,255,0.85)",
+                    }}>
+                      {isCurrentMonth?"🗓 ":""}{MOIS_L[parseInt(mo)]} {yr}
+                    </div>
+                    <div style={{flex:1,height:1,background:"linear-gradient(90deg,rgba(166,210,220,0.4),transparent)"}}/>
+                    <div style={{fontSize:10,color:"#94a3b8",fontWeight:600,flexShrink:0}}>
+                      {grouped[key].length} év.
+                    </div>
                   </div>
-                  {grouped[key].map((ev,i)=>{
-                    const d=new Date(ev.date);
-                    const clickable=!!(ev._p||ev._l||ev._r);
-                    return (
-                      <div key={i} onClick={ev._p?()=>setDetailPassageFiche(ev._p):ev._l?()=>{setEditLiv(ev._l);setShowFormLiv(true);}:ev._r?()=>onEditRdv&&onEditRdv(ev._r):undefined}
-                        style={{display:"flex",alignItems:"center",gap:12,padding:"11px 0",borderBottom:i<grouped[key].length-1?"1px solid #f8fafc":"none",cursor:clickable?"pointer":"default"}}>
-                        <div style={{width:36,flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
-                          <div style={{width:10,height:10,borderRadius:"50%",background:ev.dot}}/>
-                          <div style={{fontSize:9,color:"#94a3b8",fontWeight:600,textAlign:"center",lineHeight:1.2}}>{d.toLocaleDateString("fr",{day:"2-digit",month:"short"})}</div>
+
+                  {/* Timeline */}
+                  <div style={{position:"relative",paddingLeft:44}}>
+                    {/* Ligne verticale */}
+                    <div style={{position:"absolute",left:16,top:0,bottom:0,width:2,background:"linear-gradient(180deg,rgba(8,145,178,0.3),rgba(166,210,220,0.1))",borderRadius:1}}/>
+
+                    {grouped[key].map((ev,i)=>{
+                      const d=new Date(ev.date);
+                      const clickable=!!(ev._p||ev._l||ev._r);
+                      return (
+                        <div key={i} style={{position:"relative",marginBottom:i<grouped[key].length-1?12:0}}>
+                          {/* Point timeline */}
+                          <div style={{
+                            position:"absolute",left:-32,top:14,
+                            width:16,height:16,borderRadius:"50%",
+                            background:ev.cfg.bg,
+                            border:`2.5px solid ${ev.cfg.color}`,
+                            display:"flex",alignItems:"center",justifyContent:"center",
+                            fontSize:8,boxShadow:`0 0 0 3px ${ev.cfg.color}22`,
+                          }}>
+                            <span style={{fontSize:8}}>{ev.cfg.emoji}</span>
+                          </div>
+
+                          {/* Carte événement */}
+                          <div onClick={ev._p?()=>setDetailPassageFiche(ev._p):ev._l?()=>{setEditLiv(ev._l);setShowFormLiv(true);}:ev._r?()=>onEditRdv&&onEditRdv(ev._r):undefined}
+                            className={clickable?"card-hover":""}
+                            style={{
+                              background:"#eef2f7",
+                              borderRadius:14,
+                              border:`1px solid ${ev.cfg.border}`,
+                              borderLeft:`3px solid ${ev.cfg.color}`,
+                              overflow:"hidden",
+                              cursor:clickable?"pointer":"default",
+                              boxShadow:"3px 3px 8px rgba(166,210,220,0.5),-2px -2px 6px rgba(255,255,255,0.85)",
+                            }}>
+                            <div style={{padding:"10px 12px"}}>
+                              {/* Ligne principale */}
+                              <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
+                                <div style={{width:32,height:32,borderRadius:10,background:ev.cfg.bg,
+                                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0,
+                                  border:`1px solid ${ev.cfg.border}`}}>
+                                  {ev.cfg.emoji}
+                                </div>
+                                <div style={{flex:1,minWidth:0}}>
+                                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2,flexWrap:"wrap"}}>
+                                    <span style={{fontSize:13,fontWeight:800,color:"#0f172a"}}>{ev.title}</span>
+                                    {ev.badge&&(
+                                      <span style={{
+                                        fontSize:9,fontWeight:800,
+                                        color:ev.badgeOk?ev.cfg.color:"#94a3b8",
+                                        background:ev.badgeOk?ev.cfg.bg:"#f1f5f9",
+                                        border:`1px solid ${ev.badgeOk?ev.cfg.border:"#e2e8f0"}`,
+                                        padding:"1px 7px",borderRadius:20,
+                                      }}>{ev.badge}</span>
+                                    )}
+                                  </div>
+                                  <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                                    <span style={{fontSize:11,color:"#64748b",fontWeight:600}}>
+                                      📅 {d.toLocaleDateString("fr",{weekday:"short",day:"2-digit",month:"short"})}
+                                    </span>
+                                    {ev.sub&&<span style={{fontSize:11,color:"#94a3b8"}}>· {ev.sub}</span>}
+                                  </div>
+                                </div>
+                                {clickable&&(
+                                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round" style={{flexShrink:0,marginTop:8}}>
+                                    <polyline points="9 18 15 12 9 6"/>
+                                  </svg>
+                                )}
+                              </div>
+
+                              {/* Mesures eau si passage */}
+                              {ev._p && (ev.ph||ev.cl) && (
+                                <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
+                                  {ev.ph&&(()=>{const ok=ev.ph>=7&&ev.ph<=7.6;return(
+                                    <div style={{display:"flex",alignItems:"center",gap:4,padding:"3px 9px",borderRadius:20,
+                                      background:ok?"#f0fdf4":"#fff1f2",border:`1px solid ${ok?"#86efac":"#fca5a5"}`}}>
+                                      <span style={{fontSize:9,fontWeight:800,color:ok?"#059669":"#be123c"}}>pH</span>
+                                      <span style={{fontSize:12,fontWeight:900,color:ok?"#059669":"#be123c"}}>{ev.ph}</span>
+                                      <span style={{fontSize:10}}>{ok?"✓":"⚠"}</span>
+                                    </div>
+                                  );})()}
+                                  {ev.cl&&(()=>{const ok=ev.cl>=0.5&&ev.cl<=3;return(
+                                    <div style={{display:"flex",alignItems:"center",gap:4,padding:"3px 9px",borderRadius:20,
+                                      background:ok?"#f0fdf4":"#fff1f2",border:`1px solid ${ok?"#86efac":"#fca5a5"}`}}>
+                                      <span style={{fontSize:9,fontWeight:800,color:ok?"#059669":"#be123c"}}>Cl</span>
+                                      <span style={{fontSize:12,fontWeight:900,color:ok?"#059669":"#be123c"}}>{ev.cl}</span>
+                                      <span style={{fontSize:10}}>{ok?"✓":"⚠"}</span>
+                                    </div>
+                                  );})()}
+                                  {/* Score IA */}
+                                  {ev.ia?.hasMesures&&(()=>{const s=ev.ia.score;const c=s>=90?"#059669":s>=75?"#0891b2":s>=50?"#f59e0b":"#ef4444";return(
+                                    <div style={{display:"flex",alignItems:"center",gap:4,padding:"3px 9px",borderRadius:20,
+                                      background:`${c}15`,border:`1px solid ${c}44`}}>
+                                      <span style={{fontSize:9,fontWeight:800,color:c}}>🧠 IA</span>
+                                      <span style={{fontSize:12,fontWeight:900,color:c}}>{s}%</span>
+                                    </div>
+                                  );})()}
+                                </div>
+                              )}
+
+                              {/* Alerte IA si problème */}
+                              {ev._p && ev.ia?.alerts?.length>0 && (
+                                <div style={{marginTop:6,padding:"5px 8px",borderRadius:8,
+                                  background:ev.ia.alerts[0].lvl==="danger"?"#fff1f2":"#fffbeb",
+                                  border:`1px solid ${ev.ia.alerts[0].lvl==="danger"?"#fca5a5":"#fde68a"}`}}>
+                                  <div style={{fontSize:10,fontWeight:700,color:ev.ia.alerts[0].lvl==="danger"?"#be123c":"#b45309"}}>
+                                    {ev.ia.alerts[0].lvl==="danger"?"🚨":"⚠️"} {ev.ia.alerts[0].msg}
+                                  </div>
+                                  {ev.ia.alerts[0].conseil&&<div style={{fontSize:9,color:"#64748b",marginTop:2}}>💡 {ev.ia.alerts[0].conseil}</div>}
+                                </div>
+                              )}
+
+                              {/* Miniatures photos */}
+                              {ev._p && (ev._p.photoArrivee||ev._p.photoDepart) && (
+                                <div style={{display:"flex",gap:4,marginTop:8}}>
+                                  {ev._p.photoArrivee&&<div style={{position:"relative",borderRadius:8,overflow:"hidden",height:40,width:60,flexShrink:0}}>
+                                    <img src={ev._p.photoArrivee} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                                    <span style={{position:"absolute",bottom:1,left:2,fontSize:7,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.5)",borderRadius:2,padding:"1px 3px"}}>Arr.</span>
+                                  </div>}
+                                  {ev._p.photoDepart&&<div style={{position:"relative",borderRadius:8,overflow:"hidden",height:40,width:60,flexShrink:0}}>
+                                    <img src={ev._p.photoDepart} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                                    <span style={{position:"absolute",bottom:1,left:2,fontSize:7,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.5)",borderRadius:2,padding:"1px 3px"}}>Dép.</span>
+                                  </div>}
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:13,fontWeight:700,color:"#0f172a",marginBottom:2}}>{ev.title}</div>
-                          {ev.sub&&<div style={{fontSize:11,color:"#64748b"}}>{ev.sub}</div>}
-                        </div>
-                        <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
-                          <span style={{fontSize:10,fontWeight:700,color:ev.badgeColor,background:ev.badgeColor+"18",padding:"2px 7px",borderRadius:10,whiteSpace:"nowrap"}}>{ev.badge}</span>
-                          {clickable&&<svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>}
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               );
             });
@@ -4506,84 +4593,11 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
         )}
       </div>
 
-      {/* ── Stats rapides animées ── */}
-      {(()=>{
-        const passagesMois = passages.filter(p=>new Date(p.date).getMonth()+1===MOIS_NOW&&new Date(p.date).getFullYear()===YEAR_NOW).length;
-        const passagesSemaine = passages.filter(p=>{const d=new Date(p.date);return (new Date()-d)/86400000<=7&&d<=new Date();}).length;
-        const alertesCount = clients.filter(c=>alerteClient(c,passages)==="rouge").length;
-        const scoresMoy = clients.map(c=>scoreClientPiscine(c.id,passages)).filter(s=>s!==null);
-        const scoreMoyen = scoresMoy.length>0 ? Math.round(scoresMoy.reduce((a,b)=>a+b,0)/scoresMoy.length) : null;
-        return (
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:14}}>
-            {[
-              {icon:"📋",val:passagesMois,label:"Ce mois",color:DS.blue,bg:"#e0f2fe"},
-              {icon:"🗓",val:passagesSemaine,label:"7 jours",color:"#7c3aed",bg:"#ede9fe"},
-              {icon:"🚨",val:alertesCount,label:"Urgents",color:alertesCount>0?"#ef4444":DS.green,bg:alertesCount>0?"#fff1f2":"#f0fdf4"},
-              {icon:"💧",val:scoreMoyen!==null?scoreMoyen+"%":"—",label:"Santé eau",color:scoreMoyen>=80?DS.green:scoreMoyen>=60?"#f59e0b":"#ef4444",bg:scoreMoyen>=80?"#f0fdf4":scoreMoyen>=60?"#fffbeb":"#fff1f2"},
-            ].map(({icon,val,label,color,bg},i)=>(
-              <div key={i} style={{background:"#eef2f7",borderRadius:16,padding:"12px 8px",textAlign:"center",
-                boxShadow:"4px 4px 10px rgba(166,210,220,0.65),-3px -3px 8px rgba(255,255,255,0.9)"}}>
-                <div style={{fontSize:18,marginBottom:4}}>{icon}</div>
-                <div style={{fontSize:18,fontWeight:900,color,lineHeight:1}}>{val}</div>
-                <div style={{fontSize:10,color:DS.mid,fontWeight:600,marginTop:2}}>{label}</div>
-              </div>
-            ))}
-          </div>
-        );
-      })()}
-
-      {/* ── Graphique barres passages 6 derniers mois ── */}
-      {(()=>{
-        const moisLabels=["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
-        const data = Array.from({length:6},(_,i)=>{
-          const m = ((MOIS_NOW-6+i+12)%12)+1;
-          const y = m > MOIS_NOW ? YEAR_NOW-1 : YEAR_NOW;
-          const count = passages.filter(p=>{const d=new Date(p.date);return d.getMonth()+1===m&&d.getFullYear()===y;}).length;
-          return {m, y, label:moisLabels[m-1], count, isNow:m===MOIS_NOW&&y===YEAR_NOW};
-        });
-        const maxVal = Math.max(...data.map(d=>d.count), 1);
-        return (
-          <div style={{background:"#eef2f7",borderRadius:18,padding:"16px 14px 12px",marginBottom:14,
-            boxShadow:"5px 5px 12px rgba(166,210,220,0.65),-4px -4px 10px rgba(255,255,255,0.9)"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-              <div style={{fontWeight:800,fontSize:14,color:DS.dark}}>📊 Activité</div>
-              <div style={{fontSize:11,color:DS.mid,fontWeight:600}}>6 derniers mois</div>
-            </div>
-            <div style={{display:"flex",gap:6,alignItems:"flex-end",height:70}}>
-              {data.map((d,i)=>(
-                <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
-                  <div style={{fontSize:10,fontWeight:800,color:d.isNow?DS.blue:DS.mid,opacity:d.count>0?1:0.3}}>{d.count||""}</div>
-                  <div style={{
-                    width:"100%",borderRadius:6,transition:"height .5s ease",
-                    height: d.count>0 ? `${Math.max(8,(d.count/maxVal)*52)}px` : "4px",
-                    background: d.isNow
-                      ? "linear-gradient(180deg,#06b6d4,#0891b2)"
-                      : d.count>0 ? "linear-gradient(180deg,#93c5fd,#60a5fa)" : "#dde8f0",
-                    boxShadow: d.isNow ? "0 2px 8px rgba(8,145,178,0.4)" : "none",
-                  }}/>
-                  <div style={{fontSize:9,fontWeight:d.isNow?800:500,color:d.isNow?DS.blue:DS.mid}}>{d.label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ── Action buttons ── */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:14}}>
-        {[
-          {label:"Passage",  icon:"🔧", bg:"linear-gradient(135deg,#0891b2,#06b6d4)", shadow:"rgba(8,145,178,0.35)",  fn:onAddPassage},
-          {label:"Livraison",icon:"🚚", bg:"linear-gradient(135deg,#f59e0b,#f97316)", shadow:"rgba(245,158,11,0.35)", fn:()=>onAddLivraison()},
-          {label:"RDV",      icon:"📅", bg:"linear-gradient(135deg,#7c3aed,#818cf8)", shadow:"rgba(124,58,237,0.35)", fn:onAddRdv},
-        ].map(({label,icon,bg,shadow,fn})=>(
-          <button key={label} onClick={fn} style={{padding:"12px 6px",borderRadius:16,border:"none",cursor:"pointer",
-            background:bg,color:"#fff",fontFamily:"inherit",fontWeight:800,fontSize:13,
-            display:"flex",flexDirection:"column",alignItems:"center",gap:4,
-            boxShadow:`0 4px 14px ${shadow}`,transition:"transform .15s"}}>
-            <span style={{fontSize:22}}>{icon}</span>
-            {label}
-          </button>
-        ))}
+      {/* Action buttons */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:10,marginBottom:14}}>
+        <BtnPrimary onClick={onAddPassage} bg={DS.blueGrad} icon={Ico.clipboard(14,"#fff")} style={{width:"100%",fontSize:13,padding:"11px 8px",borderRadius:14}}>Passage</BtnPrimary>
+        <BtnPrimary onClick={()=>onAddLivraison()} bg={DS.blueGrad} icon={Ico.truck(14,"#fff")} style={{width:"100%",fontSize:13,padding:"11px 8px",borderRadius:14}}>Livraison</BtnPrimary>
+        <BtnPrimary onClick={onAddRdv} bg={DS.blueGrad} icon={Ico.rdv(14,"#fff")} style={{width:"100%",fontSize:13,padding:"11px 8px",borderRadius:14}}>RDV</BtnPrimary>
       </div>
 
       {/* RDVs Aujourd'hui */}
@@ -4946,44 +4960,6 @@ function PassageDetailModal({ passage, client, onClose }) {
   );
 }
 
-// ══════════════════════════════════════════════
-// 📋 PASSAGE SWIPE CARD — composant avec swipe mobile
-// ══════════════════════════════════════════════
-function PassageSwipeCard({ p, c, idx, onDelete, onEdit, onUpdatePassageStatus, onDetailClick, children }) {
-  const [swiped, setSwiped] = useState(false);
-  const swipeH = useSwipe(()=>setSwiped(true), ()=>setSwiped(false));
-  return (
-    <div className="fade-in" {...swipeH}
-      style={{position:"relative",overflow:"hidden",borderRadius:16,animationDelay:`${idx*0.05}s`}}>
-      {/* Actions révélées au swipe gauche */}
-      {swiped && (
-        <div style={{position:"absolute",right:0,top:0,bottom:0,display:"flex",zIndex:2}}>
-          <button onClick={()=>{setSwiped(false);ouvrirRapport(p,c);}}
-            style={{width:70,background:DS.blue,border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,color:"#fff",fontSize:10,fontWeight:700,fontFamily:"inherit"}}>
-            {Ico.pdf(16,"#fff")}<span>PDF</span>
-          </button>
-          {c?.email && (
-            <button onClick={()=>{setSwiped(false);showConfirm(`Envoyer à ${c.email} ?`,()=>envoyerEmail(p,c,onUpdatePassageStatus),null,{type:"email",title:"Envoyer email"});}}
-              style={{width:70,background:DS.green,border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,color:"#fff",fontSize:10,fontWeight:700,fontFamily:"inherit"}}>
-              {Ico.send(16,"#fff")}<span>Email</span>
-            </button>
-          )}
-          <button onClick={()=>{setSwiped(false);showConfirm("Supprimer ce passage ?",()=>onDelete(p.id));}}
-            style={{width:60,background:DS.red,border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,color:"#fff",fontSize:10,fontWeight:700,fontFamily:"inherit"}}>
-            {Ico.trash(16,"#fff")}<span>Suppr.</span>
-          </button>
-        </div>
-      )}
-      {/* Contenu glissant */}
-      <div style={{transform:swiped?"translateX(-200px)":"translateX(0)",transition:"transform .25s ease"}}>
-        <Card style={{borderRadius:16,margin:0}}>
-          {children}
-        </Card>
-      </div>
-    </div>
-  );
-}
-
 // PAGE PASSAGES
 function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePassageStatus, onAddClient }) {
   const [filter,setFilter]=useState("mois");
@@ -5045,7 +5021,7 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
             const rapportStatus = getRapportStatus(p);
             const rapportMeta = RAPPORT_STATUS[rapportStatus];
             return (
-              <PassageSwipeCard key={p.id} p={p} c={c} idx={idx} onDelete={onDelete} onEdit={onEdit} onUpdatePassageStatus={onUpdatePassageStatus} onDetailClick={setDetailPassage}>
+              <Card key={p.id} className="fade-in" style={{animationDelay:`${idx*0.05}s`}}>
                 <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
                   <Avatar nom={c?.nom||"?"} size={42} photo={c?.photoPiscine}/>
                   <div style={{flex:1,minWidth:0}}>
@@ -5071,8 +5047,6 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                       {_cl&&<Tag color={clOk?DS.green:DS.red} style={{fontSize:11}}>Cl {_cl}</Tag>}
                       <Tag color={rapportMeta.color} bg={rapportMeta.bg} style={{fontSize:11}}>{rapportMeta.label}</Tag>
                     </div>
-                    {/* Alertes IA eau */}
-                    {(()=>{ const a=analyseEauIA(p); return a.hasMesures&&a.alerts.length>0?<AlertesIA analyse={a}/>:null; })()}
                     {(p.photoArrivee||p.photoDepart) && (
                       <div style={{display:"flex",gap:6,marginBottom:6}}>
                         {p.photoArrivee && (<div style={{position:"relative"}}><img src={p.photoArrivee} alt="Arrivée" style={{height:48,width:72,objectFit:"cover",borderRadius:7,border:"1px solid "+DS.border}}/><span style={{position:"absolute",bottom:2,left:3,fontSize:8,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:3,padding:"1px 4px"}}>Arr.</span></div>)}
@@ -5103,7 +5077,7 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                     </div>
                   </div>
                 </div>
-              </PassageSwipeCard>
+              </Card>
             );
           })}
         </div>
@@ -6002,22 +5976,12 @@ export default function App() {
   const [showFormRdv, setShowFormRdv] = useState(false);
   const [editRdv, setEditRdv] = useState(null);
   const [showModalAlertes, setShowModalAlertes] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
   const [dismissedAlertes, setDismissedAlertes] = useState(()=>{ try{ return JSON.parse(localStorage.getItem("briblue_dismissed_alertes")||"[]"); }catch{return [];} });
   const dismissAlerte = (clientId) => { setDismissedAlertes(prev=>{ const next=[...new Set([...prev,clientId])]; try{ localStorage.setItem("briblue_dismissed_alertes", JSON.stringify(next)); }catch{} return next; }); };
   const prevTaskCount = useRef(0);
   const isMobile = useIsMobile();
 
-  useEffect(()=>{
-    setupPWA();
-    try { if(sessionStorage.getItem("bb_auth")==="1") setLoggedIn(true); } catch {}
-    const handleKey = (e) => {
-      if ((e.metaKey||e.ctrlKey) && e.key==="k") { e.preventDefault(); setShowSearch(s=>!s); }
-      if (e.key==="Escape") setShowSearch(false);
-    };
-    window.addEventListener("keydown", handleKey);
-    return ()=>window.removeEventListener("keydown", handleKey);
-  },[]);
+  useEffect(()=>{ setupPWA(); try { if(sessionStorage.getItem("bb_auth")==="1") setLoggedIn(true); } catch {} },[]);
 
   useEffect(()=>{
     if(!loggedIn) return;
@@ -6181,11 +6145,6 @@ export default function App() {
               <span style={{fontSize:12,fontWeight:600,color:"#64748b"}}>Import</span>
             </button>
           )}
-
-          {/* Recherche globale */}
-          <button onClick={()=>setShowSearch(true)} title="Recherche" style={{width:isMobile?40:40,height:40,borderRadius:12,background:"#eef2f7",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"3px 3px 8px rgba(166,210,220,0.6),-2px -2px 6px rgba(255,255,255,0.9)"}}>
-            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-          </button>
 
           {/* Stock — vert */}
           <button onClick={()=>setShowStock(true)} title="Stock" style={{position:"relative",width:isMobile?40:undefined,height:isMobile?40:40,padding:isMobile?0:"0 14px",display:"flex",alignItems:"center",justifyContent:"center",gap:6,borderRadius:isMobile?12:20,background:"linear-gradient(135deg,#059669,#10b981)",border:"none",cursor:"pointer",flexShrink:0,fontFamily:"inherit",boxShadow:"3px 3px 10px rgba(5,150,105,0.4),-2px -2px 6px rgba(255,255,255,0.6)"}}>
@@ -6495,146 +6454,12 @@ export default function App() {
           </Modal>
         );
       })()}
+      <ToastContainer/>
+      <ConfirmModal/>
     </div>
     </>
   );
 }
-
-
-// ══════════════════════════════════════════════
-// 👆 SWIPE HOOK (mobile)
-// ══════════════════════════════════════════════
-function useSwipe(onSwipeLeft, onSwipeRight, threshold=60) {
-  const startX = useRef(null);
-  const handlers = {
-    onTouchStart: (e) => { startX.current = e.touches[0].clientX; },
-    onTouchEnd:   (e) => {
-      if (startX.current === null) return;
-      const dx = e.changedTouches[0].clientX - startX.current;
-      if (dx < -threshold && onSwipeLeft)  onSwipeLeft();
-      if (dx >  threshold && onSwipeRight) onSwipeRight();
-      startX.current = null;
-    },
-  };
-  return handlers;
-}
-
-// ══════════════════════════════════════════════
-// 🔍 RECHERCHE GLOBALE
-// ══════════════════════════════════════════════
-function SearchGlobal({ clients, passages, rdvs=[], onClientClick, onClose }) {
-  const [q, setQ] = useState("");
-  const inputRef = useRef(null);
-
-  useEffect(()=>{ setTimeout(()=>inputRef.current?.focus(), 100); }, []);
-
-  const results = useMemo(()=>{
-    if (!q.trim() || q.length < 2) return { clients:[], passages:[], rdvs:[] };
-    const ql = q.toLowerCase();
-    return {
-      clients:  clients.filter(c => c.nom.toLowerCase().includes(ql) || (c.adresse||"").toLowerCase().includes(ql) || (c.email||"").toLowerCase().includes(ql)).slice(0,5),
-      passages: passages.filter(p => {
-        const c = clients.find(x=>x.id===p.clientId);
-        return (c?.nom||"").toLowerCase().includes(ql) || (p.type||"").toLowerCase().includes(ql) || (p.commentaires||"").toLowerCase().includes(ql) || p.date.includes(ql);
-      }).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,5),
-      rdvs: rdvs.filter(r => {
-        const c = clients.find(x=>x.id===r.clientId);
-        return (c?.nom||"").toLowerCase().includes(ql) || (r.type||"").toLowerCase().includes(ql);
-      }).slice(0,3),
-    };
-  }, [q, clients, passages, rdvs]);
-
-  const total = results.clients.length + results.passages.length + results.rdvs.length;
-
-  return (
-    <div style={{position:"fixed",inset:0,background:"rgba(8,18,40,0.6)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",paddingTop:60,backdropFilter:"blur(4px)"}}
-      onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:520,padding:"0 16px"}}>
-        {/* Barre de recherche */}
-        <div style={{background:"#fff",borderRadius:18,padding:"14px 16px",boxShadow:"0 20px 60px rgba(0,0,0,0.3)",display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
-          <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-          <input ref={inputRef} value={q} onChange={e=>setQ(e.target.value)}
-            placeholder="Rechercher client, passage, date…"
-            style={{flex:1,border:"none",outline:"none",fontSize:16,color:"#0f172a",fontFamily:"inherit",background:"transparent"}}/>
-          {q && <button onClick={()=>setQ("")} style={{background:"none",border:"none",cursor:"pointer",color:"#94a3b8",fontSize:18,lineHeight:1}}>✕</button>}
-          <button onClick={onClose} style={{background:"#f1f5f9",border:"none",cursor:"pointer",borderRadius:8,padding:"4px 10px",fontSize:11,fontWeight:700,color:"#64748b",fontFamily:"inherit"}}>Esc</button>
-        </div>
-
-        {/* Résultats */}
-        {q.length >= 2 && (
-          <div style={{background:"#fff",borderRadius:16,overflow:"hidden",boxShadow:"0 12px 40px rgba(0,0,0,0.2)"}}>
-            {total === 0 && (
-              <div style={{padding:24,textAlign:"center",color:"#94a3b8",fontSize:14}}>Aucun résultat pour « {q} »</div>
-            )}
-
-            {results.clients.length > 0 && (
-              <div>
-                <div style={{padding:"8px 14px 4px",fontSize:10,fontWeight:800,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid #f1f5f9"}}>👥 Clients</div>
-                {results.clients.map(c=>(
-                  <button key={c.id} onClick={()=>{onClientClick(c);onClose();}}
-                    style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"none",border:"none",borderBottom:"1px solid #f8fafc",cursor:"pointer",textAlign:"left",fontFamily:"inherit",transition:"background .1s"}}
-                    onMouseEnter={e=>e.currentTarget.style.background="#f8fafc"} onMouseLeave={e=>e.currentTarget.style.background="none"}>
-                    <Avatar nom={c.nom} size={32}/>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontWeight:700,fontSize:13,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
-                      <div style={{fontSize:11,color:"#64748b"}}>{c.formule}{c.bassin?` · ${c.bassin}`:""}</div>
-                    </div>
-                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {results.passages.length > 0 && (
-              <div>
-                <div style={{padding:"8px 14px 4px",fontSize:10,fontWeight:800,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid #f1f5f9"}}>📋 Passages</div>
-                {results.passages.map(p=>{
-                  const c = clients.find(x=>x.id===p.clientId);
-                  return (
-                    <button key={p.id} onClick={()=>{if(c){onClientClick(c);}onClose();}}
-                      style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"none",border:"none",borderBottom:"1px solid #f8fafc",cursor:"pointer",textAlign:"left",fontFamily:"inherit"}}
-                      onMouseEnter={e=>e.currentTarget.style.background="#f8fafc"} onMouseLeave={e=>e.currentTarget.style.background="none"}>
-                      <div style={{width:32,height:32,borderRadius:10,background:"#e0f2fe",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>🔧</div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontWeight:700,fontSize:13,color:"#0f172a"}}>{c?.nom||p.clientId}</div>
-                        <div style={{fontSize:11,color:"#64748b"}}>{p.type} · {new Date(p.date).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})}</div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {results.rdvs.length > 0 && (
-              <div>
-                <div style={{padding:"8px 14px 4px",fontSize:10,fontWeight:800,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid #f1f5f9"}}>📅 RDV</div>
-                {results.rdvs.map(r=>{
-                  const c = clients.find(x=>x.id===r.clientId);
-                  return (
-                    <div key={r.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderBottom:"1px solid #f8fafc"}}>
-                      <div style={{width:32,height:32,borderRadius:10,background:"#ede9fe",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>📅</div>
-                      <div style={{flex:1}}>
-                        <div style={{fontWeight:700,fontSize:13,color:"#0f172a"}}>{r.type}</div>
-                        <div style={{fontSize:11,color:"#64748b"}}>{c?.nom||""} · {new Date(r.date).toLocaleDateString("fr",{day:"2-digit",month:"short"})}{r.heure?` à ${r.heure}`:""}</div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {q.length === 0 && (
-          <div style={{background:"rgba(255,255,255,0.1)",borderRadius:12,padding:"12px 16px",textAlign:"center",fontSize:12,color:"rgba(255,255,255,0.6)"}}>
-            Tapez au moins 2 caractères pour rechercher
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ================================================================
 // IMPORT CONNECTEAM
 // ================================================================
