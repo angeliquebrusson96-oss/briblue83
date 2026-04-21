@@ -422,6 +422,62 @@ const YEAR_NOW = new Date().getFullYear();
 // ─── Helpers champs passage (globaux) ────────────────────────────────────────
 const getPH  = p => { const v = p.tPH || p.ph; return v && Number(v)>0 ? Number(v) : null; };
 const getCL  = p => { const v = p.tChlore || p.chloreLibre || p.chlore; return v && Number(v)>0 ? Number(v) : null; };
+
+// ═══ 🧠 IA EAU ═══
+function analyseEauIA(passage) {
+  const ph=getPH(passage), cl=getCL(passage);
+  const sel=Number(passage.tSel)||0, pho=Number(passage.tPhosphate)||0, sta=Number(passage.tStabilisant)||0;
+  const alerts=[]; let score=100;
+  if (ph!==null) {
+    if      (ph<6.8) { alerts.push({lvl:"danger",msg:`pH trop bas (${ph}) → corrosion`,conseil:"Ajouter pH+"}); score-=25; }
+    else if (ph<7.0) { alerts.push({lvl:"warn",  msg:`pH bas (${ph})`,conseil:"Légère correction pH+"}); score-=10; }
+    else if (ph>7.8) { alerts.push({lvl:"danger",msg:`pH trop élevé (${ph}) → chlore inefficace`,conseil:"Ajouter pH-"}); score-=25; }
+    else if (ph>7.6) { alerts.push({lvl:"warn",  msg:`pH légèrement élevé (${ph})`,conseil:"Légère correction pH-"}); score-=8; }
+  }
+  if (cl!==null) {
+    if      (cl<0.3) { alerts.push({lvl:"danger",msg:`Chlore insuffisant (${cl} ppm)`,conseil:"Choc chlore urgent"}); score-=30; }
+    else if (cl<0.5) { alerts.push({lvl:"warn",  msg:`Chlore bas (${cl} ppm)`,conseil:"Augmenter le chlore"}); score-=12; }
+    else if (cl>3.0) { alerts.push({lvl:"danger",msg:`Chlore excessif (${cl} ppm)`,conseil:"Arrêter le chlore"}); score-=20; }
+    else if (cl>2.0) { alerts.push({lvl:"warn",  msg:`Chlore élevé (${cl} ppm)`,conseil:"Réduire le dosage"}); score-=6; }
+  }
+  if (sel>0) {
+    if (sel<2.5) { alerts.push({lvl:"warn",msg:`Sel trop bas (${sel} g/L)`,conseil:"Ajouter du sel (3-4 g/L)"}); score-=8; }
+    else if (sel>6) { alerts.push({lvl:"warn",msg:`Sel trop élevé (${sel} g/L)`,conseil:"Diluer"}); score-=8; }
+  }
+  if (pho>0.3) { alerts.push({lvl:"warn",msg:`Phosphates élevés (${pho} mg/L)`,conseil:"Anti-phosphates"}); score-=10; }
+  if (sta>75)  { alerts.push({lvl:"warn",msg:`Stabilisant trop élevé (${sta} ppm)`,conseil:"Vidange partielle"}); score-=12; }
+  const scoreF=Math.max(0,Math.min(100,score));
+  const color=scoreF>=90?"#059669":scoreF>=75?"#0891b2":scoreF>=50?"#f59e0b":"#ef4444";
+  const emoji=scoreF>=90?"🏆":scoreF>=75?"✅":scoreF>=50?"⚠️":"🚨";
+  const label=scoreF>=90?"Excellente":scoreF>=75?"Bonne":scoreF>=50?"À surveiller":"Critique";
+  return { score:scoreF, color, emoji, label, alerts:alerts.filter(a=>a.lvl!=="ok"), hasMesures:ph!==null||cl!==null };
+}
+
+function scoreClientPiscine(clientId, passages, n=3) {
+  const cp = passages.filter(p=>p.clientId===clientId&&(getPH(p)||getCL(p))).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,n);
+  if (!cp.length) return null;
+  return Math.round(cp.reduce((s,p)=>s+analyseEauIA(p).score,0)/cp.length);
+}
+
+function ScoreSante({ score, size=38, showLabel=true }) {
+  if (score===null) return null;
+  const color=score>=90?"#059669":score>=75?"#0891b2":score>=50?"#f59e0b":"#ef4444";
+  const emoji=score>=90?"🏆":score>=75?"✅":score>=50?"⚠️":"🚨";
+  const circ=2*Math.PI*(size*0.4), pct=score/100;
+  return (
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle cx={size/2} cy={size/2} r={size*0.4} fill="none" stroke="#dde8f0" strokeWidth={size*0.1}/>
+        <circle cx={size/2} cy={size/2} r={size*0.4} fill="none" stroke={color} strokeWidth={size*0.1}
+          strokeDasharray={`${circ*pct} ${circ*(1-pct)}`} strokeLinecap="round"
+          strokeDashoffset={circ*0.25}
+          style={{transform:"rotate(-90deg)",transformOrigin:"center",transition:"stroke-dasharray .6s ease"}}/>
+        <text x={size/2} y={size/2+size*0.075} textAnchor="middle" fontSize={size*0.26} fontWeight="800" fill={color} fontFamily="inherit">{score}</text>
+      </svg>
+      {showLabel && <div style={{fontSize:9,fontWeight:700,color,background:`${color}15`,padding:"1px 6px",borderRadius:20}}>{emoji} Santé eau</div>}
+    </div>
+  );
+}
 const getTemp = p => { const v = p.temperature; return v && Number(v)>0 ? Number(v) : null; };
 const getResumePassage = p => {
   const parts = [];
