@@ -6092,8 +6092,6 @@ export default function App() {
       const s = await load("bb_stock_v1", null);
       const ct = await load("bb_contrats_v1", null);
 
-      // null = clé absente de Supabase (première fois) → utiliser données initiales
-      // valeur présente = toujours utiliser les données Supabase
       const clientsData = c !== null ? c : CLIENTS_INIT;
       const passagesData = passages_data !== null ? passages_data : PASSAGES_INIT;
       const livraisonsData = l !== null ? l : [];
@@ -6106,6 +6104,33 @@ export default function App() {
       setClients(cMigrated); setPassages(passagesData); setLivraisons(livraisonsData); setRdvs(rdvsData); setStock(sWithDefaults); setContrats(contratsData); setReady(true); setInitialLoaded(true);
     })();
   },[loggedIn]);
+
+  // Écoute temps réel des passages — met à jour tous les appareils instantanément
+  // quand un autre appareil (ex: iPhone) sauvegarde de nouveaux passages
+  useEffect(()=>{
+    if(!ready) return;
+    const unsubPassages = onSnapshot(
+      doc(db, "briblue", "app_data"),
+      async (snap) => {
+        if (!snap.exists()) return;
+        const nbChunks = snap.data().bb_passages_chunks;
+        if (typeof nbChunks !== "number") return;
+        // Recharger les passages depuis Firebase
+        try {
+          const passages = await loadAllPassages();
+          if (passages.length > 0) {
+            setPassages(passages);
+            try {
+              localStorage.setItem("briblue_bb_passages_v2", JSON.stringify(passages));
+              localStorage.setItem("briblue_ts_bb_passages_v2", String(Date.now()));
+            } catch {}
+          }
+        } catch {}
+      },
+      () => {}
+    );
+    return () => unsubPassages();
+  }, [ready]);
 
   // Sauvegarde MANUELLE uniquement — jamais automatique au chargement
   const saveClients   = useCallback((data) => save("bb_clients_v2",    data), []);
