@@ -208,10 +208,7 @@ async function load(key, fallback) {
     }
 
     const allData = data.data;
-    if (key in allData) {
-      try { localStorage.setItem("briblue_" + key, JSON.stringify(allData[key])); } catch {}
-      return allData[key];
-    }
+    if (key in allData) return allData[key];
 
     try { const ls = localStorage.getItem("briblue_" + key); if (ls) return JSON.parse(ls); } catch {}
     return null;
@@ -1503,162 +1500,49 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
         <div className="fade-in">
           {(()=>{
             const passClient2 = passages.filter(p=>p.clientId===client.id);
-            const livClient   = (livraisons||[]).filter(l=>l.clientId===client.id);
-            const rdvClient2  = (rdvs||[]).filter(r=>r.clientId===client.id);
-            const getPH2 = p => p.tPH||p.ph||null;
-            const getCL2 = p => p.tChlore||p.chloreLibre||p.chlore||null;
-
-            // Construire les événements enrichis
+            const livClient  = (livraisons||[]).filter(l=>l.clientId===client.id);
+            const rdvClient2 = (rdvs||[]).filter(r=>r.clientId===client.id);
             const events = [
-              ...(client.dateDebut?[{
-                date:client.dateDebut, type:"contrat",
-                title:"Début de contrat", icon:"📄",
-                sub:client.formule+(client.prix?" · "+client.prix.toLocaleString("fr")+"€/an":""),
-                color:"#0891b2", bg:"#e0f2fe", badge:"Contrat", badgeColor:"#0891b2",
-              }]:[]),
-              ...passClient2.map(p=>({
-                date:p.date, type:"passage", _p:p,
-                title:p.type||"Entretien",
-                icon:p.type&&p.type.toLowerCase().includes("contrôle")?"💧":"🔧",
-                color:p.type&&p.type.toLowerCase().includes("contrôle")?"#0e7490":"#0284c7",
-                bg:p.type&&p.type.toLowerCase().includes("contrôle")?"#f0fdfa":"#eff6ff",
-                ph: getPH2(p), cl: getCL2(p),
-                tech: p.tech,
-                actions: p.actions||p.obs||p.commentaires||"",
-                photos: [p.photoArrivee,p.photoDepart].filter(Boolean),
-                badge: p.ok?"✅ Effectué":"⏳ En cours",
-                badgeColor: p.ok?"#059669":"#f59e0b",
-                badgeBg: p.ok?"#f0fdf4":"#fffbeb",
-              })),
-              ...livClient.map(l=>({
-                date:l.date, type:"livraison", _l:l,
-                title:"Livraison produits", icon:"📦",
-                color:"#d97706", bg:"#fffbeb",
-                sub:(l.produits||[]).slice(0,3).join(", ")+(l.montant?" · "+l.montant+"€":""),
-                badge:l.statut==="paye"?"Payé":l.statut==="facture"?"Facturé":"À facturer",
-                badgeColor:l.statut==="paye"?"#059669":l.statut==="facture"?"#0891b2":"#d97706",
-                badgeBg:l.statut==="paye"?"#f0fdf4":l.statut==="facture"?"#e0f2fe":"#fef3c7",
-              })),
-              ...rdvClient2.map(r=>({
-                date:r.date, type:"rdv", _r:r,
-                title:r.type||"Rendez-vous", icon:"📅",
-                color:"#7c3aed", bg:"#f5f3ff",
-                sub:[r.heure,r.duree?r.duree+" min":null,r.description].filter(Boolean).join(" · "),
-                badge:r.date>=TODAY?"À venir":"Passé",
-                badgeColor:r.date>=TODAY?"#7c3aed":"#94a3b8",
-                badgeBg:r.date>=TODAY?"#f5f3ff":"#f8fafc",
-              })),
+              ...(client.dateDebut?[{date:client.dateDebut,title:"Début de contrat",sub:client.formule+(client.prix?" · "+client.prix+"€/an":""),dot:"#22d3ee",badge:"Contrat",badgeColor:"#0891b2"}]:[]),
+              ...passClient2.map(p=>({date:p.date,title:p.type||"Passage",sub:[p.tech?"par "+p.tech:null,p.ph?"pH "+p.ph:null,p.chlore?"Cl "+p.chlore:null].filter(Boolean).join(" · "),dot:isControleType(p.type)?"#0e7490":"#0891b2",badge:p.ok?"Effectué":"En cours",badgeColor:p.ok?"#059669":"#f59e0b",_p:p})),
+              ...livClient.map(l=>({date:l.date,title:"Livraison",sub:[l.produits?.slice(0,2).join(", "),l.montant?l.montant+"€":null].filter(Boolean).join(" · "),dot:"#f59e0b",badge:l.statut==="paye"?"Payé":l.statut==="facture"?"Facturé":"À facturer",badgeColor:l.statut==="paye"?"#059669":"#f59e0b",_l:l})),
+              ...rdvClient2.map(r=>({date:r.date,title:r.type||"RDV",sub:[r.heure,r.duree?r.duree+" min":null].filter(Boolean).join(" · "),dot:"#818cf8",badge:r.date>=TODAY?"À venir":"Passé",badgeColor:r.date>=TODAY?"#818cf8":"#94a3b8",_r:r})),
             ].sort((a,b)=>b.date.localeCompare(a.date));
-
-            if(!events.length) return (
-              <div style={{textAlign:"center",padding:"48px 0",color:"#94a3b8"}}>
-                <div style={{fontSize:40,marginBottom:12}}>📋</div>
-                <div style={{fontSize:14,fontWeight:600}}>Aucun historique</div>
-              </div>
-            );
-
-            // Stats rapides en haut
-            const totalP = passClient2.length;
-            const totalL = livClient.length;
-            const totalR = rdvClient2.length;
-
-            // Grouper par mois
+            if(!events.length) return <div style={{textAlign:"center",padding:"48px 0",color:"#94a3b8",fontSize:14}}>Aucun historique</div>;
             const grouped={};
             events.forEach(ev=>{ const d=new Date(ev.date); const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; if(!grouped[k]) grouped[k]=[]; grouped[k].push(ev); });
-
-            return (
-              <>
-                {/* Stats rapides */}
-                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:16}}>
-                  {[
-                    {ico:"🔧",val:totalP,lbl:"Passages",color:"#0284c7",bg:"#eff6ff"},
-                    {ico:"📦",val:totalL,lbl:"Livraisons",color:"#d97706",bg:"#fffbeb"},
-                    {ico:"📅",val:totalR,lbl:"RDV",color:"#7c3aed",bg:"#f5f3ff"},
-                  ].map(({ico,val,lbl,color,bg})=>(
-                    <div key={lbl} style={{background:bg,borderRadius:12,padding:"10px 8px",textAlign:"center",border:"1px solid "+color+"22"}}>
-                      <div style={{fontSize:18,marginBottom:2}}>{ico}</div>
-                      <div style={{fontSize:20,fontWeight:900,color,lineHeight:1}}>{val}</div>
-                      <div style={{fontSize:10,color,fontWeight:600,marginTop:2,opacity:.7}}>{lbl}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Timeline par mois */}
-                {Object.keys(grouped).sort((a,b)=>b.localeCompare(a)).map(key=>{
-                  const [yr,mo]=key.split("-");
-                  const nbPass = grouped[key].filter(e=>e.type==="passage").length;
-                  return (
-                    <div key={key} style={{marginBottom:20}}>
-                      {/* Header mois */}
-                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,padding:"8px 12px",background:"linear-gradient(135deg,#0c1f3f,#0e3460)",borderRadius:12}}>
-                        <span style={{fontSize:13,fontWeight:800,color:"#fff"}}>{MOIS_L[parseInt(mo)]} {yr}</span>
-                        <div style={{display:"flex",gap:6}}>
-                          {nbPass>0&&<span style={{fontSize:10,fontWeight:700,color:"#7dd3fc",background:"rgba(125,211,252,0.15)",padding:"2px 8px",borderRadius:20}}>🔧 {nbPass}</span>}
-                          <span style={{fontSize:10,fontWeight:600,color:"rgba(255,255,255,0.4)"}}>{grouped[key].length} evt</span>
+            return Object.keys(grouped).sort((a,b)=>b.localeCompare(a)).map(key=>{
+              const [yr,mo]=key.split("-");
+              return (
+                <div key={key} style={{marginBottom:24}}>
+                  <div style={{fontSize:11,fontWeight:800,color:"#0f172a",marginBottom:10,paddingBottom:6,borderBottom:"2px solid #f1f5f9",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                    <span>{MOIS_L[parseInt(mo)]} {yr}</span>
+                    <span style={{fontSize:10,color:"#94a3b8",fontWeight:500}}>{grouped[key].length} événement{grouped[key].length>1?"s":""}</span>
+                  </div>
+                  {grouped[key].map((ev,i)=>{
+                    const d=new Date(ev.date);
+                    const clickable=!!(ev._p||ev._l||ev._r);
+                    return (
+                      <div key={i} onClick={ev._p?()=>setDetailPassageFiche(ev._p):ev._l?()=>{setEditLiv(ev._l);setShowFormLiv(true);}:ev._r?()=>onEditRdv&&onEditRdv(ev._r):undefined}
+                        style={{display:"flex",alignItems:"center",gap:12,padding:"11px 0",borderBottom:i<grouped[key].length-1?"1px solid #f8fafc":"none",cursor:clickable?"pointer":"default"}}>
+                        <div style={{width:36,flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                          <div style={{width:10,height:10,borderRadius:"50%",background:ev.dot}}/>
+                          <div style={{fontSize:9,color:"#94a3b8",fontWeight:600,textAlign:"center",lineHeight:1.2}}>{d.toLocaleDateString("fr",{day:"2-digit",month:"short"})}</div>
+                        </div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:13,fontWeight:700,color:"#0f172a",marginBottom:2}}>{ev.title}</div>
+                          {ev.sub&&<div style={{fontSize:11,color:"#64748b"}}>{ev.sub}</div>}
+                        </div>
+                        <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+                          <span style={{fontSize:10,fontWeight:700,color:ev.badgeColor,background:ev.badgeColor+"18",padding:"2px 7px",borderRadius:10,whiteSpace:"nowrap"}}>{ev.badge}</span>
+                          {clickable&&<svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>}
                         </div>
                       </div>
-
-                      {/* Événements du mois */}
-                      <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                        {grouped[key].map((ev,i)=>{
-                          const d = new Date(ev.date);
-                          const clickable = !!(ev._p||ev._l||ev._r);
-                          return (
-                            <div key={i}
-                              onClick={ev._p?()=>setDetailPassageFiche(ev._p):ev._l?()=>{setEditLiv(ev._l);setShowFormLiv(true);}:ev._r?()=>onEditRdv&&onEditRdv(ev._r):undefined}
-                              style={{background:"#fff",borderRadius:14,border:"1px solid #f1f5f9",overflow:"hidden",cursor:clickable?"pointer":"default",boxShadow:"0 1px 4px rgba(0,0,0,0.04)",transition:"all .15s"}}
-                              onTouchStart={e=>{if(clickable)e.currentTarget.style.background="#f8fafc"}}
-                              onTouchEnd={e=>{e.currentTarget.style.background="#fff"}}>
-                              <div style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px"}}>
-                                {/* Date + icône */}
-                                <div style={{display:"flex",flexDirection:"column",alignItems:"center",width:44,flexShrink:0}}>
-                                  <div style={{width:36,height:36,borderRadius:10,background:ev.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,border:"1px solid "+ev.color+"22"}}>
-                                    {ev.icon}
-                                  </div>
-                                  <div style={{fontSize:9,fontWeight:700,color:"#94a3b8",marginTop:4,textAlign:"center",lineHeight:1.2}}>
-                                    {d.getDate()} {["","jan","fév","mar","avr","mai","jun","jul","aoû","sep","oct","nov","déc"][d.getMonth()+1]}
-                                  </div>
-                                </div>
-
-                                {/* Contenu */}
-                                <div style={{flex:1,minWidth:0}}>
-                                  <div style={{fontSize:13,fontWeight:700,color:"#0f172a",marginBottom:2}}>{ev.title}</div>
-
-                                  {/* Passage: tech + mesures */}
-                                  {ev.type==="passage"&&(
-                                    <div>
-                                      {ev.tech&&<div style={{fontSize:11,color:"#64748b",marginBottom:ev.ph||ev.cl?4:0}}>👤 {ev.tech}</div>}
-                                      {(ev.ph||ev.cl)&&(
-                                        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                                          {ev.ph&&<span style={{fontSize:11,fontWeight:700,padding:"2px 7px",borderRadius:6,background:Number(ev.ph)>=7&&Number(ev.ph)<=7.6?"#dcfce7":"#fef3c7",color:Number(ev.ph)>=7&&Number(ev.ph)<=7.6?"#166534":"#92400e"}}>pH {ev.ph}</span>}
-                                          {ev.cl&&<span style={{fontSize:11,fontWeight:700,padding:"2px 7px",borderRadius:6,background:Number(ev.cl)>=0.5&&Number(ev.cl)<=3?"#dcfce7":"#fef3c7",color:Number(ev.cl)>=0.5&&Number(ev.cl)<=3?"#166534":"#92400e"}}>Cl {ev.cl}</span>}
-                                        </div>
-                                      )}
-                                      {ev.actions&&!ev.ph&&!ev.cl&&<div style={{fontSize:11,color:"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{ev.actions}</div>}
-                                      {/* Miniature photo */}
-                                      {ev.photos&&ev.photos.length>0&&<div style={{display:"flex",gap:4,marginTop:5}}>{ev.photos.slice(0,2).map((ph,pi)=><img key={pi} src={ph} alt="" style={{width:36,height:28,objectFit:"cover",borderRadius:5,border:"1px solid #e2e8f0"}}/>)}</div>}
-                                    </div>
-                                  )}
-
-                                  {/* Livraison / RDV / Contrat : sous-titre */}
-                                  {ev.sub&&ev.type!=="passage"&&<div style={{fontSize:11,color:"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ev.sub}</div>}
-                                </div>
-
-                                {/* Badge + flèche */}
-                                <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
-                                  <span style={{fontSize:10,fontWeight:700,color:ev.badgeColor,background:ev.badgeBg||ev.badgeColor+"18",padding:"3px 8px",borderRadius:20,whiteSpace:"nowrap",border:"1px solid "+ev.badgeColor+"33"}}>{ev.badge}</span>
-                                  {clickable&&<svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </>
-            );
+                    );
+                  })}
+                </div>
+              );
+            });
           })()}
         </div>
       )}
@@ -2138,7 +2022,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
 
     {/* -- APERÇU CARNET CLIENT (plein écran) -- */}
     {showCarnetPreview&&(
-      <div style={{position:"fixed",inset:0,zIndex:9999,background:"#f0f4f8",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+      <div style={{position:"fixed",inset:0,zIndex:9999,background:"#f0f4f8",display:"flex",flexDirection:"column",overflow:"hidden"}}>
         {/* Barre fermeture */}
         <div style={{position:"sticky",top:0,zIndex:10,background:"rgba(12,31,63,0.96)",backdropFilter:"blur(8px)",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",boxShadow:"0 2px 12px rgba(0,0,0,0.3)"}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -2155,7 +2039,9 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           </button>
         </div>
         {/* Le vrai composant CarnetPublic avec les données déjà chargées */}
-        <CarnetPublicInline client={client} passages={passages}/>
+        <div style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+          <CarnetPublicInline client={client} passages={passages}/>
+        </div>
       </div>
     )}
     </>
@@ -4668,30 +4554,59 @@ function ModalStock({ stock, onClose, onUpdateStock, onAddProduit, onDeleteProdu
 function CarnetPublicInline({ client, passages }) {
   const [selectedPassage, setSelectedPassage] = useState(null);
 
+  // Tous les passages du client, sans filtre ok
   const passClient = (passages||[])
-    .filter(p=>p.clientId===client.id && p.ok)
-    .sort((a,b)=>new Date(b.date)-new Date(a.date));
+    .filter(p => p.clientId === client.id)
+    .sort((a,b) => new Date(b.date) - new Date(a.date));
 
-  const last = passClient[0]||null;
+  const last = passClient[0] || null;
   const F = "system-ui,-apple-system,sans-serif";
-  const phOk  = v => v>=7 && v<=7.6;
-  const clOk  = v => v>=0.5 && v<=3;
-  const fmtDate = (d,opts) => new Date(d).toLocaleDateString("fr",opts);
+
+  // Normalise pH et chlore depuis tous les champs possibles
+  const getPH = p => {
+    const v = p.tPH || p.ph;
+    return v && Number(v) > 0 ? Number(v) : null;
+  };
+  const getCL = p => {
+    const v = p.tChlore || p.chloreLibre || p.chlore;
+    return v && Number(v) > 0 ? Number(v) : null;
+  };
+  const phOk = v => v >= 7 && v <= 7.6;
+  const clOk = v => v >= 0.5 && v <= 3;
+  const fmtDate = (d, opts) => new Date(d).toLocaleDateString("fr", opts);
+
+  // Résumé lisible du passage
+  const getResume = p => {
+    const parts = [];
+    if (p.actions) parts.push(p.actions);
+    else {
+      const corr = [
+        p.corrChlore && "Chlore: " + p.corrChlore,
+        p.corrPH && "pH: " + p.corrPH,
+        p.corrAlgicide && "Algicide: " + p.corrAlgicide,
+        p.corrAlcafix && "Alcafix: " + p.corrAlcafix,
+        p.corrSel && "Sel: " + p.corrSel,
+        p.corrAutre && p.corrAutre,
+      ].filter(Boolean);
+      if (corr.length) parts.push("Produits: " + corr.join(", "));
+    }
+    if (p.obs && p.obs !== p.actions) parts.push(p.obs);
+    if (p.commentaires && p.commentaires !== p.obs) parts.push(p.commentaires);
+    return parts.join(" · ") || null;
+  };
+
+  const isCtrl = p => p.type && p.type.toLowerCase().includes("contrôle");
 
   return (
     <>
     <div style={{minHeight:"100vh",background:"#f0f4f8",fontFamily:F,maxWidth:480,margin:"0 auto",paddingBottom:40}}>
 
-      {/* -- HEADER gradient -- */}
+      {/* Header */}
       <div style={{background:"linear-gradient(160deg,#0c1f3f 0%,#0e4a7a 70%,#0891b2 100%)",padding:"28px 22px 32px",position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",right:-50,top:-50,width:200,height:200,borderRadius:"50%",background:"rgba(56,189,248,0.07)"}}/>
-        <div style={{position:"absolute",left:-30,bottom:-30,width:140,height:140,borderRadius:"50%",background:"rgba(255,255,255,0.03)"}}/>
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:20,position:"relative"}}>
           <div style={{width:32,height:32,borderRadius:9,background:"rgba(255,255,255,0.12)",display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <svg width={18} height={13} viewBox="0 0 32 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
-              <path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/>
-              <path d="M2 16c2.5 3 5 3 7.5 0S14 13 16.5 16s5 3 7.5 0"/>
-            </svg>
+            <svg width={18} height={13} viewBox="0 0 32 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/><path d="M2 16c2.5 3 5 3 7.5 0S14 13 16.5 16s5 3 7.5 0"/></svg>
           </div>
           <span style={{fontSize:13,fontWeight:800,color:"rgba(255,255,255,0.9)",letterSpacing:.3}}>BRIBLUE</span>
           <span style={{fontSize:11,color:"rgba(255,255,255,0.35)",marginLeft:4}}>Carnet d'entretien</span>
@@ -4699,7 +4614,7 @@ function CarnetPublicInline({ client, passages }) {
         <div style={{position:"relative"}}>
           <div style={{fontSize:24,fontWeight:900,color:"#fff",lineHeight:1.1,marginBottom:6}}>{client.nom}</div>
           <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:16}}>
-            {[client.bassin,client.formule,client.volume?client.volume+"m³":null,client.dateDebut?"Suivi depuis "+fmtDate(client.dateDebut,{month:"long",year:"numeric"}):null].filter(Boolean).map((t,i)=>(
+            {[client.bassin,client.formule,client.volume?client.volume+"m³":null].filter(Boolean).map((t,i)=>(
               <span key={i} style={{fontSize:11,fontWeight:600,color:"rgba(255,255,255,0.65)",background:"rgba(255,255,255,0.08)",borderRadius:20,padding:"3px 10px"}}>{t}</span>
             ))}
           </div>
@@ -4708,8 +4623,7 @@ function CarnetPublicInline({ client, passages }) {
               <div style={{fontSize:26,fontWeight:900,color:"#38bdf8",lineHeight:1}}>{passClient.length}</div>
               <div style={{fontSize:10,color:"rgba(255,255,255,0.5)",fontWeight:600,marginTop:2}}>intervention{passClient.length!==1?"s":""}</div>
             </div>
-            {last&&(<>
-              <div style={{width:1,height:36,background:"rgba(255,255,255,0.1)"}}/>
+            {last&&(<><div style={{width:1,height:36,background:"rgba(255,255,255,0.1)"}}/>
               <div>
                 <div style={{fontSize:11,color:"rgba(255,255,255,0.45)",fontWeight:600,marginBottom:2}}>Dernière visite</div>
                 <div style={{fontSize:13,fontWeight:800,color:"#e0f2fe"}}>{fmtDate(last.date,{day:"2-digit",month:"short",year:"numeric"})}</div>
@@ -4719,147 +4633,222 @@ function CarnetPublicInline({ client, passages }) {
         </div>
       </div>
 
-      <div style={{padding:"0 16px",marginTop:-12}}>
+      <div style={{padding:"0 16px",marginTop:12}}>
+
+        {passClient.length===0&&(
+          <div style={{background:"#fff",borderRadius:20,padding:"48px 24px",textAlign:"center"}}>
+            <div style={{fontSize:48,marginBottom:12}}>🏊</div>
+            <div style={{fontSize:16,fontWeight:800,color:"#0f172a",marginBottom:6}}>Aucune intervention</div>
+            <div style={{fontSize:13,color:"#94a3b8"}}>Les interventions apparaîtront ici.</div>
+          </div>
+        )}
+
+        {/* Dernière intervention */}
         {last&&(
-          <div style={{background:"#fff",borderRadius:20,padding:"18px 18px",marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)",border:"1px solid #e8f4f8"}}>
+          <div style={{background:"#fff",borderRadius:20,padding:"18px",marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)",border:"1px solid #e8f4f8"}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
               <div>
                 <div style={{fontSize:10,fontWeight:800,color:"#0891b2",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Dernière intervention</div>
                 <div style={{fontSize:17,fontWeight:900,color:"#0f172a"}}>{last.type||"Entretien"}</div>
-                <div style={{fontSize:12,color:"#64748b",marginTop:3,display:"flex",alignItems:"center",gap:5}}>
-                  <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                  {fmtDate(last.date,{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}
-                </div>
-                {last.tech&&<div style={{fontSize:12,color:"#64748b",marginTop:2,display:"flex",alignItems:"center",gap:5}}>
-                  <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                  {last.tech}
-                </div>}
+                <div style={{fontSize:12,color:"#64748b",marginTop:3}}>📅 {fmtDate(last.date,{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}</div>
+                {last.tech&&<div style={{fontSize:12,color:"#64748b",marginTop:2}}>👤 {last.tech}</div>}
               </div>
               <div style={{width:48,height:48,borderRadius:14,background:"linear-gradient(135deg,#0891b2,#0e7490)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>
-                {isControleType(last.type)?"💧":"🔧"}
+                {isCtrl(last)?"💧":"🔧"}
               </div>
             </div>
-            {(last.ph||last.chlore||last.temperature)&&(
-              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:last.obs||last.actions?14:0}}>
-                {last.ph&&(<div style={{borderRadius:14,padding:"12px 8px",textAlign:"center",background:phOk(last.ph)?"#f0fdf4":"#fff7ed",border:"1.5px solid "+(phOk(last.ph)?"#86efac":"#fed7aa")}}>
-                  <div style={{fontSize:10,fontWeight:800,color:phOk(last.ph)?"#166534":"#92400e",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>pH</div>
-                  <div style={{fontSize:30,fontWeight:900,color:phOk(last.ph)?"#16a34a":"#d97706",lineHeight:1}}>{last.ph}</div>
-                  <div style={{fontSize:10,fontWeight:700,color:phOk(last.ph)?"#22c55e":"#f59e0b",marginTop:4}}>{phOk(last.ph)?"✓ Idéal":"⚠ Revoir"}</div>
+            {/* Mesures */}
+            {(getPH(last)||getCL(last))&&(
+              <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:getResume(last)?14:0}}>
+                {getPH(last)&&(<div style={{borderRadius:14,padding:"12px 8px",textAlign:"center",background:phOk(getPH(last))?"#f0fdf4":"#fff7ed",border:"1.5px solid "+(phOk(getPH(last))?"#86efac":"#fed7aa")}}>
+                  <div style={{fontSize:10,fontWeight:800,color:phOk(getPH(last))?"#166534":"#92400e",textTransform:"uppercase",marginBottom:4}}>pH</div>
+                  <div style={{fontSize:30,fontWeight:900,color:phOk(getPH(last))?"#16a34a":"#d97706",lineHeight:1}}>{getPH(last)}</div>
+                  <div style={{fontSize:10,fontWeight:700,color:phOk(getPH(last))?"#22c55e":"#f59e0b",marginTop:4}}>{phOk(getPH(last))?"✓ Idéal":"⚠ Revoir"}</div>
                 </div>)}
-                {last.chlore&&(<div style={{borderRadius:14,padding:"12px 8px",textAlign:"center",background:clOk(last.chlore)?"#f0fdf4":"#fff7ed",border:"1.5px solid "+(clOk(last.chlore)?"#86efac":"#fed7aa")}}>
-                  <div style={{fontSize:10,fontWeight:800,color:clOk(last.chlore)?"#166534":"#92400e",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Chlore</div>
-                  <div style={{fontSize:30,fontWeight:900,color:clOk(last.chlore)?"#16a34a":"#d97706",lineHeight:1}}>{last.chlore}</div>
-                  <div style={{fontSize:10,fontWeight:700,color:clOk(last.chlore)?"#22c55e":"#f59e0b",marginTop:4}}>{clOk(last.chlore)?"✓ Idéal":"⚠ Revoir"}</div>
-                </div>)}
-                {last.temperature&&(<div style={{borderRadius:14,padding:"12px 8px",textAlign:"center",background:"#f0f9ff",border:"1.5px solid #bae6fd"}}>
-                  <div style={{fontSize:10,fontWeight:800,color:"#075985",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Temp.</div>
-                  <div style={{fontSize:30,fontWeight:900,color:"#0284c7",lineHeight:1}}>{last.temperature}°</div>
-                  <div style={{fontSize:10,fontWeight:700,color:"#38bdf8",marginTop:4}}>Eau</div>
+                {getCL(last)&&(<div style={{borderRadius:14,padding:"12px 8px",textAlign:"center",background:clOk(getCL(last))?"#f0fdf4":"#fff7ed",border:"1.5px solid "+(clOk(getCL(last))?"#86efac":"#fed7aa")}}>
+                  <div style={{fontSize:10,fontWeight:800,color:clOk(getCL(last))?"#166534":"#92400e",textTransform:"uppercase",marginBottom:4}}>Chlore</div>
+                  <div style={{fontSize:30,fontWeight:900,color:clOk(getCL(last))?"#16a34a":"#d97706",lineHeight:1}}>{getCL(last)}</div>
+                  <div style={{fontSize:10,fontWeight:700,color:clOk(getCL(last))?"#22c55e":"#f59e0b",marginTop:4}}>{clOk(getCL(last))?"✓ Idéal":"⚠ Revoir"}</div>
                 </div>)}
               </div>
             )}
-            {last.actions&&(<div style={{background:"#f8fafc",borderRadius:12,padding:"10px 14px",marginBottom:last.obs?8:0}}>
-              <div style={{fontSize:10,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:.6,marginBottom:5}}>Actions réalisées</div>
-              <div style={{fontSize:13,color:"#334155",lineHeight:1.7}}>{last.actions}</div>
-            </div>)}
-            {last.obs&&(<div style={{background:"#fffbeb",borderRadius:12,padding:"10px 14px",borderLeft:"3px solid #fbbf24"}}>
-              <div style={{fontSize:10,fontWeight:800,color:"#92400e",textTransform:"uppercase",letterSpacing:.6,marginBottom:5}}>Observations</div>
-              <div style={{fontSize:13,color:"#78350f",lineHeight:1.7}}>{last.obs}</div>
-            </div>)}
+            {getResume(last)&&(
+              <div style={{background:"#f8fafc",borderRadius:12,padding:"10px 14px"}}>
+                <div style={{fontSize:10,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:.6,marginBottom:5}}>Compte-rendu</div>
+                <div style={{fontSize:13,color:"#334155",lineHeight:1.7}}>{getResume(last)}</div>
+              </div>
+            )}
           </div>
         )}
 
-        {passClient.length>1&&(
+        {/* Historique */}
+        {passClient.length>0&&(
           <div>
             <div style={{fontSize:11,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:.8,marginBottom:10,paddingLeft:2}}>
-              Historique ({passClient.length} interventions)
+              Historique ({passClient.length} intervention{passClient.length>1?"s":""})
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {passClient.map((p,i)=>(
-                <div key={p.id} onClick={()=>setSelectedPassage(p)}
-                  style={{background:"#fff",borderRadius:16,padding:"14px 16px",boxShadow:"0 1px 6px rgba(0,0,0,0.05)",border:"1px solid "+(i===0?"#bae6fd":"#f1f5f9"),cursor:"pointer",display:"flex",alignItems:"center",gap:14}}>
-                  <div style={{width:42,height:42,borderRadius:12,background:isControleType(p.type)?"#ecfdf5":"#eff6ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
-                    {isControleType(p.type)?"💧":"🔧"}
-                  </div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:14,fontWeight:800,color:"#0f172a",marginBottom:2}}>{p.type||"Entretien"}</div>
-                    <div style={{fontSize:12,color:"#64748b"}}>
-                      {fmtDate(p.date,{day:"2-digit",month:"long",year:"numeric"})}
-                      {p.tech&&<span style={{color:"#94a3b8"}}> · {p.tech}</span>}
+              {passClient.map((p,i)=>{
+                const ph=getPH(p); const cl=getCL(p); const resume=getResume(p);
+                return (
+                  <div key={p.id||i} onClick={()=>setSelectedPassage(p)}
+                    style={{background:"#fff",borderRadius:16,padding:"14px 16px",boxShadow:"0 1px 6px rgba(0,0,0,0.05)",border:"1px solid "+(i===0?"#bae6fd":"#f1f5f9"),cursor:"pointer",display:"flex",alignItems:"center",gap:14,touchAction:"manipulation"}}>
+                    <div style={{width:42,height:42,borderRadius:12,background:isCtrl(p)?"#ecfdf5":"#eff6ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
+                      {isCtrl(p)?"💧":"🔧"}
                     </div>
-                    {(p.ph||p.chlore||p.temperature)&&(
-                      <div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap"}}>
-                        {p.ph&&<span style={{fontSize:11,fontWeight:700,padding:"2px 7px",borderRadius:6,background:phOk(p.ph)?"#dcfce7":"#fef3c7",color:phOk(p.ph)?"#166534":"#92400e"}}>pH {p.ph}</span>}
-                        {p.chlore&&<span style={{fontSize:11,fontWeight:700,padding:"2px 7px",borderRadius:6,background:clOk(p.chlore)?"#dcfce7":"#fef3c7",color:clOk(p.chlore)?"#166534":"#92400e"}}>Cl {p.chlore}</span>}
-                        {p.temperature&&<span style={{fontSize:11,fontWeight:700,padding:"2px 7px",borderRadius:6,background:"#e0f2fe",color:"#0369a1"}}>{p.temperature}°C</span>}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:14,fontWeight:800,color:"#0f172a",marginBottom:2}}>{p.type||"Entretien"}</div>
+                      <div style={{fontSize:12,color:"#64748b"}}>
+                        {fmtDate(p.date,{day:"2-digit",month:"long",year:"numeric"})}
+                        {p.tech&&<span style={{color:"#94a3b8"}}> · {p.tech}</span>}
                       </div>
-                    )}
+                      {(ph||cl)&&(
+                        <div style={{display:"flex",gap:6,marginTop:5}}>
+                          {ph&&<span style={{fontSize:11,fontWeight:700,padding:"2px 7px",borderRadius:6,background:phOk(ph)?"#dcfce7":"#fef3c7",color:phOk(ph)?"#166534":"#92400e"}}>pH {ph}</span>}
+                          {cl&&<span style={{fontSize:11,fontWeight:700,padding:"2px 7px",borderRadius:6,background:clOk(cl)?"#dcfce7":"#fef3c7",color:clOk(cl)?"#166534":"#92400e"}}>Cl {cl}</span>}
+                        </div>
+                      )}
+                      {!ph&&!cl&&resume&&<div style={{fontSize:11,color:"#94a3b8",marginTop:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{resume}</div>}
+                    </div>
+                    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round" style={{flexShrink:0}}><polyline points="9 18 15 12 9 6"/></svg>
                   </div>
-                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round" style={{flexShrink:0}}><polyline points="9 18 15 12 9 6"/></svg>
-                </div>
-              ))}
+                );
+              })}
             </div>
-          </div>
-        )}
-
-        {passClient.length===0&&(
-          <div style={{background:"#fff",borderRadius:20,padding:"48px 24px",textAlign:"center",boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
-            <div style={{fontSize:48,marginBottom:12}}>🏊</div>
-            <div style={{fontSize:16,fontWeight:800,color:"#0f172a",marginBottom:6}}>Aucune intervention</div>
-            <div style={{fontSize:13,color:"#94a3b8"}}>Les interventions apparaîtront ici au fur et à mesure.</div>
           </div>
         )}
 
         <div style={{marginTop:32,textAlign:"center",padding:"16px 0"}}>
-          <div style={{fontSize:11,color:"#94a3b8",fontWeight:600,lineHeight:2}}>
-            BRIBLUE · Traitement de l'eau · La Seyne-sur-Mer<br/>SIRET 84345436400053
-          </div>
+          <div style={{fontSize:11,color:"#94a3b8",fontWeight:600,lineHeight:2}}>BRIBLUE · La Seyne-sur-Mer · SIRET 84345436400053</div>
         </div>
       </div>
     </div>
 
+    {/* Bottom sheet détail passage */}
     {selectedPassage&&(
-      <div onClick={()=>setSelectedPassage(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:10001,padding:0,backdropFilter:"blur(4px)"}}>
-        <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,maxHeight:"90vh",overflowY:"auto",WebkitOverflowScrolling:"touch",boxShadow:"0 -12px 48px rgba(0,0,0,0.2)",paddingBottom:"max(32px,env(safe-area-inset-bottom,32px))"}}>
+      <div onClick={()=>setSelectedPassage(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:10002,WebkitBackdropFilter:"blur(4px)",backdropFilter:"blur(4px)"}}>
+        <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,maxHeight:"88vh",overflowY:"auto",WebkitOverflowScrolling:"touch",boxShadow:"0 -12px 48px rgba(0,0,0,0.2)",paddingBottom:"max(32px,env(safe-area-inset-bottom,32px))"}}>
           <div style={{padding:"14px 0 4px",display:"flex",justifyContent:"center"}}><div style={{width:36,height:4,background:"#e2e8f0",borderRadius:2}}/></div>
-          <div style={{padding:"12px 22px 0"}}>
-            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:20}}>
+          <div style={{padding:"12px 22px 16px"}}>
+            {/* Titre */}
+            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:16}}>
               <div>
                 <div style={{fontSize:20,fontWeight:900,color:"#0f172a",marginBottom:4}}>{selectedPassage.type||"Entretien"}</div>
-                <div style={{fontSize:13,color:"#64748b"}}>{fmtDate(selectedPassage.date,{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}</div>
+                <div style={{fontSize:13,color:"#64748b"}}>📅 {fmtDate(selectedPassage.date,{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}</div>
                 {selectedPassage.tech&&<div style={{fontSize:12,color:"#64748b",marginTop:3}}>👤 {selectedPassage.tech}</div>}
               </div>
-              <button onClick={()=>setSelectedPassage(null)} style={{width:34,height:34,borderRadius:"50%",background:"#f1f5f9",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              <button onClick={()=>setSelectedPassage(null)} style={{width:34,height:34,borderRadius:"50%",background:"#f1f5f9",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,touchAction:"manipulation"}}>
                 <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
-            {(selectedPassage.ph||selectedPassage.chlore||selectedPassage.temperature)&&(
-              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:18}}>
-                {selectedPassage.ph&&(<div style={{borderRadius:16,padding:"14px 8px",textAlign:"center",background:phOk(selectedPassage.ph)?"#f0fdf4":"#fff7ed",border:"2px solid "+(phOk(selectedPassage.ph)?"#86efac":"#fed7aa")}}>
-                  <div style={{fontSize:10,fontWeight:800,color:phOk(selectedPassage.ph)?"#166534":"#92400e",textTransform:"uppercase",marginBottom:6}}>pH</div>
-                  <div style={{fontSize:34,fontWeight:900,color:phOk(selectedPassage.ph)?"#16a34a":"#d97706",lineHeight:1}}>{selectedPassage.ph}</div>
-                  <div style={{fontSize:11,fontWeight:700,color:phOk(selectedPassage.ph)?"#22c55e":"#f59e0b",marginTop:6}}>{phOk(selectedPassage.ph)?"✓ Idéal":"⚠ Revoir"}</div>
+
+            {/* Mesures pH / Chlore */}
+            {(getPH(selectedPassage)||getCL(selectedPassage))&&(
+              <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,marginBottom:14}}>
+                {getPH(selectedPassage)&&(<div style={{borderRadius:16,padding:"14px 8px",textAlign:"center",background:phOk(getPH(selectedPassage))?"#f0fdf4":"#fff7ed",border:"2px solid "+(phOk(getPH(selectedPassage))?"#86efac":"#fed7aa")}}>
+                  <div style={{fontSize:10,fontWeight:800,color:phOk(getPH(selectedPassage))?"#166534":"#92400e",textTransform:"uppercase",marginBottom:6}}>pH</div>
+                  <div style={{fontSize:34,fontWeight:900,color:phOk(getPH(selectedPassage))?"#16a34a":"#d97706",lineHeight:1}}>{getPH(selectedPassage)}</div>
+                  <div style={{fontSize:11,fontWeight:700,color:phOk(getPH(selectedPassage))?"#22c55e":"#f59e0b",marginTop:6}}>{phOk(getPH(selectedPassage))?"✓ Idéal":"⚠ Revoir"}</div>
                 </div>)}
-                {selectedPassage.chlore&&(<div style={{borderRadius:16,padding:"14px 8px",textAlign:"center",background:clOk(selectedPassage.chlore)?"#f0fdf4":"#fff7ed",border:"2px solid "+(clOk(selectedPassage.chlore)?"#86efac":"#fed7aa")}}>
-                  <div style={{fontSize:10,fontWeight:800,color:clOk(selectedPassage.chlore)?"#166534":"#92400e",textTransform:"uppercase",marginBottom:6}}>Chlore</div>
-                  <div style={{fontSize:34,fontWeight:900,color:clOk(selectedPassage.chlore)?"#16a34a":"#d97706",lineHeight:1}}>{selectedPassage.chlore}</div>
-                  <div style={{fontSize:11,fontWeight:700,color:clOk(selectedPassage.chlore)?"#22c55e":"#f59e0b",marginTop:6}}>{clOk(selectedPassage.chlore)?"✓ Idéal":"⚠ Revoir"}</div>
-                </div>)}
-                {selectedPassage.temperature&&(<div style={{borderRadius:16,padding:"14px 8px",textAlign:"center",background:"#f0f9ff",border:"2px solid #bae6fd"}}>
-                  <div style={{fontSize:10,fontWeight:800,color:"#075985",textTransform:"uppercase",marginBottom:6}}>Temp.</div>
-                  <div style={{fontSize:34,fontWeight:900,color:"#0284c7",lineHeight:1}}>{selectedPassage.temperature}°</div>
-                  <div style={{fontSize:11,fontWeight:700,color:"#38bdf8",marginTop:6}}>Eau</div>
+                {getCL(selectedPassage)&&(<div style={{borderRadius:16,padding:"14px 8px",textAlign:"center",background:clOk(getCL(selectedPassage))?"#f0fdf4":"#fff7ed",border:"2px solid "+(clOk(getCL(selectedPassage))?"#86efac":"#fed7aa")}}>
+                  <div style={{fontSize:10,fontWeight:800,color:clOk(getCL(selectedPassage))?"#166534":"#92400e",textTransform:"uppercase",marginBottom:6}}>Chlore</div>
+                  <div style={{fontSize:34,fontWeight:900,color:clOk(getCL(selectedPassage))?"#16a34a":"#d97706",lineHeight:1}}>{getCL(selectedPassage)}</div>
+                  <div style={{fontSize:11,fontWeight:700,color:clOk(getCL(selectedPassage))?"#22c55e":"#f59e0b",marginTop:6}}>{clOk(getCL(selectedPassage))?"✓ Idéal":"⚠ Revoir"}</div>
                 </div>)}
               </div>
             )}
-            {selectedPassage.actions&&(<div style={{background:"#f8fafc",borderRadius:14,padding:"14px 16px",marginBottom:12}}>
-              <div style={{fontSize:10,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>Actions réalisées</div>
-              <div style={{fontSize:14,color:"#334155",lineHeight:1.8}}>{selectedPassage.actions}</div>
-            </div>)}
-            {selectedPassage.obs&&(<div style={{background:"#fffbeb",borderRadius:14,padding:"14px 16px",marginBottom:12,borderLeft:"4px solid #fbbf24"}}>
-              <div style={{fontSize:10,fontWeight:800,color:"#92400e",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>Observations</div>
-              <div style={{fontSize:14,color:"#78350f",lineHeight:1.8}}>{selectedPassage.obs}</div>
-            </div>)}
+
+            {/* Alcalinité + Stabilisant */}
+            {(selectedPassage.alcalinite||selectedPassage.stabilisant)&&(
+              <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:14}}>
+                {selectedPassage.alcalinite&&<div style={{background:"#f0f9ff",borderRadius:10,padding:"10px",textAlign:"center",border:"1px solid #bae6fd"}}>
+                  <div style={{fontSize:9,fontWeight:700,color:"#0369a1",textTransform:"uppercase",marginBottom:3}}>Alcalinité</div>
+                  <div style={{fontSize:20,fontWeight:900,color:"#0284c7"}}>{selectedPassage.alcalinite}</div>
+                  <div style={{fontSize:9,color:"#64748b"}}>ppm (TAC)</div>
+                </div>}
+                {selectedPassage.stabilisant&&<div style={{background:"#f0f9ff",borderRadius:10,padding:"10px",textAlign:"center",border:"1px solid #bae6fd"}}>
+                  <div style={{fontSize:9,fontWeight:700,color:"#0369a1",textTransform:"uppercase",marginBottom:3}}>Stabilisant</div>
+                  <div style={{fontSize:20,fontWeight:900,color:"#0284c7"}}>{selectedPassage.stabilisant}</div>
+                  <div style={{fontSize:9,color:"#64748b"}}>ppm</div>
+                </div>}
+              </div>
+            )}
+
+            {/* Qualité eau */}
+            {selectedPassage.qualiteEau&&(
+              <div style={{background:"#f8fafc",borderRadius:10,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:16}}>{selectedPassage.qualiteEau==="Cristalline"?"💎":selectedPassage.qualiteEau==="Verte"?"🌿":"🌫️"}</span>
+                <div>
+                  <div style={{fontSize:10,fontWeight:700,color:"#64748b",textTransform:"uppercase",marginBottom:1}}>Qualité eau</div>
+                  <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{selectedPassage.qualiteEau}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Produits apportés */}
+            {(selectedPassage.corrChlore||selectedPassage.corrPH||selectedPassage.corrAlgicide||selectedPassage.corrAlcafix||selectedPassage.corrSel||selectedPassage.corrChloreChoc||selectedPassage.corrPeroxyde||selectedPassage.corrPhosphate||selectedPassage.corrAutre)&&(
+              <div style={{background:"#f5f3ff",borderRadius:14,padding:"12px 14px",marginBottom:14}}>
+                <div style={{fontSize:10,fontWeight:800,color:"#4f46e5",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>⚗️ Produits apportés</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                  {[
+                    ["Chlore",selectedPassage.corrChlore],
+                    ["pH",selectedPassage.corrPH],
+                    ["Sel",selectedPassage.corrSel],
+                    ["Algicide",selectedPassage.corrAlgicide],
+                    ["Chlore choc",selectedPassage.corrChloreChoc],
+                    ["Peroxyde",selectedPassage.corrPeroxyde],
+                    ["Phosphate",selectedPassage.corrPhosphate],
+                    ["Alcafix",selectedPassage.corrAlcafix],
+                    ["Autre",selectedPassage.corrAutre],
+                  ].filter(([,v])=>v).map(([k,v])=>(
+                    <span key={k} style={{fontSize:12,fontWeight:600,color:"#4f46e5",background:"#ede9fe",borderRadius:8,padding:"4px 10px"}}>{k}: {v}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Compte-rendu */}
+            {getResume(selectedPassage)&&(
+              <div style={{background:"#f8fafc",borderRadius:14,padding:"14px 16px",marginBottom:14}}>
+                <div style={{fontSize:10,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>📋 Compte-rendu</div>
+                <div style={{fontSize:14,color:"#334155",lineHeight:1.8}}>{getResume(selectedPassage)}</div>
+              </div>
+            )}
+
+            {/* Produits livrés */}
+            {selectedPassage.livraisonProduits&&(selectedPassage.produitsLivres||[]).length>0&&(
+              <div style={{background:"#ecfdf5",borderRadius:14,padding:"12px 14px",marginBottom:14}}>
+                <div style={{fontSize:10,fontWeight:800,color:"#059669",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>📦 Produits livrés</div>
+                <div style={{fontSize:13,color:"#065f46"}}>{selectedPassage.produitsLivres.join(", ")}</div>
+              </div>
+            )}
+
+            {/* Photos */}
+            {(selectedPassage.photoArrivee||selectedPassage.photoDepart||(selectedPassage.photos||[]).some(Boolean))&&(
+              <div style={{marginBottom:14}}>
+                <div style={{fontSize:10,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>📸 Photos</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8}}>
+                  {[
+                    selectedPassage.photoArrivee?{src:selectedPassage.photoArrivee,lbl:"Arrivée"}:null,
+                    ...((selectedPassage.photos||[]).filter(Boolean).map((s,i)=>({src:s,lbl:`Photo ${i+2}`}))),
+                    selectedPassage.photoDepart?{src:selectedPassage.photoDepart,lbl:"Départ"}:null,
+                  ].filter(Boolean).map((ph,i)=>(
+                    <div key={i} style={{position:"relative",borderRadius:10,overflow:"hidden"}}>
+                      <img src={ph.src} alt={ph.lbl} style={{width:"100%",height:110,objectFit:"cover",display:"block"}}/>
+                      <span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>{ph.lbl}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Message si vraiment aucune donnée */}
+            {!getPH(selectedPassage)&&!getCL(selectedPassage)&&!getResume(selectedPassage)&&!selectedPassage.qualiteEau&&(
+              <div style={{textAlign:"center",padding:"24px 0",color:"#94a3b8",fontSize:14}}>
+                <div style={{fontSize:32,marginBottom:8}}>📝</div>
+                Aucune mesure enregistrée pour ce passage.
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -5251,10 +5240,10 @@ export default function App() {
   },[loggedIn]);
 
   // Sauvegarde MANUELLE uniquement — jamais automatique au chargement
-  const saveClients   = useCallback((data) => { try{localStorage.setItem("briblue_bb_clients_v2",JSON.stringify(data));}catch{}; save("bb_clients_v2",    data); }, []);
-  const savePassages  = useCallback((data) => { try{localStorage.setItem("briblue_bb_passages_v2",JSON.stringify(data));}catch{}; save("bb_passages_v2",   data); }, []);
-  const saveLivraisonsList = useCallback((data) => { try{localStorage.setItem("briblue_bb_livraisons_v1",JSON.stringify(data));}catch{}; save("bb_livraisons_v1", data); }, []);
-  const saveRdvsList  = useCallback((data) => { try{localStorage.setItem("briblue_bb_rdvs_v1",JSON.stringify(data));}catch{}; save("bb_rdvs_v1",       data); }, []);
+  const saveClients   = useCallback((data) => save("bb_clients_v2",    data), []);
+  const savePassages  = useCallback((data) => save("bb_passages_v2",   data), []);
+  const saveLivraisonsList = useCallback((data) => save("bb_livraisons_v1", data), []);
+  const saveRdvsList  = useCallback((data) => save("bb_rdvs_v1",       data), []);
   const saveStock     = useCallback((data) => save("bb_stock_v1",      data), []);
   const saveContrats  = useCallback((data) => save("bb_contrats_v1",   data), []);
 
