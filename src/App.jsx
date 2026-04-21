@@ -828,6 +828,10 @@ const GlobalStyles = () => (
     @supports (padding-bottom: env(safe-area-inset-bottom)) {
       .safe-bottom { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
     }
+    /* Safari iOS: safe area pour le haut (encoche + barre de statut) */
+    @supports (padding-top: env(safe-area-inset-top)) {
+      .safe-header { padding-top: env(safe-area-inset-top) !important; }
+    }
     /* Safari: backdrop-filter fallback */
     @supports not (backdrop-filter: blur(1px)) {
       .blur-bg { background: rgba(232,240,248,0.99) !important; }
@@ -5988,7 +5992,7 @@ export default function App() {
     <GlobalStyles/>
     <div style={{minHeight:"100vh",background:"#eef2f7",fontFamily:"'Inter', -apple-system, system-ui, sans-serif",maxWidth:isMobile?640:1280,margin:"0 auto",position:"relative",display:"flex",flexDirection:"column",overflowX:"hidden",width:"100%"}}>
       {/* HEADER — Soft UI */}
-      <div style={{background:"#eef2f7",padding:isMobile?"10px 14px":"10px 28px",display:"flex",alignItems:"center",gap:isMobile?8:14,position:"sticky",top:0,zIndex:50,boxShadow:"0 4px 16px rgba(166,210,220,0.5)",width:"100%",boxSizing:"border-box"}}>
+      <div className="safe-header" style={{background:"#eef2f7",padding:isMobile?"10px 14px":"10px 28px",paddingTop:`calc(${isMobile?"10px":"10px"} + env(safe-area-inset-top, 0px))`,display:"flex",alignItems:"center",gap:isMobile?8:14,position:"sticky",top:0,zIndex:50,boxShadow:"0 4px 16px rgba(166,210,220,0.5)",width:"100%",boxSizing:"border-box"}}>
 
         <button onClick={()=>setPage("dashboard")} style={{background:"#eef2f7",border:"none",padding:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",width:isMobile?44:42,height:isMobile?44:42,borderRadius:14,flexShrink:0,boxShadow:DS.nmShadow}}>
           {Ico.wave(isMobile?22:20,"#0891b2")}
