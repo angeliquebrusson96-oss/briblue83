@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, getDocs, setDoc, collection } from "firebase/firestore";
+import { getFirestore, doc, getDoc, getDocs, setDoc, collection, onSnapshot } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCyRHh4hGaDYU1NumTrRJ-3KKuRxC8NU5k",
@@ -217,29 +217,51 @@ function useOnlineStatus() {
     const onOff = ()=>setOnline(false);
     window.addEventListener('online', onOn);
     window.addEventListener('offline', onOff);
-    // Vérifier la queue toutes les 30s
-    const interval = setInterval(()=>{ setPendingCount(Object.keys(offlineQueue.pending).length); }, 5000);
-    return ()=>{ window.removeEventListener('online', onOn); window.removeEventListener('offline', onOff); clearInterval(interval); };
+    // setInterval 5s supprimé — évite re-renders inutiles
+    return ()=>{ window.removeEventListener('online', onOn); window.removeEventListener('offline', onOff); };
   },[]);
   return { online, pendingCount };
 }
 
-// STORAGE — Firebase Firestore
+// STORAGE — Firebase Firestore + cache localStorage TTL 30min
+const CACHE_TTL_MS = 30 * 60 * 1000; // 0 lecture Firebase si données < 30min
+
 async function load(key, fallback) {
+  // 1. Cache localStorage avec TTL — évite toute lecture Firebase si données fraîches
   try {
-    // Les passages sont dans des docs séparés (chunks)
+    const cached = localStorage.getItem("briblue_" + key);
+    const ts = localStorage.getItem("briblue_ts_" + key);
+    if (cached && ts && (Date.now() - Number(ts)) < CACHE_TTL_MS) {
+      return JSON.parse(cached);
+    }
+  } catch {}
+
+  // 2. Lire Firebase (seulement si cache expiré ou absent)
+  try {
     if (key === "bb_passages_v2") {
       const passages = await loadAllPassages();
-      if (passages.length > 0) return passages;
+      if (passages.length > 0) {
+        try {
+          localStorage.setItem("briblue_" + key, JSON.stringify(passages));
+          localStorage.setItem("briblue_ts_" + key, String(Date.now()));
+        } catch {}
+        return passages;
+      }
       try { const ls = localStorage.getItem("briblue_" + key); if (ls) return JSON.parse(ls); } catch {}
       return fallback;
     }
     const snap = await getDoc(APP_DOC);
     if (snap.exists()) {
       const allData = snap.data();
-      if (key in allData) return allData[key];
+      if (key in allData) {
+        const val = allData[key];
+        try {
+          localStorage.setItem("briblue_" + key, JSON.stringify(val));
+          localStorage.setItem("briblue_ts_" + key, String(Date.now()));
+        } catch {}
+        return val;
+      }
     }
-    // Fallback localStorage
     try { const ls = localStorage.getItem("briblue_" + key); if (ls) return JSON.parse(ls); } catch {}
     return fallback;
   } catch {
@@ -296,8 +318,11 @@ if (typeof window !== 'undefined') {
 }
 
 async function save(key, val) {
-  // 1. localStorage immédiat — jamais de perte
-  try { localStorage.setItem('briblue_' + key, JSON.stringify(val)); } catch {}
+  // 1. localStorage immédiat + timestamp cache frais
+  try {
+    localStorage.setItem("briblue_" + key, JSON.stringify(val));
+    localStorage.setItem("briblue_ts_" + key, String(Date.now()));
+  } catch {}
 
   if (!navigator.onLine) {
     offlineQueue.pending[key] = val;
@@ -5844,39 +5869,44 @@ export default function App() {
   const saveStock     = useCallback((data) => save("bb_stock_v1",      data), []);
   const saveContrats  = useCallback((data) => save("bb_contrats_v1",   data), []);
 
-  // Polling toutes les 10s pour détecter nouvelles signatures
+  // Listener temps réel contrats — remplace polling 10s (~8640 lectures/jour économisées)
   useEffect(()=>{
     if(!ready) return;
-    const interval = setInterval(async()=>{
-      const ct = await load("bb_contrats_v1", {});
+    const unsub = onSnapshot(APP_DOC, (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      const ct = data["bb_contrats_v1"];
+      if (!ct) return;
       setContrats(prev => {
-        // Détecter nouvelle signature
-        const keys = Object.keys(ct);
-        const newSig = keys.map(k=>ct[k]).find(c =>
-          (c.statut === "signe_client" || c.statut === "signe_complet") &&
-          (!prev[keys.find(k=>ct[k]===c)] ||
-           prev[keys.find(k=>ct[k]===c)]?.statut !== c.statut)
-        );
-        if (newSig) {
-          playNotifSound();
-          const cli = clients.find(cl => cl.id === newSig.clientId);
-          const nomCli = cli?.nom || newSig.clientId;
-          const isComplet = newSig.statut === "signe_complet";
-          const msg = isComplet
-            ? `✅ Contrat co-signé par ${nomCli} !`
-            : `📝 ${nomCli} a signé son contrat — votre signature est requise.`;
-          toastInfo(msg);
-          // Notification système (barre de notifications)
-          sendLocalNotification(
-            isComplet ? "✅ Contrat co-signé !" : "📝 Signature requise",
-            isComplet ? `${nomCli} a co-signé le contrat.` : `${nomCli} a signé — votre tour !`,
-            { tag: "briblue-contrat-" + newSig.clientId, requireInteraction: !isComplet }
-          );
+        for (const k of Object.keys(ct)) {
+          const newC = ct[k];
+          const oldC = prev[k];
+          if (!oldC) continue;
+          if (newC.statut !== oldC.statut &&
+              (newC.statut === "signe_client" || newC.statut === "signe_complet")) {
+            playNotifSound();
+            const cli = clients.find(cl => cl.id === newC.clientId);
+            const nomCli = cli?.nom || newC.clientId;
+            const isComplet = newC.statut === "signe_complet";
+            const msg = isComplet
+              ? `✅ Contrat co-signé par ${nomCli} !`
+              : `📝 ${nomCli} a signé son contrat — votre signature est requise.`;
+            toastInfo(msg);
+            sendLocalNotification(
+              isComplet ? "✅ Contrat co-signé !" : "📝 Signature requise",
+              isComplet ? `${nomCli} a co-signé le contrat.` : `${nomCli} a signé — votre tour !`,
+              { tag: "briblue-contrat-" + newC.clientId, requireInteraction: !isComplet }
+            );
+          }
         }
+        try {
+          localStorage.setItem("briblue_bb_contrats_v1", JSON.stringify(ct));
+          localStorage.setItem("briblue_ts_bb_contrats_v1", String(Date.now()));
+        } catch {}
         return ct;
       });
-    }, 10000);
-    return ()=>clearInterval(interval);
+    }, (error) => { console.warn("onSnapshot contrats error:", error); });
+    return () => unsub();
   },[ready, clients]);
 
   // Notification son + système quand nouvelles tâches apparaissent
