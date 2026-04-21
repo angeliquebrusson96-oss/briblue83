@@ -224,10 +224,9 @@ function useOnlineStatus() {
 }
 
 // STORAGE — Firebase Firestore + cache localStorage TTL 30min
-const CACHE_TTL_MS = 30 * 60 * 1000; // 0 lecture Firebase si données < 30min
+const CACHE_TTL_MS = 30 * 60 * 1000;
 
 async function load(key, fallback) {
-  // 1. Cache localStorage avec TTL — évite toute lecture Firebase si données fraîches
   try {
     const cached = localStorage.getItem("briblue_" + key);
     const ts = localStorage.getItem("briblue_ts_" + key);
@@ -235,16 +234,11 @@ async function load(key, fallback) {
       return JSON.parse(cached);
     }
   } catch {}
-
-  // 2. Lire Firebase (seulement si cache expiré ou absent)
   try {
     if (key === "bb_passages_v2") {
       const passages = await loadAllPassages();
       if (passages.length > 0) {
-        try {
-          localStorage.setItem("briblue_" + key, JSON.stringify(passages));
-          localStorage.setItem("briblue_ts_" + key, String(Date.now()));
-        } catch {}
+        try { localStorage.setItem("briblue_" + key, JSON.stringify(passages)); localStorage.setItem("briblue_ts_" + key, String(Date.now())); } catch {}
         return passages;
       }
       try { const ls = localStorage.getItem("briblue_" + key); if (ls) return JSON.parse(ls); } catch {}
@@ -255,10 +249,7 @@ async function load(key, fallback) {
       const allData = snap.data();
       if (key in allData) {
         const val = allData[key];
-        try {
-          localStorage.setItem("briblue_" + key, JSON.stringify(val));
-          localStorage.setItem("briblue_ts_" + key, String(Date.now()));
-        } catch {}
+        try { localStorage.setItem("briblue_" + key, JSON.stringify(val)); localStorage.setItem("briblue_ts_" + key, String(Date.now())); } catch {}
         return val;
       }
     }
@@ -5888,10 +5879,7 @@ export default function App() {
             const cli = clients.find(cl => cl.id === newC.clientId);
             const nomCli = cli?.nom || newC.clientId;
             const isComplet = newC.statut === "signe_complet";
-            const msg = isComplet
-              ? `✅ Contrat co-signé par ${nomCli} !`
-              : `📝 ${nomCli} a signé son contrat — votre signature est requise.`;
-            toastInfo(msg);
+            toastInfo(isComplet ? `✅ Contrat co-signé par ${nomCli} !` : `📝 ${nomCli} a signé son contrat — votre signature est requise.`);
             sendLocalNotification(
               isComplet ? "✅ Contrat co-signé !" : "📝 Signature requise",
               isComplet ? `${nomCli} a co-signé le contrat.` : `${nomCli} a signé — votre tour !`,
@@ -5899,10 +5887,7 @@ export default function App() {
             );
           }
         }
-        try {
-          localStorage.setItem("briblue_bb_contrats_v1", JSON.stringify(ct));
-          localStorage.setItem("briblue_ts_bb_contrats_v1", String(Date.now()));
-        } catch {}
+        try { localStorage.setItem("briblue_bb_contrats_v1", JSON.stringify(ct)); localStorage.setItem("briblue_ts_bb_contrats_v1", String(Date.now())); } catch {}
         return ct;
       });
     }, (error) => { console.warn("onSnapshot contrats error:", error); });
@@ -6345,6 +6330,8 @@ export default function App() {
           </Modal>
         );
       })()}
+      <ToastContainer/>
+      <ConfirmModal/>
     </div>
     </>
   );
