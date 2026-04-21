@@ -6083,6 +6083,7 @@ export default function App() {
   const [showFormPassage, setShowFormPassage] = useState(false);
   const [defaultClientId, setDefaultClientId] = useState("");
   const [editPassage, setEditPassage] = useState(null);
+  const [savingPassage, setSavingPassage] = useState(false);
   const [showFormLivraison, setShowFormLivraison] = useState(false);
   const [defaultLivraisonClientId, setDefaultLivraisonClientId] = useState("");
   const [showFormRdv, setShowFormRdv] = useState(false);
@@ -6156,7 +6157,36 @@ export default function App() {
 
   const saveClient = useCallback(c=>{ setClients(prev=>{ const next=prev.find(x=>x.id===c.id)?prev.map(x=>x.id===c.id?c:x):[...prev,c]; saveClients(next); return next; }); setShowFormClient(false);setEditClient(null);setFicheClient(c); },[saveClients]);
   const deleteClient = useCallback(id=>{ showConfirm("Supprimer ce client et tous ses passages ?", ()=>{ setClients(prev=>{ const next=prev.filter(x=>x.id!==id); saveClients(next); return next; }); setPassages(prev=>{ const next=prev.filter(x=>x.clientId!==id); savePassages(next); return next; }); setFicheClient(null); }); },[saveClients,savePassages]);
-  const savePassage = useCallback(p=>{ setPassages(prev=>{ const next=prev.find(x=>x.id===p.id)?prev.map(x=>x.id===p.id?p:x):[...prev,p]; savePassages(next); return next; }); setShowFormPassage(false);setEditPassage(null); },[savePassages]);
+  const savePassage = useCallback(async p => {
+    setSavingPassage(true);
+    try {
+      await new Promise((resolve) => {
+        setPassages(prev => {
+          const next = prev.find(x => x.id === p.id)
+            ? prev.map(x => x.id === p.id ? p : x)
+            : [...prev, p];
+          try {
+            localStorage.setItem("briblue_bb_passages_v2", JSON.stringify(next));
+            localStorage.setItem("briblue_ts_bb_passages_v2", String(Date.now()));
+          } catch {}
+          saveToFirebase("bb_passages_v2", next)
+            .then(() => resolve(next))
+            .catch(() => {
+              offlineQueue.pending["bb_passages_v2"] = next;
+              resolve(next);
+            });
+          return next;
+        });
+      });
+      toastSuccess("Passage enregistré !");
+    } catch {
+      toastError("Erreur d'enregistrement");
+    } finally {
+      setSavingPassage(false);
+      setShowFormPassage(false);
+      setEditPassage(null);
+    }
+  }, []);
   const updatePassageRapportStatus = useCallback((passageMaj) => {
     setPassages(prev => {
       const next = prev.map(x => x.id === passageMaj.id ? { ...x, ...passageMaj } : x);
