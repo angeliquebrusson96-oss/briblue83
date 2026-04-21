@@ -3781,208 +3781,195 @@ function AlertesBlock({ alertes, passages, onClientClick }) {
 // ═══════════════════════════════════════════════════════════
 // DASHBOARD HERO — fond animé saison + carrousel citations
 // ═══════════════════════════════════════════════════════════
-const CITATIONS_PISCINISTE = [
-  { texte: "Un pisciniste, c'est quelqu'un qui sait que l'eau c'est la vie… mais le pH c'est le respect.", emoji: "🧪" },
-  { texte: "Mes collègues bossent en bureau. Moi je travaille au bord de la piscine. Tous les jours.", emoji: "😎" },
-  { texte: "Le chlore, c'est mon parfum préféré.", emoji: "🏊" },
-  { texte: "Quand les autres comptent des moutons, je compte des filtres à nettoyer.", emoji: "💤" },
-  { texte: "Un pH à 7.4 — le bonheur a une valeur exacte.", emoji: "✨" },
-  { texte: "Je ne fais pas que du jardinage aquatique. Enfin... si, un peu.", emoji: "🌊" },
-  { texte: "Ma plus belle récompense ? Une eau cristalline et un client qui plonge.", emoji: "💎" },
-  { texte: "Plombier ? Non. Chimiste ? Un peu. Pisciniste ? Totalement.", emoji: "⚗️" },
-  { texte: "L'eau ne ment jamais. Le chlore non plus.", emoji: "🔬" },
-  { texte: "Mon bureau a des palmiers et une vue sur la piscine. La vie est belle.", emoji: "🌴" },
-  { texte: "Quand l'eau est verte, c'est pas une tendance déco.", emoji: "🟢" },
-  { texte: "Je parle couramment le pH, le TAC et le chlore libre. Trilingue.", emoji: "📚" },
+const VDM_BLAGUES = [
+  "Aujourd'hui, un client m'appelle en panique : « L'eau de la piscine est devenue verte du jour au lendemain ! » Il m'a fallu 10 minutes pour comprendre qu'il avait balancé tout son gazon tondu dedans pour « faire naturel ». VDM",
+  "Aujourd'hui, en nettoyant le filtre d'une piscine, j'ai sorti : 3 petites culottes, un dentier, un porte-monnaie avec 40€ dedans et une anguille. Je ne sais toujours pas pour l'anguille. VDM",
+  "Aujourd'hui, j'explique depuis 20 minutes à un client comment ajouter du chlore. À la fin, il me dit : « Ah mais moi je mets du sel de cuisine, c'est pareil non ? » Non. Non c'est pas pareil. VDM",
+  "Aujourd'hui, une cliente m'appelle pour me dire que sa piscine « sent bizarre ». J'arrive, je teste l'eau : pH 9,2, chlore à 0. Elle avait versé 5L de vinaigre blanc pour « désinfecter naturellement ». VDM",
+  "Aujourd'hui, un client m'a demandé pourquoi l'eau de sa piscine avait tourné rose. Il avait mis ses filles jouer dans la piscine avec leurs nouvelles chaussures en tissu rose fluo. Toute la journée. VDM",
+  "Aujourd'hui, un client m'appelle furieux : « Votre traitement choc ne marche pas ! » Il avait jeté le sachet entier avec l'emballage plastique. Le chlore était encore dedans. VDM",
+  "Aujourd'hui, j'arrive chez un client dont la pompe est « en panne ». Elle était juste débranchée. Il m'a quand même facturé le déplacement. C'est moi le pisciniste mais c'est lui qui me facture. VDM",
+  "Aujourd'hui, une cliente me demande de tester son eau car « elle pique les yeux ». pH parfait, chlore parfait. Je lui demande depuis quand. « Depuis que j'ai mis du shampoing dedans pour que ça mousse mieux. » VDM",
+  "Aujourd'hui, un client me montre fièrement sa « installation de traitement UV ». C'est une lampe UV pour les ongles posée sur le bord de la piscine. Elle n'est même pas branchée. VDM",
+  "Aujourd'hui, un client m'explique que son eau est propre parce qu'il y a mis un gros bouquet de lavande. L'eau est violette. Les algues, elles, s'en foutent de la lavande. VDM",
+  "Aujourd'hui, en faisant l'analyse d'eau d'un client, je lui annonce que son taux de chlore est à zéro. Sa réponse : « Normal, j'ai mis du rosé à la place, c'est moins agressif pour la peau. » VDM",
+  "Aujourd'hui, une cliente m'appelle : « Mon robot piscine ne revient plus à sa base. » Je demande où est la base. « Ben dans le salon, là où je le range. » VDM",
+  "Aujourd'hui, j'explique à un client comment lire son testeur. Il me dit qu'il est daltonien. Il teste l'eau depuis 3 ans seul. Son pH n'a jamais dépassé 6,5. VDM",
+  "Aujourd'hui, un client veut savoir si sa piscine peut attraper la grippe. Sa piscine est verte depuis août. Il pense que c'est « une infection saisonnière ». VDM",
+  "Aujourd'hui, un client m'a demandé si je pouvais faire une remise parce qu'il a « une petite piscine ». 12 mètres sur 6. Il la considère petite parce qu'il a vu des photos de Monaco. VDM",
 ];
+
+// Mélange Fisher-Yates — ordre différent à chaque rechargement
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+const VDM_SHUFFLED = shuffleArray(VDM_BLAGUES);
 
 const SAISON_THEMES = {
   hiver: {
-    gradFrom: "#0c1f3f",
-    gradMid:  "#1a3a6b",
-    gradTo:   "#0e6fa8",
-    accent:   "#60a5fa",
-    particles: "❄️",
-    label: "Hiver",
-    subLabel: "Les piscines hibernent, vous veillez.",
+    gradFrom: "#0c1f3f", gradMid: "#1a3a6b", gradTo: "#0e6fa8",
+    accent: "#60a5fa", particles: "❄️", subLabel: "Les piscines hibernent, vous veillez.",
   },
   printemps: {
-    gradFrom: "#064e3b",
-    gradMid:  "#065f46",
-    gradTo:   "#0891b2",
-    accent:   "#34d399",
-    particles: "🌸",
-    label: "Printemps",
-    subLabel: "La saison redémarre, c'est le moment !",
+    gradFrom: "#064e3b", gradMid: "#065f46", gradTo: "#0891b2",
+    accent: "#34d399", particles: "🌸", subLabel: "La saison redémarre, c'est le moment !",
   },
   ete: {
-    gradFrom: "#0c4a6e",
-    gradMid:  "#0369a1",
-    gradTo:   "#0ea5e9",
-    accent:   "#fbbf24",
-    particles: "☀️",
-    label: "Été",
-    subLabel: "Haute saison — les piscines vous attendent.",
+    gradFrom: "#0c4a6e", gradMid: "#0369a1", gradTo: "#0ea5e9",
+    accent: "#fbbf24", particles: "☀️", subLabel: "Haute saison — les piscines vous attendent.",
   },
   automne: {
-    gradFrom: "#431407",
-    gradMid:  "#7c2d12",
-    gradTo:   "#0891b2",
-    accent:   "#f59e0b",
-    particles: "🍂",
-    label: "Automne",
-    subLabel: "Les feuilles tombent, mais pas vos standards.",
+    gradFrom: "#431407", gradMid: "#7c2d12", gradTo: "#0891b2",
+    accent: "#f59e0b", particles: "🍂", subLabel: "Les feuilles tombent, pas vos standards.",
   },
 };
 
 function DashboardHero({ saisonNow, isMobile }) {
   const theme = SAISON_THEMES[saisonNow] || SAISON_THEMES.ete;
-  const [citIdx, setCitIdx] = useState(0);
-  const [fade, setFade] = useState(true);
+  const [idx, setIdx] = useState(0);
+  const [visible, setVisible] = useState(true);
   const [particles, setParticles] = useState([]);
 
-  // Génère les particules flottantes
   useEffect(() => {
-    const count = isMobile ? 10 : 16;
+    const count = isMobile ? 8 : 14;
     setParticles(Array.from({length: count}, (_, i) => ({
       id: i,
       x: Math.random() * 100,
-      y: Math.random() * 100,
-      size: 10 + Math.random() * 14,
-      delay: Math.random() * 6,
-      duration: 6 + Math.random() * 8,
-      drift: (Math.random() - 0.5) * 30,
+      y: 20 + Math.random() * 70,
+      size: 9 + Math.random() * 10,
+      delay: Math.random() * 7,
+      duration: 7 + Math.random() * 8,
+      drift: (Math.random() - 0.5) * 28,
     })));
   }, [saisonNow]);
 
-  // Carrousel auto toutes les 5s
   useEffect(() => {
     const t = setInterval(() => {
-      setFade(false);
-      setTimeout(() => {
-        setCitIdx(i => (i + 1) % CITATIONS_PISCINISTE.length);
-        setFade(true);
-      }, 320);
-    }, 5000);
+      setVisible(false);
+      setTimeout(() => { setIdx(i => (i + 1) % VDM_SHUFFLED.length); setVisible(true); }, 400);
+    }, 7000);
     return () => clearInterval(t);
   }, []);
 
-  const cit = CITATIONS_PISCINISTE[citIdx];
+  const vdm = VDM_SHUFFLED[idx];
   const heure = new Date().getHours();
   const salut = heure < 12 ? "Bonjour" : heure < 18 ? "Bon après-midi" : "Bonsoir";
 
-  const styleId = "hero-anim-" + saisonNow;
-
   return (
-    <div style={{position:"relative",borderRadius:20,overflow:"hidden",marginBottom:14,boxShadow:"0 8px 32px rgba(0,0,0,0.25)"}}>
-      {/* Styles d'animation injectés */}
+    <div style={{position:"relative",borderRadius:22,overflow:"hidden",marginBottom:14,boxShadow:"0 10px 40px rgba(0,0,0,0.28)"}}>
       <style>{`
-        @keyframes floatUp {
-          0%   { transform: translateY(0px)   translateX(0px)   scale(1);   opacity:0.7; }
-          50%  { transform: translateY(-40px) translateX(var(--drift)) scale(1.1); opacity:1; }
-          100% { transform: translateY(-90px) translateX(0px)   scale(0.8); opacity:0; }
+        @keyframes heroFloat {
+          0%   { transform:translateY(0) translateX(0) scale(1); opacity:.65; }
+          45%  { transform:translateY(-38px) translateX(var(--drift)) scale(1.08); opacity:.9; }
+          100% { transform:translateY(-80px) translateX(0) scale(.75); opacity:0; }
         }
-        @keyframes shimmer {
-          0%,100% { opacity:0.04; } 50% { opacity:0.09; }
+        @keyframes heroPulse { 0%,100%{opacity:.05} 50%{opacity:.1} }
+        @keyframes heroWave  { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+        @keyframes vdmIn {
+          from { opacity:0; transform:translateY(6px); }
+          to   { opacity:1; transform:translateY(0); }
         }
-        @keyframes waveMove {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
+        @keyframes vdmOut {
+          from { opacity:1; transform:translateY(0); }
+          to   { opacity:0; transform:translateY(-6px); }
         }
-        .hero-particle { animation: floatUp var(--dur) var(--delay) ease-in infinite; }
-        .hero-wave     { animation: waveMove 8s linear infinite; }
-        .hero-shimmer  { animation: shimmer 4s ease-in-out infinite; }
-        .cit-fade      { transition: opacity 0.32s ease; }
+        .hero-p  { animation: heroFloat var(--dur) var(--dl) ease-in infinite; }
+        .hero-sh { animation: heroPulse 4s ease-in-out infinite; }
+        .hero-wv { animation: heroWave 10s linear infinite; }
+        .vdm-in  { animation: vdmIn .4s ease forwards; }
+        .vdm-out { animation: vdmOut .35s ease forwards; }
       `}</style>
 
-      {/* Fond gradient */}
-      <div style={{
-        position:"absolute",inset:0,
-        background:`linear-gradient(145deg, ${theme.gradFrom} 0%, ${theme.gradMid} 55%, ${theme.gradTo} 100%)`,
-      }}/>
+      {/* Fond */}
+      <div style={{position:"absolute",inset:0,background:`linear-gradient(148deg,${theme.gradFrom} 0%,${theme.gradMid} 52%,${theme.gradTo} 100%)`}}/>
 
-      {/* Cercles shimmer déco */}
-      <div className="hero-shimmer" style={{position:"absolute",right:-40,top:-40,width:200,height:200,borderRadius:"50%",background:"rgba(255,255,255,0.06)"}}/>
-      <div className="hero-shimmer" style={{position:"absolute",left:-60,bottom:-60,width:240,height:240,borderRadius:"50%",background:"rgba(255,255,255,0.04)",animationDelay:"2s"}}/>
+      {/* Cercles déco */}
+      <div className="hero-sh" style={{position:"absolute",right:-50,top:-50,width:220,height:220,borderRadius:"50%",background:"rgba(255,255,255,0.06)",pointerEvents:"none"}}/>
+      <div className="hero-sh" style={{position:"absolute",left:-60,bottom:-60,width:200,height:200,borderRadius:"50%",background:"rgba(255,255,255,0.04)",pointerEvents:"none",animationDelay:"2s"}}/>
 
-      {/* Vague de fond */}
-      <div style={{position:"absolute",bottom:0,left:0,right:0,height:40,overflow:"hidden",opacity:0.12}}>
-        <div className="hero-wave" style={{display:"flex",width:"200%",height:"100%"}}>
-          <svg viewBox="0 0 400 40" style={{width:"50%",height:"100%"}} preserveAspectRatio="none">
-            <path d="M0 20 C50 5 100 35 150 20 S250 5 300 20 S350 35 400 20 L400 40 L0 40Z" fill="white"/>
-          </svg>
-          <svg viewBox="0 0 400 40" style={{width:"50%",height:"100%"}} preserveAspectRatio="none">
-            <path d="M0 20 C50 5 100 35 150 20 S250 5 300 20 S350 35 400 20 L400 40 L0 40Z" fill="white"/>
-          </svg>
+      {/* Vague bas */}
+      <div style={{position:"absolute",bottom:0,left:0,right:0,height:36,overflow:"hidden",opacity:.1,pointerEvents:"none"}}>
+        <div className="hero-wv" style={{display:"flex",width:"200%",height:"100%"}}>
+          {[0,1].map(k=>(
+            <svg key={k} viewBox="0 0 400 36" style={{width:"50%",height:"100%"}} preserveAspectRatio="none">
+              <path d="M0 18 C60 4 120 32 180 18 S300 4 360 18 S400 32 400 18 L400 36 L0 36Z" fill="white"/>
+            </svg>
+          ))}
         </div>
       </div>
 
-      {/* Particules flottantes */}
-      {particles.map(p => (
-        <div key={p.id} className="hero-particle" style={{
-          position:"absolute",
-          left:`${p.x}%`,
-          top:`${p.y}%`,
-          fontSize:p.size,
-          "--dur": `${p.duration}s`,
-          "--delay": `${p.delay}s`,
-          "--drift": `${p.drift}px`,
-          pointerEvents:"none",
-          userSelect:"none",
+      {/* Particules */}
+      {particles.map(p=>(
+        <div key={p.id} className="hero-p" style={{
+          position:"absolute",left:`${p.x}%`,top:`${p.y}%`,
+          fontSize:p.size,pointerEvents:"none",userSelect:"none",
+          "--dur":`${p.duration}s`,"--dl":`${p.delay}s`,"--drift":`${p.drift}px`,
         }}>{theme.particles}</div>
       ))}
 
       {/* Contenu */}
-      <div style={{position:"relative",zIndex:2,padding:isMobile?"20px 20px 18px":"24px 28px 22px"}}>
+      <div style={{position:"relative",zIndex:2,padding:isMobile?"18px 18px 16px":"22px 26px 20px"}}>
+
         {/* Salutation */}
-        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
-          <div style={{width:36,height:36,borderRadius:12,background:"rgba(255,255,255,0.12)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+          <div style={{width:40,height:40,borderRadius:13,background:"rgba(255,255,255,0.13)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0,boxShadow:"0 2px 8px rgba(0,0,0,0.15)"}}>
             {theme.particles}
           </div>
-          <div>
-            <div style={{fontSize:isMobile?20:24,fontWeight:900,color:"#fff",lineHeight:1,letterSpacing:-0.5}}>
-              {salut}, Dorian 👋
-            </div>
-            <div style={{fontSize:11,color:"rgba(255,255,255,0.55)",marginTop:2,fontWeight:500}}>
-              {theme.subLabel}
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:isMobile?18:22,fontWeight:900,color:"#fff",lineHeight:1,letterSpacing:-.5}}>{salut}, Dorian 👋</div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.5)",marginTop:3,fontWeight:500}}>{theme.subLabel}</div>
+          </div>
+        </div>
+
+        {/* Carte VDM */}
+        <div style={{
+          background:"rgba(0,0,0,0.22)",
+          borderRadius:14,
+          padding:"14px 16px",
+          border:"1px solid rgba(255,255,255,0.1)",
+          backdropFilter:"blur(4px)",
+          position:"relative",
+          overflow:"hidden",
+          minHeight:72,
+        }}>
+          {/* Guillemet déco */}
+          <div style={{position:"absolute",top:6,left:10,fontSize:52,lineHeight:1,color:"rgba(255,255,255,0.06)",fontFamily:"Georgia,serif",pointerEvents:"none",userSelect:"none",fontWeight:900}}>"</div>
+
+          <div className={visible ? "vdm-in" : "vdm-out"} style={{position:"relative",zIndex:1}}>
+            <div style={{
+              fontSize:isMobile?11.5:12.5,
+              color:"rgba(255,255,255,0.88)",
+              lineHeight:1.65,
+              fontStyle:"italic",
+              fontWeight:400,
+              letterSpacing:.1,
+            }}>{vdm}</div>
+            <div style={{marginTop:8,display:"flex",alignItems:"center",gap:6}}>
+              <div style={{height:1,flex:1,background:`linear-gradient(90deg,${theme.accent}60,transparent)`}}/>
+              <span style={{fontSize:10,fontWeight:700,color:theme.accent,letterSpacing:.5}}>VIE DE MERDE</span>
             </div>
           </div>
         </div>
 
-        {/* Divider */}
-        <div style={{height:1,background:"rgba(255,255,255,0.1)",margin:"12px 0"}}/>
-
-        {/* Citation carrousel */}
-        <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
-          <div className="cit-fade" style={{
-            opacity: fade ? 1 : 0,
-            flex:1,
-          }}>
-            <div style={{fontSize:22,lineHeight:1,marginBottom:5}}>{cit.emoji}</div>
-            <div style={{
-              fontSize: isMobile ? 12 : 13,
-              fontStyle:"italic",
-              color:"rgba(255,255,255,0.82)",
-              lineHeight:1.5,
-              fontWeight:500,
-            }}>"{cit.texte}"</div>
-          </div>
-
-          {/* Dots navigation */}
-          <div style={{display:"flex",flexDirection:"column",gap:4,paddingTop:4,flexShrink:0}}>
-            {CITATIONS_PISCINISTE.map((_, i) => (
-              <div key={i} onClick={() => { setFade(false); setTimeout(() => { setCitIdx(i); setFade(true); }, 200); }}
-                style={{
-                  width: i===citIdx ? 6 : 4,
-                  height: i===citIdx ? 6 : 4,
-                  borderRadius:"50%",
-                  background: i===citIdx ? theme.accent : "rgba(255,255,255,0.25)",
-                  cursor:"pointer",
-                  transition:"all .3s",
-                }}
-              />
-            ))}
-          </div>
+        {/* Barre de progression sous-forme de tirets */}
+        <div style={{display:"flex",gap:4,marginTop:10,justifyContent:"center"}}>
+          {VDM_SHUFFLED.map((_,i)=>(
+            <div key={i} onClick={()=>{setVisible(false);setTimeout(()=>{setIdx(i);setVisible(true);},200);}}
+              style={{
+                height:3,
+                borderRadius:99,
+                width: i===idx ? 20 : 6,
+                background: i===idx ? theme.accent : "rgba(255,255,255,0.22)",
+                cursor:"pointer",
+                transition:"all .35s cubic-bezier(.22,1,.36,1)",
+              }}
+            />
+          ))}
         </div>
       </div>
     </div>
@@ -5760,18 +5747,74 @@ export default function App() {
         </div>
       )}
 
-      {/* NAV BAS MODERNISÉ — mobile seulement */}
-      {isMobile && <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:640,background:"#eef2f7",borderTop:"1px solid "+DS.border,display:"flex",alignItems:"flex-end",boxShadow:"0 -4px 20px rgba(166,210,220,0.5)",zIndex:50,paddingBottom:"env(safe-area-inset-bottom,4px)"}}>
-        {NAV.map(n=>(
-          <button key={n.id} onClick={()=>setPage(n.id)} style={{flex:1,padding:"10px 4px 12px",border:"none",cursor:"pointer",background:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:3,transition:"all .15s",position:"relative"}}>
-            {page===n.id && <div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",width:32,height:3,borderRadius:"0 0 3px 3px",background:DS.blue}}/>}
-            <div style={{width:38,height:38,borderRadius:12,background:page===n.id?"#eef2f7":"transparent",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s",boxShadow:page===n.id?DS.nmShadowSm:"none"}}>
-              {n.icon(page===n.id)}
-            </div>
-            <span style={{fontSize:10,fontWeight:page===n.id?700:500,color:page===n.id?(n.id==="rdv"?"#818cf8":DS.blue):"#94a3b8"}}>{n.l}</span>
-          </button>
-        ))}
-      </div>}
+      {/* NAV BAS — mobile seulement */}
+      {isMobile && (
+        <>
+          <style>{`
+            @keyframes navPop {
+              0%  { transform:scale(.78) translateY(4px); opacity:0; }
+              60% { transform:scale(1.08) translateY(-1px); opacity:1; }
+              100%{ transform:scale(1) translateY(0); opacity:1; }
+            }
+            .nav-icon-active { animation: navPop .28s cubic-bezier(.22,1,.36,1) forwards; }
+          `}</style>
+          <div style={{
+            position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",
+            width:"100%",maxWidth:640,
+            background:"rgba(238,242,247,0.96)",
+            backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",
+            display:"flex",alignItems:"center",
+            boxShadow:"0 -1px 0 rgba(166,210,220,0.6), 0 -8px 24px rgba(140,180,200,0.18)",
+            zIndex:50,
+            paddingBottom:"env(safe-area-inset-bottom,0px)",
+            paddingTop:4,
+          }}>
+            {NAV.map(n=>{
+              const active = page===n.id;
+              const accentColor = n.id==="rdv" ? "#818cf8" : DS.blue;
+              return (
+                <button key={n.id} onClick={()=>setPage(n.id)} style={{
+                  flex:1,
+                  paddingTop:8,paddingBottom:10,
+                  border:"none",cursor:"pointer",background:"none",
+                  display:"flex",flexDirection:"column",alignItems:"center",gap:2,
+                  WebkitTapHighlightColor:"transparent",
+                  outline:"none",
+                  position:"relative",
+                }}>
+                  {/* Pill active */}
+                  {active && (
+                    <div style={{
+                      position:"absolute",
+                      top:0,left:"50%",transform:"translateX(-50%)",
+                      width:36,height:3,
+                      background:`linear-gradient(90deg,${accentColor}00,${accentColor},${accentColor}00)`,
+                      borderRadius:"0 0 4px 4px",
+                    }}/>
+                  )}
+                  {/* Icône */}
+                  <div key={active?"a":"i"} className={active?"nav-icon-active":""} style={{
+                    width:36,height:36,borderRadius:11,
+                    background: active ? `${accentColor}18` : "transparent",
+                    display:"flex",alignItems:"center",justifyContent:"center",
+                    transition:"background .2s",
+                  }}>
+                    {n.icon(active)}
+                  </div>
+                  {/* Label */}
+                  <span style={{
+                    fontSize:9.5,
+                    fontWeight: active ? 700 : 500,
+                    color: active ? accentColor : "#b0bec5",
+                    letterSpacing:.1,
+                    transition:"color .15s",
+                  }}>{n.l}</span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {/* MODALS */}
       {ficheClient&&(()=>{
