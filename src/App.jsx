@@ -510,11 +510,9 @@ const GlobalStyles = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap');
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
-    body { font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #eef2f7; overflow-x: hidden; -webkit-font-smoothing: antialiased; -webkit-overflow-scrolling: touch; }
-    input, select, textarea, button { font-family: inherit; -webkit-appearance: none; }
-    button { cursor: pointer; touch-action: manipulation; }
-    a { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #eef2f7; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+    input, select, textarea, button { font-family: inherit; }
     input, select, textarea { background: #f4f9fb !important; color: #0f172a !important; -webkit-text-fill-color: #0f172a !important; color-scheme: light; border-color: #d0e8f0 !important; }
     input::placeholder, textarea::placeholder { color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important; }
     input:focus, select:focus, textarea:focus { outline: none; border-color: ${DS.blue} !important; box-shadow: 0 0 0 3px ${DS.blue}22 !important; }
@@ -530,19 +528,15 @@ const GlobalStyles = () => (
     @keyframes shimmer { 0% { background-position:-200% 0; } 100% { background-position:200% 0; } }
     @keyframes float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-4px); } }
     .fade-in { animation: fadeIn .35s cubic-bezier(.22,1,.36,1) both; }
-    /* Safari GPU acceleration */
-    .nm-card, .btn-hover, .card-hover { -webkit-backface-visibility: hidden; backface-visibility: hidden; }
-    /* Safari: fix buttons inside sticky header */
-    header, [data-safari-header] { -webkit-transform: translateZ(0); transform: translateZ(0); isolation: isolate; }
     .slide-up { animation: slideUp .38s cubic-bezier(.22,1,.36,1) both; }
     .scale-in { animation: scaleIn .28s cubic-bezier(.22,1,.36,1) both; }
     /* Soft UI buttons */
-    .btn-hover { transition: all .18s cubic-bezier(.22,1,.36,1); -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
-    @media (hover: hover) { .btn-hover:hover { transform: translateY(-1px); box-shadow: 6px 6px 12px rgba(166,210,220,0.7), -4px -4px 10px rgba(255,255,255,0.95) !important; } }
+    .btn-hover { transition: all .18s cubic-bezier(.22,1,.36,1); }
+    .btn-hover:hover { transform: translateY(-1px); box-shadow: 6px 6px 12px rgba(166,210,220,0.7), -4px -4px 10px rgba(255,255,255,0.95) !important; }
     .btn-hover:active { transform: scale(0.97); box-shadow: inset 3px 3px 6px rgba(166,210,220,0.5), inset -2px -2px 5px rgba(255,255,255,0.8) !important; }
     /* Soft UI cards */
-    .card-hover { transition: all .2s cubic-bezier(.22,1,.36,1); -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
-    @media (hover: hover) { .card-hover:hover { transform: translateY(-2px); box-shadow: 6px 6px 14px rgba(166,210,220,0.65), -4px -4px 10px rgba(255,255,255,0.95) !important; } }
+    .card-hover { transition: all .2s cubic-bezier(.22,1,.36,1); }
+    .card-hover:hover { transform: translateY(-2px); box-shadow: 6px 6px 14px rgba(166,210,220,0.65), -4px -4px 10px rgba(255,255,255,0.95) !important; }
     .card-hover:active { transform: translateY(0); }
     /* Soft UI card base */
     .nm-card {
@@ -699,7 +693,7 @@ function Modal({ title, onClose, children, wide }) {
             {Ico.close(13,DS.mid)}
           </button>
         </div>
-        <div data-modal-body="1" style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",overflowScrolling:"touch",padding:isMobile?"14px 18px 24px":"20px 24px 24px",WebkitTransform:"translateZ(0)"}}>
+        <div data-modal-body="1" style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",padding:isMobile?"14px 18px 24px":"20px 24px 24px"}}>
           {children}
         </div>
       </div>
@@ -2028,9 +2022,9 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
 
     {/* -- APERÇU CARNET CLIENT (plein écran) -- */}
     {showCarnetPreview&&(
-      <div style={{position:"fixed",inset:0,zIndex:9999,background:"#f0f4f8",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+      <div style={{position:"fixed",inset:0,zIndex:9999,background:"#f0f4f8",display:"flex",flexDirection:"column",overflow:"hidden"}}>
         {/* Barre fermeture */}
-        <div style={{position:"sticky",top:0,zIndex:10,background:"rgba(12,31,63,0.96)",backdropFilter:"blur(8px)",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",boxShadow:"0 2px 12px rgba(0,0,0,0.3)"}}>
+        <div style={{flexShrink:0,position:"relative",zIndex:10,background:"rgba(12,31,63,0.96)",WebkitBackdropFilter:"blur(8px)",backdropFilter:"blur(8px)",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",boxShadow:"0 2px 12px rgba(0,0,0,0.3)"}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <svg width={16} height={11} viewBox="0 0 32 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2.5" strokeLinecap="round">
               <path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/>
@@ -2045,7 +2039,9 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           </button>
         </div>
         {/* Le vrai composant CarnetPublic avec les données déjà chargées */}
-        <CarnetPublicInline client={client} passages={passages}/>
+        <div style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",position:"relative"}}>
+          <CarnetPublicInline client={client} passages={passages}/>
+        </div>
       </div>
     )}
     </>
@@ -4567,6 +4563,9 @@ function CarnetPublicInline({ client, passages }) {
   const phOk  = v => v>=7 && v<=7.6;
   const clOk  = v => v>=0.5 && v<=3;
   const fmtDate = (d,opts) => new Date(d).toLocaleDateString("fr",opts);
+  // Normalise les valeurs pH et chlore depuis tous les champs possibles
+  const getPH = p => p.tPH||p.ph||null;
+  const getCL = p => p.tChlore||p.chloreLibre||p.chlore||null;
 
   return (
     <>
@@ -4709,47 +4708,57 @@ function CarnetPublicInline({ client, passages }) {
     </div>
 
     {selectedPassage&&(
-      <div onClick={()=>setSelectedPassage(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:10001,padding:0,backdropFilter:"blur(4px)"}}>
-        <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,maxHeight:"90vh",overflowY:"auto",WebkitOverflowScrolling:"touch",boxShadow:"0 -12px 48px rgba(0,0,0,0.2)",paddingBottom:"max(32px,env(safe-area-inset-bottom,32px))"}}>
+      <div onClick={()=>setSelectedPassage(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:10002,padding:0,WebkitBackdropFilter:"blur(4px)",backdropFilter:"blur(4px)"}}>
+        <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,maxHeight:"85vh",overflowY:"auto",WebkitOverflowScrolling:"touch",boxShadow:"0 -12px 48px rgba(0,0,0,0.2)",paddingBottom:"max(32px,env(safe-area-inset-bottom,32px))"}}>
           <div style={{padding:"14px 0 4px",display:"flex",justifyContent:"center"}}><div style={{width:36,height:4,background:"#e2e8f0",borderRadius:2}}/></div>
-          <div style={{padding:"12px 22px 0"}}>
+          <div style={{padding:"12px 22px 16px"}}>
             <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:20}}>
               <div>
                 <div style={{fontSize:20,fontWeight:900,color:"#0f172a",marginBottom:4}}>{selectedPassage.type||"Entretien"}</div>
                 <div style={{fontSize:13,color:"#64748b"}}>{fmtDate(selectedPassage.date,{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}</div>
                 {selectedPassage.tech&&<div style={{fontSize:12,color:"#64748b",marginTop:3}}>👤 {selectedPassage.tech}</div>}
               </div>
-              <button onClick={()=>setSelectedPassage(null)} style={{width:34,height:34,borderRadius:"50%",background:"#f1f5f9",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              <button onClick={()=>setSelectedPassage(null)} style={{width:34,height:34,borderRadius:"50%",background:"#f1f5f9",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:2,touchAction:"manipulation"}}>
                 <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
-            {(selectedPassage.ph||selectedPassage.chlore||selectedPassage.temperature)&&(
-              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:18}}>
-                {selectedPassage.ph&&(<div style={{borderRadius:16,padding:"14px 8px",textAlign:"center",background:phOk(selectedPassage.ph)?"#f0fdf4":"#fff7ed",border:"2px solid "+(phOk(selectedPassage.ph)?"#86efac":"#fed7aa")}}>
-                  <div style={{fontSize:10,fontWeight:800,color:phOk(selectedPassage.ph)?"#166534":"#92400e",textTransform:"uppercase",marginBottom:6}}>pH</div>
-                  <div style={{fontSize:34,fontWeight:900,color:phOk(selectedPassage.ph)?"#16a34a":"#d97706",lineHeight:1}}>{selectedPassage.ph}</div>
-                  <div style={{fontSize:11,fontWeight:700,color:phOk(selectedPassage.ph)?"#22c55e":"#f59e0b",marginTop:6}}>{phOk(selectedPassage.ph)?"✓ Idéal":"⚠ Revoir"}</div>
-                </div>)}
-                {selectedPassage.chlore&&(<div style={{borderRadius:16,padding:"14px 8px",textAlign:"center",background:clOk(selectedPassage.chlore)?"#f0fdf4":"#fff7ed",border:"2px solid "+(clOk(selectedPassage.chlore)?"#86efac":"#fed7aa")}}>
-                  <div style={{fontSize:10,fontWeight:800,color:clOk(selectedPassage.chlore)?"#166534":"#92400e",textTransform:"uppercase",marginBottom:6}}>Chlore</div>
-                  <div style={{fontSize:34,fontWeight:900,color:clOk(selectedPassage.chlore)?"#16a34a":"#d97706",lineHeight:1}}>{selectedPassage.chlore}</div>
-                  <div style={{fontSize:11,fontWeight:700,color:clOk(selectedPassage.chlore)?"#22c55e":"#f59e0b",marginTop:6}}>{clOk(selectedPassage.chlore)?"✓ Idéal":"⚠ Revoir"}</div>
-                </div>)}
-                {selectedPassage.temperature&&(<div style={{borderRadius:16,padding:"14px 8px",textAlign:"center",background:"#f0f9ff",border:"2px solid #bae6fd"}}>
-                  <div style={{fontSize:10,fontWeight:800,color:"#075985",textTransform:"uppercase",marginBottom:6}}>Temp.</div>
-                  <div style={{fontSize:34,fontWeight:900,color:"#0284c7",lineHeight:1}}>{selectedPassage.temperature}°</div>
-                  <div style={{fontSize:11,fontWeight:700,color:"#38bdf8",marginTop:6}}>Eau</div>
-                </div>)}
+            {(()=>{
+              const ph=getPH(selectedPassage); const cl=getCL(selectedPassage);
+              return (ph||cl||selectedPassage.temperature)&&(
+                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:18}}>
+                  {ph&&(<div style={{borderRadius:16,padding:"14px 8px",textAlign:"center",background:phOk(ph)?"#f0fdf4":"#fff7ed",border:"2px solid "+(phOk(ph)?"#86efac":"#fed7aa")}}>
+                    <div style={{fontSize:10,fontWeight:800,color:phOk(ph)?"#166534":"#92400e",textTransform:"uppercase",marginBottom:6}}>pH</div>
+                    <div style={{fontSize:34,fontWeight:900,color:phOk(ph)?"#16a34a":"#d97706",lineHeight:1}}>{ph}</div>
+                    <div style={{fontSize:11,fontWeight:700,color:phOk(ph)?"#22c55e":"#f59e0b",marginTop:6}}>{phOk(ph)?"✓ Idéal":"⚠ Revoir"}</div>
+                  </div>)}
+                  {cl&&(<div style={{borderRadius:16,padding:"14px 8px",textAlign:"center",background:clOk(cl)?"#f0fdf4":"#fff7ed",border:"2px solid "+(clOk(cl)?"#86efac":"#fed7aa")}}>
+                    <div style={{fontSize:10,fontWeight:800,color:clOk(cl)?"#166534":"#92400e",textTransform:"uppercase",marginBottom:6}}>Chlore</div>
+                    <div style={{fontSize:34,fontWeight:900,color:clOk(cl)?"#16a34a":"#d97706",lineHeight:1}}>{cl}</div>
+                    <div style={{fontSize:11,fontWeight:700,color:clOk(cl)?"#22c55e":"#f59e0b",marginTop:6}}>{clOk(cl)?"✓ Idéal":"⚠ Revoir"}</div>
+                  </div>)}
+                  {selectedPassage.temperature&&(<div style={{borderRadius:16,padding:"14px 8px",textAlign:"center",background:"#f0f9ff",border:"2px solid #bae6fd"}}>
+                    <div style={{fontSize:10,fontWeight:800,color:"#075985",textTransform:"uppercase",marginBottom:6}}>Temp.</div>
+                    <div style={{fontSize:34,fontWeight:900,color:"#0284c7",lineHeight:1}}>{selectedPassage.temperature}°</div>
+                    <div style={{fontSize:11,fontWeight:700,color:"#38bdf8",marginTop:6}}>Eau</div>
+                  </div>)}
+                </div>
+              );
+            })()}
+            {(selectedPassage.actions||selectedPassage.obs||selectedPassage.commentaires)&&(
+              <div style={{background:"#f8fafc",borderRadius:14,padding:"14px 16px",marginBottom:12}}>
+                <div style={{fontSize:10,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>Compte-rendu</div>
+                <div style={{fontSize:14,color:"#334155",lineHeight:1.8}}>{selectedPassage.actions||selectedPassage.obs||selectedPassage.commentaires}</div>
               </div>
             )}
-            {selectedPassage.actions&&(<div style={{background:"#f8fafc",borderRadius:14,padding:"14px 16px",marginBottom:12}}>
-              <div style={{fontSize:10,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>Actions réalisées</div>
-              <div style={{fontSize:14,color:"#334155",lineHeight:1.8}}>{selectedPassage.actions}</div>
-            </div>)}
-            {selectedPassage.obs&&(<div style={{background:"#fffbeb",borderRadius:14,padding:"14px 16px",marginBottom:12,borderLeft:"4px solid #fbbf24"}}>
-              <div style={{fontSize:10,fontWeight:800,color:"#92400e",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>Observations</div>
-              <div style={{fontSize:14,color:"#78350f",lineHeight:1.8}}>{selectedPassage.obs}</div>
-            </div>)}
+            {selectedPassage.obs&&selectedPassage.actions&&selectedPassage.obs!==selectedPassage.actions&&(
+              <div style={{background:"#fffbeb",borderRadius:14,padding:"14px 16px",marginBottom:12,borderLeft:"4px solid #fbbf24"}}>
+                <div style={{fontSize:10,fontWeight:800,color:"#92400e",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>Observations</div>
+                <div style={{fontSize:14,color:"#78350f",lineHeight:1.8}}>{selectedPassage.obs}</div>
+              </div>
+            )}
+            {!getPH(selectedPassage)&&!getCL(selectedPassage)&&!selectedPassage.actions&&!selectedPassage.obs&&!selectedPassage.commentaires&&(
+              <div style={{textAlign:"center",padding:"24px 0",color:"#94a3b8",fontSize:14}}>Aucune donnée disponible pour ce passage.</div>
+            )}
           </div>
         </div>
       </div>
@@ -5273,7 +5282,7 @@ export default function App() {
     <GlobalStyles/>
     <div style={{minHeight:"100vh",background:"#eef2f7",fontFamily:"'Inter', -apple-system, system-ui, sans-serif",maxWidth:isMobile?640:1280,margin:"0 auto",position:"relative",display:"flex",flexDirection:"column",overflowX:"hidden",width:"100%"}}>
       {/* HEADER — Soft UI */}
-      <div style={{background:"#eef2f7",padding:isMobile?"10px 14px":"10px 28px",display:"flex",alignItems:"center",gap:isMobile?8:14,position:"sticky",top:0,zIndex:50,boxShadow:"0 4px 16px rgba(166,210,220,0.5)",width:"100%",boxSizing:"border-box",WebkitBackfaceVisibility:"hidden"}}>
+      <div style={{background:"#eef2f7",padding:isMobile?"10px 14px":"10px 28px",display:"flex",alignItems:"center",gap:isMobile?8:14,position:"sticky",top:0,zIndex:50,boxShadow:"0 4px 16px rgba(166,210,220,0.5)",width:"100%",boxSizing:"border-box"}}>
 
         <button onClick={()=>setPage("dashboard")} style={{background:"#eef2f7",border:"none",padding:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",width:isMobile?44:42,height:isMobile?44:42,borderRadius:14,flexShrink:0,boxShadow:DS.nmShadow}}>
           {Ico.wave(isMobile?22:20,"#0891b2")}
@@ -5326,7 +5335,7 @@ export default function App() {
             <h2 style={{margin:0,fontSize:22,fontWeight:900,color:DS.dark,letterSpacing:-0.5}}>{PAGE_LABELS[page]}</h2>
             {page==="dashboard"&&<p style={{margin:"2px 0 0",color:DS.mid,fontSize:12,fontWeight:500}}>Aujourd'hui tâchons de ne rien oublier ;)</p>}
           </div>
-          <div style={{padding:"6px 16px 110px",overflowX:"hidden",WebkitOverflowScrolling:"touch"}}>
+          <div style={{padding:"6px 16px 110px",overflowX:"hidden"}}>
             {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}}/>}
             {page==="clients"&&<PageClients clients={clients} passages={passages} contrats={contrats} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onClientClick={setFicheClient} onAdd={openAddClient}/>}
             {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus}/>}
@@ -5381,7 +5390,7 @@ export default function App() {
       )}
 
       {/* NAV BAS MODERNISÉ — mobile seulement */}
-      {isMobile && <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:640,background:"#eef2f7",borderTop:"1px solid "+DS.border,display:"flex",alignItems:"flex-end",boxShadow:"0 -4px 20px rgba(166,210,220,0.5)",zIndex:50,paddingBottom:"env(safe-area-inset-bottom,4px)",WebkitTransform:"translateX(-50%) translate3d(0,0,0)",willChange:"transform"}}>
+      {isMobile && <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:640,background:"#eef2f7",borderTop:"1px solid "+DS.border,display:"flex",alignItems:"flex-end",boxShadow:"0 -4px 20px rgba(166,210,220,0.5)",zIndex:50,paddingBottom:"env(safe-area-inset-bottom,4px)"}}>
         {NAV.map(n=>(
           <button key={n.id} onClick={()=>setPage(n.id)} style={{flex:1,padding:"10px 4px 12px",border:"none",cursor:"pointer",background:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:3,transition:"all .15s",position:"relative"}}>
             {page===n.id && <div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",width:32,height:3,borderRadius:"0 0 3px 3px",background:DS.blue}}/>}
