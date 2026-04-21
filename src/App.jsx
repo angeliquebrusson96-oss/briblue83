@@ -6169,26 +6169,32 @@ export default function App() {
   const saveClient = useCallback(c=>{ setClients(prev=>{ const next=prev.find(x=>x.id===c.id)?prev.map(x=>x.id===c.id?c:x):[...prev,c]; saveClients(next); return next; }); setShowFormClient(false);setEditClient(null);setFicheClient(c); },[saveClients]);
   const deleteClient = useCallback(id=>{ showConfirm("Supprimer ce client et tous ses passages ?", ()=>{ setClients(prev=>{ const next=prev.filter(x=>x.id!==id); saveClients(next); return next; }); setPassages(prev=>{ const next=prev.filter(x=>x.clientId!==id); savePassages(next); return next; }); setFicheClient(null); }); },[saveClients,savePassages]);
   const savePassage = useCallback(async p => {
-    // Lire l'état depuis localStorage (évite la race condition React sur iOS)
-    let currentPassages = [];
+    setShowFormPassage(false);
+    setEditPassage(null);
+
+    // Toujours lire depuis Firebase (source de vérité commune à tous les appareils)
+    // Ne jamais se baser sur localStorage qui est propre à chaque appareil
+    let basePassages = [];
     try {
-      const raw = localStorage.getItem("briblue_bb_passages_v2");
-      if (raw) currentPassages = JSON.parse(raw);
-    } catch {}
-    const nextPassages = currentPassages.find(x => x.id === p.id)
-      ? currentPassages.map(x => x.id === p.id ? p : x)
-      : [...currentPassages, p];
+      basePassages = await loadAllPassages();
+    } catch {
+      // Firebase inaccessible — fallback sur le state React actuel
+      setPassages(prev => { basePassages = prev; return prev; });
+      await new Promise(r => setTimeout(r, 0));
+    }
 
-    // Mettre à jour le state React
+    const nextPassages = basePassages.find(x => x.id === p.id)
+      ? basePassages.map(x => x.id === p.id ? p : x)
+      : [...basePassages, p];
+
+    // Mettre à jour le state React et localStorage
     setPassages(nextPassages);
-
-    // localStorage immédiat
     try {
       localStorage.setItem("briblue_bb_passages_v2", JSON.stringify(nextPassages));
       localStorage.setItem("briblue_ts_bb_passages_v2", String(Date.now()));
     } catch {}
 
-    // Firebase — écriture parallèle (iOS ne timeout pas)
+    // Firebase — écriture parallèle
     if (navigator.onLine) {
       try {
         const CHUNK = 50;
@@ -6200,7 +6206,7 @@ export default function App() {
           )
         );
         await setDoc(APP_DOC, { bb_passages_chunks: chunks.length }, { merge: true });
-      } catch(e) {
+      } catch {
         offlineQueue.pending["bb_passages_v2"] = nextPassages;
         toastWarn("Sauvegardé localement — sync en attente");
       }
@@ -6208,9 +6214,6 @@ export default function App() {
       offlineQueue.pending["bb_passages_v2"] = nextPassages;
       toastWarn("Hors ligne — sync au retour connexion");
     }
-
-    setShowFormPassage(false);
-    setEditPassage(null);
   }, []);
   const updatePassageRapportStatus = useCallback((passageMaj) => {
     setPassages(prev => {
