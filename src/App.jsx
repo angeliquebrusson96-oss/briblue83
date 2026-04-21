@@ -237,7 +237,7 @@ const offlineQueue = { pending: {} };
 
 // Debounce timers par clé — une seule écriture Firebase toutes les 3s max
 const _debounceTimers = {};
-const FIREBASE_DEBOUNCE_MS = 3000;
+const FIREBASE_DEBOUNCE_MS = 800;
 
 async function saveToFirebase(key, val) {
   if (key === "bb_passages_v2" && Array.isArray(val)) {
@@ -267,8 +267,7 @@ async function flushOfflineQueue() {
 }
 
 if (typeof window !== 'undefined') {
-  window.addEventListener('online', () => { flushOfflineQueue(); });
-  window.addEventListener('beforeunload', () => {
+  const flushAll = () => {
     Object.keys(_debounceTimers).forEach(key => {
       clearTimeout(_debounceTimers[key]);
       delete _debounceTimers[key];
@@ -276,7 +275,13 @@ if (typeof window !== 'undefined') {
     Object.keys(offlineQueue.pending).forEach(key => {
       saveToFirebase(key, offlineQueue.pending[key]).catch(()=>{});
     });
+  };
+  window.addEventListener('beforeunload', flushAll);
+  // Safari iOS tue beforeunload — visibilitychange est fiable
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushAll();
   });
+  window.addEventListener('online', () => { flushOfflineQueue(); });
 }
 
 async function save(key,val){
@@ -4076,9 +4081,22 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
           ? <button onClick={()=>setStep(s=>s+1)} className="btn-hover" style={{minHeight:52,padding:"14px 24px",borderRadius:DS.radiusSm,background:(STEP_INFO[step]||STEP_INFO[STEPS-1]).color,border:"none",cursor:"pointer",fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:8,boxShadow:`0 4px 16px ${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}44`,flexShrink:0}}>
               {(STEP_INFO[step]||STEP_INFO[STEPS-1]).l} <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
-          : <button onClick={handleSave} className="btn-hover" style={{minHeight:52,padding:"14px 24px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:8,boxShadow:"0 4px 16px #05996944",flexShrink:0}}>
-              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Enregistrer
-            </button>
+          : <button 
+  onClick={handleSave} 
+  disabled={savingPassage}
+  className="btn-hover" 
+  style={{minHeight:52,padding:"14px 24px",borderRadius:DS.radiusSm,
+    background:savingPassage?"#64748b":"linear-gradient(135deg,#059669,#34d399)",
+    border:"none",cursor:savingPassage?"not-allowed":"pointer",
+    fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit",
+    display:"flex",alignItems:"center",gap:8,
+    boxShadow:savingPassage?"none":"0 4px 16px #05996944",flexShrink:0,
+    opacity:savingPassage?0.7:1,transition:"all .2s"}}>
+  {savingPassage
+    ? <><svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" style={{animation:"pulse 1s infinite"}}><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> Enregistrement…</>
+    : <><svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Enregistrer</>
+  }
+</button>
         }
       </div>
       {/* Modale confirmation enregistrement */}
