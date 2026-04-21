@@ -222,7 +222,7 @@ function useOnlineStatus() {
   return { online, pendingCount };
 }
 
-// STORAGE — Firebase + cache TTL 24h (iOS : localStorage prioritaire même après rechargement)
+// STORAGE — cache TTL 24h (iOS : localStorage toujours prioritaire au rechargement)
 const CACHE_TTL_MS=24*60*60*1000;
 async function load(key,fallback){
   try{const c=localStorage.getItem("briblue_"+key),ts=localStorage.getItem("briblue_ts_"+key);if(c&&ts&&(Date.now()-Number(ts))<CACHE_TTL_MS)return JSON.parse(c);}catch{}
@@ -235,10 +235,10 @@ async function load(key,fallback){
 // Queue hors-ligne
 const offlineQueue = { pending: {} };
 
-// Debounce timers par clé — 0ms sur iOS (Safari tue la page trop vite), 800ms ailleurs
+// Pas de debounce — chaque save écrit immédiatement dans Firebase
+// (le debounce était la cause du problème sur iOS Safari qui coupe les timers)
 const _debounceTimers = {};
-const isIOS = typeof navigator !== 'undefined' && /iP(hone|ad|od)/.test(navigator.userAgent);
-const FIREBASE_DEBOUNCE_MS = isIOS ? 0 : 800;
+const FIREBASE_DEBOUNCE_MS = 0;
 
 async function saveToFirebase(key, val) {
   if (key === "bb_passages_v2" && Array.isArray(val)) {
@@ -278,38 +278,29 @@ if (typeof window !== 'undefined') {
     });
   };
   window.addEventListener('beforeunload', flushAll);
-  // Safari iOS ignore beforeunload — visibilitychange + pagehide sont fiables
+  // Safari iOS tue beforeunload — visibilitychange est fiable
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') flushAll();
   });
-  window.addEventListener('pagehide', flushAll);
   window.addEventListener('online', () => { flushOfflineQueue(); });
 }
 
 async function save(key,val){
+  // 1. localStorage IMMÉDIAT (synchrone)
   try{localStorage.setItem("briblue_"+key,JSON.stringify(val));localStorage.setItem("briblue_ts_"+key,String(Date.now()));}catch{}
 
+  // 2. Firebase IMMÉDIAT — pas de debounce, pas de timer (iOS tue les timers)
   if (!navigator.onLine) {
     offlineQueue.pending[key] = val;
     return;
   }
 
-  // 2. Firebase debounced — regroupe les appels rapides en un seul
-  offlineQueue.pending[key] = val;
-
-  if (_debounceTimers[key]) clearTimeout(_debounceTimers[key]);
-
-  _debounceTimers[key] = setTimeout(async () => {
-    delete _debounceTimers[key];
-    const latest = offlineQueue.pending[key];
-    if (latest === undefined) return;
-    try {
-      await saveToFirebase(key, latest);
-      delete offlineQueue.pending[key];
-    } catch {
-      // reste en queue, réessayé au retour connexion
-    }
-  }, FIREBASE_DEBOUNCE_MS);
+  try {
+    await saveToFirebase(key, val);
+  } catch {
+    // Firebase échoué → queue pour retry au retour connexion
+    offlineQueue.pending[key] = val;
+  }
 }
 
 
@@ -6147,37 +6138,43 @@ export default function App() {
   const saveClient = useCallback(c=>{ setClients(prev=>{ const next=prev.find(x=>x.id===c.id)?prev.map(x=>x.id===c.id?c:x):[...prev,c]; saveClients(next); return next; }); setShowFormClient(false);setEditClient(null);setFicheClient(c); },[saveClients]);
   const deleteClient = useCallback(id=>{ showConfirm("Supprimer ce client et tous ses passages ?", ()=>{ setClients(prev=>{ const next=prev.filter(x=>x.id!==id); saveClients(next); return next; }); setPassages(prev=>{ const next=prev.filter(x=>x.clientId!==id); savePassages(next); return next; }); setFicheClient(null); }); },[saveClients,savePassages]);
   const savePassage = useCallback(async p => {
-    // IMPORTANT : calculer nextPassages AVANT setPassages (évite la race condition iOS)
-    // setPassages est async React — nextPassages dans la closure peut être undefined
+    // Calculer nextPassages DANS le callback setPassages (garanti synchrone)
+    let nextPassages;
     setPassages(prev => {
-      const nextPassages = prev.find(x => x.id === p.id)
+      nextPassages = prev.find(x => x.id === p.id)
         ? prev.map(x => x.id === p.id ? p : x)
         : [...prev, p];
+      return nextPassages;
+    });
 
-      // localStorage immédiat (synchrone) — filet de sécurité si Firebase rate
+    // Attendre le prochain tick pour que nextPassages soit défini
+    await new Promise(r => setTimeout(r, 0));
+
+    if (!nextPassages) { setShowFormPassage(false); setEditPassage(null); return; }
+
+    // localStorage IMMÉDIAT
+    try {
+      localStorage.setItem("briblue_bb_passages_v2", JSON.stringify(nextPassages));
+      localStorage.setItem("briblue_ts_bb_passages_v2", String(Date.now()));
+    } catch {}
+
+    // Firebase IMMÉDIAT (pas de debounce ni timer)
+    if (navigator.onLine) {
       try {
-        localStorage.setItem("briblue_bb_passages_v2", JSON.stringify(nextPassages));
-        localStorage.setItem("briblue_ts_bb_passages_v2", String(Date.now()));
-      } catch {}
-
-      // Firebase — direct sans debounce pour les passages
-      if (navigator.onLine) {
         const CHUNK = 50;
         const chunks = [];
         for (let i = 0; i < nextPassages.length; i += CHUNK) chunks.push(nextPassages.slice(i, i + CHUNK));
-        Promise.all(
-          chunks.map((chunk, i) => setDoc(doc(db, "briblue", "passages_" + i), { bb_passages_v2: chunk }, { merge: false }))
-        ).then(() => setDoc(APP_DOC, { bb_passages_chunks: chunks.length }, { merge: true }))
-        .catch(() => {
-          offlineQueue.pending["bb_passages_v2"] = nextPassages;
-          toastWarn("Sauvegardé localement — sync en attente");
-        });
-      } else {
+        for (let i = 0; i < chunks.length; i++) {
+          await setDoc(doc(db, "briblue", "passages_" + i), { bb_passages_v2: chunks[i] }, { merge: false });
+        }
+        await setDoc(APP_DOC, { bb_passages_chunks: chunks.length }, { merge: true });
+      } catch {
         offlineQueue.pending["bb_passages_v2"] = nextPassages;
+        toastWarn("Sauvegardé localement — sync en attente");
       }
-
-      return nextPassages;
-    });
+    } else {
+      offlineQueue.pending["bb_passages_v2"] = nextPassages;
+    }
 
     setShowFormPassage(false);
     setEditPassage(null);
