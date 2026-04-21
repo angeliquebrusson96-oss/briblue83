@@ -4093,22 +4093,9 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
           ? <button onClick={()=>setStep(s=>s+1)} className="btn-hover" style={{minHeight:52,padding:"14px 24px",borderRadius:DS.radiusSm,background:(STEP_INFO[step]||STEP_INFO[STEPS-1]).color,border:"none",cursor:"pointer",fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:8,boxShadow:`0 4px 16px ${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}44`,flexShrink:0}}>
               {(STEP_INFO[step]||STEP_INFO[STEPS-1]).l} <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
-          : <button 
-  onClick={handleSave} 
-  disabled={savingPassage}
-  className="btn-hover" 
-  style={{minHeight:52,padding:"14px 24px",borderRadius:DS.radiusSm,
-    background:savingPassage?"#64748b":"linear-gradient(135deg,#059669,#34d399)",
-    border:"none",cursor:savingPassage?"not-allowed":"pointer",
-    fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit",
-    display:"flex",alignItems:"center",gap:8,
-    boxShadow:savingPassage?"none":"0 4px 16px #05996944",flexShrink:0,
-    opacity:savingPassage?0.7:1,transition:"all .2s"}}>
-  {savingPassage
-    ? <><svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" style={{animation:"pulse 1s infinite"}}><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> Enregistrement…</>
-    : <><svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Enregistrer</>
-  }
-</button>
+          : <button onClick={handleSave} className="btn-hover" style={{minHeight:52,padding:"14px 24px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:8,boxShadow:"0 4px 16px #05996944",flexShrink:0}}>
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Enregistrer
+            </button>
         }
       </div>
       {/* Modale confirmation enregistrement */}
@@ -4331,14 +4318,10 @@ function AlertesBlock({ alertes, passages, onClientClick }) {
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
         <div style={{display:"flex",alignItems:"center",gap:7}}>
           <div style={{width:8,height:8,borderRadius:4,background:DS.red}}/>
-          <span style={{fontSize:12,fontWeight:800,color:DS.red,textTransform:"uppercase",letterSpacing:.8}}>
-            {alertes.length} Alerte{alertes.length>1?"s":""}
-          </span>
+          <span style={{fontSize:12,fontWeight:800,color:DS.red,textTransform:"uppercase",letterSpacing:.8}}>{alertes.length} Alerte{alertes.length>1?"s":""}</span>
         </div>
         {alertes.length>3&&(
-          <button onClick={()=>setShowAll(v=>!v)} style={{fontSize:11,fontWeight:700,color:DS.blue,background:"none",border:"none",cursor:"pointer",fontFamily:"inherit"}}>
-            {showAll?"Réduire":"Voir tout"}
-          </button>
+          <button onClick={()=>setShowAll(v=>!v)} style={{fontSize:11,fontWeight:700,color:DS.blue,background:"none",border:"none",cursor:"pointer",fontFamily:"inherit"}}>{showAll?"Réduire":"Voir tout"}</button>
         )}
       </div>
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -4349,20 +4332,11 @@ function AlertesBlock({ alertes, passages, onClientClick }) {
           const doneMois=passM.length;
           return (
             <div key={c.id} onClick={()=>onClientClick(c)}
-              style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",
-                borderRadius:14,background:"#eef2f7",cursor:"pointer",
-                border:"1.5px solid "+col.tx+"33",
-                borderLeft:"4px solid "+col.tx,
-                boxShadow:"3px 3px 8px rgba(166,210,220,0.5),-2px -2px 5px rgba(255,255,255,0.85)"}}>
+              style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:14,background:"#eef2f7",cursor:"pointer",border:"1.5px solid "+col.tx+"33",borderLeft:"4px solid "+col.tx,boxShadow:"3px 3px 8px rgba(166,210,220,0.5),-2px -2px 5px rgba(255,255,255,0.85)"}}>
               <Avatar nom={c.nom} size={40} photo={c.photoPiscine}/>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontWeight:800,fontSize:13,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:3}}>{c.nom}</div>
-                <div style={{fontSize:11,color:col.tx,fontWeight:700}}>
-                  {al==="rouge"?`Contrat expire dans ${j}j`
-                   :al==="jaune"?`Expire dans ${j} jours`
-                   :al==="orange"?"Passages en retard"
-                   :`Ce mois : ${doneMois}/${prevMois} passages`}
-                </div>
+                <div style={{fontSize:11,color:col.tx,fontWeight:700}}>{al==="rouge"?`Contrat expire dans ${j}j`:al==="jaune"?`Expire dans ${j} jours`:al==="orange"?"Passages en retard":`Ce mois : ${doneMois}/${prevMois} passages`}</div>
               </div>
               <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
                 <span style={{fontSize:10,fontWeight:800,color:col.tx,background:col.bg,padding:"3px 9px",borderRadius:20,border:"1px solid "+col.tx+"44"}}>{col.lbl}</span>
@@ -6160,18 +6134,7 @@ export default function App() {
 
   const saveClient = useCallback(c=>{ setClients(prev=>{ const next=prev.find(x=>x.id===c.id)?prev.map(x=>x.id===c.id?c:x):[...prev,c]; saveClients(next); return next; }); setShowFormClient(false);setEditClient(null);setFicheClient(c); },[saveClients]);
   const deleteClient = useCallback(id=>{ showConfirm("Supprimer ce client et tous ses passages ?", ()=>{ setClients(prev=>{ const next=prev.filter(x=>x.id!==id); saveClients(next); return next; }); setPassages(prev=>{ const next=prev.filter(x=>x.clientId!==id); savePassages(next); return next; }); setFicheClient(null); }); },[saveClients,savePassages]);
-  const savePassage = useCallback(p => {
-    setPassages(prev => {
-      const next = prev.find(x => x.id === p.id)
-        ? prev.map(x => x.id === p.id ? p : x)
-        : [...prev, p];
-      savePassages(next);
-      return next;
-    });
-    setShowFormPassage(false);
-    setEditPassage(null);
-    toastSuccess("Passage enregistré !");
-  }, [savePassages]);
+  const savePassage = useCallback(p=>{ setPassages(prev=>{ const next=prev.find(x=>x.id===p.id)?prev.map(x=>x.id===p.id?p:x):[...prev,p]; savePassages(next); return next; }); setShowFormPassage(false);setEditPassage(null); },[savePassages]);
   const updatePassageRapportStatus = useCallback((passageMaj) => {
     setPassages(prev => {
       const next = prev.map(x => x.id === passageMaj.id ? { ...x, ...passageMaj } : x);
