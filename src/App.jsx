@@ -4910,7 +4910,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
   );
 
   const passClient = (loadedPassages||[])
-    .filter(p=>p.clientId===client.id && p.ok)
+    .filter(p=>p.clientId===client.id)
     .sort((a,b)=>new Date(b.date)-new Date(a.date));
 
   const last = passClient[0]||null;
