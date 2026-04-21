@@ -224,37 +224,19 @@ function useOnlineStatus() {
 
 // STORAGE — Firebase Firestore + cache localStorage TTL 30min
 const CACHE_TTL_MS = 30 * 60 * 1000;
-
 async function load(key, fallback) {
+  try { const c=localStorage.getItem("briblue_"+key),ts=localStorage.getItem("briblue_ts_"+key); if(c&&ts&&(Date.now()-Number(ts))<CACHE_TTL_MS) return JSON.parse(c); } catch {}
   try {
-    const cached = localStorage.getItem("briblue_" + key);
-    const ts = localStorage.getItem("briblue_ts_" + key);
-    if (cached && ts && (Date.now() - Number(ts)) < CACHE_TTL_MS) return JSON.parse(cached);
-  } catch {}
-  try {
-    if (key === "bb_passages_v2") {
-      const passages = await loadAllPassages();
-      if (passages.length > 0) {
-        try { localStorage.setItem("briblue_" + key, JSON.stringify(passages)); localStorage.setItem("briblue_ts_" + key, String(Date.now())); } catch {}
-        return passages;
-      }
-      try { const ls = localStorage.getItem("briblue_" + key); if (ls) return JSON.parse(ls); } catch {}
-      return fallback;
+    if (key==="bb_passages_v2") {
+      const passages=await loadAllPassages();
+      if(passages.length>0){try{localStorage.setItem("briblue_"+key,JSON.stringify(passages));localStorage.setItem("briblue_ts_"+key,String(Date.now()));}catch{} return passages;}
+      try{const ls=localStorage.getItem("briblue_"+key);if(ls)return JSON.parse(ls);}catch{} return fallback;
     }
-    const snap = await getDoc(APP_DOC);
-    if (snap.exists()) {
-      const allData = snap.data();
-      if (key in allData) {
-        const val = allData[key];
-        try { localStorage.setItem("briblue_" + key, JSON.stringify(val)); localStorage.setItem("briblue_ts_" + key, String(Date.now())); } catch {}
-        return val;
-      }
-    }
-    try { const ls = localStorage.getItem("briblue_" + key); if (ls) return JSON.parse(ls); } catch {}
-    return fallback;
+    const snap=await getDoc(APP_DOC);
+    if(snap.exists()){const allData=snap.data();if(key in allData){const val=allData[key];try{localStorage.setItem("briblue_"+key,JSON.stringify(val));localStorage.setItem("briblue_ts_"+key,String(Date.now()));}catch{} return val;}}
+    try{const ls=localStorage.getItem("briblue_"+key);if(ls)return JSON.parse(ls);}catch{} return fallback;
   } catch {
-    try { const ls = localStorage.getItem("briblue_" + key); if (ls) return JSON.parse(ls); } catch {}
-    return fallback;
+    try{const ls=localStorage.getItem("briblue_"+key);if(ls)return JSON.parse(ls);}catch{} return fallback;
   }
 }
 
@@ -306,7 +288,7 @@ if (typeof window !== 'undefined') {
 }
 
 async function save(key, val) {
-  try { localStorage.setItem("briblue_" + key, JSON.stringify(val)); localStorage.setItem("briblue_ts_" + key, String(Date.now())); } catch {}
+  try{localStorage.setItem("briblue_"+key,JSON.stringify(val));localStorage.setItem("briblue_ts_"+key,String(Date.now()));}catch{}
 
   if (!navigator.onLine) {
     offlineQueue.pending[key] = val;
@@ -828,7 +810,6 @@ const GlobalStyles = () => (
     @supports (padding-bottom: env(safe-area-inset-bottom)) {
       .safe-bottom { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
     }
-    /* Safari iOS: safe area pour le haut (encoche + barre de statut) */
     @supports (padding-top: env(safe-area-inset-top)) {
       .safe-header { padding-top: env(safe-area-inset-top) !important; }
     }
@@ -839,6 +820,272 @@ const GlobalStyles = () => (
   `}</style>
 );
 
+
+
+// ═══════════════════════════════════════════════════════════════
+// TOUR GUIDE — Aide interactive avec spotlight + flèches animées
+// ═══════════════════════════════════════════════════════════════
+
+const TOUR_STEPS = [
+  {
+    id: "welcome",
+    title: "👋 Bienvenue dans BRIBLUE !",
+    desc: "Ce tutoriel va vous montrer les fonctions clés de l'application en 8 étapes. Tapez ➡️ pour continuer.",
+    target: null, // pas de spotlight, juste modale centrale
+    arrow: null,
+  },
+  {
+    id: "nav_clients",
+    title: "👥 Onglet Clients",
+    desc: "Accédez à toute votre liste de clients. Tapez un client pour voir sa fiche complète, son contrat et ses passages.",
+    target: "tour-nav-clients",
+    arrow: "bottom",
+  },
+  {
+    id: "nav_rapports",
+    title: "📋 Onglet Rapports",
+    desc: "Consultez et gérez tous les passages effectués. Filtrez par client, par mois, ou par type d'intervention.",
+    target: "tour-nav-rapports",
+    arrow: "bottom",
+  },
+  {
+    id: "nav_rdv",
+    title: "📅 Rendez-vous",
+    desc: "Planifiez et suivez vos rendez-vous. Visualisez votre planning de la semaine en un coup d'œil.",
+    target: "tour-nav-rdv",
+    arrow: "bottom",
+  },
+  {
+    id: "btn_rapport",
+    title: "🔧 Nouveau rapport",
+    desc: "Ce bouton bleu lance le formulaire de passage. Saisissez les mesures eau, photos, produits utilisés — tout est sauvegardé automatiquement.",
+    target: "tour-btn-rapport",
+    arrow: "top",
+  },
+  {
+    id: "btn_livraison",
+    title: "🚚 Livraison produits",
+    desc: "Enregistrez une livraison de produits à un client. Le stock est mis à jour automatiquement.",
+    target: "tour-btn-livraison",
+    arrow: "top",
+  },
+  {
+    id: "btn_stock",
+    title: "📦 Gestion du stock",
+    desc: "Visualisez votre stock de produits. Un badge rouge s'affiche quand un produit est en rupture.",
+    target: "tour-btn-stock",
+    arrow: "top",
+  },
+  {
+    id: "btn_logout",
+    title: "🔒 Déconnexion",
+    desc: "Ce bouton rouge vous déconnecte de l'application. Vos données sont toujours sauvegardées dans Firebase.",
+    target: "tour-btn-logout",
+    arrow: "top",
+  },
+  {
+    id: "done",
+    title: "🎉 Vous êtes prêt !",
+    desc: "Vous connaissez maintenant les bases de BRIBLUE. N'hésitez pas à relancer ce tutoriel depuis le bouton ❓ en haut à droite.",
+    target: null,
+    arrow: null,
+  },
+];
+
+function TourGuide({ onClose }) {
+  const [step, setStep] = useState(0);
+  const [targetRect, setTargetRect] = useState(null);
+  const [visible, setVisible] = useState(false);
+
+  const current = TOUR_STEPS[step];
+  const isFirst = step === 0;
+  const isLast = step === TOUR_STEPS.length - 1;
+
+  // Mesurer la cible à chaque changement d'étape
+  useEffect(() => {
+    setVisible(false);
+    setTargetRect(null);
+    const timer = setTimeout(() => {
+      if (current.target) {
+        const el = document.getElementById(current.target);
+        if (el) {
+          const r = el.getBoundingClientRect();
+          setTargetRect({ top: r.top, left: r.left, width: r.width, height: r.height });
+          // Scroll pour que l'élément soit visible
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }
+      setVisible(true);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [step, current.target]);
+
+  const next = () => { if (!isLast) setStep(s => s + 1); else onClose(); };
+  const prev = () => { if (!isFirst) setStep(s => s - 1); };
+
+  // Calcul position de la bulle selon la flèche
+  const getBubbleStyle = () => {
+    if (!targetRect || !current.target) {
+      return { position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", maxWidth: 320, zIndex: 100010 };
+    }
+    const MARGIN = 18;
+    const PAD = 16;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const bw = Math.min(300, vw - 40);
+
+    let top, left;
+
+    if (current.arrow === "bottom") {
+      // bulle en DESSUS de la cible
+      top = targetRect.top - 170 - MARGIN;
+      left = Math.max(PAD, Math.min(targetRect.left + targetRect.width/2 - bw/2, vw - bw - PAD));
+      if (top < PAD) { top = targetRect.top + targetRect.height + MARGIN; }
+    } else {
+      // bulle en DESSOUS de la cible
+      top = targetRect.top + targetRect.height + MARGIN;
+      left = Math.max(PAD, Math.min(targetRect.left + targetRect.width/2 - bw/2, vw - bw - PAD));
+      if (top + 180 > vh) { top = targetRect.top - 180 - MARGIN; }
+    }
+
+    return { position: "fixed", top, left, width: bw, zIndex: 100010 };
+  };
+
+  // Position flèche SVG entre la bulle et la cible
+  const getArrowStyle = () => {
+    if (!targetRect || !current.arrow) return null;
+    const cx = targetRect.left + targetRect.width / 2;
+    const cy = targetRect.top + targetRect.height / 2;
+    return { position: "fixed", left: cx - 20, top: cy - 20, zIndex: 100011, pointerEvents: "none" };
+  };
+
+  const pad = 10; // padding spotlight
+  const spotStyle = targetRect ? {
+    position: "fixed",
+    top: targetRect.top - pad,
+    left: targetRect.left - pad,
+    width: targetRect.width + pad * 2,
+    height: targetRect.height + pad * 2,
+    borderRadius: 16,
+    boxShadow: "0 0 0 9999px rgba(8,18,40,0.72)",
+    zIndex: 100005,
+    pointerEvents: "none",
+    transition: "all .35s cubic-bezier(.22,1,.36,1)",
+    border: "2.5px solid rgba(6,182,212,0.85)",
+    animation: "tourPulse 1.8s ease-in-out infinite",
+  } : null;
+
+  const bubbleStyle = getBubbleStyle();
+  const arrowPos = getArrowStyle();
+
+  return (
+    <>
+      {/* Overlay sombre global quand pas de cible */}
+      {!targetRect && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(8,18,40,0.75)", zIndex:100004 }} onClick={onClose}/>
+      )}
+
+      {/* Spotlight sur la cible */}
+      {spotStyle && <div style={spotStyle}/>}
+
+      {/* Flèche animée pointant vers la cible */}
+      {arrowPos && targetRect && (
+        <div style={arrowPos}>
+          <svg width={44} height={44} viewBox="0 0 44 44" style={{animation:"tourBounce 0.9s ease-in-out infinite"}}>
+            {current.arrow === "bottom" ? (
+              // flèche vers le bas (cible est en dessous de la bulle)
+              <>
+                <path d="M22 4 L22 30" stroke="#06b6d4" strokeWidth="3" strokeLinecap="round"/>
+                <path d="M12 22 L22 34 L32 22" stroke="#06b6d4" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+              </>
+            ) : (
+              // flèche vers le haut (cible est au-dessus)
+              <>
+                <path d="M22 40 L22 14" stroke="#06b6d4" strokeWidth="3" strokeLinecap="round"/>
+                <path d="M12 22 L22 10 L32 22" stroke="#06b6d4" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+              </>
+            )}
+            <circle cx="22" cy={current.arrow==="bottom"?34:10} r="4" fill="#06b6d4"/>
+          </svg>
+        </div>
+      )}
+
+      {/* Bulle de dialogue */}
+      {visible && (
+        <div style={{
+          ...bubbleStyle,
+          background: "linear-gradient(145deg,#0c1f3e,#0a1628)",
+          borderRadius: 20,
+          padding: "20px 18px 16px",
+          boxShadow: "0 24px 60px rgba(0,0,0,0.6), 0 0 0 1.5px rgba(6,182,212,0.35)",
+          fontFamily: "'Nunito', system-ui, sans-serif",
+          animation: "tourSlide .28s cubic-bezier(.22,1,.36,1) both",
+        }}>
+          {/* Indicateur étapes */}
+          <div style={{display:"flex", gap:5, marginBottom:14, justifyContent:"center"}}>
+            {TOUR_STEPS.map((_,i) => (
+              <div key={i} style={{
+                width: i===step ? 22 : 7, height:7, borderRadius:4,
+                background: i===step ? "#06b6d4" : i<step ? "rgba(6,182,212,0.4)" : "rgba(255,255,255,0.15)",
+                transition:"all .3s ease",
+              }}/>
+            ))}
+          </div>
+
+          {/* Titre */}
+          <div style={{fontSize:16, fontWeight:800, color:"#f0f9ff", marginBottom:8, lineHeight:1.3}}>
+            {current.title}
+          </div>
+
+          {/* Description */}
+          <div style={{fontSize:13, color:"rgba(186,230,253,0.9)", lineHeight:1.55, marginBottom:16}}>
+            {current.desc}
+          </div>
+
+          {/* Boutons nav */}
+          <div style={{display:"flex", gap:8, alignItems:"center"}}>
+            {!isFirst && (
+              <button onClick={prev} style={{
+                flex:1, padding:"10px", borderRadius:12, border:"1.5px solid rgba(6,182,212,0.3)",
+                background:"transparent", color:"rgba(186,230,253,0.8)", fontSize:13, fontWeight:700,
+                cursor:"pointer", fontFamily:"inherit",
+              }}>← Retour</button>
+            )}
+            <button onClick={next} style={{
+              flex:2, padding:"10px", borderRadius:12, border:"none",
+              background:"linear-gradient(135deg,#06b6d4,#0891b2)", color:"#fff",
+              fontSize:13, fontWeight:800, cursor:"pointer", fontFamily:"inherit",
+              boxShadow:"0 4px 16px rgba(6,182,212,0.4)",
+            }}>
+              {isLast ? "✓ Terminer" : "Suivant →"}
+            </button>
+            <button onClick={onClose} style={{
+              width:36, height:36, borderRadius:10, border:"none",
+              background:"rgba(255,255,255,0.07)", color:"rgba(186,230,253,0.6)",
+              fontSize:16, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
+            }}>✕</button>
+          </div>
+        </div>
+      )}
+
+      {/* CSS animations injectées */}
+      <style>{`
+        @keyframes tourPulse {
+          0%,100% { box-shadow: 0 0 0 9999px rgba(8,18,40,0.72), 0 0 0 4px rgba(6,182,212,0.5); }
+          50%      { box-shadow: 0 0 0 9999px rgba(8,18,40,0.72), 0 0 0 8px rgba(6,182,212,0.2); }
+        }
+        @keyframes tourBounce {
+          0%,100% { transform: translateY(0); }
+          50%      { transform: translateY(6px); }
+        }
+        @keyframes tourSlide {
+          from { opacity:0; transform: translateY(10px) scale(0.96); }
+          to   { opacity:1; transform: translateY(0)   scale(1); }
+        }
+      `}</style>
+    </>
+  );
+}
 
 // ═══════════════════════════════════════════
 // SYSTÈME TOAST + CONFIRM (remplace alert/confirm)
@@ -5817,6 +6064,7 @@ export default function App() {
   const [showFormRdv, setShowFormRdv] = useState(false);
   const [editRdv, setEditRdv] = useState(null);
   const [showModalAlertes, setShowModalAlertes] = useState(false);
+  const [showTour, setShowTour] = useState(false);
   const [dismissedAlertes, setDismissedAlertes] = useState(()=>{ try{ return JSON.parse(localStorage.getItem("briblue_dismissed_alertes")||"[]"); }catch{return [];} });
   const dismissAlerte = (clientId) => { setDismissedAlertes(prev=>{ const next=[...new Set([...prev,clientId])]; try{ localStorage.setItem("briblue_dismissed_alertes", JSON.stringify(next)); }catch{} return next; }); };
   const prevTaskCount = useRef(0);
@@ -5859,29 +6107,29 @@ export default function App() {
 
   useEffect(()=>{
     if(!ready) return;
-    const unsub = onSnapshot(APP_DOC, (snap) => {
-      if (!snap.exists()) return;
-      const ct = snap.data()["bb_contrats_v1"];
-      if (!ct) return;
-      setContrats(prev => {
-        for (const k of Object.keys(ct)) {
-          const newC = ct[k]; const oldC = prev[k];
-          if (!oldC) continue;
-          if (newC.statut !== oldC.statut && (newC.statut === "signe_client" || newC.statut === "signe_complet")) {
+    const unsub=onSnapshot(APP_DOC,(snap)=>{
+      if(!snap.exists()) return;
+      const ct=snap.data()["bb_contrats_v1"];
+      if(!ct) return;
+      setContrats(prev=>{
+        for(const k of Object.keys(ct)){
+          const newC=ct[k],oldC=prev[k];
+          if(!oldC) continue;
+          if(newC.statut!==oldC.statut&&(newC.statut==="signe_client"||newC.statut==="signe_complet")){
             playNotifSound();
-            const cli = clients.find(cl => cl.id === newC.clientId);
-            const nomCli = cli?.nom || newC.clientId;
-            const isComplet = newC.statut === "signe_complet";
-            toastInfo(isComplet ? `✅ Contrat co-signé par ${nomCli} !` : `📝 ${nomCli} a signé — votre signature est requise.`);
-            sendLocalNotification(isComplet ? "✅ Contrat co-signé !" : "📝 Signature requise", isComplet ? `${nomCli} a co-signé.` : `${nomCli} a signé — votre tour !`, { tag: "briblue-contrat-" + newC.clientId, requireInteraction: !isComplet });
+            const cli=clients.find(cl=>cl.id===newC.clientId);
+            const nomCli=cli?.nom||newC.clientId;
+            const isComplet=newC.statut==="signe_complet";
+            toastInfo(isComplet?`✅ Contrat co-signé par ${nomCli} !`:`📝 ${nomCli} a signé — votre signature est requise.`);
+            sendLocalNotification(isComplet?"✅ Contrat co-signé !":"📝 Signature requise",isComplet?`${nomCli} a co-signé.`:`${nomCli} a signé — votre tour !`,{tag:"briblue-contrat-"+newC.clientId,requireInteraction:!isComplet});
           }
         }
-        try { localStorage.setItem("briblue_bb_contrats_v1", JSON.stringify(ct)); localStorage.setItem("briblue_ts_bb_contrats_v1", String(Date.now())); } catch {}
+        try{localStorage.setItem("briblue_bb_contrats_v1",JSON.stringify(ct));localStorage.setItem("briblue_ts_bb_contrats_v1",String(Date.now()));}catch{}
         return ct;
       });
-    }, (e) => console.warn("onSnapshot error:", e));
-    return () => unsub();
-  },[ready, clients]);
+    },(e)=>console.warn("onSnapshot error:",e));
+    return ()=>unsub();
+  },[ready,clients]);
 
   // Notification son + système quand nouvelles tâches apparaissent
   useEffect(()=>{
@@ -5992,7 +6240,7 @@ export default function App() {
     <GlobalStyles/>
     <div style={{minHeight:"100vh",background:"#eef2f7",fontFamily:"'Inter', -apple-system, system-ui, sans-serif",maxWidth:isMobile?640:1280,margin:"0 auto",position:"relative",display:"flex",flexDirection:"column",overflowX:"hidden",width:"100%"}}>
       {/* HEADER — Soft UI */}
-      <div className="safe-header" style={{background:"#eef2f7",padding:isMobile?"10px 14px":"10px 28px",paddingTop:`calc(${isMobile?"10px":"10px"} + env(safe-area-inset-top, 0px))`,display:"flex",alignItems:"center",gap:isMobile?8:14,position:"sticky",top:0,zIndex:50,boxShadow:"0 4px 16px rgba(166,210,220,0.5)",width:"100%",boxSizing:"border-box"}}>
+      <div className="safe-header" style={{background:"#eef2f7",padding:isMobile?"10px 14px":"10px 28px",paddingTop:`calc(10px + env(safe-area-inset-top, 0px))`,display:"flex",alignItems:"center",gap:isMobile?8:14,position:"sticky",top:0,zIndex:50,boxShadow:"0 4px 16px rgba(166,210,220,0.5)",width:"100%",boxSizing:"border-box"}}>
 
         <button onClick={()=>setPage("dashboard")} style={{background:"#eef2f7",border:"none",padding:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",width:isMobile?44:42,height:isMobile?44:42,borderRadius:14,flexShrink:0,boxShadow:DS.nmShadow}}>
           {Ico.wave(isMobile?22:20,"#0891b2")}
@@ -6012,14 +6260,14 @@ export default function App() {
           )}
 
           {/* Stock — vert */}
-          <button onClick={()=>setShowStock(true)} title="Stock" style={{position:"relative",width:isMobile?40:undefined,height:isMobile?40:40,padding:isMobile?0:"0 14px",display:"flex",alignItems:"center",justifyContent:"center",gap:6,borderRadius:isMobile?12:20,background:"linear-gradient(135deg,#059669,#10b981)",border:"none",cursor:"pointer",flexShrink:0,fontFamily:"inherit",boxShadow:"3px 3px 10px rgba(5,150,105,0.4),-2px -2px 6px rgba(255,255,255,0.6)"}}>
+          <button id="tour-btn-stock" onClick={()=>setShowStock(true)} title="Stock" style={{position:"relative",width:isMobile?40:undefined,height:isMobile?40:40,padding:isMobile?0:"0 14px",display:"flex",alignItems:"center",justifyContent:"center",gap:6,borderRadius:isMobile?12:20,background:"linear-gradient(135deg,#059669,#10b981)",border:"none",cursor:"pointer",flexShrink:0,fontFamily:"inherit",boxShadow:"3px 3px 10px rgba(5,150,105,0.4),-2px -2px 6px rgba(255,255,255,0.6)"}}>
             <svg width={isMobile?18:15} height={isMobile?18:15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8V21H3V8"/><path d="M23 3H1v5h22V3z"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
             {!isMobile&&<span style={{fontSize:12,fontWeight:700,color:"#fff"}}>Stock</span>}
             {nbStockBas>0&&<span style={{position:"absolute",top:-5,right:-5,minWidth:17,height:17,borderRadius:9,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",boxShadow:"0 2px 6px rgba(239,68,68,0.5)"}}>{nbStockBas}</span>}
           </button>
 
           {/* Livraison — orange */}
-          <button onClick={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} title="Livraison" style={{width:isMobile?40:undefined,height:isMobile?40:40,padding:isMobile?0:"0 14px",display:"flex",alignItems:"center",justifyContent:"center",gap:6,borderRadius:isMobile?12:20,background:"linear-gradient(135deg,#f59e0b,#f97316)",border:"none",cursor:"pointer",flexShrink:0,fontFamily:"inherit",boxShadow:"3px 3px 10px rgba(245,158,11,0.4),-2px -2px 6px rgba(255,255,255,0.6)"}}>
+          <button id="tour-btn-livraison" onClick={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} title="Livraison" style={{width:isMobile?40:undefined,height:isMobile?40:40,padding:isMobile?0:"0 14px",display:"flex",alignItems:"center",justifyContent:"center",gap:6,borderRadius:isMobile?12:20,background:"linear-gradient(135deg,#f59e0b,#f97316)",border:"none",cursor:"pointer",flexShrink:0,fontFamily:"inherit",boxShadow:"3px 3px 10px rgba(245,158,11,0.4),-2px -2px 6px rgba(255,255,255,0.6)"}}>
             <svg width={isMobile?18:15} height={isMobile?18:15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 4v4h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
             {!isMobile&&<span style={{fontSize:12,fontWeight:700,color:"#fff"}}>Livraison</span>}
           </button>
@@ -6037,13 +6285,18 @@ export default function App() {
           )}
 
           {/* Rapport — cyan/bleu */}
-          <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} style={{width:isMobile?40:undefined,height:isMobile?40:40,padding:isMobile?0:"0 18px",display:"flex",alignItems:"center",justifyContent:"center",gap:7,borderRadius:isMobile?12:20,background:"linear-gradient(135deg,#06b6d4,#0891b2)",border:"none",cursor:"pointer",flexShrink:0,fontFamily:"inherit",boxShadow:"3px 3px 10px rgba(8,145,178,0.4),-2px -2px 6px rgba(255,255,255,0.6)"}}>
+          <button id="tour-btn-rapport" onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} style={{width:isMobile?40:undefined,height:isMobile?40:40,padding:isMobile?0:"0 18px",display:"flex",alignItems:"center",justifyContent:"center",gap:7,borderRadius:isMobile?12:20,background:"linear-gradient(135deg,#06b6d4,#0891b2)",border:"none",cursor:"pointer",flexShrink:0,fontFamily:"inherit",boxShadow:"3px 3px 10px rgba(8,145,178,0.4),-2px -2px 6px rgba(255,255,255,0.6)"}}>
             <svg width={isMobile?18:15} height={isMobile?18:15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
             {!isMobile&&<span style={{fontSize:12,fontWeight:700,color:"#fff",whiteSpace:"nowrap"}}>Rapport</span>}
           </button>
 
+          {/* Aide — ❓ */}
+          <button id="tour-btn-aide" onClick={()=>setShowTour(true)} title="Aide interactive" style={{width:isMobile?40:40,height:isMobile?40:40,borderRadius:12,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"3px 3px 10px rgba(109,40,217,0.35),-2px -2px 6px rgba(255,255,255,0.6)"}}>
+            <span style={{fontSize:isMobile?17:15,fontWeight:900,color:"#fff",lineHeight:1}}>?</span>
+          </button>
+
           {/* Déconnexion — rouge */}
-          <button onClick={handleLogout} title="Déconnexion" style={{width:isMobile?40:40,height:isMobile?40:40,borderRadius:12,background:"linear-gradient(135deg,#be123c,#e11d48)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"3px 3px 10px rgba(190,18,60,0.35),-2px -2px 6px rgba(255,255,255,0.6)"}}>
+          <button id="tour-btn-logout" onClick={handleLogout} title="Déconnexion" style={{width:isMobile?40:40,height:isMobile?40:40,borderRadius:12,background:"linear-gradient(135deg,#be123c,#e11d48)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"3px 3px 10px rgba(190,18,60,0.35),-2px -2px 6px rgba(255,255,255,0.6)"}}>
             <svg width={isMobile?17:15} height={isMobile?17:15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           </button>
 
@@ -6163,7 +6416,7 @@ export default function App() {
               const gradFrom   = n.id==="rdv" ? "#818cf8" : "#06b6d4";
               const gradTo     = n.id==="rdv" ? "#4f46e5" : "#0891b2";
               return (
-                <button key={n.id} onClick={()=>setPage(n.id)} style={{
+                <button key={n.id} id={`tour-nav-${n.id}`} onClick={()=>setPage(n.id)} style={{
                   flex:1,
                   paddingTop:8,
                   paddingBottom:14,
@@ -6321,6 +6574,7 @@ export default function App() {
       })()}
       <ToastContainer/>
       <ConfirmModal/>
+      {showTour && <TourGuide onClose={()=>setShowTour(false)}/>}
     </div>
     </>
   );
