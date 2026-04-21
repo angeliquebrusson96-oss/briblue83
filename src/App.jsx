@@ -217,7 +217,6 @@ function useOnlineStatus() {
     const onOff = ()=>setOnline(false);
     window.addEventListener('online', onOn);
     window.addEventListener('offline', onOff);
-    // setInterval 5s supprimé — évite re-renders inutiles
     return ()=>{ window.removeEventListener('online', onOn); window.removeEventListener('offline', onOff); };
   },[]);
   return { online, pendingCount };
@@ -230,9 +229,7 @@ async function load(key, fallback) {
   try {
     const cached = localStorage.getItem("briblue_" + key);
     const ts = localStorage.getItem("briblue_ts_" + key);
-    if (cached && ts && (Date.now() - Number(ts)) < CACHE_TTL_MS) {
-      return JSON.parse(cached);
-    }
+    if (cached && ts && (Date.now() - Number(ts)) < CACHE_TTL_MS) return JSON.parse(cached);
   } catch {}
   try {
     if (key === "bb_passages_v2") {
@@ -309,11 +306,7 @@ if (typeof window !== 'undefined') {
 }
 
 async function save(key, val) {
-  // 1. localStorage immédiat + timestamp cache frais
-  try {
-    localStorage.setItem("briblue_" + key, JSON.stringify(val));
-    localStorage.setItem("briblue_ts_" + key, String(Date.now()));
-  } catch {}
+  try { localStorage.setItem("briblue_" + key, JSON.stringify(val)); localStorage.setItem("briblue_ts_" + key, String(Date.now())); } catch {}
 
   if (!navigator.onLine) {
     offlineQueue.pending[key] = val;
@@ -5036,7 +5029,7 @@ function LoginScreen({ onLogin }) {
             <label style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>Adresse email</label>
             <div style={{position:"relative"}}>
               <div style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}>{Ico.mail(15,"#9ca3af")}</div>
-              <input type="email" value={email} onChange={e=>{setEmail(e.target.value);setErr("");}} placeholder="briblue83@hotmail.com" onKeyDown={e=>e.key==="Enter"&&handleLogin()} style={{width:"100%",padding:"12px 14px 12px 38px",borderRadius:DS.radiusSm,border:"none",fontSize:14,outline:"none",boxSizing:"border-box",color:DS.dark,fontFamily:"inherit",background:"#eef2f7",boxShadow:"inset 3px 3px 6px rgba(166,210,220,0.45), inset -2px -2px 5px rgba(255,255,255,0.8)"}}/>
+              <input type="email" value={email} onChange={e=>{setEmail(e.target.value);setErr("");}} placeholder="Adresse email" onKeyDown={e=>e.key==="Enter"&&handleLogin()} style={{width:"100%",padding:"12px 14px 12px 38px",borderRadius:DS.radiusSm,border:"none",fontSize:14,outline:"none",boxSizing:"border-box",color:DS.dark,fontFamily:"inherit",background:"#eef2f7",boxShadow:"inset 3px 3px 6px rgba(166,210,220,0.45), inset -2px -2px 5px rgba(255,255,255,0.8)"}}/>
             </div>
           </div>
           <div>
@@ -5860,37 +5853,29 @@ export default function App() {
   const saveStock     = useCallback((data) => save("bb_stock_v1",      data), []);
   const saveContrats  = useCallback((data) => save("bb_contrats_v1",   data), []);
 
-  // Listener temps réel contrats — remplace polling 10s (~8640 lectures/jour économisées)
   useEffect(()=>{
     if(!ready) return;
     const unsub = onSnapshot(APP_DOC, (snap) => {
       if (!snap.exists()) return;
-      const data = snap.data();
-      const ct = data["bb_contrats_v1"];
+      const ct = snap.data()["bb_contrats_v1"];
       if (!ct) return;
       setContrats(prev => {
         for (const k of Object.keys(ct)) {
-          const newC = ct[k];
-          const oldC = prev[k];
+          const newC = ct[k]; const oldC = prev[k];
           if (!oldC) continue;
-          if (newC.statut !== oldC.statut &&
-              (newC.statut === "signe_client" || newC.statut === "signe_complet")) {
+          if (newC.statut !== oldC.statut && (newC.statut === "signe_client" || newC.statut === "signe_complet")) {
             playNotifSound();
             const cli = clients.find(cl => cl.id === newC.clientId);
             const nomCli = cli?.nom || newC.clientId;
             const isComplet = newC.statut === "signe_complet";
-            toastInfo(isComplet ? `✅ Contrat co-signé par ${nomCli} !` : `📝 ${nomCli} a signé son contrat — votre signature est requise.`);
-            sendLocalNotification(
-              isComplet ? "✅ Contrat co-signé !" : "📝 Signature requise",
-              isComplet ? `${nomCli} a co-signé le contrat.` : `${nomCli} a signé — votre tour !`,
-              { tag: "briblue-contrat-" + newC.clientId, requireInteraction: !isComplet }
-            );
+            toastInfo(isComplet ? `✅ Contrat co-signé par ${nomCli} !` : `📝 ${nomCli} a signé — votre signature est requise.`);
+            sendLocalNotification(isComplet ? "✅ Contrat co-signé !" : "📝 Signature requise", isComplet ? `${nomCli} a co-signé.` : `${nomCli} a signé — votre tour !`, { tag: "briblue-contrat-" + newC.clientId, requireInteraction: !isComplet });
           }
         }
         try { localStorage.setItem("briblue_bb_contrats_v1", JSON.stringify(ct)); localStorage.setItem("briblue_ts_bb_contrats_v1", String(Date.now())); } catch {}
         return ct;
       });
-    }, (error) => { console.warn("onSnapshot contrats error:", error); });
+    }, (e) => console.warn("onSnapshot error:", e));
     return () => unsub();
   },[ready, clients]);
 
