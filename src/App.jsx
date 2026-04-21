@@ -1626,7 +1626,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
             ))}
           </div>
           {selectedClient?.email&&(
-            <button onClick={()=>envoyerEmailLivraison({...f,id:isEdit?f.id:uid()}, selectedClient)}
+            <button onClick={()=>showConfirm(`Envoyer le bon de livraison à ${selectedClient?.email} ?`, ()=>envoyerEmailLivraison({...f,id:isEdit?f.id:uid()}, selectedClient), null, {type:"email", title:"Envoyer par email", detail:`Destinataire : ${selectedClient?.nom||"client"} — ${selectedClient?.email||""}`})}
               style={{padding:"11px",borderRadius:DS.radiusSm,background:"#f0f9ff",border:"1px solid #bae6fd",cursor:"pointer",fontWeight:700,fontSize:13,color:"#0891b2",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
               {Ico.send(13,"#0891b2")} Envoyer par email à {selectedClient.email}
             </button>
@@ -2138,7 +2138,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                       {label:"Aperçu",  ico:Ico.search(12,DS.mid),  bg:"#f8fafc", color:DS.dark,   onClick:()=>setDetailPassageFiche(p)},
                       {label:"Modifier",ico:Ico.edit(12,DS.mid),    bg:"#f8fafc", color:DS.mid,    onClick:()=>onEditPassage&&onEditPassage(p)},
                       {label:"Rapport", ico:Ico.pdf(12,DS.blue),    bg:"#eff6ff", color:DS.blue,   onClick:()=>ouvrirRapport(p,client)},
-                      ...(client.email?[{label:"Email",ico:Ico.send(12,DS.green),bg:"#f0fdf4",color:DS.green,onClick:()=>envoyerEmail(p,client,onUpdatePassageStatus)}]:[]),
+                      ...(client.email?[{label:"Email",ico:Ico.send(12,DS.green),bg:"#f0fdf4",color:DS.green,onClick:()=>showConfirm(`Envoyer le rapport à ${client?.email} ?`, ()=>envoyerEmail(p,client,onUpdatePassageStatus), null, {type:"email",title:"Envoyer le rapport",detail:`Client : ${client?.nom||""} — ${new Date(p.date).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})}`})}]:[]),
                       ...(onDeletePassage?[{label:"",ico:Ico.trash(12,DS.red),bg:"#fef2f2",color:DS.red,onClick:()=>showConfirm("Supprimer ce passage ?",()=>onDeletePassage(p.id))}]:[]),
                     ].map((btn,i,arr)=>(
                       <button key={i} onClick={e=>{e.stopPropagation();btn.onClick();}}
@@ -2298,7 +2298,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
               style={{height:44,borderRadius:12,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,boxShadow:"0 2px 8px rgba(2,132,199,0.25)",WebkitTapHighlightColor:"transparent"}}>
               {Ico.contract(12,"#fff")} Contrat
             </button>
-            <button onClick={()=>envoyerContratSignature(client)}
+            <button onClick={()=>showConfirm(`Envoyer le contrat à ${client?.email} pour signature ?`, ()=>envoyerContratSignature(client), null, {type:"email", title:"Envoyer le contrat", detail:`Client : ${client?.nom||""}`})}
               style={{height:44,borderRadius:12,background:contratClient?.statut==="signe_complet"?DS.greenSoft:contratClient?.statut==="signe_client"?DS.blueSoft:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,WebkitTapHighlightColor:"transparent"}}>
               {Ico.sign(12,contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff")}
               {contratClient?.statut==="signe_complet"?"Signé":contratClient?.statut==="signe_client"?"Attente":"Envoyer"}
@@ -2396,7 +2396,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                   <div style={{display:"flex",borderTop:"1px solid #f8fafc"}}>
                     <button onClick={()=>{setEditLiv(l);setShowFormLiv(true);}} style={{flex:1,padding:"8px",background:"#f8fafc",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,fontWeight:700,color:DS.mid,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>{Ico.edit(11,DS.mid)} Modifier</button>
                     {client.email
-                      ?<button onClick={()=>envoyerEmailLivraison(l,client)} style={{flex:1,padding:"8px",background:"#f0fdf4",border:"none",borderLeft:"1px solid #f8fafc",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,fontWeight:700,color:DS.green,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>{Ico.send(11,DS.green)} Email</button>
+                      ?<button onClick={()=>showConfirm(`Envoyer le bon de livraison à ${client?.email} ?`, ()=>envoyerEmailLivraison(l,client), null, {type:"email",title:"Envoyer la livraison",detail:`Client : ${client?.nom||""}`})} style={{flex:1,padding:"8px",background:"#f0fdf4",border:"none",borderLeft:"1px solid #f8fafc",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,fontWeight:700,color:DS.green,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>{Ico.send(11,DS.green)} Email</button>
                       :<div style={{flex:1}}/>
                     }
                     <button onClick={()=>showConfirm("Supprimer ?",()=>onDeleteLivraison(l.id))} style={{width:38,padding:"8px",background:"#fef2f2",border:"none",borderLeft:"1px solid #f8fafc",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",WebkitTapHighlightColor:"transparent"}}>{Ico.trash(11,DS.red)}</button>
@@ -4014,7 +4014,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                 {Ico.pdf(18,DS.dark)} Télécharger PDF
               </button>
               {client?.email ? (
-                <button onClick={()=>envoyerEmail(f,client)} className="btn-hover" style={{padding:"14px",borderRadius:DS.radiusSm,background:DS.blueGrad,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 16px "+DS.blue+"44"}}>
+                <button onClick={()=>showConfirm(`Envoyer le rapport à ${client?.email} ?`, ()=>envoyerEmail(f,client), null, {type:"email",title:"Envoyer le rapport par email",detail:`Client : ${client?.nom||""}`})} className="btn-hover" style={{padding:"14px",borderRadius:DS.radiusSm,background:DS.blueGrad,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 16px "+DS.blue+"44"}}>
                   {Ico.send(16,"#fff")} Envoyer à {client.email}
                 </button>
               ) : (
@@ -5119,7 +5119,7 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                         {Ico.pdf(14,DS.blue)} Rapport PDF
                       </button>
                       {c?.email
-                        ? <button onClick={()=>envoyerEmail(p,c,onUpdatePassageStatus)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.green,fontFamily:"inherit",fontWeight:700}}>
+                        ? <button onClick={()=>showConfirm(`Envoyer le rapport à ${c?.email} ?`, ()=>envoyerEmail(p,c,onUpdatePassageStatus), null, {type:"email",title:"Envoyer le rapport",detail:`Client : ${c?.nom||""} — ${new Date(p.date).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})}`})} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.green,fontFamily:"inherit",fontWeight:700}}>
                             {Ico.send(13,DS.green)} Envoyer email
                           </button>
                         : <div style={{borderRadius:10,background:DS.light,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:DS.mid,fontWeight:500}}>{Ico.mail(12,DS.mid)} Pas d'email</div>
