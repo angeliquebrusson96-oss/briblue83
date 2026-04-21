@@ -882,7 +882,7 @@ function toastWarn(msg)    { showToast(msg,"warn"); }
 
 const confirmListeners = [];
 function subscribeConfirm(fn) { confirmListeners.push(fn); return ()=>{ const i=confirmListeners.indexOf(fn); if(i>=0) confirmListeners.splice(i,1); }; }
-function showConfirm(msg, onOk, onCancel) { confirmListeners.forEach(fn=>fn({msg, onOk, onCancel, id:Date.now()+Math.random()})); }
+function showConfirm(msg, onOk, onCancel, opts={}) { confirmListeners.forEach(fn=>fn({msg, onOk, onCancel, id:Date.now()+Math.random(), ...opts})); }
 
 function ToastContainer() {
   const [toasts, setToasts] = useState([]);
@@ -916,23 +916,59 @@ function ToastContainer() {
 
 function ConfirmModal() {
   const [item, setItem] = useState(null);
-  useEffect(()=>{
-    return subscribeConfirm(c=>setItem(c));
-  },[]);
+  useEffect(()=>{ return subscribeConfirm(c=>setItem(c)); },[]);
   if(!item) return null;
-  const handle = (ok) => {
-    setItem(null);
-    if(ok && item.onOk) item.onOk();
-    if(!ok && item.onCancel) item.onCancel();
+  const handle = (ok) => { setItem(null); if(ok&&item.onOk) item.onOk(); if(!ok&&item.onCancel) item.onCancel(); };
+
+  const TYPES = {
+    danger:  {emoji:"🗑️", title:"Confirmer la suppression", btn:"Supprimer",   btnBg:"linear-gradient(135deg,#ef4444,#dc2626)", btnShadow:"rgba(220,38,38,0.35)",  accent:"#ef4444"},
+    email:   {emoji:"📧", title:"Envoyer par email",         btn:"Envoyer",     btnBg:"linear-gradient(135deg,#0891b2,#06b6d4)", btnShadow:"rgba(8,145,178,0.35)",  accent:"#0891b2"},
+    save:    {emoji:"💾", title:"Enregistrer",                btn:"Enregistrer", btnBg:"linear-gradient(135deg,#059669,#34d399)", btnShadow:"rgba(5,150,105,0.35)",  accent:"#059669"},
+    success: {emoji:"✅", title:"Confirmer",                  btn:"Confirmer",   btnBg:"linear-gradient(135deg,#059669,#34d399)", btnShadow:"rgba(5,150,105,0.35)",  accent:"#059669"},
+    info:    {emoji:"ℹ️", title:"Confirmer l'action",        btn:"Confirmer",   btnBg:"linear-gradient(135deg,#4f46e5,#818cf8)", btnShadow:"rgba(79,70,229,0.35)",  accent:"#4f46e5"},
   };
+  const t = TYPES[item.type||"danger"];
+
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:99998,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>handle(false)}>
-      <div className="scale-in" onClick={e=>e.stopPropagation()} style={{background:"#eef2f7",borderRadius:22,padding:"28px 24px",maxWidth:360,width:"100%",boxShadow:"8px 8px 24px rgba(166,210,220,0.7), -5px -5px 16px rgba(255,255,255,0.9)",fontFamily:"Inter,sans-serif"}}>
-        <div style={{fontSize:36,textAlign:"center",marginBottom:12}}>🗑️</div>
-        <div style={{fontSize:15,fontWeight:700,color:"#0c1222",textAlign:"center",marginBottom:8,lineHeight:1.4}}>{item.msg}</div>
+    <div style={{position:"fixed",inset:0,background:"rgba(8,18,40,0.55)",zIndex:99998,display:"flex",alignItems:"center",justifyContent:"center",padding:20,backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}}
+      onClick={()=>handle(false)}>
+      <div className="scale-in" onClick={e=>e.stopPropagation()}
+        style={{background:"#eef2f7",borderRadius:24,padding:"26px 22px 20px",maxWidth:340,width:"100%",
+          boxShadow:`0 0 0 1px ${t.accent}22, 8px 8px 24px rgba(166,210,220,0.7), -5px -5px 16px rgba(255,255,255,0.9)`,
+          fontFamily:"'Nunito',system-ui,sans-serif"}}>
+        {/* Icône */}
+        <div style={{width:60,height:60,borderRadius:18,background:`${t.accent}15`,border:`2px solid ${t.accent}30`,
+          display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px",fontSize:26}}>
+          {t.emoji}
+        </div>
+        {/* Titre */}
+        <div style={{fontSize:11,fontWeight:800,color:"#64748b",textAlign:"center",textTransform:"uppercase",letterSpacing:.8,marginBottom:6}}>
+          {item.title||t.title}
+        </div>
+        {/* Message */}
+        <div style={{fontSize:15,fontWeight:700,color:"#0c1222",textAlign:"center",lineHeight:1.5,marginBottom:item.detail?8:0}}>
+          {item.msg}
+        </div>
+        {/* Détail */}
+        {item.detail&&(
+          <div style={{fontSize:12,color:"#64748b",textAlign:"center",padding:"7px 12px",borderRadius:10,background:"rgba(166,210,220,0.15)",marginTop:6}}>
+            {item.detail}
+          </div>
+        )}
+        {/* Boutons */}
         <div style={{display:"flex",gap:10,marginTop:20}}>
-          <button onClick={()=>handle(false)} style={{flex:1,padding:"12px",borderRadius:14,background:"#eef2f7",border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#64748b",fontFamily:"inherit",boxShadow:"4px 4px 8px rgba(166,210,220,0.6), -3px -3px 7px rgba(255,255,255,0.9)"}}>Annuler</button>
-          <button onClick={()=>handle(true)} style={{flex:1,padding:"12px",borderRadius:14,background:"linear-gradient(135deg,#ef4444,#dc2626)",border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#fff",fontFamily:"inherit",boxShadow:"4px 4px 12px rgba(220,38,38,0.35)"}}>Supprimer</button>
+          <button onClick={()=>handle(false)}
+            style={{flex:1,padding:"12px",borderRadius:14,background:"#eef2f7",border:"none",cursor:"pointer",
+              fontWeight:700,fontSize:14,color:"#64748b",fontFamily:"inherit",
+              boxShadow:"4px 4px 8px rgba(166,210,220,0.6),-3px -3px 7px rgba(255,255,255,0.9)"}}>
+            Annuler
+          </button>
+          <button onClick={()=>handle(true)}
+            style={{flex:1,padding:"12px",borderRadius:14,background:t.btnBg,border:"none",cursor:"pointer",
+              fontWeight:800,fontSize:14,color:"#fff",fontFamily:"inherit",
+              boxShadow:`4px 4px 12px ${t.btnShadow}`}}>
+            {item.btnLabel||t.btn}
+          </button>
         </div>
       </div>
     </div>
