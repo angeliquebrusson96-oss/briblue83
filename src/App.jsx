@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, getDocs, setDoc, collection } from "firebase/firestore";
+import { getFirestore, doc, getDoc, getDocs, setDoc, collection, onSnapshot } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCyRHh4hGaDYU1NumTrRJ-3KKuRxC8NU5k",
@@ -217,35 +217,19 @@ function useOnlineStatus() {
     const onOff = ()=>setOnline(false);
     window.addEventListener('online', onOn);
     window.addEventListener('offline', onOff);
-    // Vérifier la queue toutes les 30s
-    const interval = setInterval(()=>{ setPendingCount(Object.keys(offlineQueue.pending).length); }, 5000);
-    return ()=>{ window.removeEventListener('online', onOn); window.removeEventListener('offline', onOff); clearInterval(interval); };
+    return ()=>{ window.removeEventListener('online', onOn); window.removeEventListener('offline', onOff); };
   },[]);
   return { online, pendingCount };
 }
 
-// STORAGE — Firebase Firestore
-async function load(key, fallback) {
-  try {
-    // Les passages sont dans des docs séparés (chunks)
-    if (key === "bb_passages_v2") {
-      const passages = await loadAllPassages();
-      if (passages.length > 0) return passages;
-      try { const ls = localStorage.getItem("briblue_" + key); if (ls) return JSON.parse(ls); } catch {}
-      return fallback;
-    }
-    const snap = await getDoc(APP_DOC);
-    if (snap.exists()) {
-      const allData = snap.data();
-      if (key in allData) return allData[key];
-    }
-    // Fallback localStorage
-    try { const ls = localStorage.getItem("briblue_" + key); if (ls) return JSON.parse(ls); } catch {}
-    return fallback;
-  } catch {
-    try { const ls = localStorage.getItem("briblue_" + key); if (ls) return JSON.parse(ls); } catch {}
-    return fallback;
-  }
+// STORAGE — Firebase + cache TTL 30min
+const CACHE_TTL_MS=30*60*1000;
+async function load(key,fallback){
+  try{const c=localStorage.getItem("briblue_"+key),ts=localStorage.getItem("briblue_ts_"+key);if(c&&ts&&(Date.now()-Number(ts))<CACHE_TTL_MS)return JSON.parse(c);}catch{}
+  try{if(key==="bb_passages_v2"){const passages=await loadAllPassages();if(passages.length>0){try{localStorage.setItem("briblue_"+key,JSON.stringify(passages));localStorage.setItem("briblue_ts_"+key,String(Date.now()));}catch{}return passages;}try{const ls=localStorage.getItem("briblue_"+key);if(ls)return JSON.parse(ls);}catch{}return fallback;}
+  const snap=await getDoc(APP_DOC);if(snap.exists()){const allData=snap.data();if(key in allData){const val=allData[key];try{localStorage.setItem("briblue_"+key,JSON.stringify(val));localStorage.setItem("briblue_ts_"+key,String(Date.now()));}catch{}return val;}}
+  try{const ls=localStorage.getItem("briblue_"+key);if(ls)return JSON.parse(ls);}catch{}return fallback;}
+  catch{try{const ls=localStorage.getItem("briblue_"+key);if(ls)return JSON.parse(ls);}catch{}return fallback;}
 }
 
 // Queue hors-ligne
@@ -295,9 +279,8 @@ if (typeof window !== 'undefined') {
   });
 }
 
-async function save(key, val) {
-  // 1. localStorage immédiat — jamais de perte
-  try { localStorage.setItem('briblue_' + key, JSON.stringify(val)); } catch {}
+async function save(key,val){
+  try{localStorage.setItem("briblue_"+key,JSON.stringify(val));localStorage.setItem("briblue_ts_"+key,String(Date.now()));}catch{}
 
   if (!navigator.onLine) {
     offlineQueue.pending[key] = val;
@@ -823,6 +806,9 @@ const GlobalStyles = () => (
     @supports not (backdrop-filter: blur(1px)) {
       .blur-bg { background: rgba(232,240,248,0.99) !important; }
     }
+    @supports (padding-top: env(safe-area-inset-top)) {
+      .safe-header { padding-top: env(safe-area-inset-top) !important; }
+    }
   `}</style>
 );
 
@@ -840,7 +826,10 @@ function toastWarn(msg)    { showToast(msg,"warn"); }
 
 const confirmListeners = [];
 function subscribeConfirm(fn) { confirmListeners.push(fn); return ()=>{ const i=confirmListeners.indexOf(fn); if(i>=0) confirmListeners.splice(i,1); }; }
-function showConfirm(msg, onOk, onCancel) { confirmListeners.forEach(fn=>fn({msg, onOk, onCancel, id:Date.now()+Math.random()})); }
+// type: "danger" | "success" | "email" | "save" | "info"
+function showConfirm(msg, onOk, onCancel, opts={}) {
+  confirmListeners.forEach(fn=>fn({msg, onOk, onCancel, id:Date.now()+Math.random(), ...opts}));
+}
 
 function ToastContainer() {
   const [toasts, setToasts] = useState([]);
@@ -874,23 +863,70 @@ function ToastContainer() {
 
 function ConfirmModal() {
   const [item, setItem] = useState(null);
-  useEffect(()=>{
-    return subscribeConfirm(c=>setItem(c));
-  },[]);
+  useEffect(()=>{ return subscribeConfirm(c=>setItem(c)); },[]);
   if(!item) return null;
+
   const handle = (ok) => {
     setItem(null);
     if(ok && item.onOk) item.onOk();
     if(!ok && item.onCancel) item.onCancel();
   };
+
+  // Config visuelle selon type
+  const TYPE = {
+    danger:  { emoji:"🗑️",  title:"Confirmer la suppression", btnLabel:"Supprimer",   btnBg:"linear-gradient(135deg,#ef4444,#dc2626)", btnShadow:"rgba(220,38,38,0.35)",  accent:"#ef4444" },
+    email:   { emoji:"📧",  title:"Envoyer par email",         btnLabel:"Envoyer",     btnBg:"linear-gradient(135deg,#0891b2,#06b6d4)", btnShadow:"rgba(8,145,178,0.35)",  accent:"#0891b2" },
+    save:    { emoji:"💾",  title:"Enregistrer",                btnLabel:"Enregistrer", btnBg:"linear-gradient(135deg,#059669,#34d399)", btnShadow:"rgba(5,150,105,0.35)",  accent:"#059669" },
+    success: { emoji:"✅",  title:"Confirmer",                  btnLabel:"Confirmer",   btnBg:"linear-gradient(135deg,#059669,#34d399)", btnShadow:"rgba(5,150,105,0.35)",  accent:"#059669" },
+    info:    { emoji:"ℹ️",  title:"Confirmer l'action",        btnLabel:"Confirmer",   btnBg:"linear-gradient(135deg,#4f46e5,#818cf8)", btnShadow:"rgba(79,70,229,0.35)",  accent:"#4f46e5" },
+  };
+  const t = TYPE[item.type||"danger"];
+
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:99998,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>handle(false)}>
-      <div className="scale-in" onClick={e=>e.stopPropagation()} style={{background:"#eef2f7",borderRadius:22,padding:"28px 24px",maxWidth:360,width:"100%",boxShadow:"8px 8px 24px rgba(166,210,220,0.7), -5px -5px 16px rgba(255,255,255,0.9)",fontFamily:"Inter,sans-serif"}}>
-        <div style={{fontSize:36,textAlign:"center",marginBottom:12}}>🗑️</div>
-        <div style={{fontSize:15,fontWeight:700,color:"#0c1222",textAlign:"center",marginBottom:8,lineHeight:1.4}}>{item.msg}</div>
-        <div style={{display:"flex",gap:10,marginTop:20}}>
-          <button onClick={()=>handle(false)} style={{flex:1,padding:"12px",borderRadius:14,background:"#eef2f7",border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#64748b",fontFamily:"inherit",boxShadow:"4px 4px 8px rgba(166,210,220,0.6), -3px -3px 7px rgba(255,255,255,0.9)"}}>Annuler</button>
-          <button onClick={()=>handle(true)} style={{flex:1,padding:"12px",borderRadius:14,background:"linear-gradient(135deg,#ef4444,#dc2626)",border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#fff",fontFamily:"inherit",boxShadow:"4px 4px 12px rgba(220,38,38,0.35)"}}>Supprimer</button>
+    <div style={{position:"fixed",inset:0,background:"rgba(8,18,40,0.55)",zIndex:99998,display:"flex",alignItems:"center",justifyContent:"center",padding:20,backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}}
+      onClick={()=>handle(false)}>
+      <div className="scale-in" onClick={e=>e.stopPropagation()}
+        style={{background:"#eef2f7",borderRadius:24,padding:"28px 24px 22px",maxWidth:340,width:"100%",
+          boxShadow:`0 0 0 1px ${t.accent}22, 8px 8px 24px rgba(166,210,220,0.7), -5px -5px 16px rgba(255,255,255,0.9)`,
+          fontFamily:"'Nunito',system-ui,sans-serif"}}>
+
+        {/* Icône */}
+        <div style={{width:64,height:64,borderRadius:20,background:`${t.accent}15`,border:`2px solid ${t.accent}30`,
+          display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px",fontSize:28}}>
+          {t.emoji}
+        </div>
+
+        {/* Titre */}
+        <div style={{fontSize:14,fontWeight:800,color:"#64748b",textAlign:"center",textTransform:"uppercase",
+          letterSpacing:0.8,marginBottom:8}}>{item.title||t.title}</div>
+
+        {/* Message */}
+        <div style={{fontSize:15,fontWeight:700,color:"#0c1222",textAlign:"center",lineHeight:1.5,marginBottom:6}}>
+          {item.msg}
+        </div>
+
+        {/* Détails optionnels */}
+        {item.detail && (
+          <div style={{fontSize:12,color:"#64748b",textAlign:"center",lineHeight:1.5,marginBottom:4,
+            padding:"8px 12px",borderRadius:10,background:"rgba(166,210,220,0.2)"}}>
+            {item.detail}
+          </div>
+        )}
+
+        {/* Boutons */}
+        <div style={{display:"flex",gap:10,marginTop:22}}>
+          <button onClick={()=>handle(false)}
+            style={{flex:1,padding:"12px",borderRadius:14,background:"#eef2f7",border:"none",cursor:"pointer",
+              fontWeight:700,fontSize:14,color:"#64748b",fontFamily:"inherit",
+              boxShadow:"4px 4px 8px rgba(166,210,220,0.6),-3px -3px 7px rgba(255,255,255,0.9)"}}>
+            Annuler
+          </button>
+          <button onClick={()=>handle(true)}
+            style={{flex:1,padding:"12px",borderRadius:14,background:t.btnBg,border:"none",cursor:"pointer",
+              fontWeight:800,fontSize:14,color:"#fff",fontFamily:"inherit",
+              boxShadow:`4px 4px 12px ${t.btnShadow}`}}>
+            {item.btnLabel||t.btnLabel}
+          </button>
         </div>
       </div>
     </div>
@@ -1276,7 +1312,7 @@ function FormClient({ initial, clients, onSave, onClose }) {
       </Section>
       <div style={{display:"flex",gap:10}}>
         <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
-        <BtnPrimary onClick={()=>{ if(!f.nom.trim()){ toastWarn("Nom du client requis"); return; } const prixCalc=totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0); onSave({...f, prix:prixCalc}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
+        <BtnPrimary onClick={()=>{ if(!f.nom.trim()){ toastWarn("Nom du client requis"); return; } const prixCalc=totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0); showConfirm(`Enregistrer le client "${f.nom}" ?`, ()=>onSave({...f, prix:prixCalc}), null, {type:"save",title:"Enregistrer le client"}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
       </div>
     </Modal>
   );
@@ -1584,7 +1620,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
             ))}
           </div>
           {selectedClient?.email&&(
-            <button onClick={()=>envoyerEmailLivraison({...f,id:isEdit?f.id:uid()}, selectedClient)}
+            <button onClick={()=>showConfirm(`Envoyer le bon de livraison à ${selectedClient?.email} ?`, ()=>envoyerEmailLivraison({...f,id:isEdit?f.id:uid()}, selectedClient), null, {type:"email", title:"Envoyer par email", detail:`Destinataire : ${selectedClient?.nom||"client"}`})}
               style={{padding:"11px",borderRadius:DS.radiusSm,background:"#f0f9ff",border:"1px solid #bae6fd",cursor:"pointer",fontWeight:700,fontSize:13,color:"#0891b2",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
               {Ico.send(13,"#0891b2")} Envoyer par email à {selectedClient.email}
             </button>
@@ -1604,7 +1640,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
               style={{padding:"11px 20px",borderRadius:DS.radiusSm,background:(STEP_INFO[step]||STEP_INFO[STEPS-1]).color,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,boxShadow:`0 3px 10px ${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}33`}}>
               {(STEP_INFO[step]||STEP_INFO[STEPS-1]).l} {Ico.next(13,"#fff")}
             </button>
-          : <button onClick={()=>{if(!f.clientId){ toastWarn("Client requis"); return; } if(!f.date){ toastWarn("Date requise"); return; }onSave({...f,id:isEdit?f.id:uid()});}}
+          : <button onClick={()=>{if(!f.clientId){ toastWarn("Client requis"); return; } if(!f.date){ toastWarn("Date requise"); return; } showConfirm("Enregistrer cette livraison ?", ()=>onSave({...f,id:isEdit?f.id:uid()}), null, {type:"save", title:"Enregistrer la livraison", detail: f.produits?.length ? f.produits.join(", ") : undefined});}}
               style={{padding:"11px 20px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#059669,#0d9488)",border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,boxShadow:"0 3px 10px rgba(5,150,105,0.3)"}}>
               {Ico.save(14,"#fff")} Enregistrer
             </button>
@@ -1671,7 +1707,7 @@ function FormRdv({ initial, clients, onSave, onClose }) {
       </Section>
       <div style={{display:"flex",gap:10}}>
         <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
-        <BtnPrimary onClick={()=>{ if(!f.date){ toastWarn("Date requise"); return; } onSave({...f,id:isEdit?f.id:uid()}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
+        <BtnPrimary onClick={()=>{ if(!f.date){ toastWarn("Date requise"); return; } showConfirm(`Enregistrer ce rendez-vous ?`, ()=>onSave({...f,id:isEdit?f.id:uid()}), null, {type:"save",title:"Enregistrer le RDV", detail: f.type ? `Type : ${f.type}${f.heure?" à "+f.heure:""}` : undefined}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
       </div>
     </Modal>
   );
@@ -1908,7 +1944,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                       {label:"Aperçu",  ico:Ico.search(12,DS.mid),  bg:"#f8fafc", color:DS.dark,   onClick:()=>setDetailPassageFiche(p)},
                       {label:"Modifier",ico:Ico.edit(12,DS.mid),    bg:"#f8fafc", color:DS.mid,    onClick:()=>onEditPassage&&onEditPassage(p)},
                       {label:"Rapport", ico:Ico.pdf(12,DS.blue),    bg:"#eff6ff", color:DS.blue,   onClick:()=>ouvrirRapport(p,client)},
-                      ...(client.email?[{label:"Email",ico:Ico.send(12,DS.green),bg:"#f0fdf4",color:DS.green,onClick:()=>envoyerEmail(p,client,onUpdatePassageStatus)}]:[]),
+                      ...(client.email?[{label:"Email",ico:Ico.send(12,DS.green),bg:"#f0fdf4",color:DS.green,onClick:()=>showConfirm(`Envoyer le rapport à ${client?.email} ?`, ()=>envoyerEmail(p,client,onUpdatePassageStatus), null, {type:"email",title:"Envoyer le rapport",detail:`Client : ${client?.nom||""} — ${new Date(p.date).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})}`})}]:[]),
                       ...(onDeletePassage?[{label:"",ico:Ico.trash(12,DS.red),bg:"#fef2f2",color:DS.red,onClick:()=>showConfirm("Supprimer ce passage ?",()=>onDeletePassage(p.id))}]:[]),
                     ].map((btn,i,arr)=>(
                       <button key={i} onClick={e=>{e.stopPropagation();btn.onClick();}}
@@ -2068,7 +2104,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
               style={{height:44,borderRadius:12,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,boxShadow:"0 2px 8px rgba(2,132,199,0.25)",WebkitTapHighlightColor:"transparent"}}>
               {Ico.contract(12,"#fff")} Contrat
             </button>
-            <button onClick={()=>envoyerContratSignature(client)}
+            <button onClick={()=>showConfirm(`Envoyer le contrat à ${client?.email} pour signature ?`, ()=>envoyerContratSignature(client), null, {type:"email",title:"Envoyer le contrat",detail:`Client : ${client?.nom||""}`})}
               style={{height:44,borderRadius:12,background:contratClient?.statut==="signe_complet"?DS.greenSoft:contratClient?.statut==="signe_client"?DS.blueSoft:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,WebkitTapHighlightColor:"transparent"}}>
               {Ico.sign(12,contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff")}
               {contratClient?.statut==="signe_complet"?"Signé":contratClient?.statut==="signe_client"?"Attente":"Envoyer"}
@@ -2166,7 +2202,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                   <div style={{display:"flex",borderTop:"1px solid #f8fafc"}}>
                     <button onClick={()=>{setEditLiv(l);setShowFormLiv(true);}} style={{flex:1,padding:"8px",background:"#f8fafc",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,fontWeight:700,color:DS.mid,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>{Ico.edit(11,DS.mid)} Modifier</button>
                     {client.email
-                      ?<button onClick={()=>envoyerEmailLivraison(l,client)} style={{flex:1,padding:"8px",background:"#f0fdf4",border:"none",borderLeft:"1px solid #f8fafc",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,fontWeight:700,color:DS.green,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>{Ico.send(11,DS.green)} Email</button>
+                      ?<button onClick={()=>showConfirm(`Envoyer le bon de livraison à ${client?.email} ?`, ()=>envoyerEmailLivraison(l,client), null, {type:"email", title:"Envoyer par email", detail:`Client : ${client?.nom||""}`})} style={{flex:1,padding:"8px",background:"#f0fdf4",border:"none",borderLeft:"1px solid #f8fafc",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,fontWeight:700,color:DS.green,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>{Ico.send(11,DS.green)} Email</button>
                       :<div style={{flex:1}}/>
                     }
                     <button onClick={()=>showConfirm("Supprimer ?",()=>onDeleteLivraison(l.id))} style={{width:38,padding:"8px",background:"#fef2f2",border:"none",borderLeft:"1px solid #f8fafc",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",WebkitTapHighlightColor:"transparent"}}>{Ico.trash(11,DS.red)}</button>
@@ -3784,7 +3820,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                 {Ico.pdf(18,DS.dark)} Télécharger PDF
               </button>
               {client?.email ? (
-                <button onClick={()=>envoyerEmail(f,client)} className="btn-hover" style={{padding:"14px",borderRadius:DS.radiusSm,background:DS.blueGrad,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 16px "+DS.blue+"44"}}>
+                <button onClick={()=>showConfirm(`Envoyer le rapport à ${client?.email} ?`, ()=>envoyerEmail(f,client), null, {type:"email",title:"Envoyer le rapport par email",detail:`Client : ${client?.nom||""}`})} className="btn-hover" style={{padding:"14px",borderRadius:DS.radiusSm,background:DS.blueGrad,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 16px "+DS.blue+"44"}}>
                   {Ico.send(16,"#fff")} Envoyer à {client.email}
                 </button>
               ) : (
@@ -4889,7 +4925,7 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                         {Ico.pdf(14,DS.blue)} Rapport PDF
                       </button>
                       {c?.email
-                        ? <button onClick={()=>envoyerEmail(p,c,onUpdatePassageStatus)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.green,fontFamily:"inherit",fontWeight:700}}>
+                        ? <button onClick={()=>showConfirm(`Envoyer le rapport à ${c?.email} ?`, ()=>envoyerEmail(p,c,onUpdatePassageStatus), null, {type:"email",title:"Envoyer le rapport par email",detail:`Client : ${c?.nom||""} — ${new Date(p.date).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})}`})} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.green,fontFamily:"inherit",fontWeight:700}}>
                             {Ico.send(13,DS.green)} Envoyer email
                           </button>
                         : <div style={{borderRadius:10,background:DS.light,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:DS.mid,fontWeight:500}}>{Ico.mail(12,DS.mid)} Pas d'email</div>
@@ -5018,7 +5054,7 @@ function LoginScreen({ onLogin }) {
             <label style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>Adresse email</label>
             <div style={{position:"relative"}}>
               <div style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}>{Ico.mail(15,"#9ca3af")}</div>
-              <input type="email" value={email} onChange={e=>{setEmail(e.target.value);setErr("");}} placeholder="briblue83@hotmail.com" onKeyDown={e=>e.key==="Enter"&&handleLogin()} style={{width:"100%",padding:"12px 14px 12px 38px",borderRadius:DS.radiusSm,border:"none",fontSize:14,outline:"none",boxSizing:"border-box",color:DS.dark,fontFamily:"inherit",background:"#eef2f7",boxShadow:"inset 3px 3px 6px rgba(166,210,220,0.45), inset -2px -2px 5px rgba(255,255,255,0.8)"}}/>
+              <input type="email" value={email} onChange={e=>{setEmail(e.target.value);setErr("");}} placeholder="Adresse email" onKeyDown={e=>e.key==="Enter"&&handleLogin()} style={{width:"100%",padding:"12px 14px 12px 38px",borderRadius:DS.radiusSm,border:"none",fontSize:14,outline:"none",boxSizing:"border-box",color:DS.dark,fontFamily:"inherit",background:"#eef2f7",boxShadow:"inset 3px 3px 6px rgba(166,210,220,0.45), inset -2px -2px 5px rgba(255,255,255,0.8)"}}/>
             </div>
           </div>
           <div>
@@ -5842,40 +5878,7 @@ export default function App() {
   const saveStock     = useCallback((data) => save("bb_stock_v1",      data), []);
   const saveContrats  = useCallback((data) => save("bb_contrats_v1",   data), []);
 
-  // Polling toutes les 10s pour détecter nouvelles signatures
-  useEffect(()=>{
-    if(!ready) return;
-    const interval = setInterval(async()=>{
-      const ct = await load("bb_contrats_v1", {});
-      setContrats(prev => {
-        // Détecter nouvelle signature
-        const keys = Object.keys(ct);
-        const newSig = keys.map(k=>ct[k]).find(c =>
-          (c.statut === "signe_client" || c.statut === "signe_complet") &&
-          (!prev[keys.find(k=>ct[k]===c)] ||
-           prev[keys.find(k=>ct[k]===c)]?.statut !== c.statut)
-        );
-        if (newSig) {
-          playNotifSound();
-          const cli = clients.find(cl => cl.id === newSig.clientId);
-          const nomCli = cli?.nom || newSig.clientId;
-          const isComplet = newSig.statut === "signe_complet";
-          const msg = isComplet
-            ? `✅ Contrat co-signé par ${nomCli} !`
-            : `📝 ${nomCli} a signé son contrat — votre signature est requise.`;
-          toastInfo(msg);
-          // Notification système (barre de notifications)
-          sendLocalNotification(
-            isComplet ? "✅ Contrat co-signé !" : "📝 Signature requise",
-            isComplet ? `${nomCli} a co-signé le contrat.` : `${nomCli} a signé — votre tour !`,
-            { tag: "briblue-contrat-" + newSig.clientId, requireInteraction: !isComplet }
-          );
-        }
-        return ct;
-      });
-    }, 10000);
-    return ()=>clearInterval(interval);
-  },[ready, clients]);
+  useEffect(()=>{if(!ready)return;const unsub=onSnapshot(APP_DOC,(snap)=>{if(!snap.exists())return;const ct=snap.data()["bb_contrats_v1"];if(!ct)return;setContrats(prev=>{for(const k of Object.keys(ct)){const newC=ct[k],oldC=prev[k];if(!oldC)continue;if(newC.statut!==oldC.statut&&(newC.statut==="signe_client"||newC.statut==="signe_complet")){playNotifSound();const cli=clients.find(cl=>cl.id===newC.clientId);const nomCli=cli?.nom||newC.clientId;const isComplet=newC.statut==="signe_complet";toastInfo(isComplet?`✅ Contrat co-signé par ${nomCli} !`:`📝 ${nomCli} a signé.`);sendLocalNotification(isComplet?"✅ Contrat co-signé !":"📝 Signature requise",isComplet?`${nomCli} a co-signé.`:`${nomCli} a signé !`,{tag:"briblue-contrat-"+newC.clientId,requireInteraction:!isComplet});}}try{localStorage.setItem("briblue_bb_contrats_v1",JSON.stringify(ct));localStorage.setItem("briblue_ts_bb_contrats_v1",String(Date.now()));}catch{}return ct;});},(e)=>console.warn("onSnapshot:",e));return()=>unsub();},[ready,clients]);
 
   // Notification son + système quand nouvelles tâches apparaissent
   useEffect(()=>{
@@ -5986,7 +5989,7 @@ export default function App() {
     <GlobalStyles/>
     <div style={{minHeight:"100vh",background:"#eef2f7",fontFamily:"'Inter', -apple-system, system-ui, sans-serif",maxWidth:isMobile?640:1280,margin:"0 auto",position:"relative",display:"flex",flexDirection:"column",overflowX:"hidden",width:"100%"}}>
       {/* HEADER — Soft UI */}
-      <div style={{background:"#eef2f7",padding:isMobile?"10px 14px":"10px 28px",display:"flex",alignItems:"center",gap:isMobile?8:14,position:"sticky",top:0,zIndex:50,boxShadow:"0 4px 16px rgba(166,210,220,0.5)",width:"100%",boxSizing:"border-box"}}>
+      <div className="safe-header" style={{background:"#eef2f7",padding:isMobile?"10px 14px":"10px 28px",paddingTop:`calc(10px + env(safe-area-inset-top, 0px))`,display:"flex",alignItems:"center",gap:isMobile?8:14,position:"sticky",top:0,zIndex:50,boxShadow:"0 4px 16px rgba(166,210,220,0.5)",width:"100%",boxSizing:"border-box"}}>
 
         <button onClick={()=>setPage("dashboard")} style={{background:"#eef2f7",border:"none",padding:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",width:isMobile?44:42,height:isMobile?44:42,borderRadius:14,flexShrink:0,boxShadow:DS.nmShadow}}>
           {Ico.wave(isMobile?22:20,"#0891b2")}
@@ -6313,6 +6316,8 @@ export default function App() {
           </Modal>
         );
       })()}
+      <ToastContainer/>
+      <ConfirmModal/>
     </div>
     </>
   );
