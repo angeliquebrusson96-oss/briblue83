@@ -3757,6 +3757,218 @@ function AlertesBlock({ alertes, passages, onClientClick }) {
 }
 
 // DASHBOARD  Bannire tches + RDV
+
+// ═══════════════════════════════════════════════════════════
+// DASHBOARD HERO — fond animé saison + carrousel citations
+// ═══════════════════════════════════════════════════════════
+const CITATIONS_PISCINISTE = [
+  { texte: "Un pisciniste, c'est quelqu'un qui sait que l'eau c'est la vie… mais le pH c'est le respect.", emoji: "🧪" },
+  { texte: "Mes collègues bossent en bureau. Moi je travaille au bord de la piscine. Tous les jours.", emoji: "😎" },
+  { texte: "Le chlore, c'est mon parfum préféré.", emoji: "🏊" },
+  { texte: "Quand les autres comptent des moutons, je compte des filtres à nettoyer.", emoji: "💤" },
+  { texte: "Un pH à 7.4 — le bonheur a une valeur exacte.", emoji: "✨" },
+  { texte: "Je ne fais pas que du jardinage aquatique. Enfin... si, un peu.", emoji: "🌊" },
+  { texte: "Ma plus belle récompense ? Une eau cristalline et un client qui plonge.", emoji: "💎" },
+  { texte: "Plombier ? Non. Chimiste ? Un peu. Pisciniste ? Totalement.", emoji: "⚗️" },
+  { texte: "L'eau ne ment jamais. Le chlore non plus.", emoji: "🔬" },
+  { texte: "Mon bureau a des palmiers et une vue sur la piscine. La vie est belle.", emoji: "🌴" },
+  { texte: "Quand l'eau est verte, c'est pas une tendance déco.", emoji: "🟢" },
+  { texte: "Je parle couramment le pH, le TAC et le chlore libre. Trilingue.", emoji: "📚" },
+];
+
+const SAISON_THEMES = {
+  hiver: {
+    gradFrom: "#0c1f3f",
+    gradMid:  "#1a3a6b",
+    gradTo:   "#0e6fa8",
+    accent:   "#60a5fa",
+    particles: "❄️",
+    label: "Hiver",
+    subLabel: "Les piscines hibernent, vous veillez.",
+  },
+  printemps: {
+    gradFrom: "#064e3b",
+    gradMid:  "#065f46",
+    gradTo:   "#0891b2",
+    accent:   "#34d399",
+    particles: "🌸",
+    label: "Printemps",
+    subLabel: "La saison redémarre, c'est le moment !",
+  },
+  ete: {
+    gradFrom: "#0c4a6e",
+    gradMid:  "#0369a1",
+    gradTo:   "#0ea5e9",
+    accent:   "#fbbf24",
+    particles: "☀️",
+    label: "Été",
+    subLabel: "Haute saison — les piscines vous attendent.",
+  },
+  automne: {
+    gradFrom: "#431407",
+    gradMid:  "#7c2d12",
+    gradTo:   "#0891b2",
+    accent:   "#f59e0b",
+    particles: "🍂",
+    label: "Automne",
+    subLabel: "Les feuilles tombent, mais pas vos standards.",
+  },
+};
+
+function DashboardHero({ saisonNow, isMobile }) {
+  const theme = SAISON_THEMES[saisonNow] || SAISON_THEMES.ete;
+  const [citIdx, setCitIdx] = useState(0);
+  const [fade, setFade] = useState(true);
+  const [particles, setParticles] = useState([]);
+
+  // Génère les particules flottantes
+  useEffect(() => {
+    const count = isMobile ? 10 : 16;
+    setParticles(Array.from({length: count}, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      size: 10 + Math.random() * 14,
+      delay: Math.random() * 6,
+      duration: 6 + Math.random() * 8,
+      drift: (Math.random() - 0.5) * 30,
+    })));
+  }, [saisonNow]);
+
+  // Carrousel auto toutes les 5s
+  useEffect(() => {
+    const t = setInterval(() => {
+      setFade(false);
+      setTimeout(() => {
+        setCitIdx(i => (i + 1) % CITATIONS_PISCINISTE.length);
+        setFade(true);
+      }, 320);
+    }, 5000);
+    return () => clearInterval(t);
+  }, []);
+
+  const cit = CITATIONS_PISCINISTE[citIdx];
+  const heure = new Date().getHours();
+  const salut = heure < 12 ? "Bonjour" : heure < 18 ? "Bon après-midi" : "Bonsoir";
+
+  const styleId = "hero-anim-" + saisonNow;
+
+  return (
+    <div style={{position:"relative",borderRadius:20,overflow:"hidden",marginBottom:14,boxShadow:"0 8px 32px rgba(0,0,0,0.25)"}}>
+      {/* Styles d'animation injectés */}
+      <style>{`
+        @keyframes floatUp {
+          0%   { transform: translateY(0px)   translateX(0px)   scale(1);   opacity:0.7; }
+          50%  { transform: translateY(-40px) translateX(var(--drift)) scale(1.1); opacity:1; }
+          100% { transform: translateY(-90px) translateX(0px)   scale(0.8); opacity:0; }
+        }
+        @keyframes shimmer {
+          0%,100% { opacity:0.04; } 50% { opacity:0.09; }
+        }
+        @keyframes waveMove {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .hero-particle { animation: floatUp var(--dur) var(--delay) ease-in infinite; }
+        .hero-wave     { animation: waveMove 8s linear infinite; }
+        .hero-shimmer  { animation: shimmer 4s ease-in-out infinite; }
+        .cit-fade      { transition: opacity 0.32s ease; }
+      `}</style>
+
+      {/* Fond gradient */}
+      <div style={{
+        position:"absolute",inset:0,
+        background:`linear-gradient(145deg, ${theme.gradFrom} 0%, ${theme.gradMid} 55%, ${theme.gradTo} 100%)`,
+      }}/>
+
+      {/* Cercles shimmer déco */}
+      <div className="hero-shimmer" style={{position:"absolute",right:-40,top:-40,width:200,height:200,borderRadius:"50%",background:"rgba(255,255,255,0.06)"}}/>
+      <div className="hero-shimmer" style={{position:"absolute",left:-60,bottom:-60,width:240,height:240,borderRadius:"50%",background:"rgba(255,255,255,0.04)",animationDelay:"2s"}}/>
+
+      {/* Vague de fond */}
+      <div style={{position:"absolute",bottom:0,left:0,right:0,height:40,overflow:"hidden",opacity:0.12}}>
+        <div className="hero-wave" style={{display:"flex",width:"200%",height:"100%"}}>
+          <svg viewBox="0 0 400 40" style={{width:"50%",height:"100%"}} preserveAspectRatio="none">
+            <path d="M0 20 C50 5 100 35 150 20 S250 5 300 20 S350 35 400 20 L400 40 L0 40Z" fill="white"/>
+          </svg>
+          <svg viewBox="0 0 400 40" style={{width:"50%",height:"100%"}} preserveAspectRatio="none">
+            <path d="M0 20 C50 5 100 35 150 20 S250 5 300 20 S350 35 400 20 L400 40 L0 40Z" fill="white"/>
+          </svg>
+        </div>
+      </div>
+
+      {/* Particules flottantes */}
+      {particles.map(p => (
+        <div key={p.id} className="hero-particle" style={{
+          position:"absolute",
+          left:`${p.x}%`,
+          top:`${p.y}%`,
+          fontSize:p.size,
+          "--dur": `${p.duration}s`,
+          "--delay": `${p.delay}s`,
+          "--drift": `${p.drift}px`,
+          pointerEvents:"none",
+          userSelect:"none",
+        }}>{theme.particles}</div>
+      ))}
+
+      {/* Contenu */}
+      <div style={{position:"relative",zIndex:2,padding:isMobile?"20px 20px 18px":"24px 28px 22px"}}>
+        {/* Salutation */}
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+          <div style={{width:36,height:36,borderRadius:12,background:"rgba(255,255,255,0.12)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>
+            {theme.particles}
+          </div>
+          <div>
+            <div style={{fontSize:isMobile?20:24,fontWeight:900,color:"#fff",lineHeight:1,letterSpacing:-0.5}}>
+              {salut}, Dorian 👋
+            </div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.55)",marginTop:2,fontWeight:500}}>
+              {theme.subLabel}
+            </div>
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div style={{height:1,background:"rgba(255,255,255,0.1)",margin:"12px 0"}}/>
+
+        {/* Citation carrousel */}
+        <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+          <div className="cit-fade" style={{
+            opacity: fade ? 1 : 0,
+            flex:1,
+          }}>
+            <div style={{fontSize:22,lineHeight:1,marginBottom:5}}>{cit.emoji}</div>
+            <div style={{
+              fontSize: isMobile ? 12 : 13,
+              fontStyle:"italic",
+              color:"rgba(255,255,255,0.82)",
+              lineHeight:1.5,
+              fontWeight:500,
+            }}>"{cit.texte}"</div>
+          </div>
+
+          {/* Dots navigation */}
+          <div style={{display:"flex",flexDirection:"column",gap:4,paddingTop:4,flexShrink:0}}>
+            {CITATIONS_PISCINISTE.map((_, i) => (
+              <div key={i} onClick={() => { setFade(false); setTimeout(() => { setCitIdx(i); setFade(true); }, 200); }}
+                style={{
+                  width: i===citIdx ? 6 : 4,
+                  height: i===citIdx ? 6 : 4,
+                  borderRadius:"50%",
+                  background: i===citIdx ? theme.accent : "rgba(255,255,255,0.25)",
+                  cursor:"pointer",
+                  transition:"all .3s",
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, onAddLivraison, onAddClient, onAddRdv, onEditPassage, onEditRdv }) {
   const isMobile = useIsMobile();
   const moisCourant = MOIS_NOW;
@@ -3790,6 +4002,9 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
 
   return (
     <div>
+      {/* Hero animé saison */}
+      <DashboardHero saisonNow={saisonNow} isMobile={isMobile}/>
+
       {/* Widget passages du mois — redesigné */}
       <div style={{marginBottom:14,borderRadius:DS.radius,overflow:"hidden",boxShadow:DS.nmShadow,border:"none"}}>
         {/* Header */}
@@ -5512,11 +5727,12 @@ export default function App() {
       {/* LAYOUT PRINCIPAL — sidebar desktop, plein mobile */}
       {isMobile ? (
         <>
-          {/* TITRE mobile */}
+          {/* TITRE mobile — masqué sur dashboard (le hero le remplace) */}
+          {page!=="dashboard"&&(
           <div style={{padding:"16px 16px 4px"}}>
             <h2 style={{margin:0,fontSize:22,fontWeight:900,color:DS.dark,letterSpacing:-0.5}}>{PAGE_LABELS[page]}</h2>
-            {page==="dashboard"&&<p style={{margin:"2px 0 0",color:DS.mid,fontSize:12,fontWeight:500}}>Aujourd'hui tâchons de ne rien oublier ;)</p>}
           </div>
+          )}
           <div style={{padding:"6px 16px 110px",overflowX:"hidden"}}>
             {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}}/>}
             {page==="clients"&&<PageClients clients={clients} passages={passages} contrats={contrats} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onClientClick={setFicheClient} onAdd={openAddClient}/>}
@@ -5558,10 +5774,11 @@ export default function App() {
           {/* Contenu principal desktop */}
           <div style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",minWidth:0}}>
             <div style={{padding:"20px 32px 80px",maxWidth:860,margin:"0 auto"}}>
+              {page!=="dashboard"&&(
               <div style={{marginBottom:16}}>
                 <h2 style={{margin:0,fontSize:26,fontWeight:900,color:DS.dark,letterSpacing:-0.5}}>{PAGE_LABELS[page]}</h2>
-                {page==="dashboard"&&<p style={{margin:"2px 0 0",color:DS.mid,fontSize:13,fontWeight:500}}>Aujourd'hui tâchons de ne rien oublier ;)</p>}
               </div>
+              )}
               {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}}/>}
               {page==="clients"&&<PageClients clients={clients} passages={passages} contrats={contrats} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onClientClick={setFicheClient} onAdd={openAddClient}/>}
               {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus}/>}
