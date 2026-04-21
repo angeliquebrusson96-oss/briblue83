@@ -4104,7 +4104,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                 boxShadow:isSaving?"none":"0 4px 16px #05996944",
                 flexShrink:0,opacity:isSaving?0.7:1}}>
               {isSaving
-                ? <><svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" style={{animation:"pulse 1s infinite"}}><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> Sync…</>
+                ? <><svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" style={{animation:"pulse 1s infinite"}}><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> Sync Firebase…</>
                 : <><svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Enregistrer</>
               }
             </button>
@@ -4358,7 +4358,9 @@ function AlertesBlock({ alertes, passages, onClientClick }) {
       </div>
     </div>
   );
-}// DASHBOARD  Bannire tches + RDV
+}
+
+// DASHBOARD  Bannire tches + RDV
 
 // ═══════════════════════════════════════════════════════════
 // DASHBOARD HERO — fond animé saison + carrousel citations
@@ -6142,7 +6144,42 @@ export default function App() {
 
   const saveClient = useCallback(c=>{ setClients(prev=>{ const next=prev.find(x=>x.id===c.id)?prev.map(x=>x.id===c.id?c:x):[...prev,c]; saveClients(next); return next; }); setShowFormClient(false);setEditClient(null);setFicheClient(c); },[saveClients]);
   const deleteClient = useCallback(id=>{ showConfirm("Supprimer ce client et tous ses passages ?", ()=>{ setClients(prev=>{ const next=prev.filter(x=>x.id!==id); saveClients(next); return next; }); setPassages(prev=>{ const next=prev.filter(x=>x.clientId!==id); savePassages(next); return next; }); setFicheClient(null); }); },[saveClients,savePassages]);
-  const savePassage = useCallback(p=>{ setPassages(prev=>{ const next=prev.find(x=>x.id===p.id)?prev.map(x=>x.id===p.id?p:x):[...prev,p]; savePassages(next); return next; }); setShowFormPassage(false);setEditPassage(null); },[savePassages]);
+  const savePassage = useCallback(async p => {
+    // Calcul du prochain état passages
+    let nextPassages;
+    setPassages(prev => {
+      nextPassages = prev.find(x => x.id === p.id)
+        ? prev.map(x => x.id === p.id ? p : x)
+        : [...prev, p];
+      return nextPassages;
+    });
+    // localStorage immédiat
+    try {
+      localStorage.setItem("briblue_bb_passages_v2", JSON.stringify(nextPassages));
+      localStorage.setItem("briblue_ts_bb_passages_v2", String(Date.now()));
+    } catch {}
+    // Firebase DIRECT — on attend la confirmation avant de retourner
+    if (navigator.onLine) {
+      try {
+        const CHUNK = 50;
+        const chunks = [];
+        for (let i = 0; i < nextPassages.length; i += CHUNK) chunks.push(nextPassages.slice(i, i + CHUNK));
+        for (let i = 0; i < chunks.length; i++) {
+          await setDoc(doc(db, "briblue", "passages_" + i), { bb_passages_v2: chunks[i] }, { merge: false });
+        }
+        await setDoc(APP_DOC, { bb_passages_chunks: chunks.length }, { merge: true });
+      } catch {
+        // Firebase échoué — queue pour retry
+        offlineQueue.pending["bb_passages_v2"] = nextPassages;
+        toastWarn("Sauvegardé localement — sync en attente");
+      }
+    } else {
+      offlineQueue.pending["bb_passages_v2"] = nextPassages;
+    }
+    // Fermer le formulaire SEULEMENT après confirmation Firebase
+    setShowFormPassage(false);
+    setEditPassage(null);
+  }, []);
   const updatePassageRapportStatus = useCallback((passageMaj) => {
     setPassages(prev => {
       const next = prev.map(x => x.id === passageMaj.id ? { ...x, ...passageMaj } : x);
