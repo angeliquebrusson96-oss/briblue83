@@ -15,10 +15,20 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 const APP_DOC = doc(db, "briblue", "app_data");
-const NB_PASSAGE_CHUNKS = 3; // passages_0, passages_1, passages_2
+const NB_PASSAGE_CHUNKS_DEFAULT = 3;
 async function loadAllPassages() {
+  // Lire le nombre REEL de chunks depuis Firebase pour eviter les chunks orphelins
+  // C'est la cause principale du bug iOS : on lit 3 chunks fixes alors qu'on en a sauvegarde 1
+  let nbChunks = NB_PASSAGE_CHUNKS_DEFAULT;
+  try {
+    const appSnap = await getDoc(APP_DOC);
+    if (appSnap.exists()) {
+      const n = appSnap.data().bb_passages_chunks;
+      if (typeof n === "number" && n >= 1) nbChunks = n;
+    }
+  } catch {}
   const all = [];
-  for (let i = 0; i < NB_PASSAGE_CHUNKS; i++) {
+  for (let i = 0; i < nbChunks; i++) {
     try {
       const snap = await getDoc(doc(db, "briblue", "passages_" + i));
       if (snap.exists()) {
@@ -222,7 +232,7 @@ function useOnlineStatus() {
   return { online, pendingCount };
 }
 
-// STORAGE — cache TTL 24h (iOS : localStorage toujours prioritaire au rechargement)
+// STORAGE — cache TTL 24h (iOS : localStorage prioritaire au rechargement)
 const CACHE_TTL_MS=24*60*60*1000;
 async function load(key,fallback){
   try{const c=localStorage.getItem("briblue_"+key),ts=localStorage.getItem("briblue_ts_"+key);if(c&&ts&&(Date.now()-Number(ts))<CACHE_TTL_MS)return JSON.parse(c);}catch{}
@@ -235,21 +245,31 @@ async function load(key,fallback){
 // Queue hors-ligne
 const offlineQueue = { pending: {} };
 
-// Pas de debounce — chaque save écrit immédiatement dans Firebase
-// (le debounce était la cause du problème sur iOS Safari qui coupe les timers)
+// Debounce timers par clé — une seule écriture Firebase toutes les 3s max
 const _debounceTimers = {};
-const FIREBASE_DEBOUNCE_MS = 0;
+const FIREBASE_DEBOUNCE_MS = 800;
 
 async function saveToFirebase(key, val) {
   if (key === "bb_passages_v2" && Array.isArray(val)) {
-    // Sauvegarder les passages en chunks de 50
     const CHUNK = 50;
     const chunks = [];
     for (let i = 0; i < val.length; i += CHUNK) chunks.push(val.slice(i, i + CHUNK));
+    // Ecrire les nouveaux chunks
     for (let i = 0; i < chunks.length; i++) {
       await setDoc(doc(db, "briblue", "passages_" + i), { bb_passages_v2: chunks[i] }, { merge: false });
     }
-    // Mettre à jour le nombre de chunks dans le doc principal
+    // IMPORTANT : vider les chunks orphelins (ex: avant 3 chunks, maintenant 1)
+    // Sans ca, la lecture suivante concatene les vieux chunks et cree des doublons/pertes
+    const { deleteDoc } = await import("firebase/firestore");
+    for (let i = chunks.length; i < 10; i++) {
+      try {
+        const orphan = doc(db, "briblue", "passages_" + i);
+        const snap = await getDoc(orphan);
+        if (!snap.exists()) break; // plus de chunks au-dela
+        await deleteDoc(orphan);
+      } catch { break; }
+    }
+    // Mettre a jour le nombre de chunks
     await setDoc(APP_DOC, { bb_passages_chunks: chunks.length }, { merge: true });
     return;
   }
@@ -286,19 +306,18 @@ if (typeof window !== 'undefined') {
 }
 
 async function save(key,val){
-  // 1. localStorage IMMÉDIAT (synchrone)
+  // 1. localStorage IMMEDIAT et synchrone
   try{localStorage.setItem("briblue_"+key,JSON.stringify(val));localStorage.setItem("briblue_ts_"+key,String(Date.now()));}catch{}
 
-  // 2. Firebase IMMÉDIAT — pas de debounce, pas de timer (iOS tue les timers)
+  // 2. Firebase IMMEDIAT — ZERO timer, ZERO debounce
+  // Les timers sont tues par iOS Safari avant execution = donnees perdues
   if (!navigator.onLine) {
     offlineQueue.pending[key] = val;
     return;
   }
-
   try {
     await saveToFirebase(key, val);
   } catch {
-    // Firebase échoué → queue pour retry au retour connexion
     offlineQueue.pending[key] = val;
   }
 }
@@ -6138,27 +6157,28 @@ export default function App() {
   const saveClient = useCallback(c=>{ setClients(prev=>{ const next=prev.find(x=>x.id===c.id)?prev.map(x=>x.id===c.id?c:x):[...prev,c]; saveClients(next); return next; }); setShowFormClient(false);setEditClient(null);setFicheClient(c); },[saveClients]);
   const deleteClient = useCallback(id=>{ showConfirm("Supprimer ce client et tous ses passages ?", ()=>{ setClients(prev=>{ const next=prev.filter(x=>x.id!==id); saveClients(next); return next; }); setPassages(prev=>{ const next=prev.filter(x=>x.clientId!==id); savePassages(next); return next; }); setFicheClient(null); }); },[saveClients,savePassages]);
   const savePassage = useCallback(async p => {
-    // Calculer nextPassages DANS le callback setPassages (garanti synchrone)
-    let nextPassages;
-    setPassages(prev => {
-      nextPassages = prev.find(x => x.id === p.id)
-        ? prev.map(x => x.id === p.id ? p : x)
-        : [...prev, p];
-      return nextPassages;
-    });
+    // Lire l'etat courant DIRECTEMENT depuis localStorage (contourne la closure React)
+    // Cela evite la race condition ou nextPassages est undefined sur iOS
+    let currentPassages = [];
+    try {
+      const raw = localStorage.getItem("briblue_bb_passages_v2");
+      if (raw) currentPassages = JSON.parse(raw);
+    } catch {}
 
-    // Attendre le prochain tick pour que nextPassages soit défini
-    await new Promise(r => setTimeout(r, 0));
+    const nextPassages = currentPassages.find(x => x.id === p.id)
+      ? currentPassages.map(x => x.id === p.id ? p : x)
+      : [...currentPassages, p];
 
-    if (!nextPassages) { setShowFormPassage(false); setEditPassage(null); return; }
+    // Mettre a jour React state
+    setPassages(nextPassages);
 
-    // localStorage IMMÉDIAT
+    // localStorage IMMEDIAT
     try {
       localStorage.setItem("briblue_bb_passages_v2", JSON.stringify(nextPassages));
       localStorage.setItem("briblue_ts_bb_passages_v2", String(Date.now()));
     } catch {}
 
-    // Firebase IMMÉDIAT (pas de debounce ni timer)
+    // Firebase IMMEDIAT sans timer
     if (navigator.onLine) {
       try {
         const CHUNK = 50;
@@ -6167,13 +6187,24 @@ export default function App() {
         for (let i = 0; i < chunks.length; i++) {
           await setDoc(doc(db, "briblue", "passages_" + i), { bb_passages_v2: chunks[i] }, { merge: false });
         }
+        // Vider les chunks orphelins
+        const { deleteDoc: delDoc } = await import("firebase/firestore");
+        for (let i = chunks.length; i < 10; i++) {
+          try {
+            const orphan = doc(db, "briblue", "passages_" + i);
+            const snap = await getDoc(orphan);
+            if (!snap.exists()) break;
+            await delDoc(orphan);
+          } catch { break; }
+        }
         await setDoc(APP_DOC, { bb_passages_chunks: chunks.length }, { merge: true });
       } catch {
         offlineQueue.pending["bb_passages_v2"] = nextPassages;
-        toastWarn("Sauvegardé localement — sync en attente");
+        toastWarn("Sauvegarde locale — sync en attente");
       }
     } else {
       offlineQueue.pending["bb_passages_v2"] = nextPassages;
+      toastWarn("Hors ligne — sync au retour connexion");
     }
 
     setShowFormPassage(false);
