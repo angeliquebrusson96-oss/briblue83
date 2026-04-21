@@ -1693,8 +1693,8 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
                           <div style={{fontSize:12,fontWeight:700,color:DS.dark}}>{new Date(p.date).toLocaleDateString("fr",{day:"2-digit",month:"long"})} {p.tech&&<span style={{color:DS.mid,fontWeight:500}}>· {p.tech}</span>}</div>
                           <div style={{display:"flex",gap:4}}>
-                            {p.ph&&<span style={{fontSize:10,fontWeight:700,color:phOk?DS.green:DS.red,background:phOk?DS.greenSoft:DS.redSoft,padding:"1px 5px",borderRadius:4}}>pH {p.ph}</span>}
-                            {p.chlore&&<span style={{fontSize:10,fontWeight:700,color:clOk?DS.green:DS.red,background:clOk?DS.greenSoft:DS.redSoft,padding:"1px 5px",borderRadius:4}}>Cl {p.chlore}</span>}
+                            {getPH(p)&&<span style={{fontSize:10,fontWeight:700,color:phOk?DS.green:DS.red,background:phOk?DS.greenSoft:DS.redSoft,padding:"1px 5px",borderRadius:4}}>pH {getPH(p)}</span>}
+                            {getCL(p)&&<span style={{fontSize:10,fontWeight:700,color:clOk?DS.green:DS.red,background:clOk?DS.greenSoft:DS.redSoft,padding:"1px 5px",borderRadius:4}}>Cl {getCL(p)}</span>}
                           </div>
                         </div>
                         <div style={{display:"flex",gap:4}}>
@@ -4328,8 +4328,8 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                           {isCtrl ? Ico.drop(11,DS.teal) : Ico.wrench(11,DS.blue)} {p.type}
                         </span>
                       </Tag>
-                      {p.ph&&<Tag color={phOk?DS.green:DS.red} style={{fontSize:11}}>pH {p.ph}</Tag>}
-                      {p.chlore&&<Tag color={clOk?DS.green:DS.red} style={{fontSize:11}}>Cl {p.chlore}</Tag>}
+                      {p.ph&&<Tag color={phOk?DS.green:DS.red} style={{fontSize:11}}>pH {getPH(p)}</Tag>}
+                      {p.chlore&&<Tag color={clOk?DS.green:DS.red} style={{fontSize:11}}>Cl {getCL(p)}</Tag>}
                       <Tag color={rapportMeta.color} bg={rapportMeta.bg} style={{fontSize:11}}>{rapportMeta.label}</Tag>
                     </div>
                     {(p.photoArrivee||p.photoDepart) && (
@@ -4916,7 +4916,28 @@ function CarnetPublic({ code, allClients, allPassages }) {
   const last = passClient[0]||null;
   const F = "system-ui,-apple-system,sans-serif";
 
-  // helpers
+  // helpers — lit les nouveaux champs ET les anciens
+  const getPH   = p => { const v = p.tPH || p.ph; return v && Number(v)>0 ? Number(v) : null; };
+  const getCL   = p => { const v = p.tChlore || p.chloreLibre || p.chlore; return v && Number(v)>0 ? Number(v) : null; };
+  const getTemp = p => { const v = p.temperature; return v && Number(v)>0 ? Number(v) : null; };
+  const getResume = p => {
+    const parts = [];
+    if (p.actions) parts.push(p.actions);
+    else {
+      const corr = [
+        p.corrChlore   && "Chlore: "+p.corrChlore,
+        p.corrPH       && "pH: "+p.corrPH,
+        p.corrAlgicide && "Algicide: "+p.corrAlgicide,
+        p.corrAlcafix  && "Alcafix: "+p.corrAlcafix,
+        p.corrSel      && "Sel: "+p.corrSel,
+        p.corrAutre    && p.corrAutre,
+      ].filter(Boolean);
+      if (corr.length) parts.push("Produits: "+corr.join(", "));
+    }
+    if (p.obs && p.obs !== p.actions) parts.push(p.obs);
+    if (p.commentaires && p.commentaires !== p.obs) parts.push(p.commentaires);
+    return parts.join(" · ") || null;
+  };
   const phOk  = v => v>=7 && v<=7.6;
   const clOk  = v => v>=0.5 && v<=3;
   const fmtDate = (d,opts) => new Date(d).toLocaleDateString("fr",opts);
@@ -4999,26 +5020,26 @@ function CarnetPublic({ code, allClients, allPassages }) {
             </div>
 
             {/* Mesures en gros */}
-            {(last.ph||last.chlore||last.temperature)&&(
+            {(getPH(last)||getCL(last)||getTemp(last))&&(
               <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:last.obs||last.actions?14:0}}>
-                {last.ph&&(
-                  <div style={{borderRadius:14,padding:"12px 8px",textAlign:"center",background:phOk(last.ph)?"#f0fdf4":"#fff7ed",border:"1.5px solid "+(phOk(last.ph)?"#86efac":"#fed7aa")}}>
-                    <div style={{fontSize:10,fontWeight:800,color:phOk(last.ph)?"#166534":"#92400e",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>pH</div>
-                    <div style={{fontSize:30,fontWeight:900,color:phOk(last.ph)?"#16a34a":"#d97706",lineHeight:1}}>{last.ph}</div>
-                    <div style={{fontSize:10,fontWeight:700,color:phOk(last.ph)?"#22c55e":"#f59e0b",marginTop:4}}>{phOk(last.ph)?"✓ Idéal":"⚠ Revoir"}</div>
+                {getPH(last)&&(
+                  <div style={{borderRadius:14,padding:"12px 8px",textAlign:"center",background:phOk(getPH(last))?"#f0fdf4":"#fff7ed",border:"1.5px solid "+(phOk(getPH(last))?"#86efac":"#fed7aa")}}>
+                    <div style={{fontSize:10,fontWeight:800,color:phOk(getPH(last))?"#166534":"#92400e",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>pH</div>
+                    <div style={{fontSize:30,fontWeight:900,color:phOk(getPH(last))?"#16a34a":"#d97706",lineHeight:1}}>{getPH(last)}</div>
+                    <div style={{fontSize:10,fontWeight:700,color:phOk(getPH(last))?"#22c55e":"#f59e0b",marginTop:4}}>{phOk(getPH(last))?"✓ Idéal":"⚠ Revoir"}</div>
                   </div>
                 )}
-                {last.chlore&&(
-                  <div style={{borderRadius:14,padding:"12px 8px",textAlign:"center",background:clOk(last.chlore)?"#f0fdf4":"#fff7ed",border:"1.5px solid "+(clOk(last.chlore)?"#86efac":"#fed7aa")}}>
-                    <div style={{fontSize:10,fontWeight:800,color:clOk(last.chlore)?"#166534":"#92400e",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Chlore</div>
-                    <div style={{fontSize:30,fontWeight:900,color:clOk(last.chlore)?"#16a34a":"#d97706",lineHeight:1}}>{last.chlore}</div>
-                    <div style={{fontSize:10,fontWeight:700,color:clOk(last.chlore)?"#22c55e":"#f59e0b",marginTop:4}}>{clOk(last.chlore)?"✓ Idéal":"⚠ Revoir"}</div>
+                {getCL(last)&&(
+                  <div style={{borderRadius:14,padding:"12px 8px",textAlign:"center",background:clOk(getCL(last))?"#f0fdf4":"#fff7ed",border:"1.5px solid "+(clOk(getCL(last))?"#86efac":"#fed7aa")}}>
+                    <div style={{fontSize:10,fontWeight:800,color:clOk(getCL(last))?"#166534":"#92400e",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Chlore</div>
+                    <div style={{fontSize:30,fontWeight:900,color:clOk(getCL(last))?"#16a34a":"#d97706",lineHeight:1}}>{getCL(last)}</div>
+                    <div style={{fontSize:10,fontWeight:700,color:clOk(getCL(last))?"#22c55e":"#f59e0b",marginTop:4}}>{clOk(getCL(last))?"✓ Idéal":"⚠ Revoir"}</div>
                   </div>
                 )}
-                {last.temperature&&(
+                {getTemp(last)&&(
                   <div style={{borderRadius:14,padding:"12px 8px",textAlign:"center",background:"#f0f9ff",border:"1.5px solid #bae6fd"}}>
                     <div style={{fontSize:10,fontWeight:800,color:"#075985",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Temp.</div>
-                    <div style={{fontSize:30,fontWeight:900,color:"#0284c7",lineHeight:1}}>{last.temperature}°</div>
+                    <div style={{fontSize:30,fontWeight:900,color:"#0284c7",lineHeight:1}}>{getTemp(last)}°</div>
                     <div style={{fontSize:10,fontWeight:700,color:"#38bdf8",marginTop:4}}>Eau</div>
                   </div>
                 )}
@@ -5026,10 +5047,10 @@ function CarnetPublic({ code, allClients, allPassages }) {
             )}
 
             {/* Actions / Obs */}
-            {last.actions&&(
+            {getResume(last)&&(
               <div style={{background:"#f8fafc",borderRadius:12,padding:"10px 14px",marginBottom:last.obs?8:0}}>
                 <div style={{fontSize:10,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:.6,marginBottom:5}}>Actions réalisées</div>
-                <div style={{fontSize:13,color:"#334155",lineHeight:1.7}}>{last.actions}</div>
+                <div style={{fontSize:13,color:"#334155",lineHeight:1.7}}>{getResume(last)}</div>
               </div>
             )}
             {last.obs&&(
@@ -5066,11 +5087,11 @@ function CarnetPublic({ code, allClients, allPassages }) {
                         {fmtDate(p.date,{day:"2-digit",month:"long",year:"numeric"})}
                         {p.tech&&<span style={{color:"#94a3b8"}}> · {p.tech}</span>}
                       </div>
-                      {(p.ph||p.chlore||p.temperature)&&(
+                      {(getPH(p)||getCL(p)||getTemp(p))&&(
                         <div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap"}}>
-                          {p.ph&&<span style={{fontSize:11,fontWeight:700,padding:"2px 7px",borderRadius:6,background:phOk(p.ph)?"#dcfce7":"#fef3c7",color:phOk(p.ph)?"#166534":"#92400e"}}>pH {p.ph}</span>}
-                          {p.chlore&&<span style={{fontSize:11,fontWeight:700,padding:"2px 7px",borderRadius:6,background:clOk(p.chlore)?"#dcfce7":"#fef3c7",color:clOk(p.chlore)?"#166534":"#92400e"}}>Cl {p.chlore}</span>}
-                          {p.temperature&&<span style={{fontSize:11,fontWeight:700,padding:"2px 7px",borderRadius:6,background:"#e0f2fe",color:"#0369a1"}}>{p.temperature}°C</span>}
+                          {getPH(p)&&<span style={{fontSize:11,fontWeight:700,padding:"2px 7px",borderRadius:6,background:phOk(getPH(p))?"#dcfce7":"#fef3c7",color:phOk(getPH(p))?"#166534":"#92400e"}}>pH {getPH(p)}</span>}
+                          {getCL(p)&&<span style={{fontSize:11,fontWeight:700,padding:"2px 7px",borderRadius:6,background:clOk(getCL(p))?"#dcfce7":"#fef3c7",color:clOk(getCL(p))?"#166534":"#92400e"}}>Cl {getCL(p)}</span>}
+                          {getTemp(p)&&<span style={{fontSize:11,fontWeight:700,padding:"2px 7px",borderRadius:6,background:"#e0f2fe",color:"#0369a1"}}>{getTemp(p)}°C</span>}
                         </div>
                       )}
                     </div>
@@ -5129,42 +5150,113 @@ function CarnetPublic({ code, allClients, allPassages }) {
             </div>
 
             {/* Mesures grandes */}
-            {(selectedPassage.ph||selectedPassage.chlore||selectedPassage.temperature)&&(
+            {(getPH(selectedPassage)||getCL(selectedPassage)||getTemp(selectedPassage))&&(
               <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:18}}>
-                {selectedPassage.ph&&(
-                  <div style={{borderRadius:16,padding:"14px 8px",textAlign:"center",background:phOk(selectedPassage.ph)?"#f0fdf4":"#fff7ed",border:"2px solid "+(phOk(selectedPassage.ph)?"#86efac":"#fed7aa")}}>
-                    <div style={{fontSize:10,fontWeight:800,color:phOk(selectedPassage.ph)?"#166534":"#92400e",textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>pH</div>
-                    <div style={{fontSize:34,fontWeight:900,color:phOk(selectedPassage.ph)?"#16a34a":"#d97706",lineHeight:1}}>{selectedPassage.ph}</div>
-                    <div style={{fontSize:11,fontWeight:700,color:phOk(selectedPassage.ph)?"#22c55e":"#f59e0b",marginTop:6}}>{phOk(selectedPassage.ph)?"✓ Idéal":"⚠ Revoir"}</div>
+                {getPH(selectedPassage)&&(
+                  <div style={{borderRadius:16,padding:"14px 8px",textAlign:"center",background:phOk(getPH(selectedPassage))?"#f0fdf4":"#fff7ed",border:"2px solid "+(phOk(getPH(selectedPassage))?"#86efac":"#fed7aa")}}>
+                    <div style={{fontSize:10,fontWeight:800,color:phOk(getPH(selectedPassage))?"#166534":"#92400e",textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>pH</div>
+                    <div style={{fontSize:34,fontWeight:900,color:phOk(getPH(selectedPassage))?"#16a34a":"#d97706",lineHeight:1}}>{getPH(selectedPassage)}</div>
+                    <div style={{fontSize:11,fontWeight:700,color:phOk(getPH(selectedPassage))?"#22c55e":"#f59e0b",marginTop:6}}>{phOk(getPH(selectedPassage))?"✓ Idéal":"⚠ Revoir"}</div>
                   </div>
                 )}
-                {selectedPassage.chlore&&(
-                  <div style={{borderRadius:16,padding:"14px 8px",textAlign:"center",background:clOk(selectedPassage.chlore)?"#f0fdf4":"#fff7ed",border:"2px solid "+(clOk(selectedPassage.chlore)?"#86efac":"#fed7aa")}}>
-                    <div style={{fontSize:10,fontWeight:800,color:clOk(selectedPassage.chlore)?"#166534":"#92400e",textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>Chlore</div>
-                    <div style={{fontSize:34,fontWeight:900,color:clOk(selectedPassage.chlore)?"#16a34a":"#d97706",lineHeight:1}}>{selectedPassage.chlore}</div>
-                    <div style={{fontSize:11,fontWeight:700,color:clOk(selectedPassage.chlore)?"#22c55e":"#f59e0b",marginTop:6}}>{clOk(selectedPassage.chlore)?"✓ Idéal":"⚠ Revoir"}</div>
+                {getCL(selectedPassage)&&(
+                  <div style={{borderRadius:16,padding:"14px 8px",textAlign:"center",background:clOk(getCL(selectedPassage))?"#f0fdf4":"#fff7ed",border:"2px solid "+(clOk(getCL(selectedPassage))?"#86efac":"#fed7aa")}}>
+                    <div style={{fontSize:10,fontWeight:800,color:clOk(getCL(selectedPassage))?"#166534":"#92400e",textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>Chlore</div>
+                    <div style={{fontSize:34,fontWeight:900,color:clOk(getCL(selectedPassage))?"#16a34a":"#d97706",lineHeight:1}}>{getCL(selectedPassage)}</div>
+                    <div style={{fontSize:11,fontWeight:700,color:clOk(getCL(selectedPassage))?"#22c55e":"#f59e0b",marginTop:6}}>{clOk(getCL(selectedPassage))?"✓ Idéal":"⚠ Revoir"}</div>
                   </div>
                 )}
-                {selectedPassage.temperature&&(
+                {getTemp(selectedPassage)&&(
                   <div style={{borderRadius:16,padding:"14px 8px",textAlign:"center",background:"#f0f9ff",border:"2px solid #bae6fd"}}>
                     <div style={{fontSize:10,fontWeight:800,color:"#075985",textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>Temp.</div>
-                    <div style={{fontSize:34,fontWeight:900,color:"#0284c7",lineHeight:1}}>{selectedPassage.temperature}°</div>
+                    <div style={{fontSize:34,fontWeight:900,color:"#0284c7",lineHeight:1}}>{getTemp(selectedPassage)}°</div>
                     <div style={{fontSize:11,fontWeight:700,color:"#38bdf8",marginTop:6}}>Eau</div>
                   </div>
                 )}
               </div>
             )}
 
-            {selectedPassage.actions&&(
+            {getResume(selectedPassage)&&(
               <div style={{background:"#f8fafc",borderRadius:14,padding:"14px 16px",marginBottom:12}}>
                 <div style={{fontSize:10,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>Actions réalisées</div>
-                <div style={{fontSize:14,color:"#334155",lineHeight:1.8}}>{selectedPassage.actions}</div>
+                <div style={{fontSize:14,color:"#334155",lineHeight:1.8}}>{getResume(selectedPassage)}</div>
               </div>
             )}
-            {selectedPassage.obs&&(
+            {(selectedPassage.obs||selectedPassage.commentaires)&&(
               <div style={{background:"#fffbeb",borderRadius:14,padding:"14px 16px",marginBottom:12,borderLeft:"4px solid #fbbf24"}}>
                 <div style={{fontSize:10,fontWeight:800,color:"#92400e",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>Observations</div>
-                <div style={{fontSize:14,color:"#78350f",lineHeight:1.8}}>{selectedPassage.obs}</div>
+                <div style={{fontSize:14,color:"#78350f",lineHeight:1.8}}>{selectedPassage.obs||selectedPassage.commentaires}</div>
+              </div>
+            )}
+            {/* Alcalinité + Stabilisant */}
+            {(selectedPassage.alcalinite||selectedPassage.stabilisant)&&(
+              <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:12}}>
+                {selectedPassage.alcalinite&&<div style={{background:"#f0f9ff",borderRadius:10,padding:"10px",textAlign:"center",border:"1px solid #bae6fd"}}>
+                  <div style={{fontSize:9,fontWeight:700,color:"#0369a1",textTransform:"uppercase",marginBottom:3}}>Alcalinité</div>
+                  <div style={{fontSize:20,fontWeight:900,color:"#0284c7"}}>{selectedPassage.alcalinite}</div>
+                  <div style={{fontSize:9,color:"#64748b"}}>ppm (TAC)</div>
+                </div>}
+                {selectedPassage.stabilisant&&<div style={{background:"#f0f9ff",borderRadius:10,padding:"10px",textAlign:"center",border:"1px solid #bae6fd"}}>
+                  <div style={{fontSize:9,fontWeight:700,color:"#0369a1",textTransform:"uppercase",marginBottom:3}}>Stabilisant</div>
+                  <div style={{fontSize:20,fontWeight:900,color:"#0284c7"}}>{selectedPassage.stabilisant}</div>
+                  <div style={{fontSize:9,color:"#64748b"}}>ppm</div>
+                </div>}
+              </div>
+            )}
+            {/* Qualité eau */}
+            {selectedPassage.qualiteEau&&(
+              <div style={{background:"#f8fafc",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:16}}>{selectedPassage.qualiteEau==="Cristalline"?"💎":selectedPassage.qualiteEau==="Verte"?"🌿":"🌫️"}</span>
+                <div>
+                  <div style={{fontSize:10,fontWeight:700,color:"#64748b",textTransform:"uppercase",marginBottom:1}}>Qualité eau</div>
+                  <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{selectedPassage.qualiteEau}</div>
+                </div>
+              </div>
+            )}
+            {/* Produits apportés */}
+            {(selectedPassage.corrChlore||selectedPassage.corrPH||selectedPassage.corrAlgicide||selectedPassage.corrAlcafix||selectedPassage.corrSel||selectedPassage.corrChloreChoc||selectedPassage.corrPeroxyde||selectedPassage.corrPhosphate||selectedPassage.corrAutre)&&(
+              <div style={{background:"#f5f3ff",borderRadius:14,padding:"12px 14px",marginBottom:12}}>
+                <div style={{fontSize:10,fontWeight:800,color:"#4f46e5",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>⚗️ Produits apportés</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                  {[
+                    ["Chlore",selectedPassage.corrChlore],
+                    ["pH",selectedPassage.corrPH],
+                    ["Sel",selectedPassage.corrSel],
+                    ["Algicide",selectedPassage.corrAlgicide],
+                    ["Chlore choc",selectedPassage.corrChloreChoc],
+                    ["Peroxyde",selectedPassage.corrPeroxyde],
+                    ["Phosphate",selectedPassage.corrPhosphate],
+                    ["Alcafix",selectedPassage.corrAlcafix],
+                    ["Autre",selectedPassage.corrAutre],
+                  ].filter(([,v])=>v).map(([k,v])=>(
+                    <span key={k} style={{fontSize:12,fontWeight:600,color:"#4f46e5",background:"#ede9fe",borderRadius:8,padding:"4px 10px"}}>{k}: {v}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Photos */}
+            {(selectedPassage.photoArrivee||selectedPassage.photoDepart||(selectedPassage.photos||[]).some(Boolean))&&(
+              <div style={{marginBottom:12}}>
+                <div style={{fontSize:10,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>📸 Photos</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8}}>
+                  {[
+                    selectedPassage.photoArrivee?{src:selectedPassage.photoArrivee,lbl:"Arrivée"}:null,
+                    ...((selectedPassage.photos||[]).filter(Boolean).map((s,i)=>({src:s,lbl:`Photo ${i+2}`}))),
+                    selectedPassage.photoDepart?{src:selectedPassage.photoDepart,lbl:"Départ"}:null,
+                  ].filter(Boolean).map((ph,i)=>(
+                    <div key={i} style={{position:"relative",borderRadius:10,overflow:"hidden"}}>
+                      <img src={ph.src} alt={ph.lbl} style={{width:"100%",height:110,objectFit:"cover",display:"block"}}/>
+                      <span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>{ph.lbl}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Aucune donnée */}
+            {!getPH(selectedPassage)&&!getCL(selectedPassage)&&!getResume(selectedPassage)&&!selectedPassage.qualiteEau&&(
+              <div style={{textAlign:"center",padding:"24px 0",color:"#94a3b8",fontSize:14}}>
+                <div style={{fontSize:32,marginBottom:8}}>📝</div>
+                Aucune mesure enregistrée pour ce passage.
               </div>
             )}
           </div>
