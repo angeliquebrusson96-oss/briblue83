@@ -239,22 +239,6 @@ const offlineQueue = { pending: {} };
 const _debounceTimers = {};
 const FIREBASE_DEBOUNCE_MS = 800;
 
-// Sauvegarde immédiate passages sans debounce — pour Safari iOS
-async function savePassagesNow(passages) {
-  const CHUNK = 50;
-  const chunks = [];
-  for (let i = 0; i < passages.length; i += CHUNK) chunks.push(passages.slice(i, i + CHUNK));
-  for (let i = 0; i < chunks.length; i++) {
-    await setDoc(doc(db, "briblue", "passages_" + i), { bb_passages_v2: chunks[i] }, { merge: false });
-  }
-  await setDoc(APP_DOC, { bb_passages_chunks: chunks.length }, { merge: true });
-  // Mettre à jour le localStorage aussi
-  try {
-    localStorage.setItem("briblue_bb_passages_v2", JSON.stringify(passages));
-    localStorage.setItem("briblue_ts_bb_passages_v2", String(Date.now()));
-  } catch {}
-}
-
 async function saveToFirebase(key, val) {
   if (key === "bb_passages_v2" && Array.isArray(val)) {
     // Sauvegarder les passages en chunks de 50
@@ -3353,6 +3337,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
   const [f,setF]=useState(isEdit ? {...EMPTY,...initial, rapportStatut:getRapportStatus(initial)} : EMPTY);
   const [step,setStep]=useState(1);
   const [showConfirmSave, setShowConfirmSave] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   useEffect(()=>{ const el=document.querySelector('[data-modal-body="1"]'); if(el) el.scrollTop=0; },[step]);
   const isSAV = f.type==="SAV";
   const isDevis = f.type==="Demande de devis";
@@ -3364,7 +3349,8 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
   const ph=Number(f.tPH)||Number(f.ph);
   const cl=Number(f.tChlore)||Number(f.chloreLibre);
 
-  const doSave = () => {
+  const doSave = async () => {
+    setIsSaving(true);
     if(!f.clientId||!f.date){ toastWarn("Client et date requis"); return; }
     const isSAVsave = f.type==="SAV";
     const isDevissave = f.type==="Demande de devis";
@@ -3394,7 +3380,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
           ].filter(Boolean).join(", ") || "",
       obs: isSimplifiedSave ? (f.descriptionSAV || f.commentaires || "") : f.commentaires,
     };
-    onSave(passage);
+    try { await onSave(passage); } catch {} finally { setIsSaving(false); }
     setShowConfirmSave(false);
     // Auto-créer une livraison si produits livrés
     if (f.livraisonProduits && (f.produitsLivres?.length > 0 || f.livraisonAutre) && onSaveLivraison) {
@@ -4109,16 +4095,16 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
           ? <button onClick={()=>setStep(s=>s+1)} className="btn-hover" style={{minHeight:52,padding:"14px 24px",borderRadius:DS.radiusSm,background:(STEP_INFO[step]||STEP_INFO[STEPS-1]).color,border:"none",cursor:"pointer",fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:8,boxShadow:`0 4px 16px ${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}44`,flexShrink:0}}>
               {(STEP_INFO[step]||STEP_INFO[STEPS-1]).l} <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
-          : <button onClick={handleSave} disabled={isSavingPassage} className="btn-hover"
+          : <button onClick={handleSave} disabled={isSaving} className="btn-hover"
               style={{minHeight:52,padding:"14px 24px",borderRadius:DS.radiusSm,
-                background:isSavingPassage?"#64748b":"linear-gradient(135deg,#059669,#34d399)",
-                border:"none",cursor:isSavingPassage?"not-allowed":"pointer",
+                background:isSaving?"#64748b":"linear-gradient(135deg,#059669,#34d399)",
+                border:"none",cursor:isSaving?"not-allowed":"pointer",
                 fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit",
                 display:"flex",alignItems:"center",gap:8,
-                boxShadow:isSavingPassage?"none":"0 4px 16px #05996944",
-                flexShrink:0,opacity:isSavingPassage?0.7:1}}>
-              {isSavingPassage
-                ? <><svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" style={{animation:"pulse 1s infinite"}}><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> Sync Firebase…</>
+                boxShadow:isSaving?"none":"0 4px 16px #05996944",
+                flexShrink:0,opacity:isSaving?0.7:1}}>
+              {isSaving
+                ? <><svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" style={{animation:"pulse 1s infinite"}}><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> Sync…</>
                 : <><svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Enregistrer</>
               }
             </button>
@@ -4372,9 +4358,7 @@ function AlertesBlock({ alertes, passages, onClientClick }) {
       </div>
     </div>
   );
-}
-
-// DASHBOARD  Bannire tches + RDV
+}// DASHBOARD  Bannire tches + RDV
 
 // ═══════════════════════════════════════════════════════════
 // DASHBOARD HERO — fond animé saison + carrousel citations
@@ -6158,36 +6142,7 @@ export default function App() {
 
   const saveClient = useCallback(c=>{ setClients(prev=>{ const next=prev.find(x=>x.id===c.id)?prev.map(x=>x.id===c.id?c:x):[...prev,c]; saveClients(next); return next; }); setShowFormClient(false);setEditClient(null);setFicheClient(c); },[saveClients]);
   const deleteClient = useCallback(id=>{ showConfirm("Supprimer ce client et tous ses passages ?", ()=>{ setClients(prev=>{ const next=prev.filter(x=>x.id!==id); saveClients(next); return next; }); setPassages(prev=>{ const next=prev.filter(x=>x.clientId!==id); savePassages(next); return next; }); setFicheClient(null); }); },[saveClients,savePassages]);
-  const [isSavingPassage, setIsSavingPassage] = useState(false);
-  const savePassage = useCallback(async p => {
-    // 1. Mise à jour state immédiate
-    let nextPassages;
-    setPassages(prev => {
-      nextPassages = prev.find(x => x.id === p.id)
-        ? prev.map(x => x.id === p.id ? p : x)
-        : [...prev, p];
-      return nextPassages;
-    });
-    // 2. localStorage immédiat
-    try {
-      localStorage.setItem("briblue_bb_passages_v2", JSON.stringify(nextPassages));
-      localStorage.setItem("briblue_ts_bb_passages_v2", String(Date.now()));
-    } catch {}
-    // 3. Firebase DIRECT sans debounce — on attend la confirmation
-    setIsSavingPassage(true);
-    try {
-      await savePassagesNow(nextPassages);
-      toastSuccess("Passage enregistré et synchronisé ✅");
-    } catch (err) {
-      // Firebase échoué — mettre en queue pour retry
-      offlineQueue.pending["bb_passages_v2"] = nextPassages;
-      toastWarn("Passage sauvegardé localement — synchronisation en attente");
-    } finally {
-      setIsSavingPassage(false);
-      setShowFormPassage(false);
-      setEditPassage(null);
-    }
-  }, []);
+  const savePassage = useCallback(p=>{ setPassages(prev=>{ const next=prev.find(x=>x.id===p.id)?prev.map(x=>x.id===p.id?p:x):[...prev,p]; savePassages(next); return next; }); setShowFormPassage(false);setEditPassage(null); },[savePassages]);
   const updatePassageRapportStatus = useCallback((passageMaj) => {
     setPassages(prev => {
       const next = prev.map(x => x.id === passageMaj.id ? { ...x, ...passageMaj } : x);
