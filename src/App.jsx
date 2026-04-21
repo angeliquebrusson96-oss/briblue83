@@ -5061,6 +5061,8 @@ function PassageDetailModal({ passage, client, onClose }) {
 function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePassageStatus, onAddClient, onClientClick }) {
   const [filter,setFilter]=useState("mois");
   const [detailPassage, setDetailPassage] = useState(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState([]);
   const now=new Date();
   const filtered=useMemo(()=>{
     return passages.filter(p=>{
@@ -5077,13 +5079,71 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
     tout: passages.length,
   }),[passages]);
 
+  const toggleSelect = (id) => setSelected(prev => prev.includes(id) ? prev.filter(x=>x!==id) : [...prev,id]);
+  const toggleAll = () => setSelected(selected.length===filtered.length ? [] : filtered.map(p=>p.id));
+  const exitSelectMode = () => { setSelectMode(false); setSelected([]); };
+
+  const exportCSV = () => {
+    const sel = filtered.filter(p=>selected.includes(p.id));
+    const header = ["Date","Client","Type","pH","Cl","Technicien","Statut Rapport","OK","Notes"];
+    const rows = sel.map(p=>{
+      const c = clients.find(x=>x.id===p.clientId);
+      return [
+        new Date(p.date).toLocaleDateString("fr"),
+        c?.nom||p.clientId||"",
+        p.type||"",
+        getPH(p)||"",
+        getCL(p)||"",
+        p.tech||"",
+        getRapportStatus(p)||"",
+        p.ok?"Oui":"Non",
+        (p.notes||"").replace(/\n/g," "),
+      ].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(";");
+    });
+    const csv = [header.join(";"), ...rows].join("\n");
+    const blob = new Blob(["\uFEFF"+csv], {type:"text/csv;charset=utf-8;"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href=url; a.download=`rapports_briblue_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+    URL.revokeObjectURL(url);
+    toastOk(`${sel.length} rapport(s) exporté(s)`);
+  };
+
+  const deleteSelected = () => {
+    showConfirm(`Supprimer ${selected.length} rapport(s) sélectionné(s) ?`, ()=>{
+      selected.forEach(id=>onDelete(id));
+      exitSelectMode();
+      toastOk(`${selected.length} rapport(s) supprimé(s)`);
+    });
+  };
+
   return (
     <div>
       {/* Header Rapports avec logo */}
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
         <IconFiche size={26} color="#0891b2"/>
         <span style={{fontWeight:800,fontSize:17,color:DS.dark}}>Rapports</span>
+        <button onClick={()=>{setSelectMode(v=>!v);setSelected([]);}} className="btn-hover" style={{marginLeft:"auto",padding:"6px 12px",borderRadius:20,border:"1.5px solid "+(selectMode?DS.blue:DS.border),background:selectMode?DS.blueSoft:"transparent",cursor:"pointer",fontWeight:700,fontSize:12,color:selectMode?DS.blue:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",gap:5,transition:"all .2s"}}>
+          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="4" height="4" rx="1"/><rect x="3" y="13" width="4" height="4" rx="1"/><line x1="11" y1="7" x2="21" y2="7"/><line x1="11" y1="15" x2="21" y2="15"/></svg>
+          {selectMode ? "Annuler" : "Sélectionner"}
+        </button>
       </div>
+
+      {/* Barre d'actions sélection */}
+      {selectMode && (
+        <div style={{display:"flex",gap:8,marginBottom:12,padding:"10px 14px",borderRadius:12,background:"linear-gradient(135deg,#eff6ff,#e0f2fe)",border:"1.5px solid "+DS.blue+"44",alignItems:"center",flexWrap:"wrap"}}>
+          <button onClick={toggleAll} style={{padding:"6px 12px",borderRadius:8,border:"1.5px solid "+DS.blue,background:selected.length===filtered.length?DS.blue:"#fff",cursor:"pointer",fontWeight:700,fontSize:12,color:selected.length===filtered.length?"#fff":DS.blue,fontFamily:"inherit"}}>
+            {selected.length===filtered.length ? "✓ Tout désél." : `Tout sélect. (${filtered.length})`}
+          </button>
+          <span style={{fontSize:12,color:DS.blue,fontWeight:700,flex:1}}>{selected.length} sélectionné{selected.length>1?"s":""}</span>
+          <button onClick={exportCSV} disabled={selected.length===0} className="btn-hover" style={{padding:"7px 14px",borderRadius:8,border:"none",background:selected.length>0?"#0891b2":"#9ca3af",cursor:selected.length>0?"pointer":"default",fontWeight:700,fontSize:12,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:5}}>
+            {Ico.download(13,"#fff")} Export CSV
+          </button>
+          <button onClick={deleteSelected} disabled={selected.length===0} className="btn-hover" style={{padding:"7px 14px",borderRadius:8,border:"none",background:selected.length>0?DS.red:"#9ca3af",cursor:selected.length>0?"pointer":"default",fontWeight:700,fontSize:12,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:5}}>
+            {Ico.trash(13,"#fff")} Supprimer
+          </button>
+        </div>
+      )}
+
       <div style={{display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
         <div style={{display:"flex",gap:6,flex:1,background:DS.light,borderRadius:DS.radius,padding:4}}>
           {[["semaine","7 jours",Ico.clock],[" mois","Ce mois",Ico.calendar],["tout","Tout",Ico.clipboard]].map(([v,l,ico])=>{
@@ -5096,16 +5156,18 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
             );
           })}
         </div>
-        <button onClick={onAdd} className="btn-hover" style={{flexShrink:0,padding:"9px 12px",background:DS.blue,border:"none",borderRadius:DS.radiusSm,cursor:"pointer",display:"flex",alignItems:"center",gap:7,fontFamily:"inherit",fontWeight:700,fontSize:13,color:"#fff"}}>
-          <IconFiche size={16} color="#fff"/>
-          Rapport
-        </button>
-        {onAddClient&&(
-          <button onClick={onAddClient} className="btn-hover" style={{flexShrink:0,padding:"9px 12px",background:"linear-gradient(135deg,#7c3aed,#4f46e5)",border:"none",borderRadius:DS.radiusSm,cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontFamily:"inherit",fontWeight:700,fontSize:13,color:"#fff",boxShadow:"0 3px 12px rgba(79,70,229,0.3)"}}>
-            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="3" x2="19" y2="9"/><line x1="16" y1="6" x2="22" y2="6"/></svg>
-            + Client
+        {!selectMode && <>
+          <button onClick={onAdd} className="btn-hover" style={{flexShrink:0,padding:"9px 12px",background:DS.blue,border:"none",borderRadius:DS.radiusSm,cursor:"pointer",display:"flex",alignItems:"center",gap:7,fontFamily:"inherit",fontWeight:700,fontSize:13,color:"#fff"}}>
+            <IconFiche size={16} color="#fff"/>
+            Rapport
           </button>
-        )}
+          {onAddClient&&(
+            <button onClick={onAddClient} className="btn-hover" style={{flexShrink:0,padding:"9px 12px",background:"linear-gradient(135deg,#7c3aed,#4f46e5)",border:"none",borderRadius:DS.radiusSm,cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontFamily:"inherit",fontWeight:700,fontSize:13,color:"#fff",boxShadow:"0 3px 12px rgba(79,70,229,0.3)"}}>
+              <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="3" x2="19" y2="9"/><line x1="16" y1="6" x2="22" y2="6"/></svg>
+              + Client
+            </button>
+          )}
+        </>}
       </div>
       {filtered.length===0
         ? <div style={{textAlign:"center",color:DS.mid,padding:40,fontSize:13}}>Aucun passage sur cette période</div>
@@ -5117,13 +5179,20 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
             const isCtrl = isControleType(p.type);
             const rapportStatus = getRapportStatus(p);
             const rapportMeta = RAPPORT_STATUS[rapportStatus];
+            const isSel = selected.includes(p.id);
             return (
-              <Card key={p.id} className="fade-in" style={{animationDelay:`${idx*0.05}s`}}>
+              <Card key={p.id} className="fade-in" style={{animationDelay:`${idx*0.05}s`,outline:isSel?"2px solid "+DS.blue:"2px solid transparent",transition:"outline .15s"}}>
                 <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
-                  <div onClick={e=>{e.stopPropagation();if(c&&onClientClick)onClientClick(c);}} style={{cursor:c&&onClientClick?"pointer":"default",flexShrink:0}} title={c?"Voir la fiche de "+c.nom:""}>
+                  {/* Checkbox sélection */}
+                  {selectMode && (
+                    <div onClick={()=>toggleSelect(p.id)} style={{flexShrink:0,width:24,height:24,borderRadius:7,border:"2px solid "+(isSel?DS.blue:DS.border),background:isSel?DS.blue:"#fff",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",marginTop:10,transition:"all .15s"}}>
+                      {isSel && <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                    </div>
+                  )}
+                  <div onClick={e=>{if(selectMode){e.stopPropagation();toggleSelect(p.id);return;}e.stopPropagation();if(c&&onClientClick)onClientClick(c);}} style={{cursor:selectMode?"pointer":c&&onClientClick?"pointer":"default",flexShrink:0}} title={c?"Voir la fiche de "+c.nom:""}>
                     <Avatar nom={c?.nom||"?"} size={42} photo={c?.photoPiscine}/>
                   </div>
-                  <div style={{flex:1,minWidth:0}}>
+                  <div style={{flex:1,minWidth:0}} onClick={selectMode?()=>toggleSelect(p.id):undefined} style={{flex:1,minWidth:0,cursor:selectMode?"pointer":"default"}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
                       <div>
                         <div style={{fontWeight:800,fontSize:13,color:DS.dark}}>{c?.nom||p.clientId}</div>
@@ -5153,7 +5222,7 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                       </div>
                     )}
                     
-                    
+                    {!selectMode && (
                     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:6,marginTop:10,paddingTop:10,borderTop:"1px solid "+DS.border}}>
                       <button onClick={()=>setDetailPassage(p)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.light,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.dark,fontFamily:"inherit",fontWeight:700}}>
                         {Ico.search(13,DS.mid)} Aperçu
@@ -5174,6 +5243,7 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                         {Ico.trash(13,DS.red)} Supprimer
                       </button>
                     </div>
+                    )}
                   </div>
                 </div>
               </Card>
