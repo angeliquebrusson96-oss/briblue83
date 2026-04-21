@@ -1298,9 +1298,12 @@ async function envoyerEmailLivraison(livraison, client) {
   const corps = `Bonjour ${client?.nom||""},\n\nVotre bon de livraison du ${dateStr} est disponible.\n\nJe reste a votre disposition pour toute question.\n\nCordialement,\nDorian Briaire\nTechnicien de Piscine - BRI BLUE`;
 
   try {
-    const res = await fetch("/api/send-email", {
+    const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${RESEND_API_KEY}`,
+      },
       body: JSON.stringify({
         from: `BRIBLUE <${FROM}>`,
         to: [client.email],
@@ -2928,10 +2931,15 @@ async function envoyerEmail(passage, client, onSent) {
 </table>
 </body></html>`;
 
+  const RESEND_API_KEY = "re_FLTMeUdh_vL8QGqJhP2C293WEVCm9c7rh";
+
   try {
-    const res = await fetch("/api/send-email", {
+    const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${RESEND_API_KEY}`,
+      },
       body: JSON.stringify({
         from: `BRIBLUE <${FROM}>`,
         to: [client.email],
@@ -3014,6 +3022,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
   const isMobile = useIsMobile();
   const [f,setF]=useState(isEdit ? {...EMPTY,...initial, rapportStatut:getRapportStatus(initial)} : EMPTY);
   const [step,setStep]=useState(1);
+  const [showConfirmSave, setShowConfirmSave] = useState(false);
   useEffect(()=>{ const el=document.querySelector('[data-modal-body="1"]'); if(el) el.scrollTop=0; },[step]);
   const isSAV = f.type==="SAV";
   const isDevis = f.type==="Demande de devis";
@@ -3025,7 +3034,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
   const ph=Number(f.tPH)||Number(f.ph);
   const cl=Number(f.tChlore)||Number(f.chloreLibre);
 
-  const handleSave = () => {
+  const doSave = () => {
     if(!f.clientId||!f.date){ toastWarn("Client et date requis"); return; }
     const isSAVsave = f.type==="SAV";
     const isDevissave = f.type==="Demande de devis";
@@ -3056,6 +3065,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
       obs: isSimplifiedSave ? (f.descriptionSAV || f.commentaires || "") : f.commentaires,
     };
     onSave(passage);
+    setShowConfirmSave(false);
     // Auto-créer une livraison si produits livrés
     if (f.livraisonProduits && (f.produitsLivres?.length > 0 || f.livraisonAutre) && onSaveLivraison) {
       onSaveLivraison({
@@ -3068,6 +3078,11 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
         statut: "aFacturer",
       });
     }
+  };
+
+  const handleSave = () => {
+    if(!f.clientId||!f.date){ toastWarn("Client et date requis"); return; }
+    setShowConfirmSave(true);
   };
 
   const client = clients.find(c=>c.id===f.clientId);
@@ -3769,11 +3784,59 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
             </button>
         }
       </div>
+      {/* Modale confirmation enregistrement */}
+      {showConfirmSave && (()=>{
+        const clientSel = clients.find(c=>c.id===f.clientId);
+        const dateStr = f.date ? new Date(f.date).toLocaleDateString("fr",{weekday:"long",day:"2-digit",month:"long",year:"numeric"}) : "—";
+        return (
+          <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(12,18,34,0.72)",display:"flex",alignItems:"flex-end",justifyContent:"center",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}} onClick={()=>setShowConfirmSave(false)}>
+            <div style={{background:"#fff",borderRadius:"20px 20px 0 0",padding:"28px 22px 36px",width:"100%",maxWidth:480,boxShadow:"0 -8px 40px rgba(0,0,0,0.18)"}} onClick={e=>e.stopPropagation()}>
+              <div style={{width:40,height:4,borderRadius:2,background:"#e2e8f0",margin:"0 auto 22px"}}/>
+              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
+                <div style={{width:48,height:48,borderRadius:14,background:"linear-gradient(135deg,#059669,#34d399)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                </div>
+                <div>
+                  <div style={{fontSize:17,fontWeight:800,color:"#0c1222",lineHeight:1.2}}>Confirmer l'enregistrement</div>
+                  <div style={{fontSize:13,color:"#64748b",marginTop:3}}>{isEdit ? "Modifier ce passage" : "Créer ce nouveau passage"}</div>
+                </div>
+              </div>
+              <div style={{background:"#f8fafc",borderRadius:14,padding:"14px 16px",marginBottom:20,border:"1px solid #e2e8f0",display:"flex",flexDirection:"column",gap:8}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{fontSize:12,color:"#94a3b8",fontWeight:600}}>Client</span>
+                  <span style={{fontSize:13,fontWeight:700,color:"#0c1222"}}>{clientSel?.nom||"—"}</span>
+                </div>
+                <div style={{height:1,background:"#f1f5f9"}}/>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{fontSize:12,color:"#94a3b8",fontWeight:600}}>Date</span>
+                  <span style={{fontSize:13,fontWeight:700,color:"#0c1222"}}>{dateStr}</span>
+                </div>
+                <div style={{height:1,background:"#f1f5f9"}}/>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{fontSize:12,color:"#94a3b8",fontWeight:600}}>Type</span>
+                  <span style={{fontSize:13,fontWeight:700,color:"#0891b2"}}>{f.type||"—"}</span>
+                </div>
+                {f.tech&&<><div style={{height:1,background:"#f1f5f9"}}/><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{fontSize:12,color:"#94a3b8",fontWeight:600}}>Technicien</span>
+                  <span style={{fontSize:13,fontWeight:700,color:"#0c1222"}}>{f.tech}</span>
+                </div></>}
+              </div>
+              <div style={{display:"flex",gap:10}}>
+                <button onClick={()=>setShowConfirmSave(false)} style={{flex:1,padding:"14px",borderRadius:12,background:"#f1f5f9",border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#64748b",fontFamily:"inherit"}}>
+                  Annuler
+                </button>
+                <button onClick={doSave} style={{flex:2,padding:"14px",borderRadius:12,background:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit",boxShadow:"0 4px 16px #05996944",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  {isEdit ? "Modifier" : "Enregistrer"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </Modal>
   );
 }
-
-// CALENDRIER INTERACTIF
 function CalendrierInteractif({ passages, rdvs, clients, onClientClick, onEditPassage, onEditRdv }) {
   const [calMonth, setCalMonth] = useState(MOIS_NOW);
   const [calYear, setCalYear] = useState(YEAR_NOW);
@@ -5289,26 +5352,30 @@ function CarnetPublic({ code, allClients, allPassages }) {
   const [loadedClients, setLoadedClients] = useState(null);
   const [loadedPassages, setLoadedPassages] = useState(null);
   const [selectedPassage, setSelectedPassage] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data } = await supabase.from("app_data").select("data").eq("id", 1).single();
-        if (data?.data) {
-          const c = data.data["bb_clients_v2"];
-          const p = data.data["bb_passages_v2"];
-          setLoadedClients(c && c.length ? c : CLIENTS_INIT);
-          setLoadedPassages(p && p.length ? p : PASSAGES_INIT);
-        } else {
-          setLoadedClients(CLIENTS_INIT);
-          setLoadedPassages(PASSAGES_INIT);
-        }
-      } catch {
+  const loadData = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const { data } = await supabase.from("app_data").select("data").eq("id", 1).single();
+      if (data?.data) {
+        const c = data.data["bb_clients_v2"];
+        const p = data.data["bb_passages_v2"];
+        setLoadedClients(c && c.length ? c : CLIENTS_INIT);
+        setLoadedPassages(p && p.length ? p : PASSAGES_INIT);
+      } else {
         setLoadedClients(CLIENTS_INIT);
         setLoadedPassages(PASSAGES_INIT);
       }
-    })();
+    } catch {
+      setLoadedClients(CLIENTS_INIT);
+      setLoadedPassages(PASSAGES_INIT);
+    } finally {
+      setRefreshing(false);
+    }
   }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
 
   if (loadedClients === null) return (
     <div style={{minHeight:"100vh",background:"#0c1f3f",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,fontFamily:"system-ui,sans-serif"}}>
@@ -5359,6 +5426,12 @@ function CarnetPublic({ code, allClients, allPassages }) {
           </div>
           <span style={{fontSize:13,fontWeight:800,color:"rgba(255,255,255,0.9)",letterSpacing:.3}}>BRIBLUE</span>
           <span style={{fontSize:11,color:"rgba(255,255,255,0.35)",marginLeft:4}}>Carnet d'entretien</span>
+          <button onClick={loadData} disabled={refreshing} style={{marginLeft:"auto",width:32,height:32,borderRadius:9,background:"rgba(255,255,255,0.10)",border:"1px solid rgba(255,255,255,0.15)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"rgba(255,255,255,0.7)",fontSize:16,transition:"opacity .2s",opacity:refreshing?0.4:1}} title="Actualiser">
+            {refreshing
+              ? <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{animation:"spin .7s linear infinite"}}><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+              : <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+            }
+          </button>
         </div>
 
         {/* Nom client + infos */}
