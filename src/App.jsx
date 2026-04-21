@@ -166,14 +166,21 @@ const STATUT_LIV = {
   paye:      { label:"Payé",       color:"#059669", bg:"#d1fae5" },
 };
 
-// RESPONSIVE HOOK
+// RESPONSIVE HOOK — Safari/iOS compatible
 function useIsMobile() {
-  const [m, setM] = useState(window.innerWidth < 768);
+  const [m, setM] = useState(() => {
+    try { return window.innerWidth < 768; } catch { return false; }
+  });
   useEffect(()=>{
-    const h = ()=> setM(window.innerWidth < 768);
-    window.addEventListener("resize", h);
-    window.addEventListener("orientationchange", h);
-    return ()=>{ window.removeEventListener("resize", h); window.removeEventListener("orientationchange", h); };
+    const h = () => setM(window.innerWidth < 768);
+    window.addEventListener("resize", h, {passive:true});
+    window.addEventListener("orientationchange", h, {passive:true});
+    // iOS Safari: déclencher au chargement complet
+    window.addEventListener("load", h, {once:true,passive:true});
+    return ()=>{
+      window.removeEventListener("resize", h);
+      window.removeEventListener("orientationchange", h);
+    };
   },[]);
   return m;
 }
@@ -456,10 +463,20 @@ function exportRdvToICS(rdv, client) {
   setTimeout(() => URL.revokeObjectURL(url), 3000);
 }
 
-// NOTIFICATION SOUND
+// NOTIFICATION SOUND — Safari compatible (AudioContext requires user gesture)
+let _audioCtx = null;
+function getAudioCtx() {
+  if (!_audioCtx) {
+    try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch {}
+  }
+  return _audioCtx;
+}
 function playNotifSound() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    // Résoudre la suspension Safari
+    if (ctx.state === 'suspended') ctx.resume().catch(()=>{});
     const osc = ctx.createOscillator(); const gain = ctx.createGain();
     osc.connect(gain); gain.connect(ctx.destination);
     osc.frequency.setValueAtTime(880, ctx.currentTime);
@@ -471,16 +488,173 @@ function playNotifSound() {
   } catch {}
 }
 
-// PWA SETUP
+// PWA SETUP — Safari/iOS compatible + notifications améliorées
 function setupPWA() {
-  if (!document.querySelector('link[rel="manifest"]')) {
-    const manifest = {name:"BRIBLUE CRM",short_name:"BRIBLUE",description:"Gestion entretien piscines",start_url:window.location.href,display:"standalone",background_color:"#0c1222",theme_color:"#0891b2",orientation:"portrait",icons:[{src:"data:image/svg+xml,"+encodeURIComponent('<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 192 192\"><rect width=\"192\" height=\"192\" rx=\"40\" fill=\"#0c1222\"/><path d=\"M30 70c15 18 30 18 45 0s30-18 45 0 30 18 45 0\" fill=\"none\" stroke=\"white\" stroke-width=\"8\" stroke-linecap=\"round\"/><path d=\"M30 100c15 18 30 18 45 0s30-18 45 0 30 18 45 0\" fill=\"none\" stroke=\"white\" stroke-width=\"8\" stroke-linecap=\"round\"/></svg>'),sizes:"192x192",type:"image/svg+xml"},{src:"data:image/svg+xml,"+encodeURIComponent('<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 512 512\"><rect width=\"512\" height=\"512\" rx=\"100\" fill=\"#0c1222\"/><path d=\"M80 190c40 48 80 48 120 0s80-48 120 0 80 48 120 0\" fill=\"none\" stroke=\"white\" stroke-width=\"20\" stroke-linecap=\"round\"/><path d=\"M80 270c40 48 80 48 120 0s80-48 120 0 80 48 120 0\" fill=\"none\" stroke=\"white\" stroke-width=\"20\" stroke-linecap=\"round\"/></svg>'),sizes:"512x512",type:"image/svg+xml"}]};
-    const blob = new Blob([JSON.stringify(manifest)], {type:"application/json"});
-    const link = document.createElement("link"); link.rel="manifest"; link.href=URL.createObjectURL(blob); document.head.appendChild(link);
+  // Meta viewport et couleurs
+  if (!document.querySelector('meta[name="theme-color"]')) {
+    const m=document.createElement("meta"); m.name="theme-color"; m.content="#0891b2"; document.head.appendChild(m);
   }
-  if (!document.querySelector('meta[name="theme-color"]')) { const m=document.createElement("meta"); m.name="theme-color"; m.content="#0891b2"; document.head.appendChild(m); }
-  if (!document.querySelector('meta[name="apple-mobile-web-app-capable"]')) { const m1=document.createElement("meta"); m1.name="apple-mobile-web-app-capable"; m1.content="yes"; document.head.appendChild(m1); const m2=document.createElement("meta"); m2.name="apple-mobile-web-app-status-bar-style"; m2.content="black-translucent"; document.head.appendChild(m2); const m3=document.createElement("meta"); m3.name="apple-mobile-web-app-title"; m3.content="BRIBLUE"; document.head.appendChild(m3); }
-  if ('serviceWorker' in navigator) { const swCode=`self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>self.clients.claim());self.addEventListener('fetch',e=>e.respondWith(fetch(e.request).catch(()=>new Response('Offline',{status:503}))));`; const swBlob=new Blob([swCode],{type:'application/javascript'}); navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(()=>{}); }
+  // Apple PWA metas
+  if (!document.querySelector('meta[name="apple-mobile-web-app-capable"]')) {
+    [
+      ["apple-mobile-web-app-capable","yes"],
+      ["apple-mobile-web-app-status-bar-style","default"],
+      ["apple-mobile-web-app-title","BRIBLUE"],
+      ["mobile-web-app-capable","yes"],
+      ["format-detection","telephone=no"],
+    ].forEach(([n,c])=>{ const m=document.createElement("meta"); m.name=n; m.content=c; document.head.appendChild(m); });
+  }
+  // Viewport optimal Safari
+  const vp = document.querySelector('meta[name="viewport"]');
+  if (!vp) {
+    const m=document.createElement("meta"); m.name="viewport";
+    m.content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover";
+    document.head.appendChild(m);
+  }
+  // Manifest PWA (blob URL — compatible Safari iOS 16.4+)
+  if (!document.querySelector('link[rel="manifest"]')) {
+    const svgIcon192 = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" rx="40" fill="#0c1222"/><path d="M30 70c15 18 30 18 45 0s30-18 45 0 30 18 45 0" fill="none" stroke="white" stroke-width="8" stroke-linecap="round"/><path d="M30 100c15 18 30 18 45 0s30-18 45 0 30 18 45 0" fill="none" stroke="white" stroke-width="8" stroke-linecap="round"/></svg>`;
+    const svgIcon512 = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="100" fill="#0c1222"/><path d="M80 190c40 48 80 48 120 0s80-48 120 0 80 48 120 0" fill="none" stroke="white" stroke-width="20" stroke-linecap="round"/><path d="M80 270c40 48 80 48 120 0s80-48 120 0 80 48 120 0" fill="none" stroke="white" stroke-width="20" stroke-linecap="round"/></svg>`;
+    const manifest = {
+      name:"BRIBLUE CRM", short_name:"BRIBLUE",
+      description:"Gestion entretien piscines",
+      start_url: window.location.href,
+      scope: "/",
+      display:"standalone",
+      background_color:"#eef2f7",
+      theme_color:"#0891b2",
+      orientation:"portrait-primary",
+      lang:"fr",
+      icons:[
+        {src:"data:image/svg+xml,"+encodeURIComponent(svgIcon192),sizes:"192x192",type:"image/svg+xml",purpose:"any maskable"},
+        {src:"data:image/svg+xml,"+encodeURIComponent(svgIcon512),sizes:"512x512",type:"image/svg+xml",purpose:"any maskable"},
+      ],
+      shortcuts:[
+        {name:"Nouveau rapport",short_name:"Rapport",description:"Créer un rapport",url:window.location.href+"?action=rapport",icons:[{src:"data:image/svg+xml,"+encodeURIComponent(svgIcon192),sizes:"192x192"}]},
+      ],
+    };
+    try {
+      const blob = new Blob([JSON.stringify(manifest)],{type:"application/json"});
+      const link=document.createElement("link"); link.rel="manifest"; link.href=URL.createObjectURL(blob); document.head.appendChild(link);
+    } catch {}
+  }
+  // Service Worker amélioré avec cache + notifications
+  if ('serviceWorker' in navigator) {
+    const swCode = `
+const CACHE = 'briblue-v2';
+const STATIC = [];
+
+self.addEventListener('install', e => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    caches.keys().then(keys => Promise.all(
+      keys.filter(k => k !== CACHE).map(k => caches.delete(k))
+    )).then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
+  e.respondWith(
+    fetch(e.request)
+      .then(res => {
+        if (res && res.status === 200) {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return res;
+      })
+      .catch(() => caches.match(e.request).then(r => r || new Response('Offline', {status: 503})))
+  );
+});
+
+self.addEventListener('push', e => {
+  if (!e.data) return;
+  let data = {};
+  try { data = e.data.json(); } catch { data = {title: 'BRIBLUE', body: e.data.text()}; }
+  const opts = {
+    body: data.body || '',
+    icon: data.icon || '/icon-192.png',
+    badge: data.badge || '/icon-192.png',
+    tag: data.tag || 'briblue-notif',
+    data: data.url ? {url: data.url} : {},
+    requireInteraction: !!data.requireInteraction,
+    vibrate: [100, 50, 100],
+    actions: data.actions || [],
+  };
+  e.waitUntil(self.registration.showNotification(data.title || 'BRIBLUE CRM', opts));
+});
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = e.notification.data?.url || '/';
+  e.waitUntil(
+    clients.matchAll({type:'window',includeUncontrolled:true}).then(cs => {
+      for (const c of cs) {
+        if ('focus' in c) { c.focus(); if (url !== '/') c.navigate(url); return; }
+      }
+      if (clients.openWindow) return clients.openWindow(url);
+    })
+  );
+});
+
+self.addEventListener('message', e => {
+  if (e.data?.type === 'SKIP_WAITING') self.skipWaiting();
+});
+    `;
+    try {
+      const swBlob = new Blob([swCode],{type:'application/javascript'});
+      const swUrl = URL.createObjectURL(swBlob);
+      navigator.serviceWorker.register(swUrl, {scope: '/'})
+        .then(reg => {
+          // Demander permission notifications après 3s (évite le blocage immédiat sur iOS)
+          setTimeout(() => {
+            if ('Notification' in window && Notification.permission === 'default') {
+              Notification.requestPermission().catch(()=>{});
+            }
+          }, 3000);
+          // Vérifier les mises à jour
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            newWorker?.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                newWorker.postMessage({type:'SKIP_WAITING'});
+              }
+            });
+          });
+        })
+        .catch(() => {});
+    } catch {}
+  }
+}
+
+// Fonction utilitaire pour envoyer une notification locale (Safari + Android)
+function sendLocalNotification(title, body, options={}) {
+  if (!('Notification' in window)) return;
+  const fire = () => {
+    try {
+      new Notification(title, {
+        body,
+        icon: options.icon || undefined,
+        tag: options.tag || 'briblue',
+        requireInteraction: options.requireInteraction || false,
+        silent: options.silent || false,
+        ...options,
+      });
+    } catch {
+      // Fallback SW notification
+      navigator.serviceWorker?.ready?.then(reg => {
+        reg.showNotification(title, {body, tag: options.tag||'briblue', ...options});
+      }).catch(()=>{});
+    }
+  };
+  if (Notification.permission === 'granted') { fire(); }
+  else if (Notification.permission === 'default') {
+    Notification.requestPermission().then(p => { if (p === 'granted') fire(); }).catch(()=>{});
+  }
 }
 
 // DESIGN SYSTEM V2  MODERNE
@@ -534,16 +708,29 @@ const GlobalStyles = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap');
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    html { scroll-behavior: smooth; }
-    body { font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #eef2f7; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+    body { font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #eef2f7; overflow-x: hidden; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+    /* Safari: éviter le double-tap zoom */
+    button, a, input, select, textarea { touch-action: manipulation; }
     input, select, textarea, button { font-family: inherit; }
+    /* Safari: forcer les couleurs des inputs */
     input, select, textarea { background: #f4f9fb !important; color: #0f172a !important; -webkit-text-fill-color: #0f172a !important; color-scheme: light; border-color: #d0e8f0 !important; }
     input::placeholder, textarea::placeholder { color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important; }
     input:focus, select:focus, textarea:focus { outline: none; border-color: ${DS.blue} !important; box-shadow: 0 0 0 3px ${DS.blue}22 !important; }
+    /* Safari: fix date inputs */
+    input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: none; }
+    /* Safari: fix select */
+    select { -webkit-appearance: none; appearance: none; }
+    /* Scrollbars */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: #e8f4f8; border-radius: 99px; }
     ::-webkit-scrollbar-thumb { background: #b8d8e4; border-radius: 99px; }
     ::-webkit-scrollbar-thumb:hover { background: #8ec5d4; }
+    /* Safari: fix position sticky */
+    @supports (-webkit-overflow-scrolling: touch) {
+      .sticky-header { position: -webkit-sticky; position: sticky; }
+    }
+    /* Animations */
     @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
     @keyframes fadeInFast { from { opacity:0; } to { opacity:1; } }
     @keyframes slideUp { from { opacity:0; transform:translateY(100%); } to { opacity:1; transform:translateY(0); } }
@@ -580,6 +767,14 @@ const GlobalStyles = () => (
       .sidebar-nav-active { background: rgba(8,145,178,0.12) !important; box-shadow: inset 3px 3px 6px rgba(166,210,220,0.4), inset -2px -2px 5px rgba(255,255,255,0.7) !important; }
     }
     .page-content { animation: fadeInFast .25s ease both; }
+    /* Safari: safe area pour le nav du bas */
+    @supports (padding-bottom: env(safe-area-inset-bottom)) {
+      .safe-bottom { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+    }
+    /* Safari: backdrop-filter fallback */
+    @supports not (backdrop-filter: blur(1px)) {
+      .blur-bg { background: rgba(232,240,248,0.99) !important; }
+    }
   `}</style>
 );
 
@@ -693,20 +888,43 @@ function Tag({ children, color=DS.blue, bg, style={} }) {
 function Modal({ title, onClose, children, wide }) {
   const isMobile = useIsMobile();
   useEffect(()=>{
+    // Safari: bloquer le scroll du body sans casser le scroll de la modale
     const prev = document.body.style.overflow;
+    const prevPos = document.body.style.position;
+    const prevTop = document.body.style.top;
+    const scrollY = window.scrollY;
     document.body.style.overflow = "hidden";
-    return ()=>{ document.body.style.overflow = prev; };
+    // Fix Safari bounce scroll
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+    return ()=>{
+      document.body.style.overflow = prev;
+      document.body.style.position = prevPos;
+      document.body.style.top = prevTop;
+      document.body.style.width = "";
+      window.scrollTo(0, scrollY);
+    };
   },[]);
+  // maxHeight fallback: dvh non supporté sur vieux Safari → vh
+  const maxH = isMobile ? "min(92dvh,92vh)" : "min(88dvh,88vh)";
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.35)",zIndex:200,display:"flex",alignItems:isMobile?"flex-end":"center",justifyContent:"center",padding:isMobile?"0":"12px"}}>
+    <div
+      style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.4)",zIndex:200,display:"flex",alignItems:isMobile?"flex-end":"center",justifyContent:"center",padding:isMobile?"0":"12px",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}}
+      onClick={onClose}
+    >
       <div className={isMobile?"slide-up":"scale-in"}
-        style={{background:"#eef2f7",borderRadius:isMobile?"28px 28px 0 0":DS.radiusLg,
+        style={{background:"#eef2f7",borderRadius:isMobile?"26px 26px 0 0":DS.radiusLg,
           width:"100%",maxWidth:isMobile?"100%":wide?720:560,
-          maxHeight:isMobile?"92dvh":"88vh",
+          maxHeight:maxH,
           display:"flex",flexDirection:"column",
           boxShadow:"8px 8px 24px rgba(166,210,220,0.7), -5px -5px 16px rgba(255,255,255,0.9)",
           overflowY:"hidden",
-          paddingBottom:"env(safe-area-inset-bottom,0px)"}}
+          paddingBottom:"env(safe-area-inset-bottom,0px)",
+          // Safari: empêcher le scroll du fond de remonter
+          overscrollBehavior:"contain",
+          WebkitOverflowScrolling:"touch",
+        }}
         onClick={e=>e.stopPropagation()}>
         {isMobile && <div style={{flexShrink:0,display:"flex",justifyContent:"center",paddingTop:10,paddingBottom:2}}>
           <div style={{width:36,height:4,borderRadius:2,background:"#c8dce8"}}/>
@@ -717,7 +935,7 @@ function Modal({ title, onClose, children, wide }) {
             {Ico.close(13,DS.mid)}
           </button>
         </div>
-        <div data-modal-body="1" style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",padding:isMobile?"14px 18px 24px":"20px 24px 24px"}}>
+        <div data-modal-body="1" style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",padding:isMobile?"14px 18px 24px":"20px 24px 24px",overscrollBehavior:"contain"}}>
           {children}
         </div>
       </div>
@@ -4475,7 +4693,7 @@ function PassageDetailModal({ passage, client, onClose }) {
 }
 
 // PAGE PASSAGES
-function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePassageStatus }) {
+function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePassageStatus, onAddClient }) {
   const [filter,setFilter]=useState("mois");
   const [detailPassage, setDetailPassage] = useState(null);
   const now=new Date();
@@ -4517,6 +4735,12 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
           <IconFiche size={16} color="#fff"/>
           Rapport
         </button>
+        {onAddClient&&(
+          <button onClick={onAddClient} className="btn-hover" style={{flexShrink:0,padding:"9px 12px",background:"linear-gradient(135deg,#7c3aed,#4f46e5)",border:"none",borderRadius:DS.radiusSm,cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontFamily:"inherit",fontWeight:700,fontSize:13,color:"#fff",boxShadow:"0 3px 12px rgba(79,70,229,0.3)"}}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="3" x2="19" y2="9"/><line x1="16" y1="6" x2="22" y2="6"/></svg>
+            + Client
+          </button>
+        )}
       </div>
       {filtered.length===0
         ? <div style={{textAlign:"center",color:DS.mid,padding:40,fontSize:13}}>Aucun passage sur cette période</div>
@@ -5520,16 +5744,27 @@ export default function App() {
       const ct = await load("bb_contrats_v1", {});
       setContrats(prev => {
         // Détecter nouvelle signature
-        const newSig = Object.values(ct).find(c =>
+        const keys = Object.keys(ct);
+        const newSig = keys.map(k=>ct[k]).find(c =>
           (c.statut === "signe_client" || c.statut === "signe_complet") &&
-          (!prev[Object.keys(ct).find(k => ct[k] === c)] ||
-           prev[Object.keys(ct).find(k => ct[k] === c)]?.statut !== c.statut)
+          (!prev[keys.find(k=>ct[k]===c)] ||
+           prev[keys.find(k=>ct[k]===c)]?.statut !== c.statut)
         );
         if (newSig) {
           playNotifSound();
           const cli = clients.find(cl => cl.id === newSig.clientId);
-          const msg = newSig.statut === "signe_complet" ? `✅ Contrat co-signé par ${cli?.nom||newSig.clientId} !` : `📝 ${cli?.nom||newSig.clientId} a signé son contrat — votre signature est requise.`;
-          if (cli) toastInfo(msg);
+          const nomCli = cli?.nom || newSig.clientId;
+          const isComplet = newSig.statut === "signe_complet";
+          const msg = isComplet
+            ? `✅ Contrat co-signé par ${nomCli} !`
+            : `📝 ${nomCli} a signé son contrat — votre signature est requise.`;
+          toastInfo(msg);
+          // Notification système (barre de notifications)
+          sendLocalNotification(
+            isComplet ? "✅ Contrat co-signé !" : "📝 Signature requise",
+            isComplet ? `${nomCli} a co-signé le contrat.` : `${nomCli} a signé — votre tour !`,
+            { tag: "briblue-contrat-" + newSig.clientId, requireInteraction: !isComplet }
+          );
         }
         return ct;
       });
@@ -5537,7 +5772,7 @@ export default function App() {
     return ()=>clearInterval(interval);
   },[ready, clients]);
 
-// Notification sound when new tasks appear
+  // Notification son + système quand nouvelles tâches apparaissent
   useEffect(()=>{
     if(!ready) return;
     const currentTasks = clients.reduce((a,c)=>{
@@ -5546,7 +5781,15 @@ export default function App() {
       const effC=passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===MOIS_NOW&&new Date(p.date).getFullYear()===YEAR_NOW&&isControleType(p.type)).length;
       return a+Math.max(0,prevE-effE)+Math.max(0,prevC-effC);
     },0);
-    if(prevTaskCount.current>0 && currentTasks>prevTaskCount.current) playNotifSound();
+    if(prevTaskCount.current>0 && currentTasks>prevTaskCount.current) {
+      playNotifSound();
+      const diff = currentTasks - prevTaskCount.current;
+      sendLocalNotification(
+        "🔧 Nouvelles tâches BRIBLUE",
+        `${diff} nouveau${diff>1?"x":""} passage${diff>1?"s":""} à effectuer ce mois.`,
+        { tag: "briblue-taches", silent: false }
+      );
+    }
     prevTaskCount.current=currentTasks;
   },[clients,passages,ready]);
 
@@ -5648,7 +5891,7 @@ export default function App() {
 
         <div style={{flex:1}}/>
 
-        <div style={{display:"flex",gap:isMobile?8:10,alignItems:"center",flexShrink:0}}>
+        <div style={{display:"flex",gap:isMobile?6:10,alignItems:"center",flexShrink:0}}>
 
           {!isMobile&&(
             <button onClick={()=>setShowImport(true)} style={{display:"flex",alignItems:"center",gap:7,padding:"0 16px",height:40,borderRadius:20,background:"#eef2f7",border:"none",cursor:"pointer",flexShrink:0,fontFamily:"inherit",boxShadow:DS.nmShadow}}>
@@ -5657,23 +5900,23 @@ export default function App() {
             </button>
           )}
 
-          <button onClick={()=>setShowStock(true)} style={{position:"relative",width:isMobile?44:undefined,height:isMobile?44:40,padding:isMobile?0:"0 16px",display:"flex",alignItems:"center",justifyContent:"center",gap:7,borderRadius:isMobile?14:20,background:"#eef2f7",border:"none",cursor:"pointer",flexShrink:0,fontFamily:"inherit",boxShadow:DS.nmShadow}}>
-            <svg width={isMobile?22:16} height={isMobile?22:16} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8V21H3V8"/><path d="M23 3H1v5h22V3z"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-            {!isMobile&&<span style={{fontSize:12,fontWeight:600,color:"#94a3b8"}}>Stock</span>}
-            {nbStockBas>0&&<span style={{position:"absolute",top:-4,right:-4,minWidth:18,height:18,borderRadius:9,background:"#ef4444",color:"#fff",fontSize:10,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 4px"}}>{nbStockBas}</span>}
+          {/* Stock — vert */}
+          <button onClick={()=>setShowStock(true)} title="Stock" style={{position:"relative",width:isMobile?40:undefined,height:isMobile?40:40,padding:isMobile?0:"0 14px",display:"flex",alignItems:"center",justifyContent:"center",gap:6,borderRadius:isMobile?12:20,background:"linear-gradient(135deg,#059669,#10b981)",border:"none",cursor:"pointer",flexShrink:0,fontFamily:"inherit",boxShadow:"3px 3px 10px rgba(5,150,105,0.4),-2px -2px 6px rgba(255,255,255,0.6)"}}>
+            <svg width={isMobile?18:15} height={isMobile?18:15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8V21H3V8"/><path d="M23 3H1v5h22V3z"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+            {!isMobile&&<span style={{fontSize:12,fontWeight:700,color:"#fff"}}>Stock</span>}
+            {nbStockBas>0&&<span style={{position:"absolute",top:-5,right:-5,minWidth:17,height:17,borderRadius:9,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",boxShadow:"0 2px 6px rgba(239,68,68,0.5)"}}>{nbStockBas}</span>}
           </button>
 
+          {/* Livraison — orange */}
+          <button onClick={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} title="Livraison" style={{width:isMobile?40:undefined,height:isMobile?40:40,padding:isMobile?0:"0 14px",display:"flex",alignItems:"center",justifyContent:"center",gap:6,borderRadius:isMobile?12:20,background:"linear-gradient(135deg,#f59e0b,#f97316)",border:"none",cursor:"pointer",flexShrink:0,fontFamily:"inherit",boxShadow:"3px 3px 10px rgba(245,158,11,0.4),-2px -2px 6px rgba(255,255,255,0.6)"}}>
+            <svg width={isMobile?18:15} height={isMobile?18:15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 4v4h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            {!isMobile&&<span style={{fontSize:12,fontWeight:700,color:"#fff"}}>Livraison</span>}
+          </button>
 
-
+          {/* Nouveau client — violet (mobile uniquement) */}
           {isMobile&&(
-            <button onClick={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} style={{width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:14,background:"#eef2f7",border:"none",cursor:"pointer",flexShrink:0,boxShadow:DS.nmShadow}}>
-              <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 4v4h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-            </button>
-          )}
-
-          {isMobile&&(
-            <button onClick={openAddClient} title="Nouveau client" style={{width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:14,background:"linear-gradient(135deg,#7c3aed,#4f46e5)",border:"none",cursor:"pointer",flexShrink:0,boxShadow:"4px 4px 12px rgba(79,70,229,0.35), -2px -2px 6px rgba(255,255,255,0.6)"}}>
-              <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <button onClick={openAddClient} title="Nouveau client" style={{width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:12,background:"linear-gradient(135deg,#7c3aed,#4f46e5)",border:"none",cursor:"pointer",flexShrink:0,boxShadow:"3px 3px 10px rgba(79,70,229,0.4),-2px -2px 6px rgba(255,255,255,0.6)"}}>
+              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
                 <circle cx="12" cy="7" r="4"/>
                 <line x1="19" y1="3" x2="19" y2="9"/>
@@ -5682,13 +5925,15 @@ export default function App() {
             </button>
           )}
 
-          <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} style={{width:isMobile?44:undefined,height:isMobile?44:40,padding:isMobile?0:"0 18px",display:"flex",alignItems:"center",justifyContent:"center",gap:7,borderRadius:isMobile?14:20,background:"linear-gradient(135deg,#06b6d4,#0891b2)",border:"none",cursor:"pointer",flexShrink:0,fontFamily:"inherit",boxShadow:"4px 4px 12px rgba(8,145,178,0.35), -2px -2px 6px rgba(255,255,255,0.6)"}}>
-            <svg width={isMobile?22:16} height={isMobile?22:16} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+          {/* Rapport — cyan/bleu */}
+          <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} style={{width:isMobile?40:undefined,height:isMobile?40:40,padding:isMobile?0:"0 18px",display:"flex",alignItems:"center",justifyContent:"center",gap:7,borderRadius:isMobile?12:20,background:"linear-gradient(135deg,#06b6d4,#0891b2)",border:"none",cursor:"pointer",flexShrink:0,fontFamily:"inherit",boxShadow:"3px 3px 10px rgba(8,145,178,0.4),-2px -2px 6px rgba(255,255,255,0.6)"}}>
+            <svg width={isMobile?18:15} height={isMobile?18:15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
             {!isMobile&&<span style={{fontSize:12,fontWeight:700,color:"#fff",whiteSpace:"nowrap"}}>Rapport</span>}
           </button>
 
-          <button onClick={handleLogout} style={{width:isMobile?44:40,height:isMobile?44:40,borderRadius:14,background:"#eef2f7",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:DS.nmShadow}}>
-            <svg width={isMobile?20:16} height={isMobile?20:16} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          {/* Déconnexion — rouge */}
+          <button onClick={handleLogout} title="Déconnexion" style={{width:isMobile?40:40,height:isMobile?40:40,borderRadius:12,background:"linear-gradient(135deg,#be123c,#e11d48)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"3px 3px 10px rgba(190,18,60,0.35),-2px -2px 6px rgba(255,255,255,0.6)"}}>
+            <svg width={isMobile?17:15} height={isMobile?17:15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           </button>
 
         </div>
@@ -5703,10 +5948,10 @@ export default function App() {
             <h2 style={{margin:0,fontSize:22,fontWeight:900,color:DS.dark,letterSpacing:-0.5}}>{PAGE_LABELS[page]}</h2>
           </div>
           )}
-          <div style={{padding:"6px 16px 110px",overflowX:"hidden"}}>
+          <div style={{padding:"6px 16px calc(90px + env(safe-area-inset-bottom,0px))",overflowX:"hidden"}}>
             {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}}/>}
             {page==="clients"&&<PageClients clients={clients} passages={passages} contrats={contrats} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onClientClick={setFicheClient} onAdd={openAddClient}/>}
-            {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus}/>}
+            {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddClient={openAddClient}/>}
             {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
           </div>
         </>
@@ -5751,7 +5996,7 @@ export default function App() {
               )}
               {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}}/>}
               {page==="clients"&&<PageClients clients={clients} passages={passages} contrats={contrats} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onClientClick={setFicheClient} onAdd={openAddClient}/>}
-              {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus}/>}
+              {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddClient={openAddClient}/>}
               {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
             </div>
           </div>
@@ -5763,96 +6008,103 @@ export default function App() {
         <>
           <style>{`
             @keyframes navPop {
-              0%  { transform:scale(.72) translateY(6px); opacity:0; }
-              55% { transform:scale(1.12) translateY(-2px); opacity:1; }
+              0%  { transform:scale(.7) translateY(8px); opacity:0; }
+              55% { transform:scale(1.15) translateY(-3px); opacity:1; }
+              80% { transform:scale(0.97) translateY(0); opacity:1; }
               100%{ transform:scale(1) translateY(0); opacity:1; }
             }
-            @keyframes navGlow {
-              0%,100% { box-shadow: 0 0 0 0 var(--accent-glow); }
-              50%      { box-shadow: 0 0 16px 4px var(--accent-glow); }
-            }
             @keyframes navSlideIn {
-              from { opacity:0; transform:translateY(2px) scaleX(0.6); }
-              to   { opacity:1; transform:translateY(0) scaleX(1); }
+              from { opacity:0; transform:translateX(-50%) scaleX(0.4); }
+              to   { opacity:1; transform:translateX(-50%) scaleX(1); }
             }
             @keyframes navBubble {
-              0%   { transform:translateX(-50%) scale(0.6); opacity:0; }
-              60%  { transform:translateX(-50%) scale(1.05); opacity:1; }
+              0%   { transform:translateX(-50%) scale(0.5); opacity:0; }
+              65%  { transform:translateX(-50%) scale(1.06); opacity:1; }
               100% { transform:translateX(-50%) scale(1); opacity:1; }
             }
-            .nav-icon-active { animation: navPop .3s cubic-bezier(.34,1.56,.64,1) forwards; }
-            .nav-pill-active { animation: navSlideIn .25s cubic-bezier(.22,1,.36,1) forwards; }
-            .nav-bubble { animation: navBubble .3s cubic-bezier(.34,1.56,.64,1) forwards; }
+            @keyframes navRipple {
+              0%   { transform:translateX(-50%) scale(0.8); opacity:0.5; }
+              100% { transform:translateX(-50%) scale(2); opacity:0; }
+            }
+            .nav-icon-active { animation: navPop .35s cubic-bezier(.34,1.56,.64,1) forwards; }
+            .nav-pill-active { animation: navSlideIn .28s cubic-bezier(.22,1,.36,1) forwards; }
+            .nav-bubble      { animation: navBubble .32s cubic-bezier(.34,1.56,.64,1) forwards; }
+            .nav-ripple      { animation: navRipple .5s ease-out forwards; }
           `}</style>
           <div style={{
             position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",
             width:"100%",maxWidth:640,
-            background:"rgba(232,240,248,0.97)",
-            backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",
+            background:"rgba(228,237,246,0.96)",
+            backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",
             display:"flex",alignItems:"flex-end",
-            boxShadow:"0 -1px 0 rgba(166,210,220,0.5), 0 -12px 32px rgba(120,170,200,0.22), 6px 0 12px rgba(166,210,220,0.3), -6px 0 12px rgba(255,255,255,0.8)",
+            borderTopLeftRadius:22,borderTopRightRadius:22,
+            boxShadow:"0 -2px 0 rgba(255,255,255,0.8), 0 -16px 40px rgba(100,160,200,0.25), 8px 0 16px rgba(166,210,220,0.2), -8px 0 16px rgba(255,255,255,0.7)",
             zIndex:50,
             paddingBottom:"env(safe-area-inset-bottom,0px)",
-            borderTop:"1px solid rgba(255,255,255,0.7)",
+            borderTop:"1.5px solid rgba(255,255,255,0.85)",
+            overflow:"hidden",
           }}>
+            {/* Reflet haut du nav */}
+            <div style={{position:"absolute",top:0,left:0,right:0,height:1,background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.9),transparent)",pointerEvents:"none"}}/>
             {NAV.map(n=>{
               const active = page===n.id;
               const accentColor = n.id==="rdv" ? "#818cf8" : DS.blue;
-              const accentGlow = n.id==="rdv" ? "rgba(129,140,248,0.3)" : "rgba(8,145,178,0.3)";
+              const gradFrom   = n.id==="rdv" ? "#818cf8" : "#06b6d4";
+              const gradTo     = n.id==="rdv" ? "#4f46e5" : "#0891b2";
               return (
                 <button key={n.id} onClick={()=>setPage(n.id)} style={{
                   flex:1,
-                  paddingTop: active ? 6 : 10,
-                  paddingBottom:12,
+                  paddingTop:8,
+                  paddingBottom:14,
                   border:"none",cursor:"pointer",background:"none",
-                  display:"flex",flexDirection:"column",alignItems:"center",gap:3,
+                  display:"flex",flexDirection:"column",alignItems:"center",gap:2,
                   WebkitTapHighlightColor:"transparent",
                   outline:"none",
                   position:"relative",
-                  transition:"padding .25s cubic-bezier(.22,1,.36,1)",
+                  minWidth:0,
                 }}>
-                  {/* Trait supérieur actif */}
-                  {active && (
+                  {/* Dot/pill indicateur en haut */}
+                  {active ? (
                     <div className="nav-pill-active" style={{
                       position:"absolute",
-                      top:0,left:"50%",transform:"translateX(-50%)",
-                      width:32,height:3,
-                      background:accentColor,
-                      borderRadius:"0 0 6px 6px",
-                      boxShadow:`0 2px 8px ${accentColor}88`,
-                      transformOrigin:"center",
+                      top:0,left:"50%",
+                      width:28,height:3,
+                      background:`linear-gradient(90deg,${gradFrom},${gradTo})`,
+                      borderRadius:"0 0 8px 8px",
+                      boxShadow:`0 2px 10px ${accentColor}99`,
                     }}/>
-                  )}
-                  {/* Bulle active */}
+                  ) : null}
+                  {/* Bulle fond active */}
                   {active && (
                     <div className="nav-bubble" style={{
                       position:"absolute",
-                      top:6,left:"50%",transform:"translateX(-50%)",
-                      width:46,height:34,
-                      borderRadius:12,
-                      background:`linear-gradient(160deg,${accentColor}22,${accentColor}10)`,
-                      boxShadow:`inset 1px 1px 3px ${accentColor}20, inset -1px -1px 2px rgba(255,255,255,0.6)`,
+                      top:5,left:"50%",
+                      width:50,height:38,
+                      borderRadius:14,
+                      background:`linear-gradient(150deg,${accentColor}28,${accentColor}12)`,
+                      boxShadow:`inset 2px 2px 4px ${accentColor}18, inset -1px -1px 3px rgba(255,255,255,0.7), 0 2px 8px ${accentColor}22`,
                       pointerEvents:"none",
                     }}/>
                   )}
                   {/* Icône */}
                   <div key={active?"a":"i"} className={active?"nav-icon-active":""} style={{
-                    width:40,height:32,borderRadius:11,
+                    width:44,height:32,
                     display:"flex",alignItems:"center",justifyContent:"center",
                     position:"relative",zIndex:1,
-                    filter: active ? `drop-shadow(0 2px 6px ${accentColor}66)` : "none",
-                    transition:"filter .2s",
+                    filter: active ? `drop-shadow(0 3px 8px ${accentColor}80)` : "none",
+                    transition:"filter .25s",
                   }}>
                     {n.icon(active)}
                   </div>
                   {/* Label */}
                   <span style={{
-                    fontSize:active?10:9.5,
+                    fontSize:active?10:9,
                     fontWeight: active ? 800 : 500,
-                    color: active ? accentColor : "#a0b4c2",
-                    letterSpacing: active ? .2 : .1,
+                    color: active ? accentColor : "#96afc0",
+                    letterSpacing: active ? .3 : .1,
                     transition:"all .2s",
                     lineHeight:1,
+                    position:"relative",zIndex:1,
                   }}>{n.l}</span>
                 </button>
               );
