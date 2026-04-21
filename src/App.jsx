@@ -422,6 +422,107 @@ const YEAR_NOW = new Date().getFullYear();
 // ─── Helpers champs passage (globaux) ────────────────────────────────────────
 const getPH  = p => { const v = p.tPH || p.ph; return v && Number(v)>0 ? Number(v) : null; };
 const getCL  = p => { const v = p.tChlore || p.chloreLibre || p.chlore; return v && Number(v)>0 ? Number(v) : null; };
+
+// ══════════════════════════════════════════════
+// 🧠 MOTEUR IA — Analyse eau & score santé piscine
+// ══════════════════════════════════════════════
+function analyseEauIA(passage) {
+  const ph  = getPH(passage);
+  const cl  = getCL(passage);
+  const sel = Number(passage.tSel)||0;
+  const pho = Number(passage.tPhosphate)||0;
+  const sta = Number(passage.tStabilisant)||0;
+  const alerts = [];
+  let score = 100;
+
+  if (ph !== null) {
+    if      (ph < 6.8)  { alerts.push({lvl:"danger", msg:`pH trop bas (${ph}) → risque corrosion, yeux irrités`, conseil:"Ajouter du pH+ (carbonate de sodium)"}); score -= 25; }
+    else if (ph < 7.0)  { alerts.push({lvl:"warn",   msg:`pH bas (${ph}) → surveiller`, conseil:"Légère correction pH+"}); score -= 10; }
+    else if (ph > 7.8)  { alerts.push({lvl:"danger", msg:`pH trop élevé (${ph}) → chlore inefficace`, conseil:"Ajouter du pH- (acide sulfurique dilué)"}); score -= 25; }
+    else if (ph > 7.6)  { alerts.push({lvl:"warn",   msg:`pH légèrement élevé (${ph})`, conseil:"Légère correction pH-"}); score -= 8; }
+    else                  alerts.push({lvl:"ok", msg:`pH optimal (${ph})`, conseil:""});
+  }
+  if (cl !== null) {
+    if      (cl < 0.3)  { alerts.push({lvl:"danger", msg:`Chlore insuffisant (${cl} ppm) → risque bactéries`, conseil:"Choc chlore urgent + vérifier filtre"}); score -= 30; }
+    else if (cl < 0.5)  { alerts.push({lvl:"warn",   msg:`Chlore bas (${cl} ppm)`, conseil:"Augmenter légèrement le chlore"}); score -= 12; }
+    else if (cl > 3.0)  { alerts.push({lvl:"danger", msg:`Chlore excessif (${cl} ppm) → irritations`, conseil:"Arrêter le chlore, laisser baisser naturellement"}); score -= 20; }
+    else if (cl > 2.0)  { alerts.push({lvl:"warn",   msg:`Chlore élevé (${cl} ppm)`, conseil:"Réduire légèrement le dosage"}); score -= 6; }
+    else                  alerts.push({lvl:"ok", msg:`Chlore optimal (${cl} ppm)`, conseil:""});
+  }
+  if (sel > 0) {
+    if      (sel < 2.5) { alerts.push({lvl:"warn", msg:`Sel trop bas (${sel} g/L)`, conseil:"Ajouter du sel (objectif 3-4 g/L)"}); score -= 8; }
+    else if (sel > 6)   { alerts.push({lvl:"warn", msg:`Sel trop élevé (${sel} g/L)`, conseil:"Diluer en ajoutant de l'eau"}); score -= 8; }
+  }
+  if (pho > 0 && pho > 0.3) {
+    alerts.push({lvl:"warn", msg:`Phosphates élevés (${pho} mg/L) → algues favorisées`, conseil:"Traitement anti-phosphates"}); score -= 10;
+  }
+  if (sta > 0) {
+    if      (sta > 75)  { alerts.push({lvl:"warn", msg:`Stabilisant trop élevé (${sta} ppm) → chlore bloqué`, conseil:"Vidange partielle"}); score -= 12; }
+    else if (sta < 20 && cl !== null) { alerts.push({lvl:"warn", msg:`Stabilisant bas (${sta} ppm)`, conseil:"Ajouter de l'acide cyanurique"}); score -= 5; }
+  }
+
+  const hasMesures = ph!==null || cl!==null;
+  const scoreF = Math.max(0, Math.min(100, score));
+  const emoji = scoreF >= 90 ? "🏆" : scoreF >= 75 ? "✅" : scoreF >= 50 ? "⚠️" : "🚨";
+  const label = scoreF >= 90 ? "Excellente" : scoreF >= 75 ? "Bonne" : scoreF >= 50 ? "À surveiller" : "Critique";
+  const color = scoreF >= 90 ? "#059669" : scoreF >= 75 ? "#0891b2" : scoreF >= 50 ? "#f59e0b" : "#ef4444";
+
+  return { score: scoreF, emoji, label, color, alerts: alerts.filter(a=>a.lvl!=="ok"), hasMesures };
+}
+
+// Score santé moyen d'un client (sur ses N derniers passages avec mesures)
+function scoreClientPiscine(clientId, passages, n=3) {
+  const cp = passages
+    .filter(p => p.clientId === clientId && (getPH(p) || getCL(p)))
+    .sort((a,b) => new Date(b.date) - new Date(a.date))
+    .slice(0, n);
+  if (cp.length === 0) return null;
+  const avg = cp.reduce((s,p) => s + analyseEauIA(p).score, 0) / cp.length;
+  return Math.round(avg);
+}
+
+// Widget Score Santé inline
+function ScoreSante({ score, size=38, showLabel=true }) {
+  if (score === null) return null;
+  const color = score >= 90 ? "#059669" : score >= 75 ? "#0891b2" : score >= 50 ? "#f59e0b" : "#ef4444";
+  const bg    = score >= 90 ? "#f0fdf4" : score >= 75 ? "#e0f2fe" : score >= 50 ? "#fffbeb" : "#fff1f2";
+  const emoji = score >= 90 ? "🏆" : score >= 75 ? "✅" : score >= 50 ? "⚠️" : "🚨";
+  const circ = 2 * Math.PI * (size*0.4);
+  const pct  = score / 100;
+  return (
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle cx={size/2} cy={size/2} r={size*0.4} fill="none" stroke="#dde8f0" strokeWidth={size*0.1}/>
+        <circle cx={size/2} cy={size/2} r={size*0.4} fill="none" stroke={color} strokeWidth={size*0.1}
+          strokeDasharray={`${circ*pct} ${circ*(1-pct)}`}
+          strokeLinecap="round" strokeDashoffset={circ*0.25}
+          style={{transform:"rotate(-90deg)",transformOrigin:"center",transition:"stroke-dasharray .6s ease"}}/>
+        <text x={size/2} y={size/2+size*0.075} textAnchor="middle" fontSize={size*0.26} fontWeight="800" fill={color} fontFamily="inherit">{score}</text>
+      </svg>
+      {showLabel && <div style={{fontSize:9,fontWeight:700,color,background:bg,padding:"1px 6px",borderRadius:20}}>{emoji} Santé eau</div>}
+    </div>
+  );
+}
+
+// Bandeau alertes IA eau
+function AlertesIA({ analyse }) {
+  if (!analyse.hasMesures || analyse.alerts.length === 0) return null;
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:4,marginTop:8}}>
+      {analyse.alerts.map((a,i) => (
+        <div key={i} style={{display:"flex",gap:8,padding:"7px 10px",borderRadius:10,
+          background:a.lvl==="danger"?"#fff1f2":"#fffbeb",
+          border:`1px solid ${a.lvl==="danger"?"#fca5a5":"#fde68a"}`}}>
+          <span style={{fontSize:14,flexShrink:0}}>{a.lvl==="danger"?"🚨":"⚠️"}</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:11,fontWeight:700,color:a.lvl==="danger"?"#be123c":"#b45309",lineHeight:1.3}}>{a.msg}</div>
+            {a.conseil&&<div style={{fontSize:10,color:"#64748b",marginTop:1}}>💡 {a.conseil}</div>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 const getTemp = p => { const v = p.temperature; return v && Number(v)>0 ? Number(v) : null; };
 const getResumePassage = p => {
   const parts = [];
@@ -826,10 +927,7 @@ function toastWarn(msg)    { showToast(msg,"warn"); }
 
 const confirmListeners = [];
 function subscribeConfirm(fn) { confirmListeners.push(fn); return ()=>{ const i=confirmListeners.indexOf(fn); if(i>=0) confirmListeners.splice(i,1); }; }
-// type: "danger" | "success" | "email" | "save" | "info"
-function showConfirm(msg, onOk, onCancel, opts={}) {
-  confirmListeners.forEach(fn=>fn({msg, onOk, onCancel, id:Date.now()+Math.random(), ...opts}));
-}
+function showConfirm(msg, onOk, onCancel) { confirmListeners.forEach(fn=>fn({msg, onOk, onCancel, id:Date.now()+Math.random()})); }
 
 function ToastContainer() {
   const [toasts, setToasts] = useState([]);
@@ -863,70 +961,23 @@ function ToastContainer() {
 
 function ConfirmModal() {
   const [item, setItem] = useState(null);
-  useEffect(()=>{ return subscribeConfirm(c=>setItem(c)); },[]);
+  useEffect(()=>{
+    return subscribeConfirm(c=>setItem(c));
+  },[]);
   if(!item) return null;
-
   const handle = (ok) => {
     setItem(null);
     if(ok && item.onOk) item.onOk();
     if(!ok && item.onCancel) item.onCancel();
   };
-
-  // Config visuelle selon type
-  const TYPE = {
-    danger:  { emoji:"🗑️",  title:"Confirmer la suppression", btnLabel:"Supprimer",   btnBg:"linear-gradient(135deg,#ef4444,#dc2626)", btnShadow:"rgba(220,38,38,0.35)",  accent:"#ef4444" },
-    email:   { emoji:"📧",  title:"Envoyer par email",         btnLabel:"Envoyer",     btnBg:"linear-gradient(135deg,#0891b2,#06b6d4)", btnShadow:"rgba(8,145,178,0.35)",  accent:"#0891b2" },
-    save:    { emoji:"💾",  title:"Enregistrer",                btnLabel:"Enregistrer", btnBg:"linear-gradient(135deg,#059669,#34d399)", btnShadow:"rgba(5,150,105,0.35)",  accent:"#059669" },
-    success: { emoji:"✅",  title:"Confirmer",                  btnLabel:"Confirmer",   btnBg:"linear-gradient(135deg,#059669,#34d399)", btnShadow:"rgba(5,150,105,0.35)",  accent:"#059669" },
-    info:    { emoji:"ℹ️",  title:"Confirmer l'action",        btnLabel:"Confirmer",   btnBg:"linear-gradient(135deg,#4f46e5,#818cf8)", btnShadow:"rgba(79,70,229,0.35)",  accent:"#4f46e5" },
-  };
-  const t = TYPE[item.type||"danger"];
-
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(8,18,40,0.55)",zIndex:99998,display:"flex",alignItems:"center",justifyContent:"center",padding:20,backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}}
-      onClick={()=>handle(false)}>
-      <div className="scale-in" onClick={e=>e.stopPropagation()}
-        style={{background:"#eef2f7",borderRadius:24,padding:"28px 24px 22px",maxWidth:340,width:"100%",
-          boxShadow:`0 0 0 1px ${t.accent}22, 8px 8px 24px rgba(166,210,220,0.7), -5px -5px 16px rgba(255,255,255,0.9)`,
-          fontFamily:"'Nunito',system-ui,sans-serif"}}>
-
-        {/* Icône */}
-        <div style={{width:64,height:64,borderRadius:20,background:`${t.accent}15`,border:`2px solid ${t.accent}30`,
-          display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px",fontSize:28}}>
-          {t.emoji}
-        </div>
-
-        {/* Titre */}
-        <div style={{fontSize:14,fontWeight:800,color:"#64748b",textAlign:"center",textTransform:"uppercase",
-          letterSpacing:0.8,marginBottom:8}}>{item.title||t.title}</div>
-
-        {/* Message */}
-        <div style={{fontSize:15,fontWeight:700,color:"#0c1222",textAlign:"center",lineHeight:1.5,marginBottom:6}}>
-          {item.msg}
-        </div>
-
-        {/* Détails optionnels */}
-        {item.detail && (
-          <div style={{fontSize:12,color:"#64748b",textAlign:"center",lineHeight:1.5,marginBottom:4,
-            padding:"8px 12px",borderRadius:10,background:"rgba(166,210,220,0.2)"}}>
-            {item.detail}
-          </div>
-        )}
-
-        {/* Boutons */}
-        <div style={{display:"flex",gap:10,marginTop:22}}>
-          <button onClick={()=>handle(false)}
-            style={{flex:1,padding:"12px",borderRadius:14,background:"#eef2f7",border:"none",cursor:"pointer",
-              fontWeight:700,fontSize:14,color:"#64748b",fontFamily:"inherit",
-              boxShadow:"4px 4px 8px rgba(166,210,220,0.6),-3px -3px 7px rgba(255,255,255,0.9)"}}>
-            Annuler
-          </button>
-          <button onClick={()=>handle(true)}
-            style={{flex:1,padding:"12px",borderRadius:14,background:t.btnBg,border:"none",cursor:"pointer",
-              fontWeight:800,fontSize:14,color:"#fff",fontFamily:"inherit",
-              boxShadow:`4px 4px 12px ${t.btnShadow}`}}>
-            {item.btnLabel||t.btnLabel}
-          </button>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:99998,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>handle(false)}>
+      <div className="scale-in" onClick={e=>e.stopPropagation()} style={{background:"#eef2f7",borderRadius:22,padding:"28px 24px",maxWidth:360,width:"100%",boxShadow:"8px 8px 24px rgba(166,210,220,0.7), -5px -5px 16px rgba(255,255,255,0.9)",fontFamily:"Inter,sans-serif"}}>
+        <div style={{fontSize:36,textAlign:"center",marginBottom:12}}>🗑️</div>
+        <div style={{fontSize:15,fontWeight:700,color:"#0c1222",textAlign:"center",marginBottom:8,lineHeight:1.4}}>{item.msg}</div>
+        <div style={{display:"flex",gap:10,marginTop:20}}>
+          <button onClick={()=>handle(false)} style={{flex:1,padding:"12px",borderRadius:14,background:"#eef2f7",border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#64748b",fontFamily:"inherit",boxShadow:"4px 4px 8px rgba(166,210,220,0.6), -3px -3px 7px rgba(255,255,255,0.9)"}}>Annuler</button>
+          <button onClick={()=>handle(true)} style={{flex:1,padding:"12px",borderRadius:14,background:"linear-gradient(135deg,#ef4444,#dc2626)",border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#fff",fontFamily:"inherit",boxShadow:"4px 4px 12px rgba(220,38,38,0.35)"}}>Supprimer</button>
         </div>
       </div>
     </div>
@@ -1312,7 +1363,7 @@ function FormClient({ initial, clients, onSave, onClose }) {
       </Section>
       <div style={{display:"flex",gap:10}}>
         <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
-        <BtnPrimary onClick={()=>{ if(!f.nom.trim()){ toastWarn("Nom du client requis"); return; } const prixCalc=totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0); showConfirm(`Enregistrer le client "${f.nom}" ?`, ()=>onSave({...f, prix:prixCalc}), null, {type:"save",title:"Enregistrer le client"}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
+        <BtnPrimary onClick={()=>{ if(!f.nom.trim()){ toastWarn("Nom du client requis"); return; } const prixCalc=totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0); onSave({...f, prix:prixCalc}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
       </div>
     </Modal>
   );
@@ -1620,7 +1671,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
             ))}
           </div>
           {selectedClient?.email&&(
-            <button onClick={()=>showConfirm(`Envoyer le bon de livraison à ${selectedClient?.email} ?`, ()=>envoyerEmailLivraison({...f,id:isEdit?f.id:uid()}, selectedClient), null, {type:"email", title:"Envoyer par email", detail:`Destinataire : ${selectedClient?.nom||"client"}`})}
+            <button onClick={()=>envoyerEmailLivraison({...f,id:isEdit?f.id:uid()}, selectedClient)}
               style={{padding:"11px",borderRadius:DS.radiusSm,background:"#f0f9ff",border:"1px solid #bae6fd",cursor:"pointer",fontWeight:700,fontSize:13,color:"#0891b2",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
               {Ico.send(13,"#0891b2")} Envoyer par email à {selectedClient.email}
             </button>
@@ -1640,7 +1691,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
               style={{padding:"11px 20px",borderRadius:DS.radiusSm,background:(STEP_INFO[step]||STEP_INFO[STEPS-1]).color,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,boxShadow:`0 3px 10px ${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}33`}}>
               {(STEP_INFO[step]||STEP_INFO[STEPS-1]).l} {Ico.next(13,"#fff")}
             </button>
-          : <button onClick={()=>{if(!f.clientId){ toastWarn("Client requis"); return; } if(!f.date){ toastWarn("Date requise"); return; } showConfirm("Enregistrer cette livraison ?", ()=>onSave({...f,id:isEdit?f.id:uid()}), null, {type:"save", title:"Enregistrer la livraison", detail: f.produits?.length ? f.produits.join(", ") : undefined});}}
+          : <button onClick={()=>{if(!f.clientId){ toastWarn("Client requis"); return; } if(!f.date){ toastWarn("Date requise"); return; }onSave({...f,id:isEdit?f.id:uid()});}}
               style={{padding:"11px 20px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#059669,#0d9488)",border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,boxShadow:"0 3px 10px rgba(5,150,105,0.3)"}}>
               {Ico.save(14,"#fff")} Enregistrer
             </button>
@@ -1707,7 +1758,7 @@ function FormRdv({ initial, clients, onSave, onClose }) {
       </Section>
       <div style={{display:"flex",gap:10}}>
         <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
-        <BtnPrimary onClick={()=>{ if(!f.date){ toastWarn("Date requise"); return; } showConfirm(`Enregistrer ce rendez-vous ?`, ()=>onSave({...f,id:isEdit?f.id:uid()}), null, {type:"save",title:"Enregistrer le RDV", detail: f.type ? `Type : ${f.type}${f.heure?" à "+f.heure:""}` : undefined}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
+        <BtnPrimary onClick={()=>{ if(!f.date){ toastWarn("Date requise"); return; } onSave({...f,id:isEdit?f.id:uid()}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
       </div>
     </Modal>
   );
@@ -1944,7 +1995,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                       {label:"Aperçu",  ico:Ico.search(12,DS.mid),  bg:"#f8fafc", color:DS.dark,   onClick:()=>setDetailPassageFiche(p)},
                       {label:"Modifier",ico:Ico.edit(12,DS.mid),    bg:"#f8fafc", color:DS.mid,    onClick:()=>onEditPassage&&onEditPassage(p)},
                       {label:"Rapport", ico:Ico.pdf(12,DS.blue),    bg:"#eff6ff", color:DS.blue,   onClick:()=>ouvrirRapport(p,client)},
-                      ...(client.email?[{label:"Email",ico:Ico.send(12,DS.green),bg:"#f0fdf4",color:DS.green,onClick:()=>showConfirm(`Envoyer le rapport à ${client?.email} ?`, ()=>envoyerEmail(p,client,onUpdatePassageStatus), null, {type:"email",title:"Envoyer le rapport",detail:`Client : ${client?.nom||""} — ${new Date(p.date).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})}`})}]:[]),
+                      ...(client.email?[{label:"Email",ico:Ico.send(12,DS.green),bg:"#f0fdf4",color:DS.green,onClick:()=>envoyerEmail(p,client,onUpdatePassageStatus)}]:[]),
                       ...(onDeletePassage?[{label:"",ico:Ico.trash(12,DS.red),bg:"#fef2f2",color:DS.red,onClick:()=>showConfirm("Supprimer ce passage ?",()=>onDeletePassage(p.id))}]:[]),
                     ].map((btn,i,arr)=>(
                       <button key={i} onClick={e=>{e.stopPropagation();btn.onClick();}}
@@ -2104,7 +2155,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
               style={{height:44,borderRadius:12,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,boxShadow:"0 2px 8px rgba(2,132,199,0.25)",WebkitTapHighlightColor:"transparent"}}>
               {Ico.contract(12,"#fff")} Contrat
             </button>
-            <button onClick={()=>showConfirm(`Envoyer le contrat à ${client?.email} pour signature ?`, ()=>envoyerContratSignature(client), null, {type:"email",title:"Envoyer le contrat",detail:`Client : ${client?.nom||""}`})}
+            <button onClick={()=>envoyerContratSignature(client)}
               style={{height:44,borderRadius:12,background:contratClient?.statut==="signe_complet"?DS.greenSoft:contratClient?.statut==="signe_client"?DS.blueSoft:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,WebkitTapHighlightColor:"transparent"}}>
               {Ico.sign(12,contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff")}
               {contratClient?.statut==="signe_complet"?"Signé":contratClient?.statut==="signe_client"?"Attente":"Envoyer"}
@@ -2202,7 +2253,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                   <div style={{display:"flex",borderTop:"1px solid #f8fafc"}}>
                     <button onClick={()=>{setEditLiv(l);setShowFormLiv(true);}} style={{flex:1,padding:"8px",background:"#f8fafc",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,fontWeight:700,color:DS.mid,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>{Ico.edit(11,DS.mid)} Modifier</button>
                     {client.email
-                      ?<button onClick={()=>showConfirm(`Envoyer le bon de livraison à ${client?.email} ?`, ()=>envoyerEmailLivraison(l,client), null, {type:"email", title:"Envoyer par email", detail:`Client : ${client?.nom||""}`})} style={{flex:1,padding:"8px",background:"#f0fdf4",border:"none",borderLeft:"1px solid #f8fafc",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,fontWeight:700,color:DS.green,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>{Ico.send(11,DS.green)} Email</button>
+                      ?<button onClick={()=>envoyerEmailLivraison(l,client)} style={{flex:1,padding:"8px",background:"#f0fdf4",border:"none",borderLeft:"1px solid #f8fafc",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,fontWeight:700,color:DS.green,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>{Ico.send(11,DS.green)} Email</button>
                       :<div style={{flex:1}}/>
                     }
                     <button onClick={()=>showConfirm("Supprimer ?",()=>onDeleteLivraison(l.id))} style={{width:38,padding:"8px",background:"#fef2f2",border:"none",borderLeft:"1px solid #f8fafc",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",WebkitTapHighlightColor:"transparent"}}>{Ico.trash(11,DS.red)}</button>
@@ -3820,7 +3871,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                 {Ico.pdf(18,DS.dark)} Télécharger PDF
               </button>
               {client?.email ? (
-                <button onClick={()=>showConfirm(`Envoyer le rapport à ${client?.email} ?`, ()=>envoyerEmail(f,client), null, {type:"email",title:"Envoyer le rapport par email",detail:`Client : ${client?.nom||""}`})} className="btn-hover" style={{padding:"14px",borderRadius:DS.radiusSm,background:DS.blueGrad,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 16px "+DS.blue+"44"}}>
+                <button onClick={()=>envoyerEmail(f,client)} className="btn-hover" style={{padding:"14px",borderRadius:DS.radiusSm,background:DS.blueGrad,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 16px "+DS.blue+"44"}}>
                   {Ico.send(16,"#fff")} Envoyer à {client.email}
                 </button>
               ) : (
@@ -4455,11 +4506,84 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
         )}
       </div>
 
-      {/* Action buttons */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:10,marginBottom:14}}>
-        <BtnPrimary onClick={onAddPassage} bg={DS.blueGrad} icon={Ico.clipboard(14,"#fff")} style={{width:"100%",fontSize:13,padding:"11px 8px",borderRadius:14}}>Passage</BtnPrimary>
-        <BtnPrimary onClick={()=>onAddLivraison()} bg={DS.blueGrad} icon={Ico.truck(14,"#fff")} style={{width:"100%",fontSize:13,padding:"11px 8px",borderRadius:14}}>Livraison</BtnPrimary>
-        <BtnPrimary onClick={onAddRdv} bg={DS.blueGrad} icon={Ico.rdv(14,"#fff")} style={{width:"100%",fontSize:13,padding:"11px 8px",borderRadius:14}}>RDV</BtnPrimary>
+      {/* ── Stats rapides animées ── */}
+      {(()=>{
+        const passagesMois = passages.filter(p=>new Date(p.date).getMonth()+1===MOIS_NOW&&new Date(p.date).getFullYear()===YEAR_NOW).length;
+        const passagesSemaine = passages.filter(p=>{const d=new Date(p.date);return (new Date()-d)/86400000<=7&&d<=new Date();}).length;
+        const alertesCount = clients.filter(c=>alerteClient(c,passages)==="rouge").length;
+        const scoresMoy = clients.map(c=>scoreClientPiscine(c.id,passages)).filter(s=>s!==null);
+        const scoreMoyen = scoresMoy.length>0 ? Math.round(scoresMoy.reduce((a,b)=>a+b,0)/scoresMoy.length) : null;
+        return (
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:14}}>
+            {[
+              {icon:"📋",val:passagesMois,label:"Ce mois",color:DS.blue,bg:"#e0f2fe"},
+              {icon:"🗓",val:passagesSemaine,label:"7 jours",color:"#7c3aed",bg:"#ede9fe"},
+              {icon:"🚨",val:alertesCount,label:"Urgents",color:alertesCount>0?"#ef4444":DS.green,bg:alertesCount>0?"#fff1f2":"#f0fdf4"},
+              {icon:"💧",val:scoreMoyen!==null?scoreMoyen+"%":"—",label:"Santé eau",color:scoreMoyen>=80?DS.green:scoreMoyen>=60?"#f59e0b":"#ef4444",bg:scoreMoyen>=80?"#f0fdf4":scoreMoyen>=60?"#fffbeb":"#fff1f2"},
+            ].map(({icon,val,label,color,bg},i)=>(
+              <div key={i} style={{background:"#eef2f7",borderRadius:16,padding:"12px 8px",textAlign:"center",
+                boxShadow:"4px 4px 10px rgba(166,210,220,0.65),-3px -3px 8px rgba(255,255,255,0.9)"}}>
+                <div style={{fontSize:18,marginBottom:4}}>{icon}</div>
+                <div style={{fontSize:18,fontWeight:900,color,lineHeight:1}}>{val}</div>
+                <div style={{fontSize:10,color:DS.mid,fontWeight:600,marginTop:2}}>{label}</div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
+      {/* ── Graphique barres passages 6 derniers mois ── */}
+      {(()=>{
+        const moisLabels=["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
+        const data = Array.from({length:6},(_,i)=>{
+          const m = ((MOIS_NOW-6+i+12)%12)+1;
+          const y = m > MOIS_NOW ? YEAR_NOW-1 : YEAR_NOW;
+          const count = passages.filter(p=>{const d=new Date(p.date);return d.getMonth()+1===m&&d.getFullYear()===y;}).length;
+          return {m, y, label:moisLabels[m-1], count, isNow:m===MOIS_NOW&&y===YEAR_NOW};
+        });
+        const maxVal = Math.max(...data.map(d=>d.count), 1);
+        return (
+          <div style={{background:"#eef2f7",borderRadius:18,padding:"16px 14px 12px",marginBottom:14,
+            boxShadow:"5px 5px 12px rgba(166,210,220,0.65),-4px -4px 10px rgba(255,255,255,0.9)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+              <div style={{fontWeight:800,fontSize:14,color:DS.dark}}>📊 Activité</div>
+              <div style={{fontSize:11,color:DS.mid,fontWeight:600}}>6 derniers mois</div>
+            </div>
+            <div style={{display:"flex",gap:6,alignItems:"flex-end",height:70}}>
+              {data.map((d,i)=>(
+                <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                  <div style={{fontSize:10,fontWeight:800,color:d.isNow?DS.blue:DS.mid,opacity:d.count>0?1:0.3}}>{d.count||""}</div>
+                  <div style={{
+                    width:"100%",borderRadius:6,transition:"height .5s ease",
+                    height: d.count>0 ? `${Math.max(8,(d.count/maxVal)*52)}px` : "4px",
+                    background: d.isNow
+                      ? "linear-gradient(180deg,#06b6d4,#0891b2)"
+                      : d.count>0 ? "linear-gradient(180deg,#93c5fd,#60a5fa)" : "#dde8f0",
+                    boxShadow: d.isNow ? "0 2px 8px rgba(8,145,178,0.4)" : "none",
+                  }}/>
+                  <div style={{fontSize:9,fontWeight:d.isNow?800:500,color:d.isNow?DS.blue:DS.mid}}>{d.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Action buttons ── */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:14}}>
+        {[
+          {label:"Passage",  icon:"🔧", bg:"linear-gradient(135deg,#0891b2,#06b6d4)", shadow:"rgba(8,145,178,0.35)",  fn:onAddPassage},
+          {label:"Livraison",icon:"🚚", bg:"linear-gradient(135deg,#f59e0b,#f97316)", shadow:"rgba(245,158,11,0.35)", fn:()=>onAddLivraison()},
+          {label:"RDV",      icon:"📅", bg:"linear-gradient(135deg,#7c3aed,#818cf8)", shadow:"rgba(124,58,237,0.35)", fn:onAddRdv},
+        ].map(({label,icon,bg,shadow,fn})=>(
+          <button key={label} onClick={fn} style={{padding:"12px 6px",borderRadius:16,border:"none",cursor:"pointer",
+            background:bg,color:"#fff",fontFamily:"inherit",fontWeight:800,fontSize:13,
+            display:"flex",flexDirection:"column",alignItems:"center",gap:4,
+            boxShadow:`0 4px 14px ${shadow}`,transition:"transform .15s"}}>
+            <span style={{fontSize:22}}>{icon}</span>
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* RDVs Aujourd'hui */}
@@ -4822,6 +4946,44 @@ function PassageDetailModal({ passage, client, onClose }) {
   );
 }
 
+// ══════════════════════════════════════════════
+// 📋 PASSAGE SWIPE CARD — composant avec swipe mobile
+// ══════════════════════════════════════════════
+function PassageSwipeCard({ p, c, idx, onDelete, onEdit, onUpdatePassageStatus, onDetailClick, children }) {
+  const [swiped, setSwiped] = useState(false);
+  const swipeH = useSwipe(()=>setSwiped(true), ()=>setSwiped(false));
+  return (
+    <div className="fade-in" {...swipeH}
+      style={{position:"relative",overflow:"hidden",borderRadius:16,animationDelay:`${idx*0.05}s`}}>
+      {/* Actions révélées au swipe gauche */}
+      {swiped && (
+        <div style={{position:"absolute",right:0,top:0,bottom:0,display:"flex",zIndex:2}}>
+          <button onClick={()=>{setSwiped(false);ouvrirRapport(p,c);}}
+            style={{width:70,background:DS.blue,border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,color:"#fff",fontSize:10,fontWeight:700,fontFamily:"inherit"}}>
+            {Ico.pdf(16,"#fff")}<span>PDF</span>
+          </button>
+          {c?.email && (
+            <button onClick={()=>{setSwiped(false);showConfirm(`Envoyer à ${c.email} ?`,()=>envoyerEmail(p,c,onUpdatePassageStatus),null,{type:"email",title:"Envoyer email"});}}
+              style={{width:70,background:DS.green,border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,color:"#fff",fontSize:10,fontWeight:700,fontFamily:"inherit"}}>
+              {Ico.send(16,"#fff")}<span>Email</span>
+            </button>
+          )}
+          <button onClick={()=>{setSwiped(false);showConfirm("Supprimer ce passage ?",()=>onDelete(p.id));}}
+            style={{width:60,background:DS.red,border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,color:"#fff",fontSize:10,fontWeight:700,fontFamily:"inherit"}}>
+            {Ico.trash(16,"#fff")}<span>Suppr.</span>
+          </button>
+        </div>
+      )}
+      {/* Contenu glissant */}
+      <div style={{transform:swiped?"translateX(-200px)":"translateX(0)",transition:"transform .25s ease"}}>
+        <Card style={{borderRadius:16,margin:0}}>
+          {children}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 // PAGE PASSAGES
 function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePassageStatus, onAddClient }) {
   const [filter,setFilter]=useState("mois");
@@ -4883,7 +5045,7 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
             const rapportStatus = getRapportStatus(p);
             const rapportMeta = RAPPORT_STATUS[rapportStatus];
             return (
-              <Card key={p.id} className="fade-in" style={{animationDelay:`${idx*0.05}s`}}>
+              <PassageSwipeCard key={p.id} p={p} c={c} idx={idx} onDelete={onDelete} onEdit={onEdit} onUpdatePassageStatus={onUpdatePassageStatus} onDetailClick={setDetailPassage}>
                 <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
                   <Avatar nom={c?.nom||"?"} size={42} photo={c?.photoPiscine}/>
                   <div style={{flex:1,minWidth:0}}>
@@ -4909,6 +5071,8 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                       {_cl&&<Tag color={clOk?DS.green:DS.red} style={{fontSize:11}}>Cl {_cl}</Tag>}
                       <Tag color={rapportMeta.color} bg={rapportMeta.bg} style={{fontSize:11}}>{rapportMeta.label}</Tag>
                     </div>
+                    {/* Alertes IA eau */}
+                    {(()=>{ const a=analyseEauIA(p); return a.hasMesures&&a.alerts.length>0?<AlertesIA analyse={a}/>:null; })()}
                     {(p.photoArrivee||p.photoDepart) && (
                       <div style={{display:"flex",gap:6,marginBottom:6}}>
                         {p.photoArrivee && (<div style={{position:"relative"}}><img src={p.photoArrivee} alt="Arrivée" style={{height:48,width:72,objectFit:"cover",borderRadius:7,border:"1px solid "+DS.border}}/><span style={{position:"absolute",bottom:2,left:3,fontSize:8,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:3,padding:"1px 4px"}}>Arr.</span></div>)}
@@ -4925,7 +5089,7 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                         {Ico.pdf(14,DS.blue)} Rapport PDF
                       </button>
                       {c?.email
-                        ? <button onClick={()=>showConfirm(`Envoyer le rapport à ${c?.email} ?`, ()=>envoyerEmail(p,c,onUpdatePassageStatus), null, {type:"email",title:"Envoyer le rapport par email",detail:`Client : ${c?.nom||""} — ${new Date(p.date).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})}`})} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.green,fontFamily:"inherit",fontWeight:700}}>
+                        ? <button onClick={()=>envoyerEmail(p,c,onUpdatePassageStatus)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.green,fontFamily:"inherit",fontWeight:700}}>
                             {Ico.send(13,DS.green)} Envoyer email
                           </button>
                         : <div style={{borderRadius:10,background:DS.light,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:DS.mid,fontWeight:500}}>{Ico.mail(12,DS.mid)} Pas d'email</div>
@@ -4939,7 +5103,7 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                     </div>
                   </div>
                 </div>
-              </Card>
+              </PassageSwipeCard>
             );
           })}
         </div>
@@ -5838,12 +6002,22 @@ export default function App() {
   const [showFormRdv, setShowFormRdv] = useState(false);
   const [editRdv, setEditRdv] = useState(null);
   const [showModalAlertes, setShowModalAlertes] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const [dismissedAlertes, setDismissedAlertes] = useState(()=>{ try{ return JSON.parse(localStorage.getItem("briblue_dismissed_alertes")||"[]"); }catch{return [];} });
   const dismissAlerte = (clientId) => { setDismissedAlertes(prev=>{ const next=[...new Set([...prev,clientId])]; try{ localStorage.setItem("briblue_dismissed_alertes", JSON.stringify(next)); }catch{} return next; }); };
   const prevTaskCount = useRef(0);
   const isMobile = useIsMobile();
 
-  useEffect(()=>{ setupPWA(); try { if(sessionStorage.getItem("bb_auth")==="1") setLoggedIn(true); } catch {} },[]);
+  useEffect(()=>{
+    setupPWA();
+    try { if(sessionStorage.getItem("bb_auth")==="1") setLoggedIn(true); } catch {}
+    const handleKey = (e) => {
+      if ((e.metaKey||e.ctrlKey) && e.key==="k") { e.preventDefault(); setShowSearch(s=>!s); }
+      if (e.key==="Escape") setShowSearch(false);
+    };
+    window.addEventListener("keydown", handleKey);
+    return ()=>window.removeEventListener("keydown", handleKey);
+  },[]);
 
   useEffect(()=>{
     if(!loggedIn) return;
@@ -6007,6 +6181,11 @@ export default function App() {
               <span style={{fontSize:12,fontWeight:600,color:"#64748b"}}>Import</span>
             </button>
           )}
+
+          {/* Recherche globale */}
+          <button onClick={()=>setShowSearch(true)} title="Recherche" style={{width:isMobile?40:40,height:40,borderRadius:12,background:"#eef2f7",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"3px 3px 8px rgba(166,210,220,0.6),-2px -2px 6px rgba(255,255,255,0.9)"}}>
+            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          </button>
 
           {/* Stock — vert */}
           <button onClick={()=>setShowStock(true)} title="Stock" style={{position:"relative",width:isMobile?40:undefined,height:isMobile?40:40,padding:isMobile?0:"0 14px",display:"flex",alignItems:"center",justifyContent:"center",gap:6,borderRadius:isMobile?12:20,background:"linear-gradient(135deg,#059669,#10b981)",border:"none",cursor:"pointer",flexShrink:0,fontFamily:"inherit",boxShadow:"3px 3px 10px rgba(5,150,105,0.4),-2px -2px 6px rgba(255,255,255,0.6)"}}>
@@ -6316,12 +6495,146 @@ export default function App() {
           </Modal>
         );
       })()}
-      <ToastContainer/>
-      <ConfirmModal/>
     </div>
     </>
   );
 }
+
+
+// ══════════════════════════════════════════════
+// 👆 SWIPE HOOK (mobile)
+// ══════════════════════════════════════════════
+function useSwipe(onSwipeLeft, onSwipeRight, threshold=60) {
+  const startX = useRef(null);
+  const handlers = {
+    onTouchStart: (e) => { startX.current = e.touches[0].clientX; },
+    onTouchEnd:   (e) => {
+      if (startX.current === null) return;
+      const dx = e.changedTouches[0].clientX - startX.current;
+      if (dx < -threshold && onSwipeLeft)  onSwipeLeft();
+      if (dx >  threshold && onSwipeRight) onSwipeRight();
+      startX.current = null;
+    },
+  };
+  return handlers;
+}
+
+// ══════════════════════════════════════════════
+// 🔍 RECHERCHE GLOBALE
+// ══════════════════════════════════════════════
+function SearchGlobal({ clients, passages, rdvs=[], onClientClick, onClose }) {
+  const [q, setQ] = useState("");
+  const inputRef = useRef(null);
+
+  useEffect(()=>{ setTimeout(()=>inputRef.current?.focus(), 100); }, []);
+
+  const results = useMemo(()=>{
+    if (!q.trim() || q.length < 2) return { clients:[], passages:[], rdvs:[] };
+    const ql = q.toLowerCase();
+    return {
+      clients:  clients.filter(c => c.nom.toLowerCase().includes(ql) || (c.adresse||"").toLowerCase().includes(ql) || (c.email||"").toLowerCase().includes(ql)).slice(0,5),
+      passages: passages.filter(p => {
+        const c = clients.find(x=>x.id===p.clientId);
+        return (c?.nom||"").toLowerCase().includes(ql) || (p.type||"").toLowerCase().includes(ql) || (p.commentaires||"").toLowerCase().includes(ql) || p.date.includes(ql);
+      }).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,5),
+      rdvs: rdvs.filter(r => {
+        const c = clients.find(x=>x.id===r.clientId);
+        return (c?.nom||"").toLowerCase().includes(ql) || (r.type||"").toLowerCase().includes(ql);
+      }).slice(0,3),
+    };
+  }, [q, clients, passages, rdvs]);
+
+  const total = results.clients.length + results.passages.length + results.rdvs.length;
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(8,18,40,0.6)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",paddingTop:60,backdropFilter:"blur(4px)"}}
+      onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:520,padding:"0 16px"}}>
+        {/* Barre de recherche */}
+        <div style={{background:"#fff",borderRadius:18,padding:"14px 16px",boxShadow:"0 20px 60px rgba(0,0,0,0.3)",display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+          <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input ref={inputRef} value={q} onChange={e=>setQ(e.target.value)}
+            placeholder="Rechercher client, passage, date…"
+            style={{flex:1,border:"none",outline:"none",fontSize:16,color:"#0f172a",fontFamily:"inherit",background:"transparent"}}/>
+          {q && <button onClick={()=>setQ("")} style={{background:"none",border:"none",cursor:"pointer",color:"#94a3b8",fontSize:18,lineHeight:1}}>✕</button>}
+          <button onClick={onClose} style={{background:"#f1f5f9",border:"none",cursor:"pointer",borderRadius:8,padding:"4px 10px",fontSize:11,fontWeight:700,color:"#64748b",fontFamily:"inherit"}}>Esc</button>
+        </div>
+
+        {/* Résultats */}
+        {q.length >= 2 && (
+          <div style={{background:"#fff",borderRadius:16,overflow:"hidden",boxShadow:"0 12px 40px rgba(0,0,0,0.2)"}}>
+            {total === 0 && (
+              <div style={{padding:24,textAlign:"center",color:"#94a3b8",fontSize:14}}>Aucun résultat pour « {q} »</div>
+            )}
+
+            {results.clients.length > 0 && (
+              <div>
+                <div style={{padding:"8px 14px 4px",fontSize:10,fontWeight:800,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid #f1f5f9"}}>👥 Clients</div>
+                {results.clients.map(c=>(
+                  <button key={c.id} onClick={()=>{onClientClick(c);onClose();}}
+                    style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"none",border:"none",borderBottom:"1px solid #f8fafc",cursor:"pointer",textAlign:"left",fontFamily:"inherit",transition:"background .1s"}}
+                    onMouseEnter={e=>e.currentTarget.style.background="#f8fafc"} onMouseLeave={e=>e.currentTarget.style.background="none"}>
+                    <Avatar nom={c.nom} size={32}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:700,fontSize:13,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
+                      <div style={{fontSize:11,color:"#64748b"}}>{c.formule}{c.bassin?` · ${c.bassin}`:""}</div>
+                    </div>
+                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {results.passages.length > 0 && (
+              <div>
+                <div style={{padding:"8px 14px 4px",fontSize:10,fontWeight:800,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid #f1f5f9"}}>📋 Passages</div>
+                {results.passages.map(p=>{
+                  const c = clients.find(x=>x.id===p.clientId);
+                  return (
+                    <button key={p.id} onClick={()=>{if(c){onClientClick(c);}onClose();}}
+                      style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"none",border:"none",borderBottom:"1px solid #f8fafc",cursor:"pointer",textAlign:"left",fontFamily:"inherit"}}
+                      onMouseEnter={e=>e.currentTarget.style.background="#f8fafc"} onMouseLeave={e=>e.currentTarget.style.background="none"}>
+                      <div style={{width:32,height:32,borderRadius:10,background:"#e0f2fe",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>🔧</div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontWeight:700,fontSize:13,color:"#0f172a"}}>{c?.nom||p.clientId}</div>
+                        <div style={{fontSize:11,color:"#64748b"}}>{p.type} · {new Date(p.date).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {results.rdvs.length > 0 && (
+              <div>
+                <div style={{padding:"8px 14px 4px",fontSize:10,fontWeight:800,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid #f1f5f9"}}>📅 RDV</div>
+                {results.rdvs.map(r=>{
+                  const c = clients.find(x=>x.id===r.clientId);
+                  return (
+                    <div key={r.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderBottom:"1px solid #f8fafc"}}>
+                      <div style={{width:32,height:32,borderRadius:10,background:"#ede9fe",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>📅</div>
+                      <div style={{flex:1}}>
+                        <div style={{fontWeight:700,fontSize:13,color:"#0f172a"}}>{r.type}</div>
+                        <div style={{fontSize:11,color:"#64748b"}}>{c?.nom||""} · {new Date(r.date).toLocaleDateString("fr",{day:"2-digit",month:"short"})}{r.heure?` à ${r.heure}`:""}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {q.length === 0 && (
+          <div style={{background:"rgba(255,255,255,0.1)",borderRadius:12,padding:"12px 16px",textAlign:"center",fontSize:12,color:"rgba(255,255,255,0.6)"}}>
+            Tapez au moins 2 caractères pour rechercher
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ================================================================
 // IMPORT CONNECTEAM
 // ================================================================
