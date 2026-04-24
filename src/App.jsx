@@ -211,6 +211,104 @@ function useOnlineStatus() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// useFormDraft — brouillons auto réutilisable pour TOUS les formulaires
+// Sauve en localStorage toutes les 400ms + flush garanti iOS/Android/Desktop
+// Usage :
+//   const { hasDraft, restoreDraft, discardDraft, clearDraft } =
+//     useFormDraft(`briblue_draft_client_${initial?.id||'new'}`, f, setF, step, setStep,
+//                  () => !!f.nom || !!f.telephone);  // test "contenu réel"
+// ═══════════════════════════════════════════════════════════════════════════
+function useFormDraft(draftKey, formState, setFormState, step, setStep, hasContentFn) {
+  const loadDraft = () => {
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (!raw) return null;
+      const d = JSON.parse(raw);
+      if (d?._savedAt && (Date.now() - d._savedAt) > 7*24*3600*1000) {
+        localStorage.removeItem(draftKey);
+        return null;
+      }
+      return d;
+    } catch { return null; }
+  };
+  const [draft] = useState(loadDraft);
+  const [hasDraft, setHasDraft] = useState(!!draft);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const draftTimerRef = useRef(null);
+
+  // Auto-save debounced 400ms
+  useEffect(() => {
+    if (!draftRestored) return; // attends la décision utilisateur
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = setTimeout(() => {
+      try {
+        if (hasContentFn()) {
+          localStorage.setItem(draftKey, JSON.stringify({...formState, _savedAt: Date.now(), _step: step}));
+        }
+      } catch {}
+    }, 400);
+    return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current); };
+  }, [formState, step, draftRestored, draftKey]);
+
+  // Flush garanti avant fermeture
+  useEffect(() => {
+    const flush = () => {
+      try {
+        if (draftRestored && hasContentFn()) {
+          localStorage.setItem(draftKey, JSON.stringify({...formState, _savedAt: Date.now(), _step: step}));
+        }
+      } catch {}
+    };
+    const onVis = () => { if (document.visibilityState === 'hidden') flush(); };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('pagehide', flush);
+    window.addEventListener('beforeunload', flush);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('pagehide', flush);
+      window.removeEventListener('beforeunload', flush);
+    };
+  }, [formState, step, draftRestored, draftKey]);
+
+  const restoreDraft = () => {
+    if (!draft) return;
+    const { _savedAt, _step, ...rest } = draft;
+    setFormState(prev => ({...prev, ...rest}));
+    if (_step && setStep) setStep(_step);
+    setHasDraft(false);
+    setDraftRestored(true);
+  };
+  const discardDraft = () => {
+    try { localStorage.removeItem(draftKey); } catch {}
+    setHasDraft(false);
+    setDraftRestored(true);
+  };
+  const clearDraft = () => {
+    try { localStorage.removeItem(draftKey); } catch {}
+  };
+  return { hasDraft, restoreDraft, discardDraft, clearDraft };
+}
+
+// Bannière de restauration glassmorphique — réutilisable
+function DraftBanner({ onRestore, onDiscard }) {
+  return (
+    <div className="fade-in" style={{margin:"-4px 0 14px",padding:"14px 16px",borderRadius:16,background:"linear-gradient(135deg,rgba(245,158,11,0.18),rgba(217,119,6,0.12))",border:"1px solid rgba(245,158,11,0.35)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+      <div style={{width:40,height:40,borderRadius:12,background:"linear-gradient(135deg,#f59e0b,#d97706)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"0 6px 20px rgba(245,158,11,0.35)"}}>
+        <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 11-9-9c2.5 0 4.8 1 6.5 2.7"/><polyline points="21 3 21 9 15 9"/></svg>
+      </div>
+      <div style={{flex:1,minWidth:180}}>
+        <div style={{fontSize:14,fontWeight:800,color:"#92400e"}}>Brouillon non sauvegardé</div>
+        <div style={{fontSize:12,color:"#b45309",marginTop:2}}>Une saisie en cours a été retrouvée — la reprendre ?</div>
+      </div>
+      <div style={{display:"flex",gap:6}}>
+        <button onClick={onDiscard} style={{padding:"8px 12px",borderRadius:10,border:"1px solid rgba(180,83,9,0.3)",background:"rgba(255,255,255,0.5)",color:"#92400e",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"inherit",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)"}}>Ignorer</button>
+        <button onClick={onRestore} style={{padding:"8px 14px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:"inherit",boxShadow:"0 4px 14px rgba(245,158,11,0.4)"}}>Restaurer</button>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // STORAGE — Firebase Firestore (robuste Safari iOS / Android / Desktop)
 // ═══════════════════════════════════════════════════════════════════════════
 // Stratégie :
@@ -1363,8 +1461,16 @@ function FormClient({ initial, clients, onSave, onClose }) {
   const totalC = totalAnnuel(f.moisParMois,"controle");
   const total = totalE + totalC;
 
+  // Brouillon auto (nouveau client uniquement)
+  const { hasDraft, restoreDraft, discardDraft, clearDraft } = useFormDraft(
+    `briblue_draft_client_${initial?.id||"new"}`,
+    f, setF, null, null,
+    () => !!(f.nom?.trim() || f.tel || f.email || f.adresse)
+  );
+
   return (
     <Modal title={isNew ? "Nouveau client" : `Modifier — ${f.nom}`} onClose={onClose} wide>
+      {hasDraft && !initial?.id && <DraftBanner onRestore={restoreDraft} onDiscard={discardDraft}/>}
       <Section title="Informations">
         <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12}}>
           <div style={{gridColumn:"1/-1"}}><Input label="Nom complet *" value={f.nom} onChange={e=>set("nom",e.target.value)} placeholder="Dupont Marie"/></div>
@@ -1461,7 +1567,7 @@ function FormClient({ initial, clients, onSave, onClose }) {
           </div>
         </div>
       </Section>
-      <Section title="📝 Notes tarifaires (optionnel)">
+      <Section title="Notes tarifaires (optionnel)">
         <div style={{fontSize:12,color:DS.mid,marginBottom:8,lineHeight:1.5}}>
           Ces notes apparaîtront dans le contrat — ex: produits inclus, remise accordée, condition spéciale…
         </div>
@@ -1498,7 +1604,7 @@ function FormClient({ initial, clients, onSave, onClose }) {
       </Section>
       <div style={{display:"flex",gap:10}}>
         <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
-        <BtnPrimary onClick={()=>{ if(!f.nom.trim()){ toastWarn("Nom du client requis"); return; } const prixCalc=totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0); onSave({...f, prix:prixCalc}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
+        <BtnPrimary onClick={()=>{ if(!f.nom.trim()){ toastWarn("Nom du client requis"); return; } const prixCalc=totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0); clearDraft(); onSave({...f, prix:prixCalc}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
       </div>
     </Modal>
   );
@@ -1604,6 +1710,13 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
   const set = (k,v) => setF(p=>({...p,[k]:v}));
   const PLIV = produitsStock.length > 0 ? produitsStock : PRODUITS_DEFAUT;
   const toggleProduit = (p) => { const arr = f.produits.includes(p) ? f.produits.filter(x=>x!==p) : [...f.produits,p]; set("produits",arr); };
+
+  // Brouillon auto
+  const { hasDraft, restoreDraft, discardDraft, clearDraft } = useFormDraft(
+    `briblue_draft_livraison_${initial?.id||"new"}`,
+    f, setF, step, setStep,
+    () => !!(f.produits?.length || f.description?.trim() || f.montant)
+  );
   const selectedClient = clients.find(c=>c.id===f.clientId);
 
   const addPhotos = (e) => {
@@ -1633,7 +1746,8 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
   const pct = Math.round((step-1)/STEPS*100);
 
   return (
-    <Modal title={isEdit?"Modifier la livraison":"📦 Nouvelle livraison"} onClose={onClose} wide>
+    <Modal title={isEdit?"Modifier la livraison":"Nouvelle livraison"} onClose={onClose} wide>
+      {hasDraft && !isEdit && <DraftBanner onRestore={restoreDraft} onDiscard={discardDraft}/>}
       {/* Stepper */}
       <div style={{marginBottom:14}}>
         <div style={{height:4,background:DS.light,borderRadius:99,marginBottom:10,overflow:"hidden"}}>
@@ -1827,7 +1941,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
               style={{padding:"11px 20px",borderRadius:DS.radiusSm,background:(STEP_INFO[step]||STEP_INFO[STEPS-1]).color,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,boxShadow:`0 3px 10px ${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}33`}}>
               {(STEP_INFO[step]||STEP_INFO[STEPS-1]).l} {Ico.next(13,"#fff")}
             </button>
-          : <button onClick={()=>{if(!f.clientId){ toastWarn("Client requis"); return; } if(!f.date){ toastWarn("Date requise"); return; }onSave({...f,id:isEdit?f.id:uid()});}}
+          : <button onClick={()=>{if(!f.clientId){ toastWarn("Client requis"); return; } if(!f.date){ toastWarn("Date requise"); return; } clearDraft(); onSave({...f,id:isEdit?f.id:uid()});}}
               style={{padding:"11px 20px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#059669,#0d9488)",border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,boxShadow:"0 3px 10px rgba(5,150,105,0.3)"}}>
               {Ico.save(14,"#fff")} Enregistrer
             </button>
@@ -1846,8 +1960,16 @@ function FormRdv({ initial, clients, onSave, onClose }) {
   });
   const set = (k,v) => setF(p=>({...p,[k]:v}));
 
+  // Brouillon auto (nouveau RDV uniquement)
+  const { hasDraft, restoreDraft, discardDraft, clearDraft } = useFormDraft(
+    `briblue_draft_rdv_${initial?.id||"new"}`,
+    f, setF, null, null,
+    () => !!(f.clientId || f.description?.trim() || (f.type && f.type !== "Rendez-vous client"))
+  );
+
   return (
     <Modal title={isEdit ? "Modifier le RDV" : "Nouveau rendez-vous"} onClose={onClose}>
+      {hasDraft && !isEdit && <DraftBanner onRestore={restoreDraft} onDiscard={discardDraft}/>}
       <Section title="Client (optionnel)">
         <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:180,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
           <button onClick={()=>set("clientId","")} style={{padding:"8px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+(f.clientId===""?DS.blue:DS.border),background:f.clientId===""?DS.blueSoft:DS.white,cursor:"pointer",textAlign:"left",fontFamily:"inherit",fontSize:15,fontWeight:f.clientId===""?700:400,color:f.clientId===""?DS.blue:DS.mid}}>— Aucun client —</button>
@@ -1894,7 +2016,7 @@ function FormRdv({ initial, clients, onSave, onClose }) {
       </Section>
       <div style={{display:"flex",gap:10}}>
         <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
-        <BtnPrimary onClick={()=>{ if(!f.date){ toastWarn("Date requise"); return; } onSave({...f,id:isEdit?f.id:uid()}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
+        <BtnPrimary onClick={()=>{ if(!f.date){ toastWarn("Date requise"); return; } clearDraft(); onSave({...f,id:isEdit?f.id:uid()}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
       </div>
     </Modal>
   );
@@ -1932,76 +2054,90 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
   const pct = total>0?Math.round(eff/total*100):0;
   const mensualite = (()=>{const {m11}=calcMensualites(client.prix||0);return m11;})();
 
-  // TABS config
+  // TABS config — icônes SVG modernes minimalistes
+  const TabIcon = ({name, size=16, color="currentColor"}) => {
+    const s = {width:size,height:size,viewBox:"0 0 24 24",fill:"none",stroke:color,strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round"};
+    switch(name) {
+      case "historique": return <svg {...s}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
+      case "passages":   return <svg {...s}><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>;
+      case "saisons":    return <svg {...s}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
+      case "infos":      return <svg {...s}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>;
+      case "rdvs":       return <svg {...s}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="12" cy="15" r="1.5" fill={color}/></svg>;
+      case "livraisons": return <svg {...s}><path d="M16 16V7a1 1 0 00-1-1H4a1 1 0 00-1 1v9h13z"/><path d="M16 10h3l3 3v3h-6"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></svg>;
+      case "carnet":     return <svg {...s}><path d="M4 4.5A2.5 2.5 0 016.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15z"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>;
+      default: return null;
+    }
+  };
   const TABS = [
-    {id:"historique", label:"Historique", ico:"🕐"},
-    {id:"passages",   label:"Passages",   ico:"🔧"},
-    {id:"saisons",    label:"Planning",   ico:"📅"},
-    {id:"infos",      label:"Infos",      ico:"ℹ️"},
-    {id:"rdvs",       label:"RDV",        ico:"📆"},
-    {id:"livraisons", label:"Livraisons", ico:"📦"},
-    {id:"carnet",     label:"Carnet",     ico:"📱"},
+    {id:"historique", label:"Historique"},
+    {id:"passages",   label:"Passages"},
+    {id:"saisons",    label:"Planning"},
+    {id:"infos",      label:"Infos"},
+    {id:"rdvs",       label:"RDV"},
+    {id:"livraisons", label:"Livraisons"},
+    {id:"carnet",     label:"Carnet"},
   ];
 
   return (
     <>
     <Modal title="" onClose={onClose} wide>
-      {/* ══════════════════ HERO HEADER ══════════════════ */}
+      {/* ══════════════════ HERO HEADER GLASS ══════════════════ */}
       <div style={{margin:isMobile?"-18px -20px 0":"-24px -28px 0"}}>
 
-        {/* Bandeau gradient */}
-        <div style={{background:"linear-gradient(135deg,#0c1f3f 0%,#0e3460 60%,#0891b2 100%)",padding:"20px 20px 0",position:"relative",overflow:"hidden"}}>
-          {/* Décoration cercle bg */}
-          <div style={{position:"absolute",right:-40,top:-40,width:180,height:180,borderRadius:"50%",background:"rgba(255,255,255,0.04)",pointerEvents:"none"}}/>
-          <div style={{position:"absolute",right:40,bottom:-20,width:100,height:100,borderRadius:"50%",background:"rgba(8,145,178,0.15)",pointerEvents:"none"}}/>
+        {/* Bandeau verre translucide avec dégradé cyan/teal — plus "carré et sombre" */}
+        <div style={{background:"linear-gradient(135deg, rgba(34,211,238,0.25) 0%, rgba(6,182,212,0.35) 40%, rgba(99,102,241,0.28) 100%)",backdropFilter:"blur(30px) saturate(180%)",WebkitBackdropFilter:"blur(30px) saturate(180%)",padding:"22px 20px 0",position:"relative",overflow:"hidden",borderBottom:"1px solid rgba(255,255,255,0.3)"}}>
+          {/* Orbes lumineuses décoratives */}
+          <div style={{position:"absolute",right:-60,top:-60,width:220,height:220,borderRadius:"50%",background:"radial-gradient(circle, rgba(34,211,238,0.35) 0%, transparent 70%)",filter:"blur(20px)",pointerEvents:"none"}}/>
+          <div style={{position:"absolute",left:-40,bottom:-40,width:140,height:140,borderRadius:"50%",background:"radial-gradient(circle, rgba(168,85,247,0.25) 0%, transparent 70%)",filter:"blur(16px)",pointerEvents:"none"}}/>
 
           {/* Ligne 1 : nom + badge alerte */}
-          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10,marginBottom:8,position:"relative"}}>
+          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10,marginBottom:10,position:"relative"}}>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:isMobile?18:22,fontWeight:900,color:"#fff",lineHeight:1.15,letterSpacing:-.3}}>{client.nom}</div>
-              <div style={{fontSize:12,color:"rgba(255,255,255,0.55)",marginTop:3,fontWeight:500}}>
+              <div style={{fontSize:isMobile?20:26,fontWeight:900,color:"#0b1220",lineHeight:1.15,letterSpacing:-0.5}}>{client.nom}</div>
+              <div style={{fontSize:12,color:"rgba(11,18,32,0.65)",marginTop:4,fontWeight:600}}>
                 {[client.formule,client.bassin,client.volume?client.volume+"m³":null].filter(Boolean).join(" · ")}
               </div>
             </div>
-            <div style={{background:col.bg,color:col.tx,fontSize:11,fontWeight:800,padding:"4px 10px",borderRadius:20,flexShrink:0,border:"1px solid "+col.tx+"44",whiteSpace:"nowrap"}}>{col.lbl}</div>
+            <div style={{background:"rgba(255,255,255,0.75)",color:col.tx,fontSize:11,fontWeight:800,padding:"5px 12px",borderRadius:20,flexShrink:0,border:"1px solid "+col.tx+"55",whiteSpace:"nowrap",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",boxShadow:"0 4px 12px rgba(0,0,0,0.08)"}}>{col.lbl}</div>
           </div>
 
           {/* Ligne 2 : contrat restant */}
           {jours!==null&&(
-            <div style={{display:"inline-flex",alignItems:"center",gap:5,background:"rgba(255,255,255,0.08)",borderRadius:8,padding:"4px 10px",marginBottom:14}}>
-              <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke={jours<=30?"#fde68a":"#7dd3fc"} strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              <span style={{fontSize:11,fontWeight:700,color:jours<=30?"#fde68a":"#7dd3fc"}}>{jours>=0?jours+" j restants":"Contrat expiré"}</span>
+            <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"rgba(255,255,255,0.55)",borderRadius:20,padding:"5px 12px",marginBottom:16,backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",border:"1px solid rgba(255,255,255,0.4)"}}>
+              <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={jours<=30?"#d97706":"#0891b2"} strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span style={{fontSize:11,fontWeight:800,color:jours<=30?"#92400e":"#0e4f6f"}}>{jours>=0?jours+" j restants":"Contrat expiré"}</span>
             </div>
           )}
 
-          {/* KPI row — 4 tuiles compactes */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:0,paddingBottom:16}}>
+          {/* KPI row — 4 tuiles verre */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:0,paddingBottom:18,position:"relative"}}>
             {[
               {label:"Entretiens",val:`${effE}/${totalE}`,ok:effE>=totalE,sub:"effectués"},
               {label:"Contrôles", val:`${effC}/${totalC}`,ok:effC>=totalC,sub:"effectués"},
-              {label:"Restants",  val:rest,ok:rest===0,accent:rest>0?"#fde68a":"#a7f3d0",sub:"passages"},
-              {label:"Mensualité",val:mensualite+"€",ok:true,accent:"#a7f3d0",sub:"/mois"},
-            ].map(({label,val,ok,accent,sub},i)=>(
-              <div key={i} style={{background:"rgba(255,255,255,0.07)",borderRadius:10,padding:"10px 6px",textAlign:"center",border:"1px solid rgba(255,255,255,0.06)"}}>
-                <div style={{fontSize:9,color:"rgba(255,255,255,0.45)",fontWeight:700,textTransform:"uppercase",letterSpacing:.4,marginBottom:3}}>{label}</div>
-                <div style={{fontSize:i===2?20:16,fontWeight:900,color:accent||(ok?"#a7f3d0":"#fde68a"),lineHeight:1}}>{val}</div>
-                <div style={{fontSize:9,color:"rgba(255,255,255,0.3)",marginTop:2}}>{sub}</div>
+              {label:"Restants",  val:rest,ok:rest===0,sub:"passages",highlight:rest>0},
+              {label:"Mensualité",val:mensualite+"€",ok:true,sub:"/mois"},
+            ].map(({label,val,ok,sub,highlight},i)=>(
+              <div key={i} style={{background:"rgba(255,255,255,0.6)",borderRadius:14,padding:"11px 6px",textAlign:"center",border:"1px solid rgba(255,255,255,0.5)",backdropFilter:"blur(14px) saturate(180%)",WebkitBackdropFilter:"blur(14px) saturate(180%)",boxShadow:"0 4px 14px rgba(6,182,212,0.10)"}}>
+                <div style={{fontSize:9,color:"#475569",fontWeight:800,textTransform:"uppercase",letterSpacing:.4,marginBottom:4}}>{label}</div>
+                <div style={{fontSize:i===2?22:17,fontWeight:900,color:highlight?"#d97706":(ok?"#059669":"#0891b2"),lineHeight:1,letterSpacing:-0.5}}>{val}</div>
+                <div style={{fontSize:9,color:"#64748b",marginTop:3,fontWeight:600}}>{sub}</div>
               </div>
             ))}
           </div>
 
-          {/* Barre de progression globale */}
-          <div style={{height:3,background:"rgba(255,255,255,0.1)",margin:"0 0 0"}}>
-            <div style={{height:"100%",width:pct+"%",background:"linear-gradient(90deg,#0891b2,#a7f3d0)",transition:"width 1s ease",borderRadius:"0 99px 99px 0"}}/>
+          {/* Barre de progression */}
+          <div style={{height:4,background:"rgba(255,255,255,0.35)",margin:"0 0 0",position:"relative"}}>
+            <div style={{height:"100%",width:pct+"%",background:"linear-gradient(90deg,#06b6d4,#10b981)",transition:"width 1s ease",borderRadius:"0 99px 99px 0",boxShadow:"0 0 12px rgba(6,182,212,0.5)"}}/>
           </div>
         </div>
 
-        {/* TABS — scrollables, compacts */}
-        <div style={{background:"rgba(255,255,255,0.55)",display:"flex",borderBottom:"1px solid #f1f5f9",overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}>
-          {TABS.map(({id,label,ico})=>(
+        {/* TABS — glass, scrollables horizontalement, icônes SVG */}
+        <div style={{background:"rgba(255,255,255,0.6)",backdropFilter:"blur(20px) saturate(180%)",WebkitBackdropFilter:"blur(20px) saturate(180%)",display:"flex",borderBottom:"1px solid rgba(255,255,255,0.4)",overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none",padding:"0 4px"}}>
+          {TABS.map(({id,label})=>(
             <button key={id} onClick={()=>setTab(id)}
-              style={{flexShrink:0,padding:"10px 14px",border:"none",cursor:"pointer",fontWeight:tab===id?800:500,fontSize:12,fontFamily:"inherit",background:"transparent",color:tab===id?"#0891b2":"#94a3b8",borderBottom:tab===id?"2.5px solid #0891b2":"2.5px solid transparent",transition:"all .12s",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:4,WebkitTapHighlightColor:"transparent"}}>
-              <span style={{fontSize:13}}>{ico}</span>{label}
+              style={{flexShrink:0,padding:"12px 14px",border:"none",cursor:"pointer",fontWeight:tab===id?800:600,fontSize:12.5,fontFamily:"inherit",background:"transparent",color:tab===id?"#0891b2":"#64748b",borderBottom:tab===id?"2.5px solid #06b6d4":"2.5px solid transparent",transition:"all .18s",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:6,WebkitTapHighlightColor:"transparent",letterSpacing:"0.01em"}}>
+              <TabIcon name={id} size={15} color={tab===id?"#0891b2":"#64748b"}/>
+              {label}
             </button>
           ))}
         </div>
@@ -2273,10 +2409,10 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
             const ct=contratClient;
             if(!ct) return null;
             const cfg={
-              signe_complet:{bg:"#f0fdf4",border:"#6ee7b7",color:DS.green,label:"✅ Contrat co-signé",sub:"Signé le "+new Date(ct.signedAt||0).toLocaleDateString("fr")},
-              signe_client: {bg:"#eff6ff",border:"#93c5fd",color:DS.blue,label:"📝 Client signé",sub:"En attente de votre signature"},
-              signe:        {bg:"#f0fdf4",border:"#6ee7b7",color:DS.green,label:"✅ Contrat signé",sub:""},
-            }[ct.statut]||{bg:"#fff7ed",border:"#fed7aa",color:DS.orange,label:"📨 En attente de signature",sub:""};
+              signe_complet:{bg:"#f0fdf4",border:"#6ee7b7",color:DS.green,label:"Contrat co-signé",sub:"Signé le "+new Date(ct.signedAt||0).toLocaleDateString("fr")},
+              signe_client: {bg:"#eff6ff",border:"#93c5fd",color:DS.blue,label:"Client signé",sub:"En attente de votre signature"},
+              signe:        {bg:"#f0fdf4",border:"#6ee7b7",color:DS.green,label:"Contrat signé",sub:""},
+            }[ct.statut]||{bg:"#fff7ed",border:"#fed7aa",color:DS.orange,label:"En attente de signature",sub:""};
             return <div style={{background:cfg.bg,border:"1px solid "+cfg.border,borderRadius:10,padding:"8px 12px",display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
               <div style={{flex:1}}>
                 <div style={{fontSize:12,fontWeight:800,color:cfg.color}}>{cfg.label}</div>
@@ -3275,9 +3411,95 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
   };
   const isEdit = !!initial?.id;
   const isMobile = useIsMobile();
-  const [f,setF]=useState(isEdit ? {...EMPTY,...initial, rapportStatut:getRapportStatus(initial)} : EMPTY);
+
+  // ═══════════════════════════════════════════════════════════════════
+  // BROUILLON AUTO — sauvegarde chaque frappe en localStorage
+  // Récupération auto si crash, fermeture onglet, perte de réseau…
+  // ═══════════════════════════════════════════════════════════════════
+  const DRAFT_KEY = isEdit ? `briblue_draft_rapport_${initial.id}` : "briblue_draft_rapport_new";
+  const loadDraft = () => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return null;
+      const d = JSON.parse(raw);
+      // Brouillon expiré après 7 jours
+      if (d?._savedAt && (Date.now() - d._savedAt) > 7*24*3600*1000) {
+        localStorage.removeItem(DRAFT_KEY);
+        return null;
+      }
+      return d;
+    } catch { return null; }
+  };
+  const draft = loadDraft();
+  const [hasDraft, setHasDraft] = useState(!!draft && !isEdit);
+  const [draftRestored, setDraftRestored] = useState(false);
+
+  const [f,setF]=useState(() => {
+    if (isEdit) return {...EMPTY, ...initial, rapportStatut:getRapportStatus(initial)};
+    return EMPTY;
+  });
   const [step,setStep]=useState(1);
   const [showConfirmSave, setShowConfirmSave] = useState(false);
+
+  // Sauvegarde du brouillon à chaque changement (debounced 400ms)
+  const draftTimerRef = useRef(null);
+  useEffect(() => {
+    if (!draftRestored && !isEdit) return; // ne pas sauver avant restauration manuelle
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = setTimeout(() => {
+      try {
+        // Seulement si le formulaire a du contenu réel
+        const hasContent = f.clientId || f.commentaires || f.tPH || f.tChlore ||
+                          f.descriptionSAV || f.photos?.length || f.actions ||
+                          f.produitsLivres?.length || f.corrChlore || f.corrPH;
+        if (hasContent) {
+          localStorage.setItem(DRAFT_KEY, JSON.stringify({...f, _savedAt: Date.now(), _step: step}));
+        }
+      } catch {}
+    }, 400);
+    return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current); };
+  }, [f, step, draftRestored, isEdit, DRAFT_KEY]);
+
+  // Flush le brouillon AVANT que la page se ferme (iOS + Desktop)
+  useEffect(() => {
+    const flush = () => {
+      try {
+        const hasContent = f.clientId || f.commentaires || f.tPH || f.tChlore ||
+                          f.descriptionSAV || f.photos?.length;
+        if (hasContent && (!isEdit || draftRestored)) {
+          localStorage.setItem(DRAFT_KEY, JSON.stringify({...f, _savedAt: Date.now(), _step: step}));
+        }
+      } catch {}
+    };
+    const onVis = () => { if (document.visibilityState === 'hidden') flush(); };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('pagehide', flush);
+    window.addEventListener('beforeunload', flush);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('pagehide', flush);
+      window.removeEventListener('beforeunload', flush);
+    };
+  }, [f, step, draftRestored, isEdit, DRAFT_KEY]);
+
+  const restoreDraft = () => {
+    if (!draft) return;
+    const { _savedAt, _step, ...rest } = draft;
+    setF({...EMPTY, ...rest});
+    if (_step) setStep(_step);
+    setHasDraft(false);
+    setDraftRestored(true);
+    toastSuccess("Brouillon restauré");
+  };
+  const discardDraft = () => {
+    try { localStorage.removeItem(DRAFT_KEY); } catch {}
+    setHasDraft(false);
+    setDraftRestored(true);
+  };
+  const clearDraftAfterSave = () => {
+    try { localStorage.removeItem(DRAFT_KEY); } catch {}
+  };
+
   useEffect(()=>{ const el=document.querySelector('[data-modal-body="1"]'); if(el) el.scrollTop=0; },[step]);
   const isSAV = f.type==="SAV";
   const isDevis = f.type==="Demande de devis";
@@ -3320,6 +3542,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
       obs: isSimplifiedSave ? (f.descriptionSAV || f.commentaires || "") : f.commentaires,
     };
     onSave(passage);
+    clearDraftAfterSave();
     setShowConfirmSave(false);
     // Auto-créer une livraison si produits livrés
     if (f.livraisonProduits && (f.produitsLivres?.length > 0 || f.livraisonAutre) && onSaveLivraison) {
@@ -3461,6 +3684,22 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
 
   return (
     <Modal title={isEdit ? "Modifier le passage" : "Rapport"} onClose={onClose} wide>
+      {/* ═══ BROUILLON DÉTECTÉ ═══ */}
+      {hasDraft && (
+        <div className="fade-in" style={{margin:"-4px 0 14px",padding:"14px 16px",borderRadius:16,background:"linear-gradient(135deg,rgba(245,158,11,0.18),rgba(217,119,6,0.12))",border:"1px solid rgba(245,158,11,0.35)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+          <div style={{width:40,height:40,borderRadius:12,background:"linear-gradient(135deg,#f59e0b,#d97706)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"0 6px 20px rgba(245,158,11,0.35)"}}>
+            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 11-9-9c2.5 0 4.8 1 6.5 2.7"/><polyline points="21 3 21 9 15 9"/></svg>
+          </div>
+          <div style={{flex:1,minWidth:180}}>
+            <div style={{fontSize:14,fontWeight:800,color:"#92400e"}}>Brouillon non sauvegardé</div>
+            <div style={{fontSize:12,color:"#b45309",marginTop:2}}>Un rapport en cours a été retrouvé — reprendre là où vous vous étiez arrêté ?</div>
+          </div>
+          <div style={{display:"flex",gap:6}}>
+            <button onClick={discardDraft} style={{padding:"8px 12px",borderRadius:10,border:"1px solid rgba(180,83,9,0.3)",background:"rgba(255,255,255,0.5)",color:"#92400e",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"inherit",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)"}}>Ignorer</button>
+            <button onClick={restoreDraft} style={{padding:"8px 14px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:"inherit",boxShadow:"0 4px 14px rgba(245,158,11,0.4)"}}>Restaurer</button>
+          </div>
+        </div>
+      )}
       {/* Bandeau client sélectionné */}
       {clientSel && (
         <div style={{margin:"-24px -28px 16px",marginTop:isMobile?"-18px":"-24px",marginLeft:isMobile?"-20px":"-28px",marginRight:isMobile?"-20px":"-28px",position:"relative",overflow:"hidden"}}>
@@ -4729,10 +4968,10 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
     { key:"aucun",         label:"Aucun contrat",         color:"#9ca3af", bg:"#f9fafb", border:"#e5e7eb" },
     { key:"cree",          label:"📄 Contrat créé",       color:"#0891b2", bg:"#e0f2fe", border:"#7dd3fc" },
     
-    { key:"demande_envoyee",label:"📨 Contrat envoyé",    color:"#0891b2", bg:"#f0f9ff", border:"#bae6fd" },
-    { key:"signe_client",  label:"📝 En attente co-sign.", color:"#4f46e5", bg:"#eef2ff", border:"#a5b4fc" },
-    { key:"signe_complet", label:"✅ Contrat signé",      color:"#059669", bg:"#f0fdf4", border:"#86efac" },
-    { key:"renouveler",    label:"🔄 À renouveler",       color:"#b45309", bg:"#fef3c7", border:"#fcd34d" },
+    { key:"demande_envoyee",label:"Contrat envoyé",    color:"#0891b2", bg:"#f0f9ff", border:"#bae6fd" },
+    { key:"signe_client",  label:"En attente co-sign.", color:"#4f46e5", bg:"#eef2ff", border:"#a5b4fc" },
+    { key:"signe_complet", label:"Contrat signé",      color:"#059669", bg:"#f0fdf4", border:"#86efac" },
+    { key:"renouveler",    label:"À renouveler",       color:"#b45309", bg:"#fef3c7", border:"#fcd34d" },
     { key:"suspendu",      label:"⏸ Suspendu",            color:"#dc2626", bg:"#fff1f2", border:"#fda4af" },
   ];
 
@@ -4871,7 +5110,7 @@ function PassageDetailModal({ passage, client, onClose }) {
   if (!passage) return null;
 
   const val = (v, u="") => (v!==""&&v!==null&&v!==undefined) ? `${v}${u?" "+u:""}` : "—";
-  const ouiNon = (v) => v===true ? "✅ Oui" : v===false ? "❌ Non" : "—";
+  const ouiNon = (v) => v===true ? "Oui" : v===false ? "Non" : "—";
   const liste = (arr) => Array.isArray(arr)&&arr.length ? arr.join(", ") : (arr||"—");
   const etoiles = (n) => n>0 ? "★".repeat(n)+"☆".repeat(5-n)+" "+n+"/5" : "—";
 
@@ -4886,13 +5125,29 @@ function PassageDetailModal({ passage, client, onClose }) {
   const rapportMeta = RAPPORT_STATUS[rapportStatus];
   const isCtrl = isControleType(passage.type);
 
-  const Block = ({title, icon, color=DS.blue, children}) => (
-    <div style={{borderRadius:DS.radiusSm,overflow:"hidden",border:"1px solid "+DS.border,marginBottom:12}}>
-      <div style={{background:color+"12",borderBottom:"1px solid "+color+"22",padding:"9px 14px",display:"flex",alignItems:"center",gap:8}}>
-        <span style={{fontSize:14}}>{icon}</span>
+  // Icônes SVG modernes (remplace les émojis)
+  const BlockIcon = ({name, size=14, color="currentColor"}) => {
+    const s = {width:size,height:size,viewBox:"0 0 24 24",fill:"none",stroke:color,strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round"};
+    switch(name) {
+      case "wrench":    return <svg {...s}><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>;
+      case "water":     return <svg {...s}><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>;
+      case "pool":      return <svg {...s}><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 14c2.5 2.5 5 2.5 7.5 0s5-2.5 7.5 0 5 2.5 7.5 0"/></svg>;
+      case "flask":     return <svg {...s}><path d="M9 3h6v5l3 9a3 3 0 01-3 3H9a3 3 0 01-3-3l3-9V3z"/><path d="M9 3h6"/><path d="M6.5 15h11"/></svg>;
+      case "check":     return <svg {...s}><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
+      case "camera":    return <svg {...s}><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>;
+      case "pen":       return <svg {...s}><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>;
+      default: return null;
+    }
+  };
+  const Block = ({title, iconName, color=DS.blue, children}) => (
+    <div style={{borderRadius:16,overflow:"hidden",border:"1px solid rgba(255,255,255,0.5)",marginBottom:12,background:"rgba(255,255,255,0.45)",backdropFilter:"blur(16px) saturate(180%)",WebkitBackdropFilter:"blur(16px) saturate(180%)"}}>
+      <div style={{background:`linear-gradient(135deg, ${color}18, ${color}08)`,borderBottom:"1px solid "+color+"22",padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
+        <div style={{width:24,height:24,borderRadius:8,background:color+"22",display:"flex",alignItems:"center",justifyContent:"center",color}}>
+          <BlockIcon name={iconName} size={13} color={color}/>
+        </div>
         <span style={{fontSize:12,fontWeight:800,color,textTransform:"uppercase",letterSpacing:.7}}>{title}</span>
       </div>
-      <div style={{padding:"12px 14px",background:"rgba(255,255,255,0.45)"}}>{children}</div>
+      <div style={{padding:"12px 14px"}}>{children}</div>
     </div>
   );
 
@@ -4920,7 +5175,7 @@ function PassageDetailModal({ passage, client, onClose }) {
       </div>
 
       {/* Intervention */}
-      <Block title="Intervention" icon="🔧" color={DS.blue}>
+      <Block title="Intervention" iconName="wrench" color={DS.blue}>
         <Row label="Type" value={passage.type||"—"}/>
         <Row label="Technicien" value={passage.tech||"—"}/>
         {passage.actions&&<Row label="Actions" value={passage.actions}/>}
@@ -4929,7 +5184,7 @@ function PassageDetailModal({ passage, client, onClose }) {
 
       {/* Analyses */}
       {(passage.chloreLibre||passage.ph||passage.alcalinite||passage.stabilisant||passage.tChlore||passage.tPH||passage.tSel||passage.tPhosphate||passage.tStabilisant) && (
-        <Block title="Analyses eau" icon="💧" color={DS.teal}>
+        <Block title="Analyses eau" iconName="water" color={DS.teal}>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:0}}>
             {passage.tChlore!==""&&passage.tChlore!==null&&passage.tChlore!==undefined&&<Row label="Chlore (appareil)" value={val(passage.tChlore,"ppm")} color={+passage.tChlore>=0.5&&+passage.tChlore<=3?DS.green:DS.red}/>}
             {passage.tPH!==""&&passage.tPH!==null&&passage.tPH!==undefined&&<Row label="pH (appareil)" value={val(passage.tPH)} color={+passage.tPH>=7.0&&+passage.tPH<=7.6?DS.green:DS.red}/>}
@@ -4947,7 +5202,7 @@ function PassageDetailModal({ passage, client, onClose }) {
 
       {/* État bassin */}
       {(passage.qualiteEau||(passage.etatFond||[]).length||(passage.etatParois||[]).length) && (
-        <Block title="État bassin" icon="🏊" color={DS.green}>
+        <Block title="État bassin" iconName="pool" color={DS.green}>
           {passage.qualiteEau&&<Row label="Qualité eau" value={passage.qualiteEau}/>}
           {(passage.etatFond||[]).length>0&&<Row label="Fond" value={liste(passage.etatFond)}/>}
           {(passage.etatParois||[]).length>0&&<Row label="Parois" value={liste(passage.etatParois)}/>}
@@ -4957,7 +5212,7 @@ function PassageDetailModal({ passage, client, onClose }) {
 
       {/* Correctifs */}
       {(passage.corrChlore||passage.corrPH||passage.corrSel||passage.corrAlgicide||passage.corrAlcafix||passage.corrAutre) && (
-        <Block title="Correctifs apportés" icon="⚗️" color={DS.purple}>
+        <Block title="Correctifs apportés" iconName="flask" color={DS.purple}>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:0}}>
             {passage.corrChlore&&<Row label="Chlore" value={passage.corrChlore}/>}
             {passage.corrPH&&<Row label="pH" value={passage.corrPH}/>}
@@ -4973,7 +5228,7 @@ function PassageDetailModal({ passage, client, onClose }) {
       )}
 
       {/* Clôture */}
-      <Block title="Clôture" icon="✅" color={DS.orange}>
+      <Block title="Clôture" iconName="check" color={DS.orange}>
         <Row label="Devis à faire" value={ouiNon(passage.devis)}/>
         <Row label="Prise d'échantillon" value={ouiNon(passage.priseEchantillon)}/>
         <Row label="Présence client" value={ouiNon(passage.presenceClient)}/>
@@ -4985,7 +5240,7 @@ function PassageDetailModal({ passage, client, onClose }) {
 
       {/* Photos */}
       {photos.length>0&&(
-        <Block title={`Photos (${photos.length})`} icon="📸" color={DS.mid}>
+        <Block title={`Photos (${photos.length})`} iconName="camera" color={DS.mid}>
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(3,1fr)",gap:8}}>
             {photos.map((ph,i)=>(
               <div key={i} style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid "+DS.border}}>
@@ -4999,7 +5254,7 @@ function PassageDetailModal({ passage, client, onClose }) {
 
       {/* Signatures */}
       {(passage.signatureTech||passage.signatureClient)&&(
-        <Block title="Signatures" icon="✍️" color={DS.mid}>
+        <Block title="Signatures" iconName="pen" color={DS.mid}>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12}}>
             {passage.signatureTech&&<div><div style={{fontSize:10,fontWeight:700,color:DS.mid,marginBottom:6}}>TECHNICIEN</div><img src={passage.signatureTech} style={{width:"100%",maxHeight:60,objectFit:"contain",borderRadius:8,border:"1px solid "+DS.border,background:"#fafafa"}}/></div>}
             {passage.signatureClient&&<div><div style={{fontSize:10,fontWeight:700,color:DS.mid,marginBottom:6}}>CLIENT</div><img src={passage.signatureClient} style={{width:"100%",maxHeight:60,objectFit:"contain",borderRadius:8,border:"1px solid "+DS.border,background:"#fafafa"}}/></div>}
@@ -5271,7 +5526,7 @@ function ModalStock({ stock, onClose, onUpdateStock, onAddProduit, onDeleteProdu
   const produitsListe = Object.keys(stock);
 
   return (
-    <Modal title="📦 Stock produits" onClose={onClose} wide>
+    <Modal title="Stock produits" onClose={onClose} wide>
       <Section title="Ajouter un produit personnalisé">
         <div style={{display:"flex",gap:8,flexWrap:"wrap",width:"100%"}}>
           <input value={newProduit} onChange={e=>setNewProduit(e.target.value)} placeholder="Nom du produit..."
@@ -5663,57 +5918,59 @@ function CarnetPublic({ code, allClients, allPassages }) {
 
   return (
     <>
-    <div style={{minHeight:"100vh",background:"rgba(255,255,255,0.5)",fontFamily:F,maxWidth:480,margin:"0 auto",paddingBottom:40}}>
+    <div style={{minHeight:"100vh",fontFamily:F,maxWidth:480,margin:"0 auto",paddingBottom:40,position:"relative"}}>
 
-      {/* -- HEADER gradient -- */}
-      <div style={{background:"linear-gradient(160deg,#0c1f3f 0%,#0e4a7a 70%,#0891b2 100%)",padding:"28px 22px 32px",position:"relative",overflow:"hidden"}}>
-        <div style={{position:"absolute",right:-50,top:-50,width:200,height:200,borderRadius:"50%",background:"rgba(56,189,248,0.07)"}}/>
-        <div style={{position:"absolute",left:-30,bottom:-30,width:140,height:140,borderRadius:"50%",background:"rgba(255,255,255,0.03)"}}/>
+      {/* -- HEADER GLASS LUMINEUX -- */}
+      <div style={{background:"linear-gradient(135deg, rgba(34,211,238,0.35) 0%, rgba(6,182,212,0.45) 45%, rgba(99,102,241,0.38) 100%)",backdropFilter:"blur(30px) saturate(180%)",WebkitBackdropFilter:"blur(30px) saturate(180%)",padding:"32px 22px 42px",position:"relative",overflow:"hidden",borderBottom:"1px solid rgba(255,255,255,0.35)"}}>
+        <div style={{position:"absolute",right:-70,top:-70,width:240,height:240,borderRadius:"50%",background:"radial-gradient(circle, rgba(34,211,238,0.5) 0%, transparent 70%)",filter:"blur(24px)"}}/>
+        <div style={{position:"absolute",left:-50,bottom:-50,width:180,height:180,borderRadius:"50%",background:"radial-gradient(circle, rgba(168,85,247,0.35) 0%, transparent 70%)",filter:"blur(20px)"}}/>
 
         {/* Logo ligne */}
-        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:20,position:"relative"}}>
-          <div style={{width:32,height:32,borderRadius:9,background:"rgba(255,255,255,0.12)",display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <svg width={18} height={13} viewBox="0 0 32 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:22,position:"relative"}}>
+          <div style={{width:38,height:38,borderRadius:12,background:"rgba(255,255,255,0.75)",display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",boxShadow:"0 4px 12px rgba(6,182,212,0.25)"}}>
+            <svg width={20} height={14} viewBox="0 0 32 24" fill="none" stroke="#0891b2" strokeWidth="2.8" strokeLinecap="round">
               <path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/>
               <path d="M2 16c2.5 3 5 3 7.5 0S14 13 16.5 16s5 3 7.5 0"/>
             </svg>
           </div>
-          <span style={{fontSize:13,fontWeight:800,color:"rgba(255,255,255,0.9)",letterSpacing:.3}}>BRIBLUE</span>
-          <span style={{fontSize:11,color:"rgba(255,255,255,0.35)",marginLeft:4}}>Carnet d'entretien</span>
-          <button onClick={loadData} disabled={refreshing} style={{marginLeft:"auto",width:32,height:32,borderRadius:9,background:"rgba(255,255,255,0.10)",border:"1px solid rgba(255,255,255,0.15)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"rgba(255,255,255,0.7)",fontSize:16,transition:"opacity .2s",opacity:refreshing?0.4:1}} title="Actualiser">
+          <div style={{display:"flex",flexDirection:"column"}}>
+            <span style={{fontSize:14,fontWeight:900,color:"#0b1220",letterSpacing:.3}}>BRIBLUE</span>
+            <span style={{fontSize:10,color:"rgba(11,18,32,0.55)",fontWeight:600,marginTop:-2}}>Carnet d'entretien</span>
+          </div>
+          <button onClick={loadData} disabled={refreshing} style={{marginLeft:"auto",width:38,height:38,borderRadius:12,background:"rgba(255,255,255,0.65)",border:"1px solid rgba(255,255,255,0.5)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#0e4f6f",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",boxShadow:"0 4px 12px rgba(6,182,212,0.15)",transition:"opacity .2s",opacity:refreshing?0.5:1}} title="Actualiser">
             {refreshing
-              ? <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{animation:"spin .7s linear infinite"}}><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-              : <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+              ? <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{animation:"spin .7s linear infinite"}}><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+              : <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
             }
           </button>
         </div>
 
         {/* Nom client + infos */}
         <div style={{position:"relative"}}>
-          <div style={{fontSize:24,fontWeight:900,color:"#fff",lineHeight:1.1,marginBottom:6}}>{client.nom}</div>
-          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:16}}>
+          <div style={{fontSize:28,fontWeight:900,color:"#0b1220",lineHeight:1.1,marginBottom:8,letterSpacing:-0.5}}>{client.nom}</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:20}}>
             {[
               client.bassin,
               client.formule,
               client.volume ? client.volume+"m³" : null,
               client.dateDebut ? "Suivi depuis "+fmtDate(client.dateDebut,{month:"long",year:"numeric"}) : null,
             ].filter(Boolean).map((t,i)=>(
-              <span key={i} style={{fontSize:11,fontWeight:600,color:"rgba(255,255,255,0.65)",background:"rgba(255,255,255,0.08)",borderRadius:20,padding:"3px 10px"}}>{t}</span>
+              <span key={i} style={{fontSize:11,fontWeight:700,color:"#0e4f6f",background:"rgba(255,255,255,0.65)",borderRadius:20,padding:"4px 11px",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",border:"1px solid rgba(255,255,255,0.5)"}}>{t}</span>
             ))}
           </div>
 
           {/* Stat rapide : nb passages */}
-          <div style={{display:"inline-flex",alignItems:"center",gap:10,background:"rgba(255,255,255,0.08)",borderRadius:12,padding:"10px 16px",border:"1px solid rgba(255,255,255,0.1)"}}>
+          <div style={{display:"inline-flex",alignItems:"center",gap:14,background:"rgba(255,255,255,0.65)",borderRadius:18,padding:"14px 20px",border:"1px solid rgba(255,255,255,0.6)",backdropFilter:"blur(16px) saturate(180%)",WebkitBackdropFilter:"blur(16px) saturate(180%)",boxShadow:"0 8px 26px rgba(6,182,212,0.18)"}}>
             <div style={{textAlign:"center"}}>
-              <div style={{fontSize:26,fontWeight:900,color:"#38bdf8",lineHeight:1}}>{passClient.length}</div>
-              <div style={{fontSize:10,color:"rgba(255,255,255,0.5)",fontWeight:600,marginTop:2}}>intervention{passClient.length!==1?"s":""}</div>
+              <div style={{fontSize:30,fontWeight:900,color:"#0891b2",lineHeight:1,letterSpacing:-1,background:"linear-gradient(135deg,#06b6d4,#0891b2)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text"}}>{passClient.length}</div>
+              <div style={{fontSize:10,color:"#475569",fontWeight:700,marginTop:3,textTransform:"uppercase",letterSpacing:0.4}}>intervention{passClient.length!==1?"s":""}</div>
             </div>
             {last&&(
               <>
-                <div style={{width:1,height:36,background:"rgba(255,255,255,0.1)"}}/>
+                <div style={{width:1,height:42,background:"rgba(11,18,32,0.12)"}}/>
                 <div>
-                  <div style={{fontSize:11,color:"rgba(255,255,255,0.45)",fontWeight:600,marginBottom:2}}>Dernière visite</div>
-                  <div style={{fontSize:13,fontWeight:800,color:"#e0f2fe"}}>{fmtDate(last.date,{day:"2-digit",month:"short",year:"numeric"})}</div>
+                  <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:3,textTransform:"uppercase",letterSpacing:0.4}}>Dernière visite</div>
+                  <div style={{fontSize:14,fontWeight:800,color:"#0b1220"}}>{fmtDate(last.date,{day:"2-digit",month:"short",year:"numeric"})}</div>
                 </div>
               </>
             )}
@@ -5721,7 +5978,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
         </div>
       </div>
 
-      <div style={{padding:"0 16px",marginTop:-12}}>
+      <div style={{padding:"0 16px",marginTop:-18,position:"relative",zIndex:2}}>
 
         {/* -- DERNIÈRE INTERVENTION -- */}
         {last&&(
