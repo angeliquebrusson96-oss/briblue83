@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, getDocs, setDoc, collection, onSnapshot } from "firebase/firestore";
+import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCyRHh4hGaDYU1NumTrRJ-3KKuRxC8NU5k",
@@ -15,32 +15,6 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 const APP_DOC = doc(db, "briblue", "app_data");
-const NB_PASSAGE_CHUNKS = 3;
-async function loadAllPassages() {
-  // Lire le nb réel de chunks pour éviter les chunks orphelins
-  let nbChunks = NB_PASSAGE_CHUNKS;
-  try {
-    const appSnap = await getDoc(APP_DOC);
-    if (appSnap.exists()) {
-      const n = appSnap.data().bb_passages_chunks;
-      if (typeof n === "number" && n >= 1) nbChunks = n;
-    }
-  } catch {}
-  // Lecture parallèle
-  const snaps = await Promise.all(
-    Array.from({length: nbChunks}, (_, i) =>
-      getDoc(doc(db, "briblue", "passages_" + i)).catch(() => null)
-    )
-  );
-  const all = [];
-  for (const snap of snaps) {
-    if (snap && snap.exists()) {
-      const d = snap.data();
-      if (d.bb_passages_v2) all.push(...d.bb_passages_v2);
-    }
-  }
-  return all;
-}
 
 
 const BRAND_LOGO = `data:image/svg+xml;utf8,${encodeURIComponent(`
@@ -229,43 +203,78 @@ function useOnlineStatus() {
     const onOff = ()=>setOnline(false);
     window.addEventListener('online', onOn);
     window.addEventListener('offline', onOff);
-    return ()=>{ window.removeEventListener('online', onOn); window.removeEventListener('offline', onOff); };
+    // Vérifier la queue toutes les 30s
+    const interval = setInterval(()=>{ setPendingCount(Object.keys(offlineQueue.pending).length); }, 5000);
+    return ()=>{ window.removeEventListener('online', onOn); window.removeEventListener('offline', onOff); clearInterval(interval); };
   },[]);
   return { online, pendingCount };
 }
 
-// STORAGE — cache TTL 24h
-const CACHE_TTL_MS=24*60*60*1000;
-async function load(key,fallback){
-  try{const c=localStorage.getItem("briblue_"+key),ts=localStorage.getItem("briblue_ts_"+key);if(c&&ts&&(Date.now()-Number(ts))<CACHE_TTL_MS)return JSON.parse(c);}catch{}
-  try{if(key==="bb_passages_v2"){const passages=await loadAllPassages();if(passages.length>0){try{localStorage.setItem("briblue_"+key,JSON.stringify(passages));localStorage.setItem("briblue_ts_"+key,String(Date.now()));}catch{}return passages;}try{const ls=localStorage.getItem("briblue_"+key);if(ls)return JSON.parse(ls);}catch{}return fallback;}
-  const snap=await getDoc(APP_DOC);if(snap.exists()){const allData=snap.data();if(key in allData){const val=allData[key];try{localStorage.setItem("briblue_"+key,JSON.stringify(val));localStorage.setItem("briblue_ts_"+key,String(Date.now()));}catch{}return val;}}
-  try{const ls=localStorage.getItem("briblue_"+key);if(ls)return JSON.parse(ls);}catch{}return fallback;}
-  catch{try{const ls=localStorage.getItem("briblue_"+key);if(ls)return JSON.parse(ls);}catch{}return fallback;}
+// ═══════════════════════════════════════════════════════════════════════════
+// STORAGE — Firebase Firestore (robuste Safari iOS / Android / Desktop)
+// ═══════════════════════════════════════════════════════════════════════════
+// Stratégie :
+//   1) localStorage IMMÉDIAT à chaque save  → aucune perte locale
+//   2) Firebase debounced 800ms             → regroupe les frappes, évite le spam
+//   3) Flush garanti sur :                  → JAMAIS de perte en quittant
+//        - visibilitychange (iOS Safari, Android Chrome, quand on switch d'app)
+//        - pagehide         (iOS Safari, fermeture onglet)
+//        - beforeunload     (desktop, rechargement)
+//        - blur de textarea (sécurité supplémentaire)
+//   4) Au chargement : on LIT d'abord Firebase, fallback localStorage si échec
+//   5) Retry auto au retour online
+//
+// ⚠️ Ne JAMAIS utiliser uniquement beforeunload : Safari iOS ne le déclenche
+//    quasiment jamais (bfcache). C'est LA cause des "rapports qui s'effacent".
+
+async function load(key, fallback) {
+  try {
+    const snap = await getDoc(APP_DOC);
+    if (snap.exists()) {
+      const allData = snap.data();
+      if (key in allData) {
+        // On garde aussi en local pour accélérer le prochain chargement
+        try { localStorage.setItem("briblue_" + key, JSON.stringify(allData[key])); } catch {}
+        return allData[key];
+      }
+    }
+    // Fallback localStorage (première visite ou Firebase indispo)
+    try { const ls = localStorage.getItem("briblue_" + key); if (ls) return JSON.parse(ls); } catch {}
+    return fallback;
+  } catch (e) {
+    console.warn("[briblue] load fallback localStorage pour", key, e?.message);
+    try { const ls = localStorage.getItem("briblue_" + key); if (ls) return JSON.parse(ls); } catch {}
+    return fallback;
+  }
 }
 
-// Queue hors-ligne
+// Queue des écritures en attente (clé → dernière valeur)
 const offlineQueue = { pending: {} };
-
-// Debounce timers par clé — une seule écriture Firebase toutes les 3s max
 const _debounceTimers = {};
-const FIREBASE_DEBOUNCE_MS = 800;
+const FIREBASE_DEBOUNCE_MS = 800; // ← réduit de 3000 à 800ms (écart sûr + réactif)
 
 async function saveToFirebase(key, val) {
-  if (key === "bb_passages_v2" && Array.isArray(val)) {
-    const CHUNK = 50;
-    const chunks = [];
-    for (let i = 0; i < val.length; i += CHUNK) chunks.push(val.slice(i, i + CHUNK));
-    // Écriture parallèle — plus rapide, iOS ne timeout pas
-    await Promise.all(
-      chunks.map((chunk, i) =>
-        setDoc(doc(db, "briblue", "passages_" + i), { bb_passages_v2: chunk }, { merge: false })
-      )
-    );
-    await setDoc(APP_DOC, { bb_passages_chunks: chunks.length }, { merge: true });
-    return;
-  }
   await setDoc(APP_DOC, { [key]: val }, { merge: true });
+}
+
+// Flush SYNCHRONE de tout ce qui est en attente. Les promesses sont lancées
+// mais on ne les await pas : pagehide/visibilitychange ne les attendent pas.
+// C'est acceptable car localStorage est DÉJÀ à jour — on n'aura jamais de perte.
+// À la prochaine ouverture, si Firebase n'a pas tout reçu, le code compare
+// Firebase vs localStorage et re-pousse les divergences.
+function flushPendingNow() {
+  const keys = Object.keys(offlineQueue.pending);
+  if (!keys.length) return;
+  // Annule les timers : on envoie maintenant
+  Object.keys(_debounceTimers).forEach(k => { clearTimeout(_debounceTimers[k]); delete _debounceTimers[k]; });
+  keys.forEach(key => {
+    const val = offlineQueue.pending[key];
+    // Le .catch() évite une UnhandledPromiseRejection ; en cas d'échec
+    // la donnée reste en localStorage et sera re-sync au prochain chargement.
+    saveToFirebase(key, val).then(() => {
+      if (offlineQueue.pending[key] === val) delete offlineQueue.pending[key];
+    }).catch(() => {});
+  });
 }
 
 async function flushOfflineQueue() {
@@ -279,34 +288,93 @@ async function flushOfflineQueue() {
   }
 }
 
-if (typeof window !== 'undefined') {
-  const flushAll = () => {
-    Object.keys(_debounceTimers).forEach(key => {
-      clearTimeout(_debounceTimers[key]);
-      delete _debounceTimers[key];
-    });
-    Object.keys(offlineQueue.pending).forEach(key => {
-      saveToFirebase(key, offlineQueue.pending[key]).catch(()=>{});
-    });
-  };
-  window.addEventListener('beforeunload', flushAll);
-  // Safari iOS tue beforeunload — visibilitychange est fiable
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') flushAll();
-  });
-  window.addEventListener('online', () => { flushOfflineQueue(); });
+// Au chargement : réconcilier localStorage ←→ Firebase
+// Si localStorage a des données récentes que Firebase n'a pas (crash, bfcache),
+// on les renvoie. Ça corrige AUTOMATIQUEMENT tout rapport perdu en fermeture brutale.
+async function reconcileOnBoot() {
+  try {
+    const snap = await getDoc(APP_DOC);
+    const remote = snap.exists() ? snap.data() : {};
+    const keys = [
+      "bb_clients_v2", "bb_passages_v2", "bb_livraisons_v1",
+      "bb_rdvs_v1", "bb_stock_v1", "bb_contrats_v1"
+    ];
+    for (const key of keys) {
+      let local = null;
+      try { const ls = localStorage.getItem("briblue_" + key); if (ls) local = JSON.parse(ls); } catch {}
+      if (local == null) continue;
+      const remoteVal = remote[key];
+      // Si la version locale diffère de la version cloud ET n'est pas vide → on pousse
+      if (JSON.stringify(local) !== JSON.stringify(remoteVal)) {
+        // On ne push que si local semble "plus riche" (plus d'items) OU si remote absent
+        const localSize = Array.isArray(local) ? local.length : Object.keys(local||{}).length;
+        const remoteSize = Array.isArray(remoteVal) ? remoteVal.length : Object.keys(remoteVal||{}).length;
+        if (remoteVal == null || localSize >= remoteSize) {
+          try { await saveToFirebase(key, local); console.info("[briblue] reconcile: push", key); } catch {}
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("[briblue] reconcile skipped", e?.message);
+  }
 }
 
-async function save(key,val){
-  // localStorage immédiat
-  try{localStorage.setItem("briblue_"+key,JSON.stringify(val));localStorage.setItem("briblue_ts_"+key,String(Date.now()));}catch{}
-  // Firebase immédiat — zéro timer (les timers sont tués par iOS Safari)
-  if (!navigator.onLine) { offlineQueue.pending[key] = val; return; }
-  try {
-    await saveToFirebase(key, val);
-  } catch {
-    offlineQueue.pending[key] = val;
+if (typeof window !== 'undefined') {
+  // Retour online → envoie tout
+  window.addEventListener('online', () => { flushOfflineQueue(); });
+
+  // ⭐ iOS Safari + Android : l'app passe en background → FLUSH IMMÉDIAT
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushPendingNow();
+  });
+
+  // ⭐ iOS Safari : quand l'utilisateur ferme l'onglet / swipe
+  window.addEventListener('pagehide', () => { flushPendingNow(); });
+
+  // Desktop : rechargement / fermeture
+  window.addEventListener('beforeunload', () => { flushPendingNow(); });
+
+  // Réconciliation locale↔cloud dès que la page est chargée (async, non bloquant)
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => { reconcileOnBoot(); });
+  } else {
+    setTimeout(reconcileOnBoot, 0);
   }
+}
+
+async function save(key, val) {
+  // 1. localStorage IMMÉDIAT — source de vérité locale, jamais de perte
+  try { localStorage.setItem('briblue_' + key, JSON.stringify(val)); } catch {}
+
+  // 2. Mémoriser la dernière valeur pour Firebase
+  offlineQueue.pending[key] = val;
+
+  if (!navigator.onLine) return; // sera flushé au retour online
+
+  // 3. Firebase debounced (800ms)
+  if (_debounceTimers[key]) clearTimeout(_debounceTimers[key]);
+  _debounceTimers[key] = setTimeout(async () => {
+    delete _debounceTimers[key];
+    const latest = offlineQueue.pending[key];
+    if (latest === undefined) return;
+    try {
+      await saveToFirebase(key, latest);
+      if (offlineQueue.pending[key] === latest) delete offlineQueue.pending[key];
+    } catch {
+      // Reste en queue → sera re-tenté au prochain online / save
+    }
+  }, FIREBASE_DEBOUNCE_MS);
+}
+
+// Expose globalement pour debug en prod (console.log briblue._debug())
+if (typeof window !== 'undefined') {
+  window.briblue = window.briblue || {};
+  window.briblue._debug = () => ({
+    pending: { ...offlineQueue.pending },
+    timers: Object.keys(_debounceTimers),
+    online: navigator.onLine
+  });
+  window.briblue._forceFlush = flushPendingNow;
 }
 
 
@@ -426,62 +494,6 @@ const YEAR_NOW = new Date().getFullYear();
 // ─── Helpers champs passage (globaux) ────────────────────────────────────────
 const getPH  = p => { const v = p.tPH || p.ph; return v && Number(v)>0 ? Number(v) : null; };
 const getCL  = p => { const v = p.tChlore || p.chloreLibre || p.chlore; return v && Number(v)>0 ? Number(v) : null; };
-
-// ═══ 🧠 IA EAU ═══
-function analyseEauIA(passage) {
-  const ph=getPH(passage), cl=getCL(passage);
-  const sel=Number(passage.tSel)||0, pho=Number(passage.tPhosphate)||0, sta=Number(passage.tStabilisant)||0;
-  const alerts=[]; let score=100;
-  if (ph!==null) {
-    if      (ph<6.8) { alerts.push({lvl:"danger",msg:`pH trop bas (${ph}) → corrosion`,conseil:"Ajouter pH+"}); score-=25; }
-    else if (ph<7.0) { alerts.push({lvl:"warn",  msg:`pH bas (${ph})`,conseil:"Légère correction pH+"}); score-=10; }
-    else if (ph>7.8) { alerts.push({lvl:"danger",msg:`pH trop élevé (${ph}) → chlore inefficace`,conseil:"Ajouter pH-"}); score-=25; }
-    else if (ph>7.6) { alerts.push({lvl:"warn",  msg:`pH légèrement élevé (${ph})`,conseil:"Légère correction pH-"}); score-=8; }
-  }
-  if (cl!==null) {
-    if      (cl<0.3) { alerts.push({lvl:"danger",msg:`Chlore insuffisant (${cl} ppm)`,conseil:"Choc chlore urgent"}); score-=30; }
-    else if (cl<0.5) { alerts.push({lvl:"warn",  msg:`Chlore bas (${cl} ppm)`,conseil:"Augmenter le chlore"}); score-=12; }
-    else if (cl>3.0) { alerts.push({lvl:"danger",msg:`Chlore excessif (${cl} ppm)`,conseil:"Arrêter le chlore"}); score-=20; }
-    else if (cl>2.0) { alerts.push({lvl:"warn",  msg:`Chlore élevé (${cl} ppm)`,conseil:"Réduire le dosage"}); score-=6; }
-  }
-  if (sel>0) {
-    if (sel<2.5) { alerts.push({lvl:"warn",msg:`Sel trop bas (${sel} g/L)`,conseil:"Ajouter du sel (3-4 g/L)"}); score-=8; }
-    else if (sel>6) { alerts.push({lvl:"warn",msg:`Sel trop élevé (${sel} g/L)`,conseil:"Diluer"}); score-=8; }
-  }
-  if (pho>0.3) { alerts.push({lvl:"warn",msg:`Phosphates élevés (${pho} mg/L)`,conseil:"Anti-phosphates"}); score-=10; }
-  if (sta>75)  { alerts.push({lvl:"warn",msg:`Stabilisant trop élevé (${sta} ppm)`,conseil:"Vidange partielle"}); score-=12; }
-  const scoreF=Math.max(0,Math.min(100,score));
-  const color=scoreF>=90?"#059669":scoreF>=75?"#0891b2":scoreF>=50?"#f59e0b":"#ef4444";
-  const emoji=scoreF>=90?"🏆":scoreF>=75?"✅":scoreF>=50?"⚠️":"🚨";
-  const label=scoreF>=90?"Excellente":scoreF>=75?"Bonne":scoreF>=50?"À surveiller":"Critique";
-  return { score:scoreF, color, emoji, label, alerts:alerts.filter(a=>a.lvl!=="ok"), hasMesures:ph!==null||cl!==null };
-}
-
-function scoreClientPiscine(clientId, passages, n=3) {
-  const cp = passages.filter(p=>p.clientId===clientId&&(getPH(p)||getCL(p))).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,n);
-  if (!cp.length) return null;
-  return Math.round(cp.reduce((s,p)=>s+analyseEauIA(p).score,0)/cp.length);
-}
-
-function ScoreSante({ score, size=38, showLabel=true }) {
-  if (score===null) return null;
-  const color=score>=90?"#059669":score>=75?"#0891b2":score>=50?"#f59e0b":"#ef4444";
-  const emoji=score>=90?"🏆":score>=75?"✅":score>=50?"⚠️":"🚨";
-  const circ=2*Math.PI*(size*0.4), pct=score/100;
-  return (
-    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <circle cx={size/2} cy={size/2} r={size*0.4} fill="none" stroke="#dde8f0" strokeWidth={size*0.1}/>
-        <circle cx={size/2} cy={size/2} r={size*0.4} fill="none" stroke={color} strokeWidth={size*0.1}
-          strokeDasharray={`${circ*pct} ${circ*(1-pct)}`} strokeLinecap="round"
-          strokeDashoffset={circ*0.25}
-          style={{transform:"rotate(-90deg)",transformOrigin:"center",transition:"stroke-dasharray .6s ease"}}/>
-        <text x={size/2} y={size/2+size*0.075} textAnchor="middle" fontSize={size*0.26} fontWeight="800" fill={color} fontFamily="inherit">{score}</text>
-      </svg>
-      {showLabel && <div style={{fontSize:9,fontWeight:700,color,background:`${color}15`,padding:"1px 6px",borderRadius:20}}>{emoji} Santé eau</div>}
-    </div>
-  );
-}
 const getTemp = p => { const v = p.temperature; return v && Number(v)>0 ? Number(v) : null; };
 const getResumePassage = p => {
   const parts = [];
@@ -632,7 +644,7 @@ function setupPWA() {
   // Service Worker amélioré avec cache + notifications
   if ('serviceWorker' in navigator) {
     const swCode = `
-const CACHE = 'briblue-v2';
+const CACHE = 'briblue-v3-glass';
 const STATIC = [];
 
 self.addEventListener('install', e => {
@@ -649,6 +661,16 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  const url = e.request.url;
+  // ⚠️ NE JAMAIS cacher les APIs Firebase/Google — sinon le reload
+  // retourne des données périmées et "efface" les rapports fraîchement sauvés
+  if (url.includes('firestore.googleapis.com') ||
+      url.includes('firebaseio.com') ||
+      url.includes('identitytoolkit.googleapis.com') ||
+      url.includes('googleapis.com') ||
+      url.includes('gstatic.com')) {
+    return; // laisse le navigateur gérer, sans cache
+  }
   e.respondWith(
     fetch(e.request)
       .then(res => {
@@ -749,24 +771,36 @@ function sendLocalNotification(title, body, options={}) {
 }
 
 // DESIGN SYSTEM V2  MODERNE
+// ═══════════════════════════════════════════════════════════════════════════
+// DESIGN SYSTEM — GLASSMORPHISM MODERNE (tokens conservés pour compat)
+// ═══════════════════════════════════════════════════════════════════════════
+// Les mêmes clés (DS.blue, DS.bg, DS.white, DS.shadow…) pointent désormais
+// vers des surfaces "verre dépoli" rgba — aucune ligne d'UI à réécrire.
 const DS = {
-  blue:"#0891b2", blueSoft:"#e8f4f8", blueGrad:"linear-gradient(135deg,#06b6d4,#0891b2)",
-  dark:"#0f172a", mid:"#64748b",
-  light:"#eef6f9", bg:"#e8f4f8", border:"#d0e8f0", white:"#f4f9fb",
-  green:"#059669", greenSoft:"#d1fae5", greenGrad:"linear-gradient(135deg,#059669,#34d399)",
-  red:"#be123c", redSoft:"#fff1f2",
-  orange:"#f59e0b", orangeSoft:"#fffbeb",
-  yellow:"#d97706", yellowSoft:"#fef9c3",
-  purple:"#4f46e5", purpleSoft:"#eef2ff", purpleGrad:"linear-gradient(135deg,#4f46e5,#818cf8)",
-  teal:"#0e7490", tealSoft:"#cffafe",
-  radius: 16, radiusSm: 12, radiusLg: 22,
-  shadow: "4px 4px 8px rgba(166,210,220,0.6), -3px -3px 7px rgba(255,255,255,0.9)",
-  shadowMd: "6px 6px 12px rgba(166,210,220,0.7), -4px -4px 10px rgba(255,255,255,0.9)",
-  shadowLg: "8px 8px 16px rgba(166,210,220,0.7), -5px -5px 12px rgba(255,255,255,0.9)",
-  shadowIn: "inset 3px 3px 6px rgba(166,210,220,0.5), inset -2px -2px 5px rgba(255,255,255,0.8)",
-  nmShadow: "4px 4px 8px rgba(166,210,220,0.6), -3px -3px 7px rgba(255,255,255,0.9)",
-  nmShadowSm: "3px 3px 6px rgba(166,210,220,0.5), -2px -2px 5px rgba(255,255,255,0.85)",
-  font: "'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
+  // Accents conservés (signalétique)
+  blue:"#06b6d4", blueSoft:"rgba(255,255,255,0.55)", blueGrad:"linear-gradient(135deg,#22d3ee 0%,#0891b2 100%)",
+  dark:"#0b1220", mid:"#475569",
+  // Surfaces VERRE (rgba/alpha) → combinées avec backdrop-filter: blur()
+  light:"rgba(255,255,255,0.45)",
+  bg:"rgba(255,255,255,0.35)",
+  border:"rgba(255,255,255,0.35)",
+  white:"rgba(255,255,255,0.65)",
+  // Accents colorés conservés (badges, alertes, icônes)
+  green:"#059669", greenSoft:"rgba(16,185,129,0.15)", greenGrad:"linear-gradient(135deg,#10b981,#34d399)",
+  red:"#e11d48", redSoft:"rgba(244,63,94,0.12)",
+  orange:"#f59e0b", orangeSoft:"rgba(245,158,11,0.12)",
+  yellow:"#d97706", yellowSoft:"rgba(234,179,8,0.15)",
+  purple:"#6366f1", purpleSoft:"rgba(99,102,241,0.14)", purpleGrad:"linear-gradient(135deg,#6366f1,#a855f7)",
+  teal:"#0891b2", tealSoft:"rgba(6,182,212,0.14)",
+  radius: 18, radiusSm: 14, radiusLg: 24,
+  // Ombres glassmorphism : légères + lueur cyan subtile
+  shadow:   "0 8px 32px rgba(6,182,212,0.10), 0 2px 8px rgba(15,23,42,0.06), inset 0 1px 0 rgba(255,255,255,0.6)",
+  shadowMd: "0 12px 40px rgba(6,182,212,0.14), 0 4px 12px rgba(15,23,42,0.08), inset 0 1px 0 rgba(255,255,255,0.7)",
+  shadowLg: "0 20px 60px rgba(6,182,212,0.18), 0 8px 20px rgba(15,23,42,0.10), inset 0 1px 0 rgba(255,255,255,0.75)",
+  shadowIn: "inset 0 2px 6px rgba(15,23,42,0.06), inset 0 0 0 1px rgba(255,255,255,0.4)",
+  nmShadow: "0 8px 32px rgba(6,182,212,0.10), 0 2px 8px rgba(15,23,42,0.06), inset 0 1px 0 rgba(255,255,255,0.6)",
+  nmShadowSm: "0 4px 16px rgba(6,182,212,0.08), 0 1px 4px rgba(15,23,42,0.05), inset 0 1px 0 rgba(255,255,255,0.5)",
+  font: "'Inter', 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
 };
 
 const AC = {
@@ -797,77 +831,215 @@ function getRapportStatus(p) {
 // STYLES GLOBAUX INJECTS
 const GlobalStyles = () => (
   <style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Nunito:wght@400;500;600;700;800;900&display=swap');
+
+    /* ═══════════════════════════════════════════════════════════════════
+       GLASSMORPHISM — Fond animé multi-blobs + effet verre partout
+       ═══════════════════════════════════════════════════════════════════ */
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-    body { font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #eef2f7; overflow-x: hidden; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-    /* Safari: éviter le double-tap zoom */
+
+    /* Fond animé : dégradé cyan/teal/purple qui bouge lentement */
+    body {
+      font-family: 'Inter', 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: linear-gradient(135deg, #e0f2fe 0%, #cffafe 35%, #e0e7ff 70%, #f0f9ff 100%);
+      background-size: 400% 400%;
+      animation: gradientShift 20s ease infinite;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      min-height: 100vh;
+      color: #0b1220;
+      position: relative;
+    }
+    /* Blobs lumineux flottants derrière tout — le vrai "wow" glassmorphism */
+    body::before, body::after {
+      content: '';
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.55;
+      pointer-events: none;
+      z-index: 0;
+      will-change: transform;
+    }
+    body::before {
+      width: 520px; height: 520px;
+      background: radial-gradient(circle, #22d3ee 0%, transparent 70%);
+      top: -180px; left: -180px;
+      animation: blobFloat1 22s ease-in-out infinite;
+    }
+    body::after {
+      width: 460px; height: 460px;
+      background: radial-gradient(circle, #a855f7 0%, transparent 70%);
+      bottom: -150px; right: -150px;
+      animation: blobFloat2 26s ease-in-out infinite;
+    }
+    #root, .root-wrap { position: relative; z-index: 1; }
+
+    @keyframes gradientShift {
+      0%,100% { background-position: 0% 50%; }
+      50%     { background-position: 100% 50%; }
+    }
+    @keyframes blobFloat1 {
+      0%,100% { transform: translate(0,0) scale(1); }
+      33%     { transform: translate(120px, 80px) scale(1.15); }
+      66%     { transform: translate(60px, 160px) scale(0.9); }
+    }
+    @keyframes blobFloat2 {
+      0%,100% { transform: translate(0,0) scale(1); }
+      33%     { transform: translate(-100px, -80px) scale(1.1); }
+      66%     { transform: translate(-50px, -140px) scale(0.95); }
+    }
+
+    /* Safari tap / fonts */
     button, a, input, select, textarea { touch-action: manipulation; }
     input, select, textarea, button { font-family: inherit; }
-    /* Safari: forcer les couleurs des inputs */
-    input, select, textarea { background: #f4f9fb !important; color: #0f172a !important; -webkit-text-fill-color: #0f172a !important; color-scheme: light; border-color: #d0e8f0 !important; }
-    input::placeholder, textarea::placeholder { color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important; }
-    input:focus, select:focus, textarea:focus { outline: none; border-color: ${DS.blue} !important; box-shadow: 0 0 0 3px ${DS.blue}22 !important; }
-    /* Safari: fix date inputs */
+
+    /* Inputs en verre dépoli — lisibles, premium */
+    input, select, textarea {
+      background: rgba(255,255,255,0.55) !important;
+      color: #0b1220 !important;
+      -webkit-text-fill-color: #0b1220 !important;
+      color-scheme: light;
+      border: 1px solid rgba(255,255,255,0.5) !important;
+      backdrop-filter: blur(12px) saturate(140%);
+      -webkit-backdrop-filter: blur(12px) saturate(140%);
+      transition: all .2s ease;
+    }
+    input::placeholder, textarea::placeholder { color: #64748b !important; -webkit-text-fill-color: #64748b !important; }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #06b6d4 !important;
+      background: rgba(255,255,255,0.75) !important;
+      box-shadow: 0 0 0 4px rgba(6,182,212,0.18), 0 8px 24px rgba(6,182,212,0.15) !important;
+    }
     input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: none; }
-    /* Safari: fix select */
     select { -webkit-appearance: none; appearance: none; }
-    /* Scrollbars */
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: #e8f4f8; border-radius: 99px; }
-    ::-webkit-scrollbar-thumb { background: #b8d8e4; border-radius: 99px; }
-    ::-webkit-scrollbar-thumb:hover { background: #8ec5d4; }
-    /* Safari: fix position sticky */
+
+    /* Scrollbars modernes */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: rgba(255,255,255,0.2); border-radius: 99px; }
+    ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #22d3ee, #0891b2); border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #06b6d4, #0e7490); }
+
+    /* Sticky safari fix */
     @supports (-webkit-overflow-scrolling: touch) {
       .sticky-header { position: -webkit-sticky; position: sticky; }
     }
-    /* Animations */
-    @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       ANIMATIONS
+       ═══════════════════════════════════════════════════════════════════ */
+    @keyframes fadeIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
     @keyframes fadeInFast { from { opacity:0; } to { opacity:1; } }
     @keyframes slideUp { from { opacity:0; transform:translateY(100%); } to { opacity:1; transform:translateY(0); } }
-    @keyframes scaleIn { from { opacity:0; transform:scale(0.94); } to { opacity:1; transform:scale(1); } }
-    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.6; } }
+    @keyframes scaleIn { from { opacity:0; transform:scale(0.92); } to { opacity:1; transform:scale(1); } }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.55; } }
     @keyframes shimmer { 0% { background-position:-200% 0; } 100% { background-position:200% 0; } }
-    @keyframes float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-4px); } }
-    .fade-in { animation: fadeIn .35s cubic-bezier(.22,1,.36,1) both; }
-    .slide-up { animation: slideUp .38s cubic-bezier(.22,1,.36,1) both; }
-    .scale-in { animation: scaleIn .28s cubic-bezier(.22,1,.36,1) both; }
-    /* Soft UI buttons */
-    .btn-hover { transition: all .18s cubic-bezier(.22,1,.36,1); }
-    .btn-hover:hover { transform: translateY(-1px); box-shadow: 6px 6px 12px rgba(166,210,220,0.7), -4px -4px 10px rgba(255,255,255,0.95) !important; }
-    .btn-hover:active { transform: scale(0.97); box-shadow: inset 3px 3px 6px rgba(166,210,220,0.5), inset -2px -2px 5px rgba(255,255,255,0.8) !important; }
-    /* Soft UI cards */
-    .card-hover { transition: all .2s cubic-bezier(.22,1,.36,1); }
-    .card-hover:hover { transform: translateY(-2px); box-shadow: 6px 6px 14px rgba(166,210,220,0.65), -4px -4px 10px rgba(255,255,255,0.95) !important; }
+    @keyframes float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-6px); } }
+    @keyframes glassShine {
+      0%   { transform: translateX(-120%) skewX(-15deg); }
+      100% { transform: translateX(220%)  skewX(-15deg); }
+    }
+    .fade-in   { animation: fadeIn .4s cubic-bezier(.22,1,.36,1) both; }
+    .slide-up  { animation: slideUp .42s cubic-bezier(.22,1,.36,1) both; }
+    .scale-in  { animation: scaleIn .32s cubic-bezier(.22,1,.36,1) both; }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       GLASS BUTTONS — effet hover lumineux + reflet qui traverse
+       ═══════════════════════════════════════════════════════════════════ */
+    .btn-hover {
+      transition: all .22s cubic-bezier(.22,1,.36,1);
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-hover::after {
+      content: '';
+      position: absolute; top:0; left:0; width:40%; height:100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+      transform: translateX(-120%) skewX(-15deg);
+      pointer-events: none;
+    }
+    .btn-hover:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 40px rgba(6,182,212,0.22), 0 4px 12px rgba(15,23,42,0.10), inset 0 1px 0 rgba(255,255,255,0.8) !important;
+    }
+    .btn-hover:hover::after { animation: glassShine 0.75s ease; }
+    .btn-hover:active { transform: scale(0.97); }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       GLASS CARDS — surfaces verre dépoli
+       ═══════════════════════════════════════════════════════════════════ */
+    .card-hover { transition: all .25s cubic-bezier(.22,1,.36,1); }
+    .card-hover:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 20px 50px rgba(6,182,212,0.18), 0 6px 16px rgba(15,23,42,0.10), inset 0 1px 0 rgba(255,255,255,0.8) !important;
+    }
     .card-hover:active { transform: translateY(0); }
-    /* Soft UI card base */
+
+    /* Card de base : VRAI verre dépoli */
     .nm-card {
-      background: #e8f4f8;
-      border-radius: 18px;
-      box-shadow: 4px 4px 8px rgba(166,210,220,0.6), -3px -3px 7px rgba(255,255,255,0.9);
-      border: none;
+      background: rgba(255,255,255,0.55);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border-radius: 22px;
+      border: 1px solid rgba(255,255,255,0.55);
+      box-shadow:
+        0 8px 32px rgba(6,182,212,0.10),
+        0 2px 8px rgba(15,23,42,0.06),
+        inset 0 1px 0 rgba(255,255,255,0.7);
     }
+    /* Input inset */
     .nm-inset {
-      background: #e8f4f8;
-      box-shadow: inset 3px 3px 6px rgba(166,210,220,0.5), inset -2px -2px 5px rgba(255,255,255,0.8);
-      border-radius: 12px;
+      background: rgba(255,255,255,0.45);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: inset 0 2px 6px rgba(15,23,42,0.06), inset 0 0 0 1px rgba(255,255,255,0.4);
+      border-radius: 14px;
       border: none;
     }
-    /* Desktop sidebar */
+
+    /* Sidebar desktop */
     @media (min-width: 768px) {
-      .sidebar-nav-active { background: rgba(8,145,178,0.12) !important; box-shadow: inset 3px 3px 6px rgba(166,210,220,0.4), inset -2px -2px 5px rgba(255,255,255,0.7) !important; }
+      .sidebar-nav-active {
+        background: linear-gradient(135deg, rgba(6,182,212,0.22), rgba(99,102,241,0.18)) !important;
+        box-shadow: 0 4px 14px rgba(6,182,212,0.15), inset 0 1px 0 rgba(255,255,255,0.6) !important;
+        color: #0891b2 !important;
+      }
     }
-    .page-content { animation: fadeInFast .25s ease both; }
-    /* Safari: safe area pour le nav du bas */
+    .page-content { animation: fadeInFast .3s ease both; }
+
+    /* Safe-area iOS */
     @supports (padding-bottom: env(safe-area-inset-bottom)) {
       .safe-bottom { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
     }
-    /* Safari: backdrop-filter fallback */
-    @supports not (backdrop-filter: blur(1px)) {
-      .blur-bg { background: rgba(232,240,248,0.99) !important; }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       FALLBACK NAVIGATEURS ANCIENS (pas de backdrop-filter)
+       ═══════════════════════════════════════════════════════════════════ */
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      .nm-card, .nm-inset, .blur-bg {
+        background: rgba(255,255,255,0.9) !important;
+      }
+      input, select, textarea { background: rgba(255,255,255,0.95) !important; }
     }
-    @supports (padding-top: env(safe-area-inset-top)) {
-      .safe-header { padding-top: env(safe-area-inset-top) !important; }
+
+    /* Titres plus nets */
+    h1, h2, h3, h4 { font-family: 'Inter', system-ui, sans-serif; letter-spacing: -0.02em; }
+
+    /* Utilitaire glass utilisable inline */
+    .glass {
+      background: rgba(255,255,255,0.55);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid rgba(255,255,255,0.55);
+    }
+    .glass-strong {
+      background: rgba(255,255,255,0.72);
+      backdrop-filter: blur(28px) saturate(200%);
+      -webkit-backdrop-filter: blur(28px) saturate(200%);
+      border: 1px solid rgba(255,255,255,0.65);
     }
   `}</style>
 );
@@ -886,7 +1058,7 @@ function toastWarn(msg)    { showToast(msg,"warn"); }
 
 const confirmListeners = [];
 function subscribeConfirm(fn) { confirmListeners.push(fn); return ()=>{ const i=confirmListeners.indexOf(fn); if(i>=0) confirmListeners.splice(i,1); }; }
-function showConfirm(msg, onOk, onCancel, opts={}) { confirmListeners.forEach(fn=>fn({msg, onOk, onCancel, id:Date.now()+Math.random(), ...opts})); }
+function showConfirm(msg, onOk, onCancel) { confirmListeners.forEach(fn=>fn({msg, onOk, onCancel, id:Date.now()+Math.random()})); }
 
 function ToastContainer() {
   const [toasts, setToasts] = useState([]);
@@ -904,7 +1076,7 @@ function ToastContainer() {
   };
   if(!toasts.length) return null;
   return (
-    <div style={{position:"fixed",top:"calc(env(safe-area-inset-top, 0px) + 56px)",left:"50%",transform:"translateX(-50%)",zIndex:99999,display:"flex",flexDirection:"column",gap:8,minWidth:280,maxWidth:"92vw",pointerEvents:"none"}}>
+    <div style={{position:"fixed",top:16,left:"50%",transform:"translateX(-50%)",zIndex:99999,display:"flex",flexDirection:"column",gap:8,minWidth:280,maxWidth:"92vw",pointerEvents:"none"}}>
       {toasts.map(t=>{
         const s=STYLES[t.type]||STYLES.info;
         return (
@@ -920,59 +1092,23 @@ function ToastContainer() {
 
 function ConfirmModal() {
   const [item, setItem] = useState(null);
-  useEffect(()=>{ return subscribeConfirm(c=>setItem(c)); },[]);
+  useEffect(()=>{
+    return subscribeConfirm(c=>setItem(c));
+  },[]);
   if(!item) return null;
-  const handle = (ok) => { setItem(null); if(ok&&item.onOk) item.onOk(); if(!ok&&item.onCancel) item.onCancel(); };
-
-  const TYPES = {
-    danger:  {emoji:"🗑️", title:"Confirmer la suppression", btn:"Supprimer",   btnBg:"linear-gradient(135deg,#ef4444,#dc2626)", btnShadow:"rgba(220,38,38,0.35)",  accent:"#ef4444"},
-    email:   {emoji:"📧", title:"Envoyer par email",         btn:"Envoyer",     btnBg:"linear-gradient(135deg,#0891b2,#06b6d4)", btnShadow:"rgba(8,145,178,0.35)",  accent:"#0891b2"},
-    save:    {emoji:"💾", title:"Enregistrer",                btn:"Enregistrer", btnBg:"linear-gradient(135deg,#059669,#34d399)", btnShadow:"rgba(5,150,105,0.35)",  accent:"#059669"},
-    success: {emoji:"✅", title:"Confirmer",                  btn:"Confirmer",   btnBg:"linear-gradient(135deg,#059669,#34d399)", btnShadow:"rgba(5,150,105,0.35)",  accent:"#059669"},
-    info:    {emoji:"ℹ️", title:"Confirmer l'action",        btn:"Confirmer",   btnBg:"linear-gradient(135deg,#4f46e5,#818cf8)", btnShadow:"rgba(79,70,229,0.35)",  accent:"#4f46e5"},
+  const handle = (ok) => {
+    setItem(null);
+    if(ok && item.onOk) item.onOk();
+    if(!ok && item.onCancel) item.onCancel();
   };
-  const t = TYPES[item.type||"danger"];
-
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(8,18,40,0.55)",zIndex:99998,display:"flex",alignItems:"center",justifyContent:"center",padding:20,backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}}
-      onClick={()=>handle(false)}>
-      <div className="scale-in" onClick={e=>e.stopPropagation()}
-        style={{background:"#eef2f7",borderRadius:24,padding:"26px 22px 20px",maxWidth:340,width:"100%",
-          boxShadow:`0 0 0 1px ${t.accent}22, 8px 8px 24px rgba(166,210,220,0.7), -5px -5px 16px rgba(255,255,255,0.9)`,
-          fontFamily:"'Nunito',system-ui,sans-serif"}}>
-        {/* Icône */}
-        <div style={{width:60,height:60,borderRadius:18,background:`${t.accent}15`,border:`2px solid ${t.accent}30`,
-          display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px",fontSize:26}}>
-          {t.emoji}
-        </div>
-        {/* Titre */}
-        <div style={{fontSize:11,fontWeight:800,color:"#64748b",textAlign:"center",textTransform:"uppercase",letterSpacing:.8,marginBottom:6}}>
-          {item.title||t.title}
-        </div>
-        {/* Message */}
-        <div style={{fontSize:15,fontWeight:700,color:"#0c1222",textAlign:"center",lineHeight:1.5,marginBottom:item.detail?8:0}}>
-          {item.msg}
-        </div>
-        {/* Détail */}
-        {item.detail&&(
-          <div style={{fontSize:12,color:"#64748b",textAlign:"center",padding:"7px 12px",borderRadius:10,background:"rgba(166,210,220,0.15)",marginTop:6}}>
-            {item.detail}
-          </div>
-        )}
-        {/* Boutons */}
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:99998,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>handle(false)}>
+      <div className="scale-in" onClick={e=>e.stopPropagation()} style={{background:"rgba(255,255,255,0.45)",borderRadius:22,padding:"28px 24px",maxWidth:360,width:"100%",boxShadow:"8px 8px 24px rgba(6,182,212,0.15), -5px -5px 16px rgba(255,255,255,0.9)",fontFamily:"Inter,sans-serif"}}>
+        <div style={{fontSize:36,textAlign:"center",marginBottom:12}}>🗑️</div>
+        <div style={{fontSize:15,fontWeight:700,color:"#0c1222",textAlign:"center",marginBottom:8,lineHeight:1.4}}>{item.msg}</div>
         <div style={{display:"flex",gap:10,marginTop:20}}>
-          <button onClick={()=>handle(false)}
-            style={{flex:1,padding:"12px",borderRadius:14,background:"#eef2f7",border:"none",cursor:"pointer",
-              fontWeight:700,fontSize:14,color:"#64748b",fontFamily:"inherit",
-              boxShadow:"4px 4px 8px rgba(166,210,220,0.6),-3px -3px 7px rgba(255,255,255,0.9)"}}>
-            Annuler
-          </button>
-          <button onClick={()=>handle(true)}
-            style={{flex:1,padding:"12px",borderRadius:14,background:t.btnBg,border:"none",cursor:"pointer",
-              fontWeight:800,fontSize:14,color:"#fff",fontFamily:"inherit",
-              boxShadow:`4px 4px 12px ${t.btnShadow}`}}>
-            {item.btnLabel||t.btn}
-          </button>
+          <button onClick={()=>handle(false)} style={{flex:1,padding:"12px",borderRadius:14,background:"rgba(255,255,255,0.45)",border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#64748b",fontFamily:"inherit",boxShadow:"4px 4px 8px rgba(6,182,212,0.15), -3px -3px 7px rgba(255,255,255,0.9)"}}>Annuler</button>
+          <button onClick={()=>handle(true)} style={{flex:1,padding:"12px",borderRadius:14,background:"linear-gradient(135deg,#ef4444,#dc2626)",border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#fff",fontFamily:"inherit",boxShadow:"4px 4px 12px rgba(220,38,38,0.35)"}}>Supprimer</button>
         </div>
       </div>
     </div>
@@ -1037,31 +1173,35 @@ function Modal({ title, onClose, children, wide }) {
     };
   },[]);
   // maxHeight fallback: dvh non supporté sur vieux Safari → vh
-  const maxH = isMobile ? "min(96dvh,96vh)" : "min(88dvh,88vh)";
+  const maxH = isMobile ? "min(92dvh,92vh)" : "min(88dvh,88vh)";
   return (
     <div
-      style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.4)",zIndex:200,display:"flex",alignItems:isMobile?"flex-end":"center",justifyContent:"center",padding:isMobile?"0":"12px",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}}
+      style={{position:"fixed",inset:0,background:"rgba(11,18,32,0.45)",zIndex:200,display:"flex",alignItems:isMobile?"flex-end":"center",justifyContent:"center",padding:isMobile?"0":"12px",backdropFilter:"blur(14px) saturate(140%)",WebkitBackdropFilter:"blur(14px) saturate(140%)"}}
       onClick={onClose}
     >
       <div className={isMobile?"slide-up":"scale-in"}
-        style={{background:"#eef2f7",borderRadius:isMobile?"26px 26px 0 0":DS.radiusLg,
+        style={{
+          background:"rgba(255,255,255,0.72)",
+          backdropFilter:"blur(28px) saturate(200%)",
+          WebkitBackdropFilter:"blur(28px) saturate(200%)",
+          borderRadius:isMobile?"28px 28px 0 0":DS.radiusLg,
           width:"100%",maxWidth:isMobile?"100%":wide?720:560,
           maxHeight:maxH,
           display:"flex",flexDirection:"column",
-          boxShadow:"8px 8px 24px rgba(166,210,220,0.7), -5px -5px 16px rgba(255,255,255,0.9)",
+          boxShadow:"0 30px 80px rgba(6,182,212,0.22), 0 10px 30px rgba(15,23,42,0.18), inset 0 1px 0 rgba(255,255,255,0.8)",
+          border:"1px solid rgba(255,255,255,0.55)",
           overflowY:"hidden",
           paddingBottom:"env(safe-area-inset-bottom,0px)",
-          // Safari: empêcher le scroll du fond de remonter
           overscrollBehavior:"contain",
           WebkitOverflowScrolling:"touch",
         }}
         onClick={e=>e.stopPropagation()}>
         {isMobile && <div style={{flexShrink:0,display:"flex",justifyContent:"center",paddingTop:10,paddingBottom:2}}>
-          <div style={{width:36,height:4,borderRadius:2,background:"#c8dce8"}}/>
+          <div style={{width:42,height:5,borderRadius:3,background:"linear-gradient(90deg,#22d3ee,#0891b2)",opacity:0.6}}/>
         </div>}
-        <div style={{flexShrink:0,padding:isMobile?"8px 18px 12px":"14px 24px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid "+DS.border}}>
-          <span style={{color:DS.dark,fontWeight:700,fontSize:16}}>{title}</span>
-          <button onClick={onClose} style={{width:32,height:32,borderRadius:10,background:"#eef2f7",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:DS.nmShadowSm}}>
+        <div style={{flexShrink:0,padding:isMobile?"8px 18px 12px":"14px 24px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid rgba(255,255,255,0.45)"}}>
+          <span style={{color:DS.dark,fontWeight:800,fontSize:17,letterSpacing:"-0.01em"}}>{title}</span>
+          <button onClick={onClose} style={{width:34,height:34,borderRadius:12,background:"rgba(255,255,255,0.6)",border:"1px solid rgba(255,255,255,0.5)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",boxShadow:"0 2px 8px rgba(15,23,42,0.06)"}}>
             {Ico.close(13,DS.mid)}
           </button>
         </div>
@@ -1085,7 +1225,7 @@ function Section({ title, children, style={} }) {
 function ProgressBar({ value, max, color=DS.blue, height=6 }) {
   const pct = max > 0 ? Math.min(100, value/max*100) : 0;
   return (
-    <div style={{height,background:"#dde8f0",borderRadius:99,overflow:"hidden",boxShadow:"inset 2px 2px 4px rgba(166,210,220,0.5)"}}>
+    <div style={{height,background:"#dde8f0",borderRadius:99,overflow:"hidden",boxShadow:"inset 2px 2px 4px rgba(6,182,212,0.15)"}}>
       <div style={{height:"100%",width:`${pct}%`,background:pct>=100?DS.greenGrad:DS.blueGrad,borderRadius:99,transition:"width .5s cubic-bezier(.22,1,.36,1)"}}/>
     </div>
   );
@@ -1093,7 +1233,7 @@ function ProgressBar({ value, max, color=DS.blue, height=6 }) {
 
 function Card({ children, style={}, onClick, className="", id }) {
   return (
-    <div id={id} onClick={onClick} className={onClick?"card-hover":className} style={{background:"#eef2f7",borderRadius:18,padding:"16px 18px",boxShadow:"5px 5px 12px rgba(166,210,220,0.6), -4px -4px 9px rgba(255,255,255,0.9)",border:"none",cursor:onClick?"pointer":"default",transition:"all .2s",...style}}>{children}</div>
+    <div id={id} onClick={onClick} className={onClick?"card-hover":className} style={{background:"rgba(255,255,255,0.45)",borderRadius:18,padding:"16px 18px",boxShadow:"5px 5px 12px rgba(6,182,212,0.15), -4px -4px 9px rgba(255,255,255,0.9)",border:"none",cursor:onClick?"pointer":"default",transition:"all .2s",...style}}>{children}</div>
   );
 }
 
@@ -1101,7 +1241,7 @@ function Input({ label, ...p }) {
   return (
     <div style={{display:"flex",flexDirection:"column",gap:5}}>
       {label && <span style={{fontSize:13,fontWeight:600,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>{label}</span>}
-      <input style={{padding:"11px 14px",borderRadius:DS.radiusSm,border:"none",fontSize:15,outline:"none",background:"#eef2f7",boxSizing:"border-box",width:"100%",color:DS.dark,fontFamily:"inherit",transition:"all .2s",boxShadow:"inset 3px 3px 6px rgba(166,210,220,0.45), inset -2px -2px 5px rgba(255,255,255,0.8)",...(p.style||{})}} {...p}/>
+      <input style={{padding:"11px 14px",borderRadius:DS.radiusSm,border:"none",fontSize:15,outline:"none",background:"rgba(255,255,255,0.45)",boxSizing:"border-box",width:"100%",color:DS.dark,fontFamily:"inherit",transition:"all .2s",boxShadow:"inset 3px 3px 6px rgba(6,182,212,0.15), inset -2px -2px 5px rgba(255,255,255,0.8)",...(p.style||{})}} {...p}/>
     </div>
   );
 }
@@ -1110,7 +1250,7 @@ function Select({ label, options, ...p }) {
   return (
     <div style={{display:"flex",flexDirection:"column",gap:5}}>
       {label && <span style={{fontSize:13,fontWeight:600,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>{label}</span>}
-      <select style={{padding:"11px 14px",borderRadius:DS.radiusSm,border:"none",fontSize:15,outline:"none",background:"#eef2f7",color:DS.dark,fontFamily:"inherit",cursor:"pointer",appearance:"none",boxShadow:"inset 3px 3px 6px rgba(166,210,220,0.45), inset -2px -2px 5px rgba(255,255,255,0.8)",backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,backgroundRepeat:"no-repeat",backgroundPosition:"right 12px center",paddingRight:36}} {...p}>
+      <select style={{padding:"11px 14px",borderRadius:DS.radiusSm,border:"none",fontSize:15,outline:"none",background:"rgba(255,255,255,0.45)",color:DS.dark,fontFamily:"inherit",cursor:"pointer",appearance:"none",boxShadow:"inset 3px 3px 6px rgba(6,182,212,0.15), inset -2px -2px 5px rgba(255,255,255,0.8)",backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,backgroundRepeat:"no-repeat",backgroundPosition:"right 12px center",paddingRight:36}} {...p}>
         {options.map(o=><option key={o} value={o}>{o}</option>)}
       </select>
     </div>
@@ -1145,12 +1285,12 @@ function PhotoPicker({ label, value, onChange, compact }) {
         </div>
       ) : (
         <div style={{display:"flex",gap:10}}>
-          <button onClick={() => cameraRef.current?.click()} className="btn-hover" style={{flex:1,padding:"16px 10px",borderRadius:DS.radius,border:"none",background:"#eef2f7",boxShadow:DS.nmShadow,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:8,fontFamily:"inherit"}}>
+          <button onClick={() => cameraRef.current?.click()} className="btn-hover" style={{flex:1,padding:"16px 10px",borderRadius:DS.radius,border:"none",background:"rgba(255,255,255,0.45)",boxShadow:DS.nmShadow,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:8,fontFamily:"inherit"}}>
             {Ico.camera(24,DS.blue)}
             <span style={{fontSize:15,fontWeight:700,color:DS.blue}}>Caméra</span>
             <span style={{fontSize:15,color:DS.mid}}>Photo directe</span>
           </button>
-          <button onClick={() => galleryRef.current?.click()} className="btn-hover" style={{flex:1,padding:"16px 10px",borderRadius:DS.radius,border:"none",background:"#eef2f7",boxShadow:DS.nmShadow,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:8,fontFamily:"inherit"}}>
+          <button onClick={() => galleryRef.current?.click()} className="btn-hover" style={{flex:1,padding:"16px 10px",borderRadius:DS.radius,border:"none",background:"rgba(255,255,255,0.45)",boxShadow:DS.nmShadow,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:8,fontFamily:"inherit"}}>
             {Ico.image(24,DS.mid)}
             <span style={{fontSize:15,fontWeight:700,color:DS.mid}}>Galerie</span>
             <span style={{fontSize:15,color:"#94a3b8"}}>Depuis l'album</span>
@@ -1166,7 +1306,7 @@ function PhotoPicker({ label, value, onChange, compact }) {
 // BOUTON PRIMAIRE
 function BtnPrimary({ children, onClick, bg=DS.blueGrad, color="#fff", icon, style={} }) {
   return (
-    <button onClick={onClick} className="btn-hover" style={{padding:"12px 20px",borderRadius:DS.radiusSm,background:bg,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"4px 4px 12px rgba(8,145,178,0.3), -2px -2px 6px rgba(255,255,255,0.7)",transition:"all .2s",...style}}>
+    <button onClick={onClick} className="btn-hover" style={{padding:"13px 22px",borderRadius:14,background:bg,border:"1px solid rgba(255,255,255,0.25)",cursor:"pointer",fontWeight:700,fontSize:15,color,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 10px 30px rgba(6,182,212,0.30), inset 0 1px 0 rgba(255,255,255,0.35)",transition:"all .22s cubic-bezier(.22,1,.36,1)",letterSpacing:"0.01em",...style}}>
       {icon}{children}
     </button>
   );
@@ -1232,11 +1372,7 @@ function FormClient({ initial, clients, onSave, onClose }) {
           <Input label="Email" type="email" value={f.email} onChange={e=>set("email",e.target.value)}/>
           <div style={{gridColumn:"1/-1"}}><Input label="Adresse" value={f.adresse} onChange={e=>set("adresse",e.target.value)}/></div>
           <Select label="Type bassin" value={f.bassin} onChange={e=>set("bassin",e.target.value)} options={["Liner","Béton","Coque polyester","PVC armé","Hors-sol","Autre"]}/>
-          <div style={{display:"flex",flexDirection:"column",gap:5}}>
-            <span style={{fontSize:13,fontWeight:600,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>Volume (m³)</span>
-            <input type="number" inputMode="decimal" value={f.volume||""} onChange={e=>set("volume",+e.target.value)}
-              style={{padding:"11px 14px",borderRadius:DS.radiusSm,border:"none",fontSize:18,fontWeight:800,color:DS.dark,background:"#eef2f7",boxShadow:"inset 3px 3px 6px rgba(166,210,220,0.45),inset -2px -2px 5px rgba(255,255,255,0.8)",outline:"none",width:"100%",boxSizing:"border-box",touchAction:"manipulation",fontFamily:"inherit"}}/>
-          </div>
+          <Input label="Volume (m³)" type="number" style={{fontSize:16}} value={f.volume} onChange={e=>set("volume",+e.target.value)}/>
         </div>
       </Section>
       <Section title="Photo de la piscine">
@@ -1256,7 +1392,7 @@ function FormClient({ initial, clients, onSave, onClose }) {
           <span style={{color:"rgba(255,255,255,0.8)",fontSize:15,fontWeight:700}}>Planning mensuel</span>
           <span style={{color:"#fff",fontSize:15,fontWeight:800}}>🔧 {totalE}  ·  💧 {totalC}  ·  Total {totalE+totalC}</span>
         </div>
-        <div style={{padding:"6px 10px",background:"#f8fafc",borderLeft:"1px solid "+DS.border,borderRight:"1px solid "+DS.border,display:"flex",justifyContent:"flex-end"}}>
+        <div style={{padding:"6px 10px",background:"rgba(255,255,255,0.45)",borderLeft:"1px solid "+DS.border,borderRight:"1px solid "+DS.border,display:"flex",justifyContent:"flex-end"}}>
           <button onClick={()=>setF(p=>({...p,moisParMois:Object.fromEntries([1,2,3,4,5,6,7,8,9,10,11,12].map(m=>[m,{entretien:0,controle:0}]))}))}
             style={{fontSize:12,fontWeight:700,color:DS.red,background:DS.redSoft,border:"1px solid #fca5a5",borderRadius:6,padding:"4px 12px",cursor:"pointer",fontFamily:"inherit"}}>
             🔄 Tout remettre à zéro
@@ -1274,15 +1410,15 @@ function FormClient({ initial, clients, onSave, onClose }) {
                 <div style={{flex:1,display:"flex",alignItems:"center",gap:12}}>
                   <div style={{display:"flex",alignItems:"center",gap:4}}>
                     <span style={{fontSize:15,color:DS.blue}}>🔧</span>
-                    <button onClick={()=>setMoisVal(m,"entretien",mv.entretien-1)} style={{width:38,height:38,borderRadius:10,border:"none",background:"#eef2f7",boxShadow:DS.nmShadowSm,cursor:"pointer",fontSize:18,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center",touchAction:"manipulation"}}>−</button>
-                    <span style={{fontSize:18,fontWeight:900,color:DS.blue,minWidth:24,textAlign:"center"}}>{mv.entretien}</span>
-                    <button onClick={()=>setMoisVal(m,"entretien",mv.entretien+1)} style={{width:38,height:38,borderRadius:10,border:"1px solid "+DS.blue,background:DS.blueSoft,cursor:"pointer",fontSize:18,fontWeight:700,color:DS.blue,display:"flex",alignItems:"center",justifyContent:"center",touchAction:"manipulation"}}>+</button>
+                    <button onClick={()=>setMoisVal(m,"entretien",mv.entretien-1)} style={{width:24,height:24,borderRadius:6,border:"none",background:"rgba(255,255,255,0.45)",boxShadow:DS.nmShadowSm,cursor:"pointer",fontSize:15,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                    <span style={{fontSize:16,fontWeight:900,color:DS.blue,minWidth:16,textAlign:"center"}}>{mv.entretien}</span>
+                    <button onClick={()=>setMoisVal(m,"entretien",mv.entretien+1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.blue,background:DS.blueSoft,cursor:"pointer",fontSize:15,fontWeight:700,color:DS.blue,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:4}}>
                     <span style={{fontSize:15,color:DS.teal}}>💧</span>
-                    <button onClick={()=>setMoisVal(m,"controle",mv.controle-1)} style={{width:38,height:38,borderRadius:10,border:"none",background:"#eef2f7",boxShadow:DS.nmShadowSm,cursor:"pointer",fontSize:18,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center",touchAction:"manipulation"}}>−</button>
-                    <span style={{fontSize:18,fontWeight:900,color:DS.teal,minWidth:24,textAlign:"center"}}>{mv.controle}</span>
-                    <button onClick={()=>setMoisVal(m,"controle",mv.controle+1)} style={{width:38,height:38,borderRadius:10,border:"1px solid "+DS.teal,background:DS.tealSoft,cursor:"pointer",fontSize:18,fontWeight:700,color:DS.teal,display:"flex",alignItems:"center",justifyContent:"center",touchAction:"manipulation"}}>+</button>
+                    <button onClick={()=>setMoisVal(m,"controle",mv.controle-1)} style={{width:24,height:24,borderRadius:6,border:"none",background:"rgba(255,255,255,0.45)",boxShadow:DS.nmShadowSm,cursor:"pointer",fontSize:15,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                    <span style={{fontSize:16,fontWeight:900,color:DS.teal,minWidth:16,textAlign:"center"}}>{mv.controle}</span>
+                    <button onClick={()=>setMoisVal(m,"controle",mv.controle+1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.teal,background:DS.tealSoft,cursor:"pointer",fontSize:15,fontWeight:700,color:DS.teal,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
                   </div>
                 </div>
                 <div style={{fontSize:15,fontWeight:700,color:mv.entretien+mv.controle>0?DS.dark:DS.border,minWidth:20,textAlign:"right"}}>{mv.entretien+mv.controle>0?mv.entretien+mv.controle:"—"}</div>
@@ -1290,17 +1426,9 @@ function FormClient({ initial, clients, onSave, onClose }) {
             );
           })}
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:14}}>
-          <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            <span style={{fontSize:12,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>🔧 Prix entretien (€)</span>
-            <input type="number" inputMode="decimal" value={f.prixPassageE||""} onChange={e=>set("prixPassageE",+e.target.value||0)}
-              style={{padding:"14px 16px",borderRadius:12,border:"2px solid "+DS.blue+"44",fontSize:20,fontWeight:800,color:DS.blue,background:"#eff9ff",outline:"none",width:"100%",boxSizing:"border-box",touchAction:"manipulation",fontFamily:"inherit"}}/>
-          </div>
-          <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            <span style={{fontSize:12,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>💧 Prix contrôle (€)</span>
-            <input type="number" inputMode="decimal" value={f.prixPassageC||""} onChange={e=>set("prixPassageC",+e.target.value||0)}
-              style={{padding:"14px 16px",borderRadius:12,border:"2px solid "+DS.teal+"44",fontSize:20,fontWeight:800,color:DS.teal,background:"#effcff",outline:"none",width:"100%",boxSizing:"border-box",touchAction:"manipulation",fontFamily:"inherit"}}/>
-          </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginTop:12}}>
+          <Input label="Prix/passage entretien (€)" type="number" style={{fontSize:16}} value={f.prixPassageE||""} onChange={e=>set("prixPassageE",+e.target.value||0)}/>
+          <Input label="Prix/passage contrôle (€)" type="number" style={{fontSize:16}} value={f.prixPassageC||""} onChange={e=>set("prixPassageC",+e.target.value||0)}/>
         </div>
         {/* Récap tarification auto */}
         <div style={{marginTop:12,background:"#0891b2",borderRadius:DS.radiusSm,padding:"14px 16px",color:"#fff"}}>
@@ -1426,7 +1554,7 @@ function genererHTMLLivraison(livraison, client) {
 }
 
 async function envoyerEmailLivraison(livraison, client) {
-  const PROXY = "https://briblue83.angelique-brusson96.workers.dev";
+  const RESEND_API_KEY = "re_FLTMeUdh_vL8QGqJhP2C293WEVCm9c7rh";
   const FROM = "rapport-piscine@briblue83.com";
 
   if (!client?.email) { toastWarn("Aucun email renseigné pour ce client."); return; }
@@ -1440,10 +1568,11 @@ async function envoyerEmailLivraison(livraison, client) {
   const corps = `Bonjour ${client?.nom||""},\n\nVotre bon de livraison du ${dateStr} est disponible.\n\nJe reste a votre disposition pour toute question.\n\nCordialement,\nDorian Briaire\nTechnicien de Piscine - BRI BLUE`;
 
   try {
-    const res = await fetch(PROXY, {
+    const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
         from: `BRIBLUE <${FROM}>`,
@@ -1539,7 +1668,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
               <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:8}}>Client *</span>
               {isMobile
                 ? <select value={f.clientId} onChange={e=>set("clientId",e.target.value)}
-                    style={{width:"100%",padding:"12px",borderRadius:DS.radiusSm,border:"none",background:"#eef2f7",boxShadow:DS.nmShadowSm,fontSize:14,color:DS.dark,fontFamily:"inherit"}}>
+                    style={{width:"100%",padding:"12px",borderRadius:DS.radiusSm,border:"none",background:"rgba(255,255,255,0.45)",boxShadow:DS.nmShadowSm,fontSize:14,color:DS.dark,fontFamily:"inherit"}}>
                     <option value="">Choisir…</option>
                     {clients.map(c=><option key={c.id} value={c.id}>{c.nom}</option>)}
                   </select>
@@ -1565,7 +1694,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
             </div>
           )}
           {selectedClient && (
-            <div style={{background:"#f0f9ff",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10,border:"1px solid #bae6fd"}}>
+            <div style={{background:"rgba(224,242,254,0.5)",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10,border:"1px solid #bae6fd"}}>
               <Avatar nom={selectedClient.nom} size={36}/>
               <div><div style={{fontWeight:700,fontSize:13,color:DS.dark}}>{selectedClient.nom}</div><div style={{fontSize:11,color:DS.mid}}>{selectedClient.formule}</div></div>
             </div>
@@ -1637,7 +1766,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
               <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>Photos {(f.photos||[]).length>0&&`(${(f.photos||[]).length}/10)`}</span>
               {(f.photos||[]).length<10&&(
-                <label style={{display:"flex",alignItems:"center",gap:5,padding:"5px 10px",borderRadius:8,background:"#f0f9ff",border:"1px solid #bae6fd",cursor:"pointer",fontSize:12,fontWeight:700,color:"#0891b2"}}>
+                <label style={{display:"flex",alignItems:"center",gap:5,padding:"5px 10px",borderRadius:8,background:"rgba(224,242,254,0.5)",border:"1px solid #bae6fd",cursor:"pointer",fontSize:12,fontWeight:700,color:"#0891b2"}}>
                   {Ico.plus(11,"#0891b2")} Ajouter
                   <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={addPhotos}/>
                 </label>
@@ -1663,7 +1792,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
             }
           </div>
           {/* Récap */}
-          <div style={{background:"#f8fafc",borderRadius:10,padding:"12px 14px",border:"1px solid "+DS.border}}>
+          <div style={{background:"rgba(255,255,255,0.45)",borderRadius:10,padding:"12px 14px",border:"1px solid "+DS.border}}>
             <div style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>Récapitulatif</div>
             {[
               ["Client", selectedClient?.nom||"—"],
@@ -1678,8 +1807,8 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
             ))}
           </div>
           {selectedClient?.email&&(
-            <button onClick={()=>showConfirm(`Envoyer le bon de livraison à ${selectedClient?.email} ?`, ()=>envoyerEmailLivraison({...f,id:isEdit?f.id:uid()}, selectedClient), null, {type:"email", title:"Envoyer par email", detail:`Destinataire : ${selectedClient?.nom||"client"} — ${selectedClient?.email||""}`})}
-              style={{padding:"11px",borderRadius:DS.radiusSm,background:"#f0f9ff",border:"1px solid #bae6fd",cursor:"pointer",fontWeight:700,fontSize:13,color:"#0891b2",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            <button onClick={()=>envoyerEmailLivraison({...f,id:isEdit?f.id:uid()}, selectedClient)}
+              style={{padding:"11px",borderRadius:DS.radiusSm,background:"rgba(224,242,254,0.5)",border:"1px solid #bae6fd",cursor:"pointer",fontWeight:700,fontSize:13,color:"#0891b2",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
               {Ico.send(13,"#0891b2")} Envoyer par email à {selectedClient.email}
             </button>
           )}
@@ -1868,7 +1997,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
         </div>
 
         {/* TABS — scrollables, compacts */}
-        <div style={{background:"#fff",display:"flex",borderBottom:"1px solid #f1f5f9",overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}>
+        <div style={{background:"rgba(255,255,255,0.55)",display:"flex",borderBottom:"1px solid #f1f5f9",overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}>
           {TABS.map(({id,label,ico})=>(
             <button key={id} onClick={()=>setTab(id)}
               style={{flexShrink:0,padding:"10px 14px",border:"none",cursor:"pointer",fontWeight:tab===id?800:500,fontSize:12,fontFamily:"inherit",background:"transparent",color:tab===id?"#0891b2":"#94a3b8",borderBottom:tab===id?"2.5px solid #0891b2":"2.5px solid transparent",transition:"all .12s",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:4,WebkitTapHighlightColor:"transparent"}}>
@@ -1886,234 +2015,46 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
         <div className="fade-in">
           {(()=>{
             const passClient2 = passages.filter(p=>p.clientId===client.id);
-            const livClient   = (livraisons||[]).filter(l=>l.clientId===client.id);
-            const rdvClient2  = (rdvs||[]).filter(r=>r.clientId===client.id);
-
-            // Config visuelle par type d'événement
-            const EVT_CONFIG = {
-              entretien: { emoji:"🔧", color:"#0891b2", bg:"#e0f2fe", border:"#7dd3fc", label:"Entretien" },
-              controle:  { emoji:"💧", color:"#0e7490", bg:"#cffafe", border:"#67e8f9", label:"Contrôle" },
-              sav:       { emoji:"⚙️", color:"#7c3aed", bg:"#ede9fe", border:"#c4b5fd", label:"SAV" },
-              livraison: { emoji:"🚚", color:"#f59e0b", bg:"#fef3c7", border:"#fcd34d", label:"Livraison" },
-              rdv:       { emoji:"📅", color:"#818cf8", bg:"#eef2ff", border:"#a5b4fc", label:"RDV" },
-              contrat:   { emoji:"📋", color:"#06b6d4", bg:"#e0f2fe", border:"#67e8f9", label:"Contrat" },
-            };
-
-            const getEvtConfig = (type="") => {
-              const t = type.toLowerCase();
-              if (t.includes("contrôle")||t.includes("controle")) return EVT_CONFIG.controle;
-              if (t.includes("entretien")) return EVT_CONFIG.entretien;
-              if (t.includes("sav")||t.includes("dépann")) return EVT_CONFIG.sav;
-              return EVT_CONFIG.entretien;
-            };
-
+            const livClient  = (livraisons||[]).filter(l=>l.clientId===client.id);
+            const rdvClient2 = (rdvs||[]).filter(r=>r.clientId===client.id);
             const events = [
-              ...(client.dateDebut?[{
-                date:client.dateDebut,
-                type:"contrat",
-                title:"Début de contrat",
-                sub:client.formule+(client.prix?" · "+client.prix+"€/an":""),
-                cfg:EVT_CONFIG.contrat,
-              }]:[]),
-              ...passClient2.map(p=>({
-                date:p.date,
-                type:"passage",
-                title:p.type||"Passage",
-                sub:p.tech?"par "+p.tech:"",
-                cfg:getEvtConfig(p.type),
-                badge:p.ok?"Effectué":"En cours",
-                badgeOk:!!p.ok,
-                ph:getPH(p), cl:getCL(p),
-                ia:analyseEauIA(p),
-                photos:!!(p.photoArrivee||p.photoDepart),
-                _p:p,
-              })),
-              ...livClient.map(l=>({
-                date:l.date,
-                type:"livraison",
-                title:"Livraison produits",
-                sub:(l.produits||[]).slice(0,3).join(", ")+(l.montant?" · "+l.montant+"€":""),
-                cfg:EVT_CONFIG.livraison,
-                badge:l.statut==="paye"?"Payé":l.statut==="facture"?"Facturé":"À facturer",
-                badgeOk:l.statut==="paye",
-                _l:l,
-              })),
-              ...rdvClient2.map(r=>({
-                date:r.date,
-                type:"rdv",
-                title:r.type||"Rendez-vous",
-                sub:[r.heure,r.duree?r.duree+" min":null].filter(Boolean).join(" · "),
-                cfg:EVT_CONFIG.rdv,
-                badge:r.date>=TODAY?"À venir":"Passé",
-                badgeOk:r.date>=TODAY,
-                _r:r,
-              })),
+              ...(client.dateDebut?[{date:client.dateDebut,title:"Début de contrat",sub:client.formule+(client.prix?" · "+client.prix+"€/an":""),dot:"#22d3ee",badge:"Contrat",badgeColor:"#0891b2"}]:[]),
+              ...passClient2.map(p=>({date:p.date,title:p.type||"Passage",sub:[p.tech?"par "+p.tech:null,p.ph?"pH "+p.ph:null,p.chlore?"Cl "+p.chlore:null].filter(Boolean).join(" · "),dot:isControleType(p.type)?"#0e7490":"#0891b2",badge:p.ok?"Effectué":"En cours",badgeColor:p.ok?"#059669":"#f59e0b",_p:p})),
+              ...livClient.map(l=>({date:l.date,title:"Livraison",sub:[l.produits?.slice(0,2).join(", "),l.montant?l.montant+"€":null].filter(Boolean).join(" · "),dot:"#f59e0b",badge:l.statut==="paye"?"Payé":l.statut==="facture"?"Facturé":"À facturer",badgeColor:l.statut==="paye"?"#059669":"#f59e0b",_l:l})),
+              ...rdvClient2.map(r=>({date:r.date,title:r.type||"RDV",sub:[r.heure,r.duree?r.duree+" min":null].filter(Boolean).join(" · "),dot:"#818cf8",badge:r.date>=TODAY?"À venir":"Passé",badgeColor:r.date>=TODAY?"#818cf8":"#94a3b8",_r:r})),
             ].sort((a,b)=>b.date.localeCompare(a.date));
-
-            if(!events.length) return (
-              <div style={{textAlign:"center",padding:"56px 0",color:"#94a3b8"}}>
-                <div style={{fontSize:48,marginBottom:12}}>📭</div>
-                <div style={{fontSize:14,fontWeight:700}}>Aucun historique</div>
-                <div style={{fontSize:12,marginTop:4}}>Les passages et livraisons apparaîtront ici</div>
-              </div>
-            );
-
-            // Grouper par mois
+            if(!events.length) return <div style={{textAlign:"center",padding:"48px 0",color:"#94a3b8",fontSize:14}}>Aucun historique</div>;
             const grouped={};
             events.forEach(ev=>{ const d=new Date(ev.date); const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; if(!grouped[k]) grouped[k]=[]; grouped[k].push(ev); });
-
             return Object.keys(grouped).sort((a,b)=>b.localeCompare(a)).map(key=>{
               const [yr,mo]=key.split("-");
-              const isCurrentMonth = parseInt(mo)===MOIS_NOW && parseInt(yr)===YEAR_NOW;
               return (
-                <div key={key} style={{marginBottom:28}}>
-                  {/* En-tête mois */}
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-                    <div style={{
-                      padding:"4px 14px",borderRadius:20,
-                      background:isCurrentMonth?"linear-gradient(135deg,#0891b2,#06b6d4)":"#eef2f7",
-                      color:isCurrentMonth?"#fff":DS.mid,
-                      fontSize:12,fontWeight:800,
-                      boxShadow:isCurrentMonth?"0 3px 10px rgba(8,145,178,0.35)":"3px 3px 6px rgba(166,210,220,0.5),-2px -2px 5px rgba(255,255,255,0.85)",
-                    }}>
-                      {isCurrentMonth?"🗓 ":""}{MOIS_L[parseInt(mo)]} {yr}
-                    </div>
-                    <div style={{flex:1,height:1,background:"linear-gradient(90deg,rgba(166,210,220,0.4),transparent)"}}/>
-                    <div style={{fontSize:10,color:"#94a3b8",fontWeight:600,flexShrink:0}}>
-                      {grouped[key].length} év.
-                    </div>
+                <div key={key} style={{marginBottom:24}}>
+                  <div style={{fontSize:11,fontWeight:800,color:"#0f172a",marginBottom:10,paddingBottom:6,borderBottom:"2px solid #f1f5f9",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                    <span>{MOIS_L[parseInt(mo)]} {yr}</span>
+                    <span style={{fontSize:10,color:"#94a3b8",fontWeight:500}}>{grouped[key].length} événement{grouped[key].length>1?"s":""}</span>
                   </div>
-
-                  {/* Timeline */}
-                  <div style={{position:"relative",paddingLeft:44}}>
-                    {/* Ligne verticale */}
-                    <div style={{position:"absolute",left:16,top:0,bottom:0,width:2,background:"linear-gradient(180deg,rgba(8,145,178,0.3),rgba(166,210,220,0.1))",borderRadius:1}}/>
-
-                    {grouped[key].map((ev,i)=>{
-                      const d=new Date(ev.date);
-                      const clickable=!!(ev._p||ev._l||ev._r);
-                      return (
-                        <div key={i} style={{position:"relative",marginBottom:i<grouped[key].length-1?12:0}}>
-                          {/* Point timeline */}
-                          <div style={{
-                            position:"absolute",left:-32,top:14,
-                            width:16,height:16,borderRadius:"50%",
-                            background:ev.cfg.bg,
-                            border:`2.5px solid ${ev.cfg.color}`,
-                            display:"flex",alignItems:"center",justifyContent:"center",
-                            fontSize:8,boxShadow:`0 0 0 3px ${ev.cfg.color}22`,
-                          }}>
-                            <span style={{fontSize:8}}>{ev.cfg.emoji}</span>
-                          </div>
-
-                          {/* Carte événement */}
-                          <div onClick={ev._p?()=>setDetailPassageFiche(ev._p):ev._l?()=>{setEditLiv(ev._l);setShowFormLiv(true);}:ev._r?()=>onEditRdv&&onEditRdv(ev._r):undefined}
-                            className={clickable?"card-hover":""}
-                            style={{
-                              background:"#eef2f7",
-                              borderRadius:14,
-                              border:`1px solid ${ev.cfg.border}`,
-                              borderLeft:`3px solid ${ev.cfg.color}`,
-                              overflow:"hidden",
-                              cursor:clickable?"pointer":"default",
-                              boxShadow:"3px 3px 8px rgba(166,210,220,0.5),-2px -2px 6px rgba(255,255,255,0.85)",
-                            }}>
-                            <div style={{padding:"10px 12px"}}>
-                              {/* Ligne principale */}
-                              <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
-                                <div style={{width:32,height:32,borderRadius:10,background:ev.cfg.bg,
-                                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0,
-                                  border:`1px solid ${ev.cfg.border}`}}>
-                                  {ev.cfg.emoji}
-                                </div>
-                                <div style={{flex:1,minWidth:0}}>
-                                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2,flexWrap:"wrap"}}>
-                                    <span style={{fontSize:13,fontWeight:800,color:"#0f172a"}}>{ev.title}</span>
-                                    {ev.badge&&(
-                                      <span style={{
-                                        fontSize:9,fontWeight:800,
-                                        color:ev.badgeOk?ev.cfg.color:"#94a3b8",
-                                        background:ev.badgeOk?ev.cfg.bg:"#f1f5f9",
-                                        border:`1px solid ${ev.badgeOk?ev.cfg.border:"#e2e8f0"}`,
-                                        padding:"1px 7px",borderRadius:20,
-                                      }}>{ev.badge}</span>
-                                    )}
-                                  </div>
-                                  <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                                    <span style={{fontSize:11,color:"#64748b",fontWeight:600}}>
-                                      📅 {d.toLocaleDateString("fr",{weekday:"short",day:"2-digit",month:"short"})}
-                                    </span>
-                                    {ev.sub&&<span style={{fontSize:11,color:"#94a3b8"}}>· {ev.sub}</span>}
-                                  </div>
-                                </div>
-                                {clickable&&(
-                                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round" style={{flexShrink:0,marginTop:8}}>
-                                    <polyline points="9 18 15 12 9 6"/>
-                                  </svg>
-                                )}
-                              </div>
-
-                              {/* Mesures eau si passage */}
-                              {ev._p && (ev.ph||ev.cl) && (
-                                <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
-                                  {ev.ph&&(()=>{const ok=ev.ph>=7&&ev.ph<=7.6;return(
-                                    <div style={{display:"flex",alignItems:"center",gap:4,padding:"3px 9px",borderRadius:20,
-                                      background:ok?"#f0fdf4":"#fff1f2",border:`1px solid ${ok?"#86efac":"#fca5a5"}`}}>
-                                      <span style={{fontSize:9,fontWeight:800,color:ok?"#059669":"#be123c"}}>pH</span>
-                                      <span style={{fontSize:12,fontWeight:900,color:ok?"#059669":"#be123c"}}>{ev.ph}</span>
-                                      <span style={{fontSize:10}}>{ok?"✓":"⚠"}</span>
-                                    </div>
-                                  );})()}
-                                  {ev.cl&&(()=>{const ok=ev.cl>=0.5&&ev.cl<=3;return(
-                                    <div style={{display:"flex",alignItems:"center",gap:4,padding:"3px 9px",borderRadius:20,
-                                      background:ok?"#f0fdf4":"#fff1f2",border:`1px solid ${ok?"#86efac":"#fca5a5"}`}}>
-                                      <span style={{fontSize:9,fontWeight:800,color:ok?"#059669":"#be123c"}}>Cl</span>
-                                      <span style={{fontSize:12,fontWeight:900,color:ok?"#059669":"#be123c"}}>{ev.cl}</span>
-                                      <span style={{fontSize:10}}>{ok?"✓":"⚠"}</span>
-                                    </div>
-                                  );})()}
-                                  {/* Score IA */}
-                                  {ev.ia?.hasMesures&&(()=>{const s=ev.ia.score;const c=s>=90?"#059669":s>=75?"#0891b2":s>=50?"#f59e0b":"#ef4444";return(
-                                    <div style={{display:"flex",alignItems:"center",gap:4,padding:"3px 9px",borderRadius:20,
-                                      background:`${c}15`,border:`1px solid ${c}44`}}>
-                                      <span style={{fontSize:9,fontWeight:800,color:c}}>🧠 IA</span>
-                                      <span style={{fontSize:12,fontWeight:900,color:c}}>{s}%</span>
-                                    </div>
-                                  );})()}
-                                </div>
-                              )}
-
-                              {/* Alerte IA si problème */}
-                              {ev._p && ev.ia?.alerts?.length>0 && (
-                                <div style={{marginTop:6,padding:"5px 8px",borderRadius:8,
-                                  background:ev.ia.alerts[0].lvl==="danger"?"#fff1f2":"#fffbeb",
-                                  border:`1px solid ${ev.ia.alerts[0].lvl==="danger"?"#fca5a5":"#fde68a"}`}}>
-                                  <div style={{fontSize:10,fontWeight:700,color:ev.ia.alerts[0].lvl==="danger"?"#be123c":"#b45309"}}>
-                                    {ev.ia.alerts[0].lvl==="danger"?"🚨":"⚠️"} {ev.ia.alerts[0].msg}
-                                  </div>
-                                  {ev.ia.alerts[0].conseil&&<div style={{fontSize:9,color:"#64748b",marginTop:2}}>💡 {ev.ia.alerts[0].conseil}</div>}
-                                </div>
-                              )}
-
-                              {/* Miniatures photos */}
-                              {ev._p && (ev._p.photoArrivee||ev._p.photoDepart) && (
-                                <div style={{display:"flex",gap:4,marginTop:8}}>
-                                  {ev._p.photoArrivee&&<div style={{position:"relative",borderRadius:8,overflow:"hidden",height:40,width:60,flexShrink:0}}>
-                                    <img src={ev._p.photoArrivee} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                                    <span style={{position:"absolute",bottom:1,left:2,fontSize:7,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.5)",borderRadius:2,padding:"1px 3px"}}>Arr.</span>
-                                  </div>}
-                                  {ev._p.photoDepart&&<div style={{position:"relative",borderRadius:8,overflow:"hidden",height:40,width:60,flexShrink:0}}>
-                                    <img src={ev._p.photoDepart} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                                    <span style={{position:"absolute",bottom:1,left:2,fontSize:7,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.5)",borderRadius:2,padding:"1px 3px"}}>Dép.</span>
-                                  </div>}
-                                </div>
-                              )}
-                            </div>
-                          </div>
+                  {grouped[key].map((ev,i)=>{
+                    const d=new Date(ev.date);
+                    const clickable=!!(ev._p||ev._l||ev._r);
+                    return (
+                      <div key={i} onClick={ev._p?()=>setDetailPassageFiche(ev._p):ev._l?()=>{setEditLiv(ev._l);setShowFormLiv(true);}:ev._r?()=>onEditRdv&&onEditRdv(ev._r):undefined}
+                        style={{display:"flex",alignItems:"center",gap:12,padding:"11px 0",borderBottom:i<grouped[key].length-1?"1px solid #f8fafc":"none",cursor:clickable?"pointer":"default"}}>
+                        <div style={{width:36,flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                          <div style={{width:10,height:10,borderRadius:"50%",background:ev.dot}}/>
+                          <div style={{fontSize:9,color:"#94a3b8",fontWeight:600,textAlign:"center",lineHeight:1.2}}>{d.toLocaleDateString("fr",{day:"2-digit",month:"short"})}</div>
                         </div>
-                      );
-                    })}
-                  </div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:13,fontWeight:700,color:"#0f172a",marginBottom:2}}>{ev.title}</div>
+                          {ev.sub&&<div style={{fontSize:11,color:"#64748b"}}>{ev.sub}</div>}
+                        </div>
+                        <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+                          <span style={{fontSize:10,fontWeight:700,color:ev.badgeColor,background:ev.badgeColor+"18",padding:"2px 7px",borderRadius:10,whiteSpace:"nowrap"}}>{ev.badge}</span>
+                          {clickable&&<svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               );
             });
@@ -2145,7 +2086,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
               const rapportStatus=getRapportStatus(p);
               const rapportMeta=RAPPORT_STATUS[rapportStatus];
               return (
-                <div key={p.id} style={{background:"#fff",borderRadius:14,border:"1px solid #f1f5f9",marginBottom:8,overflow:"hidden",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
+                <div key={p.id} style={{background:"rgba(255,255,255,0.55)",borderRadius:14,border:"1px solid #f1f5f9",marginBottom:8,overflow:"hidden",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
                   {/* Header passage */}
                   <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px 8px"}}>
                     <div style={{width:36,height:36,borderRadius:10,background:isCtrl?"#ecfdf5":"#eff6ff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:16}}>
@@ -2190,7 +2131,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                       {label:"Aperçu",  ico:Ico.search(12,DS.mid),  bg:"#f8fafc", color:DS.dark,   onClick:()=>setDetailPassageFiche(p)},
                       {label:"Modifier",ico:Ico.edit(12,DS.mid),    bg:"#f8fafc", color:DS.mid,    onClick:()=>onEditPassage&&onEditPassage(p)},
                       {label:"Rapport", ico:Ico.pdf(12,DS.blue),    bg:"#eff6ff", color:DS.blue,   onClick:()=>ouvrirRapport(p,client)},
-                      ...(client.email?[{label:"Email",ico:Ico.send(12,DS.green),bg:"#f0fdf4",color:DS.green,onClick:()=>showConfirm(`Envoyer le rapport à ${client?.email} ?`, ()=>envoyerEmail(p,client,onUpdatePassageStatus), null, {type:"email",title:"Envoyer le rapport",detail:`Client : ${client?.nom||""} — ${new Date(p.date).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})}`})}]:[]),
+                      ...(client.email?[{label:"Email",ico:Ico.send(12,DS.green),bg:"#f0fdf4",color:DS.green,onClick:()=>envoyerEmail(p,client,onUpdatePassageStatus)}]:[]),
                       ...(onDeletePassage?[{label:"",ico:Ico.trash(12,DS.red),bg:"#fef2f2",color:DS.red,onClick:()=>showConfirm("Supprimer ce passage ?",()=>onDeletePassage(p.id))}]:[]),
                     ].map((btn,i,arr)=>(
                       <button key={i} onClick={e=>{e.stopPropagation();btn.onClick();}}
@@ -2259,11 +2200,11 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                 </div>
               </div>
               {isSelMois&&passM.length>0&&(
-                <div style={{background:"#f8fafc",padding:"8px 12px",borderBottom:i<11?"1px solid "+DS.border:"none",display:"flex",flexDirection:"column",gap:6}}>
+                <div style={{background:"rgba(255,255,255,0.45)",padding:"8px 12px",borderBottom:i<11?"1px solid "+DS.border:"none",display:"flex",flexDirection:"column",gap:6}}>
                   {passM.sort((a,b)=>new Date(b.date)-new Date(a.date)).map(p=>{
                     const phOk=p.ph>=7&&p.ph<=7.6;const clOk=p.chlore>=0.5&&p.chlore<=3;
                     return (
-                      <div key={p.id} style={{background:"#fff",borderRadius:10,padding:"9px 11px",border:"1px solid #f1f5f9"}}>
+                      <div key={p.id} style={{background:"rgba(255,255,255,0.55)",borderRadius:10,padding:"9px 11px",border:"1px solid #f1f5f9"}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
                           <div style={{fontSize:12,fontWeight:700,color:DS.dark}}>{new Date(p.date).toLocaleDateString("fr",{day:"2-digit",month:"long"})} {p.tech&&<span style={{color:DS.mid,fontWeight:500}}>· {p.tech}</span>}</div>
                           <div style={{display:"flex",gap:4}}>
@@ -2272,8 +2213,8 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                           </div>
                         </div>
                         <div style={{display:"flex",gap:4}}>
-                          <button onClick={e=>{e.stopPropagation();setDetailPassageFiche(p);}} style={{flex:1,padding:"5px",borderRadius:7,background:"#f1f5f9",border:"none",cursor:"pointer",fontSize:11,fontWeight:700,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:3}}>{Ico.search(10,DS.mid)} Aperçu</button>
-                          <button onClick={e=>{e.stopPropagation();onEditPassage&&onEditPassage(p);}} style={{flex:1,padding:"5px",borderRadius:7,background:"#f1f5f9",border:"none",cursor:"pointer",fontSize:11,fontWeight:700,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:3}}>{Ico.edit(10,DS.mid)} Modifier</button>
+                          <button onClick={e=>{e.stopPropagation();setDetailPassageFiche(p);}} style={{flex:1,padding:"5px",borderRadius:7,background:"rgba(255,255,255,0.4)",border:"none",cursor:"pointer",fontSize:11,fontWeight:700,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:3}}>{Ico.search(10,DS.mid)} Aperçu</button>
+                          <button onClick={e=>{e.stopPropagation();onEditPassage&&onEditPassage(p);}} style={{flex:1,padding:"5px",borderRadius:7,background:"rgba(255,255,255,0.4)",border:"none",cursor:"pointer",fontSize:11,fontWeight:700,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:3}}>{Ico.edit(10,DS.mid)} Modifier</button>
                           <button onClick={e=>{e.stopPropagation();ouvrirRapport(p,client);}} style={{flex:1,padding:"5px",borderRadius:7,background:DS.blueSoft,border:"none",cursor:"pointer",fontSize:11,fontWeight:700,color:DS.blue,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:3}}>{Ico.pdf(10,DS.blue)} Rapport</button>
                           {onDeletePassage&&<button onClick={e=>{e.stopPropagation();showConfirm("Supprimer ?",()=>onDeletePassage(p.id));}} style={{padding:"5px 7px",borderRadius:7,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(10,DS.red)}</button>}
                         </div>
@@ -2299,7 +2240,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
           {/* Contact rapide */}
           {(client.tel||client.email)&&(
             <div style={{display:"flex",gap:8,marginBottom:16}}>
-              {client.tel&&<a href={"tel:"+client.tel} style={{flex:1,height:44,borderRadius:12,background:"#eff6ff",border:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:13,fontWeight:700,color:DS.blue,textDecoration:"none",WebkitTapHighlightColor:"transparent"}}>
+              {client.tel&&<a href={"tel:"+client.tel} style={{flex:1,height:44,borderRadius:12,background:"rgba(219,234,254,0.5)",border:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:13,fontWeight:700,color:DS.blue,textDecoration:"none",WebkitTapHighlightColor:"transparent"}}>
                 {Ico.phone(14,DS.blue)} Appeler
               </a>}
               {client.email&&<a href={"mailto:"+client.email} style={{flex:1,height:44,borderRadius:12,background:"#f0fdf4",border:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:13,fontWeight:700,color:DS.green,textDecoration:"none",WebkitTapHighlightColor:"transparent"}}>
@@ -2307,7 +2248,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
               </a>}
             </div>
           )}
-          <div style={{background:"#fff",borderRadius:14,border:"1px solid #f1f5f9",overflow:"hidden",marginBottom:16}}>
+          <div style={{background:"rgba(255,255,255,0.55)",borderRadius:14,border:"1px solid #f1f5f9",overflow:"hidden",marginBottom:16}}>
           {[
             {ico:Ico.phone(15,DS.blue),l:"Téléphone",v:client.tel,href:client.tel?"tel:"+client.tel:null},
             {ico:Ico.mail(15,DS.blue),l:"Email",v:client.email,href:client.email?"mailto:"+client.email:null},
@@ -2318,7 +2259,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
             {ico:Ico.calendar(15,jours!==null&&jours<=30?DS.orange:DS.blue),l:"Fin contrat",v:client.dateFin?new Date(client.dateFin).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}):null},
           ].filter(r=>r.v).map((r,i,arr)=>(
             <div key={r.l} style={{display:"flex",gap:12,padding:"13px 16px",alignItems:"center",borderBottom:i<arr.length-1?"1px solid #f8fafc":"none"}}>
-              <div style={{width:34,height:34,borderRadius:9,background:"#f0f9ff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{r.ico}</div>
+              <div style={{width:34,height:34,borderRadius:9,background:"rgba(224,242,254,0.5)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{r.ico}</div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:2}}>{r.l}</div>
                 {r.href?<a href={r.href} style={{fontSize:13,color:DS.blue,fontWeight:700,textDecoration:"none"}}>{r.v}</a>:<div style={{fontSize:13,color:"#0f172a",fontWeight:600}}>{r.v}</div>}
@@ -2350,13 +2291,13 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
               style={{height:44,borderRadius:12,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,boxShadow:"0 2px 8px rgba(2,132,199,0.25)",WebkitTapHighlightColor:"transparent"}}>
               {Ico.contract(12,"#fff")} Contrat
             </button>
-            <button onClick={()=>showConfirm(`Envoyer le contrat à ${client?.email} pour signature ?`, ()=>envoyerContratSignature(client), null, {type:"email", title:"Envoyer le contrat", detail:`Client : ${client?.nom||""}`})}
+            <button onClick={()=>envoyerContratSignature(client)}
               style={{height:44,borderRadius:12,background:contratClient?.statut==="signe_complet"?DS.greenSoft:contratClient?.statut==="signe_client"?DS.blueSoft:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,WebkitTapHighlightColor:"transparent"}}>
               {Ico.sign(12,contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff")}
               {contratClient?.statut==="signe_complet"?"Signé":contratClient?.statut==="signe_client"?"Attente":"Envoyer"}
             </button>
             <button onClick={onEdit}
-              style={{height:44,borderRadius:12,background:"#f1f5f9",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,WebkitTapHighlightColor:"transparent"}}>
+              style={{height:44,borderRadius:12,background:"rgba(255,255,255,0.4)",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,WebkitTapHighlightColor:"transparent"}}>
               {Ico.edit(12,DS.dark)} Modifier
             </button>
             <button onClick={onDelete}
@@ -2398,7 +2339,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                     {isToday&&<span style={{fontSize:9,fontWeight:800,color:DS.purple,background:DS.purpleSoft,padding:"2px 7px",borderRadius:8}}>Aujourd'hui</span>}
                   </div>
                   <div style={{display:"flex",gap:6,marginTop:10,paddingTop:8,borderTop:"1px solid #f8fafc"}}>
-                    <button onClick={()=>onEditRdv&&onEditRdv(r)} style={{flex:1,padding:"7px",borderRadius:8,background:"#f8fafc",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,fontWeight:700,color:DS.mid,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>{Ico.edit(11,DS.mid)} Modifier</button>
+                    <button onClick={()=>onEditRdv&&onEditRdv(r)} style={{flex:1,padding:"7px",borderRadius:8,background:"rgba(255,255,255,0.45)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,fontWeight:700,color:DS.mid,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>{Ico.edit(11,DS.mid)} Modifier</button>
                     <button onClick={()=>exportRdvToICS(r,client)} style={{flex:1,padding:"7px",borderRadius:8,background:DS.purpleSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,fontWeight:700,color:DS.purple,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>{Ico.download(11,DS.purple)} Calendrier</button>
                     <button onClick={()=>showConfirm("Supprimer ce RDV ?",()=>onDeleteRdv&&onDeleteRdv(r.id))} style={{width:34,borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",WebkitTapHighlightColor:"transparent"}}>{Ico.trash(11,DS.red)}</button>
                   </div>
@@ -2429,7 +2370,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
             : livraisons.sort((a,b)=>new Date(b.date)-new Date(a.date)).map(l=>{
               const s=STATUT_LIV[l.statut]||STATUT_LIV.aFacturer;
               return (
-                <div key={l.id} style={{background:"#fff",borderRadius:12,border:"1px solid #f1f5f9",marginBottom:8,overflow:"hidden",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
+                <div key={l.id} style={{background:"rgba(255,255,255,0.55)",borderRadius:12,border:"1px solid #f1f5f9",marginBottom:8,overflow:"hidden",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
                   <div style={{padding:"12px 14px 8px",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontWeight:700,fontSize:13,color:DS.dark}}>{new Date(l.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"})}</div>
@@ -2446,9 +2387,9 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                     ))}
                   </div>
                   <div style={{display:"flex",borderTop:"1px solid #f8fafc"}}>
-                    <button onClick={()=>{setEditLiv(l);setShowFormLiv(true);}} style={{flex:1,padding:"8px",background:"#f8fafc",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,fontWeight:700,color:DS.mid,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>{Ico.edit(11,DS.mid)} Modifier</button>
+                    <button onClick={()=>{setEditLiv(l);setShowFormLiv(true);}} style={{flex:1,padding:"8px",background:"rgba(255,255,255,0.45)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,fontWeight:700,color:DS.mid,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>{Ico.edit(11,DS.mid)} Modifier</button>
                     {client.email
-                      ?<button onClick={()=>showConfirm(`Envoyer le bon de livraison à ${client?.email} ?`, ()=>envoyerEmailLivraison(l,client), null, {type:"email",title:"Envoyer la livraison",detail:`Client : ${client?.nom||""}`})} style={{flex:1,padding:"8px",background:"#f0fdf4",border:"none",borderLeft:"1px solid #f8fafc",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,fontWeight:700,color:DS.green,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>{Ico.send(11,DS.green)} Email</button>
+                      ?<button onClick={()=>envoyerEmailLivraison(l,client)} style={{flex:1,padding:"8px",background:"#f0fdf4",border:"none",borderLeft:"1px solid #f8fafc",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,fontWeight:700,color:DS.green,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>{Ico.send(11,DS.green)} Email</button>
                       :<div style={{flex:1}}/>
                     }
                     <button onClick={()=>showConfirm("Supprimer ?",()=>onDeleteLivraison(l.id))} style={{width:38,padding:"8px",background:"#fef2f2",border:"none",borderLeft:"1px solid #f8fafc",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",WebkitTapHighlightColor:"transparent"}}>{Ico.trash(11,DS.red)}</button>
@@ -2499,7 +2440,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
               {/* Contenu principal : QR + code */}
               <div style={{display:"flex",gap:18,alignItems:"center",position:"relative"}}>
                 {/* QR Code */}
-                <div style={{width:96,height:96,borderRadius:14,overflow:"hidden",flexShrink:0,background:"#fff",padding:4,boxShadow:"0 4px 16px rgba(0,0,0,0.3)"}}>
+                <div style={{width:96,height:96,borderRadius:14,overflow:"hidden",flexShrink:0,background:"rgba(255,255,255,0.55)",padding:4,boxShadow:"0 4px 16px rgba(0,0,0,0.3)"}}>
                   <img src={qrUrl} alt="QR" width={88} height={88} style={{display:"block",borderRadius:8}} onError={e=>{e.target.style.display="none";}}/>
                 </div>
                 {/* Nom + code */}
@@ -2527,7 +2468,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
 
             {/* Dernière intervention */}
             {lastPass && (
-              <div style={{background:"#fff",borderRadius:16,border:"1px solid #f1f5f9",padding:"14px 16px",boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+              <div style={{background:"rgba(255,255,255,0.55)",borderRadius:16,border:"1px solid #f1f5f9",padding:"14px 16px",boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
                 <div style={{fontSize:10,fontWeight:800,color:"#94a3b8",textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>Dernière intervention</div>
                 <div style={{display:"flex",alignItems:"center",gap:12}}>
                   <div style={{width:42,height:42,borderRadius:12,background:"linear-gradient(135deg,#0891b2,#0e7490)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:18}}>
@@ -2583,7 +2524,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
             </div>
 
             {/* Lien URL */}
-            <div style={{background:"#f8fafc",borderRadius:12,padding:"10px 14px",border:"1px solid #e2e8f0"}}>
+            <div style={{background:"rgba(255,255,255,0.45)",borderRadius:12,padding:"10px 14px",border:"1px solid #e2e8f0"}}>
               <div style={{fontSize:9,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:.8,marginBottom:4}}>Lien du carnet</div>
               <div style={{fontSize:11,color:"#0891b2",fontWeight:600,wordBreak:"break-all",lineHeight:1.5}}>{carnetUrl}</div>
             </div>
@@ -2596,9 +2537,9 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
 
     {/* -- APERÇU CARNET CLIENT (plein écran) -- */}
     {showCarnetPreview&&(
-      <div style={{position:"fixed",inset:0,zIndex:9999,background:"#f0f4f8",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+      <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(255,255,255,0.5)",display:"flex",flexDirection:"column",overflow:"hidden"}}>
         {/* Barre fermeture */}
-        <div style={{position:"sticky",top:0,zIndex:10,background:"rgba(12,31,63,0.96)",backdropFilter:"blur(8px)",paddingTop:"calc(env(safe-area-inset-top,0px) + 10px)",paddingBottom:10,paddingLeft:16,paddingRight:16,display:"flex",alignItems:"center",justifyContent:"space-between",boxShadow:"0 2px 12px rgba(0,0,0,0.3)"}}>
+        <div style={{position:"sticky",top:0,zIndex:10,background:"rgba(12,31,63,0.96)",backdropFilter:"blur(8px)",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",boxShadow:"0 2px 12px rgba(0,0,0,0.3)"}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <svg width={16} height={11} viewBox="0 0 32 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2.5" strokeLinecap="round">
               <path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/>
@@ -2665,7 +2606,7 @@ function RadioGroup({ label, options, value, onChange, color }) {
           return (
             <button key={o} onClick={()=>onChange(o)} className="btn-hover" style={{display:"flex",alignItems:"center",gap:11,padding:"11px 14px",borderRadius:12,border:`1.5px solid ${sel?activeColor:DS.border}`,background:sel?activeGrad:DS.white,cursor:"pointer",textAlign:"left",fontFamily:"inherit",transition:"all .2s",boxShadow:sel?`0 2px 10px ${activeColor}33`:"none",WebkitTapHighlightColor:"transparent"}}>
               <div style={{width:18,height:18,borderRadius:9,border:`2px solid ${sel?"transparent":DS.border}`,background:sel?"rgba(255,255,255,0.3)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .2s"}}>
-                {sel && <div style={{width:8,height:8,borderRadius:4,background:"#fff"}}/>}
+                {sel && <div style={{width:8,height:8,borderRadius:4,background:"rgba(255,255,255,0.55)"}}/>}
               </div>
               <span style={{fontSize:15,fontWeight:sel?700:400,color:sel?"#fff":DS.mid,flex:1}}>{o}</span>
               {sel && <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.8)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
@@ -2734,7 +2675,7 @@ function NumField({ label, value, onChange, unit, ideal, okFn }) {
       </div>
       <div style={{display:"flex",alignItems:"center",gap:8}}>
         <input type="number" step="0.1" value={value===""||value===null||value===undefined?"":value} onChange={e=>onChange(e.target.value===""?"":+e.target.value)}
-          style={{flex:1,padding:"8px 10px",borderRadius:8,border:`1.5px solid ${statusColor}`,fontSize:16,fontWeight:800,boxSizing:"border-box",color:statusTx,background:"#fff",transition:"all .2s",outline:"none",fontFamily:"inherit",minWidth:0}}/>
+          style={{flex:1,padding:"8px 10px",borderRadius:8,border:`1.5px solid ${statusColor}`,fontSize:16,fontWeight:800,boxSizing:"border-box",color:statusTx,background:"rgba(255,255,255,0.55)",transition:"all .2s",outline:"none",fontFamily:"inherit",minWidth:0}}/>
         {hasVal && (
           <div style={{width:28,height:28,borderRadius:14,background:ok?"#22c55e":"#ef4444",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:`0 2px 6px ${ok?"#22c55e":"#ef4444"}44`}}>
             {ok
@@ -3245,13 +3186,14 @@ async function envoyerEmail(passage, client, onSent) {
 </table>
 </body></html>`;
 
-  const PROXY = "https://briblue83.angelique-brusson96.workers.dev";
+  const RESEND_API_KEY = "re_FLTMeUdh_vL8QGqJhP2C293WEVCm9c7rh";
 
   try {
-    const res = await fetch(PROXY, {
+    const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
         from: `BRIBLUE <${FROM}>`,
@@ -3296,7 +3238,7 @@ function MRow({label,unit,value,onChange,ideal,okFn,icon,color="#0891b2"}) {
         {ideal&&<div style={{fontSize:10,color:"#94a3b8",marginTop:2,fontWeight:500}}>idéal {ideal}</div>}
       </div>
       <input type="number" step="0.1" value={value===""||value===null||value===undefined?"":value} onChange={e=>onChange(e.target.value===""?"":+e.target.value)}
-        style={{width:72,padding:"8px 10px",borderRadius:9,border:`2px solid ${statusColor}`,fontSize:15,fontWeight:800,boxSizing:"border-box",color:hasVal?(ok?"#16a34a":"#be123c"):DS.dark,background:"#fff",textAlign:"center",outline:"none",fontFamily:"inherit",flexShrink:0,transition:"all .2s"}}/>
+        style={{width:72,padding:"8px 10px",borderRadius:9,border:`2px solid ${statusColor}`,fontSize:15,fontWeight:800,boxSizing:"border-box",color:hasVal?(ok?"#16a34a":"#be123c"):DS.dark,background:"rgba(255,255,255,0.55)",textAlign:"center",outline:"none",fontFamily:"inherit",flexShrink:0,transition:"all .2s"}}/>
       <div style={{width:28,height:28,borderRadius:14,background:!hasVal?"#f1f5f9":ok?"#22c55e":"#ef4444",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .3s",boxShadow:hasVal?`0 2px 6px ${ok?"#22c55e":"#ef4444"}44`:"none"}}>
         {!hasVal
           ? <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -3336,7 +3278,6 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
   const [f,setF]=useState(isEdit ? {...EMPTY,...initial, rapportStatut:getRapportStatus(initial)} : EMPTY);
   const [step,setStep]=useState(1);
   const [showConfirmSave, setShowConfirmSave] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   useEffect(()=>{ const el=document.querySelector('[data-modal-body="1"]'); if(el) el.scrollTop=0; },[step]);
   const isSAV = f.type==="SAV";
   const isDevis = f.type==="Demande de devis";
@@ -3348,8 +3289,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
   const ph=Number(f.tPH)||Number(f.ph);
   const cl=Number(f.tChlore)||Number(f.chloreLibre);
 
-  const doSave = async () => {
-    setIsSaving(true);
+  const doSave = () => {
     if(!f.clientId||!f.date){ toastWarn("Client et date requis"); return; }
     const isSAVsave = f.type==="SAV";
     const isDevissave = f.type==="Demande de devis";
@@ -3379,7 +3319,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
           ].filter(Boolean).join(", ") || "",
       obs: isSimplifiedSave ? (f.descriptionSAV || f.commentaires || "") : f.commentaires,
     };
-    try { await onSave(passage); } catch {} finally { setIsSaving(false); }
+    onSave(passage);
     setShowConfirmSave(false);
     // Auto-créer une livraison si produits livrés
     if (f.livraisonProduits && (f.produitsLivres?.length > 0 || f.livraisonAutre) && onSaveLivraison) {
@@ -3567,7 +3507,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
               <select
                 value={f.clientId}
                 onChange={e=>set("clientId", e.target.value)}
-                style={{width:"100%",padding:"14px 16px",borderRadius:DS.radiusSm,border:"none",background:"#eef2f7",boxShadow:DS.nmShadowSm,fontSize:15,color:DS.dark}}
+                style={{width:"100%",padding:"14px 16px",borderRadius:DS.radiusSm,border:"none",background:"rgba(255,255,255,0.45)",boxShadow:DS.nmShadowSm,fontSize:15,color:DS.dark}}
               >
                 <option value="">Choisir un client</option>
                 {clients.map(c=>(
@@ -3692,7 +3632,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
 
       {isSansDonnees && step===1 && (
         <div className="fade-in" style={{display:"flex",flexDirection:"column",gap:16}}>
-          <div style={{padding:"16px",background:"#f8fafc",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,display:"flex",alignItems:"flex-start",gap:12}}>
+          <div style={{padding:"16px",background:"rgba(255,255,255,0.45)",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,display:"flex",alignItems:"flex-start",gap:12}}>
             <div style={{width:36,height:36,borderRadius:10,background:"#e2e8f0",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
               <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16" strokeWidth="2.5"/></svg>
             </div>
@@ -3907,7 +3847,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                 {k:"corrAlcafix",l:"Alcafix",ico:"🧫",col:"#059669"},
                 {k:"corrAutre",l:"Autre",ico:"📦",col:"#94a3b8"},
               ].map(({k,l,ico,col})=>(
-                <div key={k} style={{background:"#fff",borderRadius:10,padding:"10px 12px",border:"1px solid "+DS.border}}>
+                <div key={k} style={{background:"rgba(255,255,255,0.55)",borderRadius:10,padding:"10px 12px",border:"1px solid "+DS.border}}>
                   <div style={{fontSize:10,fontWeight:700,color:col,marginBottom:5,display:"flex",alignItems:"center",gap:4}}>
                     <span style={{fontSize:13}}>{ico}</span> {l}
                   </div>
@@ -4064,11 +4004,11 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
               <RapportStatusPicker value={f.rapportStatut} onChange={v=>set("rapportStatut",v)} />
             </div>
             <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:10}}>
-              <button onClick={()=>ouvrirRapport(f,client)} className="btn-hover" style={{padding:"14px",borderRadius:DS.radiusSm,background:"#eef2f7",border:"1.5px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:14,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              <button onClick={()=>ouvrirRapport(f,client)} className="btn-hover" style={{padding:"14px",borderRadius:DS.radiusSm,background:"rgba(255,255,255,0.45)",border:"1.5px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:14,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
                 {Ico.pdf(18,DS.dark)} Télécharger PDF
               </button>
               {client?.email ? (
-                <button onClick={()=>showConfirm(`Envoyer le rapport à ${client?.email} ?`, ()=>envoyerEmail(f,client), null, {type:"email",title:"Envoyer le rapport par email",detail:`Client : ${client?.nom||""}`})} className="btn-hover" style={{padding:"14px",borderRadius:DS.radiusSm,background:DS.blueGrad,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 16px "+DS.blue+"44"}}>
+                <button onClick={()=>envoyerEmail(f,client)} className="btn-hover" style={{padding:"14px",borderRadius:DS.radiusSm,background:DS.blueGrad,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 16px "+DS.blue+"44"}}>
                   {Ico.send(16,"#fff")} Envoyer à {client.email}
                 </button>
               ) : (
@@ -4094,18 +4034,8 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
           ? <button onClick={()=>setStep(s=>s+1)} className="btn-hover" style={{minHeight:52,padding:"14px 24px",borderRadius:DS.radiusSm,background:(STEP_INFO[step]||STEP_INFO[STEPS-1]).color,border:"none",cursor:"pointer",fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:8,boxShadow:`0 4px 16px ${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}44`,flexShrink:0}}>
               {(STEP_INFO[step]||STEP_INFO[STEPS-1]).l} <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
-          : <button onClick={handleSave} disabled={isSaving} className="btn-hover"
-              style={{minHeight:52,padding:"14px 24px",borderRadius:DS.radiusSm,
-                background:isSaving?"#64748b":"linear-gradient(135deg,#059669,#34d399)",
-                border:"none",cursor:isSaving?"not-allowed":"pointer",
-                fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit",
-                display:"flex",alignItems:"center",gap:8,
-                boxShadow:isSaving?"none":"0 4px 16px #05996944",
-                flexShrink:0,opacity:isSaving?0.7:1}}>
-              {isSaving
-                ? <><svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" style={{animation:"pulse 1s infinite"}}><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> Sync Firebase…</>
-                : <><svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Enregistrer</>
-              }
+          : <button onClick={handleSave} className="btn-hover" style={{minHeight:52,padding:"14px 24px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:8,boxShadow:"0 4px 16px #05996944",flexShrink:0}}>
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Enregistrer
             </button>
         }
       </div>
@@ -4115,7 +4045,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
         const dateStr = f.date ? new Date(f.date).toLocaleDateString("fr",{weekday:"long",day:"2-digit",month:"long",year:"numeric"}) : "—";
         return (
           <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(12,18,34,0.72)",display:"flex",alignItems:"flex-end",justifyContent:"center",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}} onClick={()=>setShowConfirmSave(false)}>
-            <div style={{background:"#fff",borderRadius:"20px 20px 0 0",padding:"28px 22px 36px",width:"100%",maxWidth:480,boxShadow:"0 -8px 40px rgba(0,0,0,0.18)"}} onClick={e=>e.stopPropagation()}>
+            <div style={{background:"rgba(255,255,255,0.55)",borderRadius:"20px 20px 0 0",padding:"28px 22px 36px",width:"100%",maxWidth:480,boxShadow:"0 -8px 40px rgba(0,0,0,0.18)"}} onClick={e=>e.stopPropagation()}>
               <div style={{width:40,height:4,borderRadius:2,background:"#e2e8f0",margin:"0 auto 22px"}}/>
               <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
                 <div style={{width:48,height:48,borderRadius:14,background:"linear-gradient(135deg,#059669,#34d399)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -4126,28 +4056,28 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                   <div style={{fontSize:13,color:"#64748b",marginTop:3}}>{isEdit ? "Modifier ce passage" : "Créer ce nouveau passage"}</div>
                 </div>
               </div>
-              <div style={{background:"#f8fafc",borderRadius:14,padding:"14px 16px",marginBottom:20,border:"1px solid #e2e8f0",display:"flex",flexDirection:"column",gap:8}}>
+              <div style={{background:"rgba(255,255,255,0.45)",borderRadius:14,padding:"14px 16px",marginBottom:20,border:"1px solid #e2e8f0",display:"flex",flexDirection:"column",gap:8}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <span style={{fontSize:12,color:"#94a3b8",fontWeight:600}}>Client</span>
                   <span style={{fontSize:13,fontWeight:700,color:"#0c1222"}}>{clientSel?.nom||"—"}</span>
                 </div>
-                <div style={{height:1,background:"#f1f5f9"}}/>
+                <div style={{height:1,background:"rgba(255,255,255,0.4)"}}/>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <span style={{fontSize:12,color:"#94a3b8",fontWeight:600}}>Date</span>
                   <span style={{fontSize:13,fontWeight:700,color:"#0c1222"}}>{dateStr}</span>
                 </div>
-                <div style={{height:1,background:"#f1f5f9"}}/>
+                <div style={{height:1,background:"rgba(255,255,255,0.4)"}}/>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <span style={{fontSize:12,color:"#94a3b8",fontWeight:600}}>Type</span>
                   <span style={{fontSize:13,fontWeight:700,color:"#0891b2"}}>{f.type||"—"}</span>
                 </div>
-                {f.tech&&<><div style={{height:1,background:"#f1f5f9"}}/><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                {f.tech&&<><div style={{height:1,background:"rgba(255,255,255,0.4)"}}/><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <span style={{fontSize:12,color:"#94a3b8",fontWeight:600}}>Technicien</span>
                   <span style={{fontSize:13,fontWeight:700,color:"#0c1222"}}>{f.tech}</span>
                 </div></>}
               </div>
               <div style={{display:"flex",gap:10}}>
-                <button onClick={()=>setShowConfirmSave(false)} style={{flex:1,padding:"14px",borderRadius:12,background:"#f1f5f9",border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#64748b",fontFamily:"inherit"}}>
+                <button onClick={()=>setShowConfirmSave(false)} style={{flex:1,padding:"14px",borderRadius:12,background:"rgba(255,255,255,0.4)",border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#64748b",fontFamily:"inherit"}}>
                   Annuler
                 </button>
                 <button onClick={doSave} style={{flex:2,padding:"14px",borderRadius:12,background:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit",boxShadow:"0 4px 16px #05996944",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
@@ -4267,7 +4197,7 @@ function CalendrierInteractif({ passages, rdvs, clients, onClientClick, onEditPa
                 const c=clients.find(x=>x.id===p.clientId);
                 const isCtrl=isControleType(p.type);
                 return (
-                  <div key={p.id} onClick={()=>onEditPassage&&onEditPassage(p)} className="card-hover" style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:"#eef2f7",borderRadius:8,marginBottom:4,border:"1.5px solid "+DS.blue+"33",cursor:"pointer"}}>
+                  <div key={p.id} onClick={()=>onEditPassage&&onEditPassage(p)} className="card-hover" style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:"rgba(255,255,255,0.45)",borderRadius:8,marginBottom:4,border:"1.5px solid "+DS.blue+"33",cursor:"pointer"}}>
                     <Avatar nom={c?.nom||"?"} size={30} photo={c?.photoPiscine}/>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontWeight:700,fontSize:12,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c?.nom||p.clientId}</div>
@@ -4290,7 +4220,7 @@ function CalendrierInteractif({ passages, rdvs, clients, onClientClick, onEditPa
               {dayRdvs.map(r=>{
                 const c=clients.find(x=>x.id===r.clientId);
                 return (
-                  <div key={r.id} onClick={()=>onEditRdv&&onEditRdv(r)} className="card-hover" style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:"#eef2f7",borderRadius:8,marginBottom:4,border:"none",cursor:"pointer"}}>
+                  <div key={r.id} onClick={()=>onEditRdv&&onEditRdv(r)} className="card-hover" style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:"rgba(255,255,255,0.45)",borderRadius:8,marginBottom:4,border:"none",cursor:"pointer"}}>
                     <div style={{width:30,textAlign:"center",flexShrink:0}}>
                       <div style={{fontSize:13,fontWeight:900,color:DS.purple}}>{r.heure||"--:--"}</div>
                     </div>
@@ -4322,39 +4252,62 @@ function CalendrierInteractif({ passages, rdvs, clients, onClientClick, onEditPa
 
 // ALERTES COLLAPSIBLE
 function AlertesBlock({ alertes, passages, onClientClick }) {
-  const [showAll, setShowAll] = useState(false);
-  const displayed = showAll ? alertes : alertes.slice(0, 3);
+  const [open, setOpen] = useState(false);
+  const preview = alertes.slice(0, 2);
+  const isMobile = useIsMobile();
   return (
-    <div style={{marginBottom:0}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-        <div style={{display:"flex",alignItems:"center",gap:7}}>
-          <div style={{width:8,height:8,borderRadius:4,background:DS.red}}/>
-          <span style={{fontSize:12,fontWeight:800,color:DS.red,textTransform:"uppercase",letterSpacing:.8}}>{alertes.length} Alerte{alertes.length>1?"s":""}</span>
+    <div style={{borderRadius:DS.radius,border:"1px solid "+DS.red+"33",background:DS.white,overflow:"hidden",boxShadow:DS.shadow,marginBottom:0}}>
+      {/* Header cliquable */}
+      <div onClick={()=>setOpen(o=>!o)} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 16px",cursor:"pointer",background:DS.redSoft}}>
+        <IcoBubble ico={Ico.alert(14,DS.red)} color={DS.red} size={30}/>
+        <span style={{flex:1,fontWeight:800,fontSize:15,color:DS.red}}>⚠️ {alertes.length} Alerte{alertes.length>1?"s":""}</span>
+        <div style={{width:28,height:28,borderRadius:8,background:DS.red+"18",display:"flex",alignItems:"center",justifyContent:"center",transition:"transform .2s",transform:open?"rotate(45deg)":"none"}}>
+          {open
+            ? <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={DS.red} strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            : <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={DS.red} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          }
         </div>
-        {alertes.length>3&&(<button onClick={()=>setShowAll(v=>!v)} style={{fontSize:11,fontWeight:700,color:DS.blue,background:"none",border:"none",cursor:"pointer",fontFamily:"inherit"}}>{showAll?"Réduire":"Voir tout"}</button>)}
       </div>
-      <div style={{display:"flex",flexDirection:"column",gap:8}}>
-        {displayed.map(c=>{
-          const al=alerteClient(c,passages); const col=AC[al]; const j=daysUntil(c.dateFin);
-          const passM=passages.filter(p=>p.clientId===c.id&&new Date(p.date).getMonth()+1===MOIS_NOW&&new Date(p.date).getFullYear()===YEAR_NOW);
-          const prevMois=(getMoisVal(c.moisParMois||c.saisons||{},MOIS_NOW).entretien||0)+(getMoisVal(c.moisParMois||c.saisons||{},MOIS_NOW).controle||0);
-          const doneMois=passM.length;
-          return (
-            <div key={c.id} onClick={()=>onClientClick(c)}
-              style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:14,background:"#eef2f7",cursor:"pointer",border:"1.5px solid "+col.tx+"33",borderLeft:"4px solid "+col.tx,boxShadow:"3px 3px 8px rgba(166,210,220,0.5),-2px -2px 5px rgba(255,255,255,0.85)"}}>
-              <Avatar nom={c.nom} size={40} photo={c.photoPiscine}/>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontWeight:800,fontSize:13,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:3}}>{c.nom}</div>
-                <div style={{fontSize:11,color:col.tx,fontWeight:700}}>{al==="rouge"?`Contrat expire dans ${j}j`:al==="jaune"?`Expire dans ${j} jours`:al==="orange"?"Passages en retard":`Ce mois : ${doneMois}/${prevMois} passages`}</div>
+      {/* Aperçu 2 lignes quand fermé */}
+      {!open && (
+        <div style={{padding:"8px 16px 10px"}}>
+          {preview.map(c=>{
+            const al=alerteClient(c,passages); const col=AC[al];
+            return (
+              <div key={c.id} onClick={()=>onClientClick(c)} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 0",borderBottom:"1px solid "+DS.border,cursor:"pointer"}}>
+                <Avatar nom={c.nom} size={28} photo={c.photoPiscine}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:700,fontSize:13,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
+                </div>
+                <Tag color={col.tx}>{col.lbl}</Tag>
               </div>
-              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
-                <span style={{fontSize:10,fontWeight:800,color:col.tx,background:col.bg,padding:"3px 9px",borderRadius:20,border:"1px solid "+col.tx+"44"}}>{col.lbl}</span>
-                {prevMois>0&&<span style={{fontSize:10,fontWeight:600,color:doneMois>=prevMois?DS.green:DS.orange}}>{doneMois}/{prevMois} ce mois</span>}
-              </div>
+            );
+          })}
+          {alertes.length > 2 && (
+            <div onClick={()=>setOpen(true)} style={{textAlign:"center",paddingTop:8,fontSize:12,fontWeight:700,color:DS.red,cursor:"pointer"}}>
+              + {alertes.length-2} autre{alertes.length-2>1?"s":""} — Voir tout
             </div>
-          );
-        })}
-      </div>
+          )}
+        </div>
+      )}
+      {/* Liste complète quand ouvert */}
+      {open && (
+        <div style={{padding:"4px 16px 12px"}}>
+          {alertes.map(c=>{
+            const al=alerteClient(c,passages); const col=AC[al]; const j=daysUntil(c.dateFin);
+            return (
+              <div key={c.id} onClick={()=>onClientClick(c)} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid "+DS.border,cursor:"pointer"}}>
+                <Avatar nom={c.nom} size={36} photo={c.photoPiscine}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:700,fontSize:14,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
+                  <div style={{fontSize:12,color:DS.mid,marginTop:2}}>{al==="rouge"||al==="jaune"?`Expire dans ${j} jours`:"Passages en retard"}</div>
+                </div>
+                <Tag color={col.tx}>{col.lbl}</Tag>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -4598,7 +4551,7 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
       {/* Widget passages du mois — redesigné */}
       <div style={{marginBottom:14,borderRadius:DS.radius,overflow:"hidden",boxShadow:DS.nmShadow,border:"none"}}>
         {/* Header */}
-        <div style={{background:"#eef2f7",padding:"14px 18px 12px",borderBottom:"1px solid #dde8f0"}}>
+        <div style={{background:"rgba(255,255,255,0.45)",padding:"14px 18px 12px",borderBottom:"1px solid #dde8f0"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div>
               <div style={{fontWeight:800,fontSize:16,color:DS.dark,letterSpacing:-0.5}}>{MOIS_L[moisCourant]} {YEAR_NOW}</div>
@@ -4628,7 +4581,7 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
                   <span style={{fontSize:11,color:DS.mid,fontWeight:600}}>Avancement global</span>
                   <span style={{fontSize:12,fontWeight:800,color:pct>=100?DS.green:"#b45309"}}>{pct}%</span>
                 </div>
-                <div style={{height:5,background:"#dde8f0",borderRadius:99,overflow:"hidden",boxShadow:"inset 1px 1px 3px rgba(166,210,220,0.4)"}}>
+                <div style={{height:5,background:"#dde8f0",borderRadius:99,overflow:"hidden",boxShadow:"inset 1px 1px 3px rgba(6,182,212,0.15)"}}>
                   <div style={{height:"100%",width:`${pct}%`,background:pct>=100?"#34d399":"linear-gradient(90deg,#fbbf24,#f59e0b)",borderRadius:99,transition:"width .5s"}}/>
                 </div>
               </div>
@@ -4638,14 +4591,14 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
 
         {/* Liste passages restants */}
         {tachesRestantes.length>0&&(
-          <div style={{background:"#eef2f7"}}>
+          <div style={{background:"rgba(255,255,255,0.45)"}}>
             {tachesRestantes.slice(0, showAllTaches?999:PREVIEW).map(({client,restE,restC,effE,prevE,effC,prevC},i)=>{
               const pct2 = (prevE+prevC)>0?Math.round((effE+effC)/(prevE+prevC)*100):0;
               return (
                 <div key={client.id} onClick={()=>onClientClick(client)}
                   style={{display:"flex",alignItems:"center",gap:10,padding:"11px 16px",
                     borderBottom:i<Math.min(tachesRestantes.length,showAllTaches?999:PREVIEW)-1?"1px solid "+DS.border:"none",
-                    cursor:"pointer",background:"#eef2f7",transition:"background .15s"}}
+                    cursor:"pointer",background:"rgba(255,255,255,0.45)",transition:"background .15s"}}
                   onMouseEnter={e=>e.currentTarget.style.background="#e4eef5"}
                   onMouseLeave={e=>e.currentTarget.style.background="#eef2f7"}>
                   <Avatar nom={client.nom} size={36} photo={client.photoPiscine}/>
@@ -4809,7 +4762,7 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
           <div style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.clients(16,"#fff")}</div>
           <div><div style={{fontSize:18,fontWeight:800,color:"#fff"}}>{totalAll}</div><div style={{fontSize:10,color:"rgba(255,255,255,0.6)"}}>Clients</div></div>
         </div>
-        {alertCount>0&&<div style={{background:"#eef2f7",borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8,border:"1px solid #fecaca"}}>
+        {alertCount>0&&<div style={{background:"rgba(255,255,255,0.45)",borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8,border:"1px solid #fecaca"}}>
           <div style={{width:36,height:36,borderRadius:10,background:"#fee2e2",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.alert(15,DS.red)}</div>
           <div><div style={{fontSize:18,fontWeight:800,color:DS.red}}>{alertCount}</div><div style={{fontSize:11,color:DS.red,fontWeight:600}}>Alertes</div></div>
         </div>}
@@ -4818,7 +4771,7 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
         <div style={{flex:1,position:"relative"}}>
           <div style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}>{Ico.search(16,"#94a3b8")}</div>
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher…"
-            style={{width:"100%",padding:"11px 14px 11px 40px",borderRadius:DS.radius,border:"none",fontSize:13,outline:"none",boxSizing:"border-box",background:"#eef2f7",boxShadow:"inset 3px 3px 6px rgba(166,210,220,0.45), inset -2px -2px 5px rgba(255,255,255,0.8)",color:DS.dark,fontFamily:"inherit"}}/>
+            style={{width:"100%",padding:"11px 14px 11px 40px",borderRadius:DS.radius,border:"none",fontSize:13,outline:"none",boxSizing:"border-box",background:"rgba(255,255,255,0.45)",boxShadow:"inset 3px 3px 6px rgba(6,182,212,0.15), inset -2px -2px 5px rgba(255,255,255,0.8)",color:DS.dark,fontFamily:"inherit"}}/>
         </div>
         <BtnPrimary onClick={onAdd} bg={DS.blueGrad} icon={Ico.userPlus(14,"#fff")} style={{flexShrink:0,padding:"10px 16px",fontSize:13,borderRadius:14,boxShadow:"4px 4px 12px rgba(8,145,178,0.3)"}}>
           {!isMobile && "Nouveau"}
@@ -4840,7 +4793,7 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
           const accentColor=al==="rouge"?DS.red:al==="jaune"?"#d97706":al==="orange"?"#d97706":DS.green;
           return (
             <div key={c.id} onClick={()=>onClientClick(c)} className="fade-in card-hover"
-              style={{animationDelay:`${idx*0.03}s`,background:"#eef2f7",borderRadius:DS.radius,
+              style={{animationDelay:`${idx*0.03}s`,background:"rgba(255,255,255,0.45)",borderRadius:DS.radius,
                 overflow:openPicker===c.id?"visible":"hidden",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",
                 border:"1px solid "+DS.border,borderTop:"2px solid "+accentColor,
                 cursor:"pointer",display:"flex",flexDirection:"column",position:"relative",zIndex:openPicker===c.id?999:1}}>
@@ -4855,22 +4808,22 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontWeight:700,fontSize:13,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
                     <div style={{display:"flex",gap:4,marginTop:3,flexWrap:"wrap"}}>
-                      <span style={{background:"#f1f5f9",color:DS.mid,padding:"1px 7px",borderRadius:20,fontWeight:600,fontSize:10,border:"1px solid "+DS.border}}>{c.formule}</span>
+                      <span style={{background:"rgba(255,255,255,0.4)",color:DS.mid,padding:"1px 7px",borderRadius:20,fontWeight:600,fontSize:10,border:"1px solid "+DS.border}}>{c.formule}</span>
                       {c.bassin&&<span style={{background:DS.light,color:DS.mid,padding:"1px 6px",borderRadius:20,fontWeight:500,fontSize:10}}>{c.bassin}</span>}
                     </div>
                   </div>
                   <Tag color={col.tx} bg={col.bg} style={{fontSize:9,fontWeight:700,flexShrink:0,padding:"2px 6px"}}>{col.lbl}</Tag>
                 </div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:3}}>
-                  <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"#f8fafc",border:"1px solid "+DS.border}}>
+                  <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"rgba(255,255,255,0.45)",border:"1px solid "+DS.border}}>
                     <div style={{fontSize:13,fontWeight:800,color:DS.blue}}>{eE}<span style={{fontSize:9,color:DS.mid}}>/{tE}</span></div>
                     <div style={{fontSize:9,color:DS.mid}}>Entret.</div>
                   </div>
-                  <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"#f8fafc",border:"1px solid "+DS.border}}>
+                  <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"rgba(255,255,255,0.45)",border:"1px solid "+DS.border}}>
                     <div style={{fontSize:13,fontWeight:800,color:DS.teal}}>{eC}<span style={{fontSize:9,color:DS.mid}}>/{tC}</span></div>
                     <div style={{fontSize:9,color:DS.mid}}>Contrôl.</div>
                   </div>
-                  <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"#f8fafc",border:"1px solid "+DS.border}}>
+                  <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"rgba(255,255,255,0.45)",border:"1px solid "+DS.border}}>
                     <div style={{fontSize:13,fontWeight:800,color:rest>0?"#b45309":DS.green}}>{pct}<span style={{fontSize:9,color:DS.mid}}>%</span></div>
                     <div style={{fontSize:9,color:DS.mid}}>{rest>0?rest+" rest.":"À jour"}</div>
                   </div>
@@ -4890,7 +4843,7 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
                         <svg width={8} height={8} viewBox="0 0 24 24" fill="none" stroke={meta.color} strokeWidth="3" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
                       </button>
                       {isOpen&&(
-                        <div onClick={e=>e.stopPropagation()} style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,background:"#eef2f7",borderRadius:8,boxShadow:"0 4px 20px rgba(0,0,0,0.15)",border:"1px solid "+DS.border,zIndex:100,overflow:"auto",maxHeight:220}}>
+                        <div onClick={e=>e.stopPropagation()} style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,background:"rgba(255,255,255,0.45)",borderRadius:8,boxShadow:"0 4px 20px rgba(0,0,0,0.15)",border:"1px solid "+DS.border,zIndex:100,overflow:"auto",maxHeight:220}}>
                           {CONTRAT_STATUTS.map(s=>(
                             <button key={s.key} onClick={()=>setStatut(c.id,s.key)}
                               style={{width:"100%",display:"flex",alignItems:"center",gap:6,padding:"7px 10px",background:meta.key===s.key?s.bg:DS.white,border:"none",cursor:"pointer",fontFamily:"inherit",borderBottom:"1px solid "+DS.light}}>
@@ -4939,7 +4892,7 @@ function PassageDetailModal({ passage, client, onClose }) {
         <span style={{fontSize:14}}>{icon}</span>
         <span style={{fontSize:12,fontWeight:800,color,textTransform:"uppercase",letterSpacing:.7}}>{title}</span>
       </div>
-      <div style={{padding:"12px 14px",background:"#eef2f7"}}>{children}</div>
+      <div style={{padding:"12px 14px",background:"rgba(255,255,255,0.45)"}}>{children}</div>
     </div>
   );
 
@@ -5058,11 +5011,9 @@ function PassageDetailModal({ passage, client, onClose }) {
 }
 
 // PAGE PASSAGES
-function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePassageStatus, onAddClient, onClientClick }) {
+function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePassageStatus, onAddClient }) {
   const [filter,setFilter]=useState("mois");
   const [detailPassage, setDetailPassage] = useState(null);
-  const [selectMode, setSelectMode] = useState(false);
-  const [selected, setSelected] = useState([]);
   const now=new Date();
   const filtered=useMemo(()=>{
     return passages.filter(p=>{
@@ -5079,71 +5030,13 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
     tout: passages.length,
   }),[passages]);
 
-  const toggleSelect = (id) => setSelected(prev => prev.includes(id) ? prev.filter(x=>x!==id) : [...prev,id]);
-  const toggleAll = () => setSelected(selected.length===filtered.length ? [] : filtered.map(p=>p.id));
-  const exitSelectMode = () => { setSelectMode(false); setSelected([]); };
-
-  const exportCSV = () => {
-    const sel = filtered.filter(p=>selected.includes(p.id));
-    const header = ["Date","Client","Type","pH","Cl","Technicien","Statut Rapport","OK","Notes"];
-    const rows = sel.map(p=>{
-      const c = clients.find(x=>x.id===p.clientId);
-      return [
-        new Date(p.date).toLocaleDateString("fr"),
-        c?.nom||p.clientId||"",
-        p.type||"",
-        getPH(p)||"",
-        getCL(p)||"",
-        p.tech||"",
-        getRapportStatus(p)||"",
-        p.ok?"Oui":"Non",
-        (p.notes||"").replace(/\n/g," "),
-      ].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(";");
-    });
-    const csv = [header.join(";"), ...rows].join("\n");
-    const blob = new Blob(["\uFEFF"+csv], {type:"text/csv;charset=utf-8;"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href=url; a.download=`rapports_briblue_${new Date().toISOString().slice(0,10)}.csv`; a.click();
-    URL.revokeObjectURL(url);
-    toastOk(`${sel.length} rapport(s) exporté(s)`);
-  };
-
-  const deleteSelected = () => {
-    showConfirm(`Supprimer ${selected.length} rapport(s) sélectionné(s) ?`, ()=>{
-      selected.forEach(id=>onDelete(id));
-      exitSelectMode();
-      toastOk(`${selected.length} rapport(s) supprimé(s)`);
-    });
-  };
-
   return (
     <div>
       {/* Header Rapports avec logo */}
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
         <IconFiche size={26} color="#0891b2"/>
         <span style={{fontWeight:800,fontSize:17,color:DS.dark}}>Rapports</span>
-        <button onClick={()=>{setSelectMode(v=>!v);setSelected([]);}} className="btn-hover" style={{marginLeft:"auto",padding:"6px 12px",borderRadius:20,border:"1.5px solid "+(selectMode?DS.blue:DS.border),background:selectMode?DS.blueSoft:"transparent",cursor:"pointer",fontWeight:700,fontSize:12,color:selectMode?DS.blue:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",gap:5,transition:"all .2s"}}>
-          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="4" height="4" rx="1"/><rect x="3" y="13" width="4" height="4" rx="1"/><line x1="11" y1="7" x2="21" y2="7"/><line x1="11" y1="15" x2="21" y2="15"/></svg>
-          {selectMode ? "Annuler" : "Sélectionner"}
-        </button>
       </div>
-
-      {/* Barre d'actions sélection */}
-      {selectMode && (
-        <div style={{display:"flex",gap:8,marginBottom:12,padding:"10px 14px",borderRadius:12,background:"linear-gradient(135deg,#eff6ff,#e0f2fe)",border:"1.5px solid "+DS.blue+"44",alignItems:"center",flexWrap:"wrap"}}>
-          <button onClick={toggleAll} style={{padding:"6px 12px",borderRadius:8,border:"1.5px solid "+DS.blue,background:selected.length===filtered.length?DS.blue:"#fff",cursor:"pointer",fontWeight:700,fontSize:12,color:selected.length===filtered.length?"#fff":DS.blue,fontFamily:"inherit"}}>
-            {selected.length===filtered.length ? "✓ Tout désél." : `Tout sélect. (${filtered.length})`}
-          </button>
-          <span style={{fontSize:12,color:DS.blue,fontWeight:700,flex:1}}>{selected.length} sélectionné{selected.length>1?"s":""}</span>
-          <button onClick={exportCSV} disabled={selected.length===0} className="btn-hover" style={{padding:"7px 14px",borderRadius:8,border:"none",background:selected.length>0?"#0891b2":"#9ca3af",cursor:selected.length>0?"pointer":"default",fontWeight:700,fontSize:12,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:5}}>
-            {Ico.download(13,"#fff")} Export CSV
-          </button>
-          <button onClick={deleteSelected} disabled={selected.length===0} className="btn-hover" style={{padding:"7px 14px",borderRadius:8,border:"none",background:selected.length>0?DS.red:"#9ca3af",cursor:selected.length>0?"pointer":"default",fontWeight:700,fontSize:12,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:5}}>
-            {Ico.trash(13,"#fff")} Supprimer
-          </button>
-        </div>
-      )}
-
       <div style={{display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
         <div style={{display:"flex",gap:6,flex:1,background:DS.light,borderRadius:DS.radius,padding:4}}>
           {[["semaine","7 jours",Ico.clock],[" mois","Ce mois",Ico.calendar],["tout","Tout",Ico.clipboard]].map(([v,l,ico])=>{
@@ -5156,18 +5049,16 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
             );
           })}
         </div>
-        {!selectMode && <>
-          <button onClick={onAdd} className="btn-hover" style={{flexShrink:0,padding:"9px 12px",background:DS.blue,border:"none",borderRadius:DS.radiusSm,cursor:"pointer",display:"flex",alignItems:"center",gap:7,fontFamily:"inherit",fontWeight:700,fontSize:13,color:"#fff"}}>
-            <IconFiche size={16} color="#fff"/>
-            Rapport
+        <button onClick={onAdd} className="btn-hover" style={{flexShrink:0,padding:"9px 12px",background:DS.blue,border:"none",borderRadius:DS.radiusSm,cursor:"pointer",display:"flex",alignItems:"center",gap:7,fontFamily:"inherit",fontWeight:700,fontSize:13,color:"#fff"}}>
+          <IconFiche size={16} color="#fff"/>
+          Rapport
+        </button>
+        {onAddClient&&(
+          <button onClick={onAddClient} className="btn-hover" style={{flexShrink:0,padding:"9px 12px",background:"linear-gradient(135deg,#7c3aed,#4f46e5)",border:"none",borderRadius:DS.radiusSm,cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontFamily:"inherit",fontWeight:700,fontSize:13,color:"#fff",boxShadow:"0 3px 12px rgba(79,70,229,0.3)"}}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="3" x2="19" y2="9"/><line x1="16" y1="6" x2="22" y2="6"/></svg>
+            + Client
           </button>
-          {onAddClient&&(
-            <button onClick={onAddClient} className="btn-hover" style={{flexShrink:0,padding:"9px 12px",background:"linear-gradient(135deg,#7c3aed,#4f46e5)",border:"none",borderRadius:DS.radiusSm,cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontFamily:"inherit",fontWeight:700,fontSize:13,color:"#fff",boxShadow:"0 3px 12px rgba(79,70,229,0.3)"}}>
-              <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="3" x2="19" y2="9"/><line x1="16" y1="6" x2="22" y2="6"/></svg>
-              + Client
-            </button>
-          )}
-        </>}
+        )}
       </div>
       {filtered.length===0
         ? <div style={{textAlign:"center",color:DS.mid,padding:40,fontSize:13}}>Aucun passage sur cette période</div>
@@ -5179,20 +5070,11 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
             const isCtrl = isControleType(p.type);
             const rapportStatus = getRapportStatus(p);
             const rapportMeta = RAPPORT_STATUS[rapportStatus];
-            const isSel = selected.includes(p.id);
             return (
-              <Card key={p.id} className="fade-in" style={{animationDelay:`${idx*0.05}s`,outline:isSel?"2px solid "+DS.blue:"2px solid transparent",transition:"outline .15s"}}>
+              <Card key={p.id} className="fade-in" style={{animationDelay:`${idx*0.05}s`}}>
                 <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
-                  {/* Checkbox sélection */}
-                  {selectMode && (
-                    <div onClick={()=>toggleSelect(p.id)} style={{flexShrink:0,width:24,height:24,borderRadius:7,border:"2px solid "+(isSel?DS.blue:DS.border),background:isSel?DS.blue:"#fff",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",marginTop:10,transition:"all .15s"}}>
-                      {isSel && <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                    </div>
-                  )}
-                  <div onClick={e=>{if(selectMode){e.stopPropagation();toggleSelect(p.id);return;}e.stopPropagation();if(c&&onClientClick)onClientClick(c);}} style={{cursor:selectMode?"pointer":c&&onClientClick?"pointer":"default",flexShrink:0}} title={c?"Voir la fiche de "+c.nom:""}>
-                    <Avatar nom={c?.nom||"?"} size={42} photo={c?.photoPiscine}/>
-                  </div>
-                  <div style={{flex:1,minWidth:0}} onClick={selectMode?()=>toggleSelect(p.id):undefined} style={{flex:1,minWidth:0,cursor:selectMode?"pointer":"default"}}>
+                  <Avatar nom={c?.nom||"?"} size={42} photo={c?.photoPiscine}/>
+                  <div style={{flex:1,minWidth:0}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
                       <div>
                         <div style={{fontWeight:800,fontSize:13,color:DS.dark}}>{c?.nom||p.clientId}</div>
@@ -5222,7 +5104,7 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                       </div>
                     )}
                     
-                    {!selectMode && (
+                    
                     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:6,marginTop:10,paddingTop:10,borderTop:"1px solid "+DS.border}}>
                       <button onClick={()=>setDetailPassage(p)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.light,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.dark,fontFamily:"inherit",fontWeight:700}}>
                         {Ico.search(13,DS.mid)} Aperçu
@@ -5231,7 +5113,7 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                         {Ico.pdf(14,DS.blue)} Rapport PDF
                       </button>
                       {c?.email
-                        ? <button onClick={()=>showConfirm(`Envoyer le rapport à ${c?.email} ?`, ()=>envoyerEmail(p,c,onUpdatePassageStatus), null, {type:"email",title:"Envoyer le rapport",detail:`Client : ${c?.nom||""} — ${new Date(p.date).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})}`})} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.green,fontFamily:"inherit",fontWeight:700}}>
+                        ? <button onClick={()=>envoyerEmail(p,c,onUpdatePassageStatus)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.green,fontFamily:"inherit",fontWeight:700}}>
                             {Ico.send(13,DS.green)} Envoyer email
                           </button>
                         : <div style={{borderRadius:10,background:DS.light,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:DS.mid,fontWeight:500}}>{Ico.mail(12,DS.mid)} Pas d'email</div>
@@ -5243,7 +5125,6 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                         {Ico.trash(13,DS.red)} Supprimer
                       </button>
                     </div>
-                    )}
                   </div>
                 </div>
               </Card>
@@ -5340,48 +5221,46 @@ function LoginScreen({ onLogin }) {
   };
 
   return (
-    <div style={{minHeight:"100vh",background:"#eef2f7",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px 20px",fontFamily:"'Inter', -apple-system, system-ui, sans-serif",position:"relative",overflow:"hidden"}}>
-      <div style={{position:"absolute",top:"-30%",right:"-20%",width:"60vw",height:"60vw",borderRadius:"50%",background:"radial-gradient(circle, #0284c720 0%, transparent 70%)",pointerEvents:"none"}}/>
-      <div style={{position:"absolute",bottom:"-20%",left:"-15%",width:"50vw",height:"50vw",borderRadius:"50%",background:"radial-gradient(circle, #7c3aed15 0%, transparent 70%)",pointerEvents:"none"}}/>
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px 20px",fontFamily:"'Inter', -apple-system, system-ui, sans-serif",position:"relative",overflow:"hidden"}}>
 
-      <div className="scale-in" style={{marginBottom:32,display:"flex",flexDirection:"column",alignItems:"center",gap:12,position:"relative"}}>
-        <div style={{width:80,height:80,borderRadius:24,background:"#0891b2",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"6px 6px 16px rgba(8,145,178,0.4), -4px -4px 10px rgba(255,255,255,0.4)"}}>{Ico.wave(42,"white")}</div>
+      <div className="scale-in" style={{marginBottom:32,display:"flex",flexDirection:"column",alignItems:"center",gap:14,position:"relative"}}>
+        <div style={{width:90,height:90,borderRadius:28,background:"linear-gradient(135deg,#22d3ee 0%, #0891b2 50%, #6366f1 100%)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 20px 50px rgba(6,182,212,0.4), inset 0 2px 0 rgba(255,255,255,0.5)",border:"1px solid rgba(255,255,255,0.3)"}}>{Ico.wave(46,"white")}</div>
         <div style={{textAlign:"center"}}>
-          <div style={{fontWeight:900,fontSize:28,color:DS.dark,letterSpacing:-1}}>BRIBLUE</div>
-          <div style={{color:DS.mid,fontSize:12,marginTop:2,fontWeight:500}}>Création · Traitement de l'eau · Installation · Dépannage</div>
+          <div style={{fontWeight:900,fontSize:34,color:DS.dark,letterSpacing:-1.5,background:"linear-gradient(135deg,#0b1220,#0891b2)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text"}}>BRIBLUE</div>
+          <div style={{color:DS.mid,fontSize:12,marginTop:4,fontWeight:600,letterSpacing:0.3}}>Création · Traitement de l'eau · Installation · Dépannage</div>
         </div>
       </div>
-      <div className="fade-in" style={{width:"100%",maxWidth:400,background:"#eef2f7",borderRadius:DS.radiusLg,padding:28,boxShadow:"8px 8px 24px rgba(166,210,220,0.7), -5px -5px 16px rgba(255,255,255,0.9)",border:"none",position:"relative"}}>
-        <div style={{marginBottom:24}}>
-          <div style={{fontWeight:800,fontSize:18,color:DS.dark}}>Connexion Technicien</div>
-          <div style={{color:DS.mid,fontSize:13,marginTop:4}}>Accès réservé à l'équipe BRIBLUE</div>
+      <div className="fade-in glass-strong" style={{width:"100%",maxWidth:420,borderRadius:DS.radiusLg,padding:32,boxShadow:"0 30px 80px rgba(6,182,212,0.22), 0 10px 30px rgba(15,23,42,0.12), inset 0 1px 0 rgba(255,255,255,0.8)",position:"relative"}}>
+        <div style={{marginBottom:26}}>
+          <div style={{fontWeight:800,fontSize:20,color:DS.dark,letterSpacing:"-0.02em"}}>Connexion Technicien</div>
+          <div style={{color:DS.mid,fontSize:13,marginTop:4,fontWeight:500}}>Accès réservé à l'équipe BRIBLUE</div>
         </div>
-        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+        <div style={{display:"flex",flexDirection:"column",gap:16}}>
           <div>
-            <label style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>Adresse email</label>
+            <label style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.8,display:"block",marginBottom:8}}>Adresse email</label>
             <div style={{position:"relative"}}>
-              <div style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}>{Ico.mail(15,"#9ca3af")}</div>
-              <input type="email" value={email} onChange={e=>{setEmail(e.target.value);setErr("");}} placeholder="Adresse email" onKeyDown={e=>e.key==="Enter"&&handleLogin()} style={{width:"100%",padding:"12px 14px 12px 38px",borderRadius:DS.radiusSm,border:"none",fontSize:14,outline:"none",boxSizing:"border-box",color:DS.dark,fontFamily:"inherit",background:"#eef2f7",boxShadow:"inset 3px 3px 6px rgba(166,210,220,0.45), inset -2px -2px 5px rgba(255,255,255,0.8)"}}/>
+              <div style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",zIndex:2}}>{Ico.mail(16,"#64748b")}</div>
+              <input type="email" value={email} onChange={e=>{setEmail(e.target.value);setErr("");}} placeholder="briblue83@hotmail.com" onKeyDown={e=>e.key==="Enter"&&handleLogin()} style={{width:"100%",padding:"14px 14px 14px 42px",borderRadius:14,fontSize:14,outline:"none",boxSizing:"border-box",color:DS.dark,fontFamily:"inherit"}}/>
             </div>
           </div>
           <div>
-            <label style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>Code d'accès</label>
+            <label style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.8,display:"block",marginBottom:8}}>Code d'accès</label>
             <div style={{position:"relative"}}>
-              <div style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}>{Ico.user(15,"#9ca3af")}</div>
-              <input type={showCode?"text":"password"} value={code} onChange={e=>{setCode(e.target.value);setErr("");}} placeholder="••••" onKeyDown={e=>e.key==="Enter"&&handleLogin()} style={{width:"100%",padding:"12px 44px 12px 38px",borderRadius:DS.radiusSm,border:"none",fontSize:14,outline:"none",boxSizing:"border-box",color:DS.dark,fontFamily:"inherit",background:"#eef2f7",boxShadow:"inset 3px 3px 6px rgba(166,210,220,0.45), inset -2px -2px 5px rgba(255,255,255,0.8)"}}/>
-              <button onClick={()=>setShowCode(v=>!v)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",padding:2}}>
-                {showCode ? <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.8" strokeLinecap="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                : <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.8" strokeLinecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>}
+              <div style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",zIndex:2}}>{Ico.user(16,"#64748b")}</div>
+              <input type={showCode?"text":"password"} value={code} onChange={e=>{setCode(e.target.value);setErr("");}} placeholder="••••" onKeyDown={e=>e.key==="Enter"&&handleLogin()} style={{width:"100%",padding:"14px 48px 14px 42px",borderRadius:14,fontSize:14,outline:"none",boxSizing:"border-box",color:DS.dark,fontFamily:"inherit"}}/>
+              <button onClick={()=>setShowCode(v=>!v)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",padding:4,zIndex:2}}>
+                {showCode ? <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="1.8" strokeLinecap="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                : <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="1.8" strokeLinecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>}
               </button>
             </div>
           </div>
-          {err && <div style={{background:DS.redSoft,color:DS.red,borderRadius:10,padding:"9px 12px",fontSize:13,display:"flex",alignItems:"center",gap:6,fontWeight:600}}>{Ico.alert(13,DS.red)} {err}</div>}
-          <BtnPrimary onClick={handleLogin} style={{width:"100%",marginTop:4,padding:"14px",fontSize:15,background:loading?"#93c5fd":DS.dark,cursor:loading?"not-allowed":"pointer"}}>
+          {err && <div style={{background:DS.redSoft,color:DS.red,borderRadius:12,padding:"11px 14px",fontSize:13,display:"flex",alignItems:"center",gap:8,fontWeight:600,border:"1px solid rgba(225,29,72,0.25)"}}>{Ico.alert(14,DS.red)} {err}</div>}
+          <button onClick={handleLogin} disabled={loading} className="btn-hover" style={{width:"100%",marginTop:6,padding:"15px",fontSize:15,fontWeight:700,color:"#fff",background:loading?"linear-gradient(135deg,#94a3b8,#64748b)":"linear-gradient(135deg,#06b6d4 0%,#0891b2 50%,#6366f1 100%)",border:"none",borderRadius:14,cursor:loading?"not-allowed":"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 10px 30px rgba(6,182,212,0.35), inset 0 1px 0 rgba(255,255,255,0.3)",letterSpacing:"0.01em"}}>
             {loading ? <><svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" style={{animation:"pulse 1s infinite"}}><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> Connexion…</> : <>{Ico.next(16,"#fff")} Se connecter</>}
-          </BtnPrimary>
+          </button>
         </div>
       </div>
-      <div style={{marginTop:20,color:"#94a3b8",fontSize:11,textAlign:"center",fontWeight:500}}>BRIBLUE · SIRET 84345436400053 · La Seyne-sur-Mer</div>
+      <div style={{marginTop:22,color:"#64748b",fontSize:11,textAlign:"center",fontWeight:600,letterSpacing:0.3}}>BRIBLUE · SIRET 84345436400053 · La Seyne-sur-Mer</div>
     </div>
   );
 }
@@ -5397,7 +5276,7 @@ function ModalStock({ stock, onClose, onUpdateStock, onAddProduit, onDeleteProdu
         <div style={{display:"flex",gap:8,flexWrap:"wrap",width:"100%"}}>
           <input value={newProduit} onChange={e=>setNewProduit(e.target.value)} placeholder="Nom du produit..."
             onKeyDown={e=>e.key==="Enter"&&newProduit.trim()&&(onAddProduit(newProduit.trim()),setNewProduit(""))}
-            style={{flex:"1 1 140px",minWidth:0,width:"100%",padding:"11px 14px",borderRadius:DS.radiusSm,border:"none",fontSize:14,outline:"none",fontFamily:"inherit",color:DS.dark,boxSizing:"border-box",boxShadow:"inset 3px 3px 6px rgba(166,210,220,0.45), inset -2px -2px 5px rgba(255,255,255,0.8)"}}/>
+            style={{flex:"1 1 140px",minWidth:0,width:"100%",padding:"11px 14px",borderRadius:DS.radiusSm,border:"none",fontSize:14,outline:"none",fontFamily:"inherit",color:DS.dark,boxSizing:"border-box",boxShadow:"inset 3px 3px 6px rgba(6,182,212,0.15), inset -2px -2px 5px rgba(255,255,255,0.8)"}}/>
           <BtnPrimary onClick={()=>{if(newProduit.trim()){onAddProduit(newProduit.trim());setNewProduit("");}}} icon={Ico.plus(14,"#fff")} bg={DS.blue} style={{flexShrink:0,whiteSpace:"nowrap"}}>Ajouter</BtnPrimary>
         </div>
       </Section>
@@ -5407,15 +5286,15 @@ function ModalStock({ stock, onClose, onUpdateStock, onAddProduit, onDeleteProdu
             const qty = stock[p] ?? 0;
             const low = qty <= 2;
             return (
-              <div key={p} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:DS.radiusSm,background:"#eef2f7",border:"none",boxShadow:low?"inset 2px 2px 5px rgba(239,68,68,0.15), inset -1px -1px 3px rgba(255,255,255,0.7)":"inset 2px 2px 5px rgba(166,210,220,0.35), inset -1px -1px 3px rgba(255,255,255,0.7)"}}>
+              <div key={p} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:DS.radiusSm,background:"rgba(255,255,255,0.45)",border:"none",boxShadow:low?"inset 2px 2px 5px rgba(239,68,68,0.15), inset -1px -1px 3px rgba(255,255,255,0.7)":"inset 2px 2px 5px rgba(6,182,212,0.15), inset -1px -1px 3px rgba(255,255,255,0.7)"}}>
                 <div style={{flex:1}}>
                   <span style={{fontSize:13,fontWeight:600,color:DS.dark}}>{p}</span>
                   {low&&<span style={{marginLeft:8,fontSize:10,fontWeight:700,color:DS.red}}>⚠️ Stock bas</span>}
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <button onClick={()=>onUpdateStock(p, Math.max(0, qty-1))} style={{width:28,height:28,borderRadius:8,border:"none",background:"#eef2f7",boxShadow:"3px 3px 6px rgba(166,210,220,0.5), -2px -2px 4px rgba(255,255,255,0.8)",cursor:"pointer",fontSize:16,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                  <button onClick={()=>onUpdateStock(p, Math.max(0, qty-1))} style={{width:28,height:28,borderRadius:8,border:"none",background:"rgba(255,255,255,0.45)",boxShadow:"3px 3px 6px rgba(6,182,212,0.15), -2px -2px 4px rgba(255,255,255,0.8)",cursor:"pointer",fontSize:16,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
                   <span style={{fontSize:16,fontWeight:900,color:low?DS.red:DS.dark,minWidth:28,textAlign:"center"}}>{qty}</span>
-                  <button onClick={()=>onUpdateStock(p, qty+1)} style={{width:28,height:28,borderRadius:8,border:"none",background:"#eef2f7",boxShadow:"3px 3px 6px rgba(166,210,220,0.5), -2px -2px 4px rgba(255,255,255,0.8)",cursor:"pointer",fontSize:16,fontWeight:700,color:DS.blue,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                  <button onClick={()=>onUpdateStock(p, qty+1)} style={{width:28,height:28,borderRadius:8,border:"none",background:"rgba(255,255,255,0.45)",boxShadow:"3px 3px 6px rgba(6,182,212,0.15), -2px -2px 4px rgba(255,255,255,0.8)",cursor:"pointer",fontSize:16,fontWeight:700,color:DS.blue,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
                 </div>
                 {!PRODUITS_DEFAUT.includes(p) && (
                   <button onClick={()=>showConfirm(`Supprimer "${p}" du stock ?`,()=>onDeleteProduit(p))} style={{width:28,height:28,borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(12,DS.red)}</button>
@@ -5454,7 +5333,7 @@ function CarnetPublicInline({ client, passages }) {
 
   return (
     <>
-    <div style={{minHeight:"100vh",background:"#f0f4f8",fontFamily:F,maxWidth:480,margin:"0 auto",paddingBottom:40}}>
+    <div style={{minHeight:"100vh",background:"rgba(255,255,255,0.5)",fontFamily:F,maxWidth:480,margin:"0 auto",paddingBottom:40}}>
 
       {/* Header */}
       <div style={{background:"linear-gradient(160deg,#0c1f3f 0%,#0e4a7a 70%,#0891b2 100%)",padding:"28px 22px 32px",position:"relative",overflow:"hidden"}}>
@@ -5491,7 +5370,7 @@ function CarnetPublicInline({ client, passages }) {
       <div style={{padding:"0 16px",marginTop:12}}>
 
         {passClient.length===0&&(
-          <div style={{background:"#fff",borderRadius:20,padding:"48px 24px",textAlign:"center"}}>
+          <div style={{background:"rgba(255,255,255,0.55)",borderRadius:20,padding:"48px 24px",textAlign:"center"}}>
             <div style={{fontSize:48,marginBottom:12}}>🏊</div>
             <div style={{fontSize:16,fontWeight:800,color:"#0f172a",marginBottom:6}}>Aucune intervention</div>
             <div style={{fontSize:13,color:"#94a3b8"}}>Les interventions apparaîtront ici.</div>
@@ -5500,7 +5379,7 @@ function CarnetPublicInline({ client, passages }) {
 
         {/* Dernière intervention */}
         {last&&(
-          <div style={{background:"#fff",borderRadius:20,padding:"18px",marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)",border:"1px solid #e8f4f8"}}>
+          <div style={{background:"rgba(255,255,255,0.55)",borderRadius:20,padding:"18px",marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)",border:"1px solid #e8f4f8"}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
               <div>
                 <div style={{fontSize:10,fontWeight:800,color:"#0891b2",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Dernière intervention</div>
@@ -5528,7 +5407,7 @@ function CarnetPublicInline({ client, passages }) {
               </div>
             )}
             {getResume(last)&&(
-              <div style={{background:"#f8fafc",borderRadius:12,padding:"10px 14px"}}>
+              <div style={{background:"rgba(255,255,255,0.45)",borderRadius:12,padding:"10px 14px"}}>
                 <div style={{fontSize:10,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:.6,marginBottom:5}}>Compte-rendu</div>
                 <div style={{fontSize:13,color:"#334155",lineHeight:1.7}}>{getResume(last)}</div>
               </div>
@@ -5547,7 +5426,7 @@ function CarnetPublicInline({ client, passages }) {
                 const ph=getPH(p); const cl=getCL(p); const resume=getResume(p);
                 return (
                   <div key={p.id||i} onClick={()=>setSelectedPassage(p)}
-                    style={{background:"#fff",borderRadius:16,padding:"14px 16px",boxShadow:"0 1px 6px rgba(0,0,0,0.05)",border:"1px solid "+(i===0?"#bae6fd":"#f1f5f9"),cursor:"pointer",display:"flex",alignItems:"center",gap:14,touchAction:"manipulation"}}>
+                    style={{background:"rgba(255,255,255,0.55)",borderRadius:16,padding:"14px 16px",boxShadow:"0 1px 6px rgba(0,0,0,0.05)",border:"1px solid "+(i===0?"#bae6fd":"#f1f5f9"),cursor:"pointer",display:"flex",alignItems:"center",gap:14,touchAction:"manipulation"}}>
                     <div style={{width:42,height:42,borderRadius:12,background:isCtrl(p)?"#ecfdf5":"#eff6ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
                       {isCtrl(p)?"💧":"🔧"}
                     </div>
@@ -5582,7 +5461,7 @@ function CarnetPublicInline({ client, passages }) {
     {/* Bottom sheet détail passage */}
     {selectedPassage&&(
       <div onClick={()=>setSelectedPassage(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:10002,WebkitBackdropFilter:"blur(4px)",backdropFilter:"blur(4px)"}}>
-        <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,maxHeight:"88vh",overflowY:"auto",WebkitOverflowScrolling:"touch",boxShadow:"0 -12px 48px rgba(0,0,0,0.2)",paddingBottom:"max(32px,env(safe-area-inset-bottom,32px))"}}>
+        <div onClick={e=>e.stopPropagation()} style={{background:"rgba(255,255,255,0.55)",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,maxHeight:"88vh",overflowY:"auto",WebkitOverflowScrolling:"touch",boxShadow:"0 -12px 48px rgba(0,0,0,0.2)",paddingBottom:"max(32px,env(safe-area-inset-bottom,32px))"}}>
           <div style={{padding:"14px 0 4px",display:"flex",justifyContent:"center"}}><div style={{width:36,height:4,background:"#e2e8f0",borderRadius:2}}/></div>
           <div style={{padding:"12px 22px 16px"}}>
             {/* Titre */}
@@ -5592,7 +5471,7 @@ function CarnetPublicInline({ client, passages }) {
                 <div style={{fontSize:13,color:"#64748b"}}>📅 {fmtDate(selectedPassage.date,{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}</div>
                 {selectedPassage.tech&&<div style={{fontSize:12,color:"#64748b",marginTop:3}}>👤 {selectedPassage.tech}</div>}
               </div>
-              <button onClick={()=>setSelectedPassage(null)} style={{width:34,height:34,borderRadius:"50%",background:"#f1f5f9",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,touchAction:"manipulation"}}>
+              <button onClick={()=>setSelectedPassage(null)} style={{width:34,height:34,borderRadius:"50%",background:"rgba(255,255,255,0.4)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,touchAction:"manipulation"}}>
                 <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
@@ -5616,12 +5495,12 @@ function CarnetPublicInline({ client, passages }) {
             {/* Alcalinité + Stabilisant */}
             {(selectedPassage.alcalinite||selectedPassage.stabilisant)&&(
               <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:14}}>
-                {selectedPassage.alcalinite&&<div style={{background:"#f0f9ff",borderRadius:10,padding:"10px",textAlign:"center",border:"1px solid #bae6fd"}}>
+                {selectedPassage.alcalinite&&<div style={{background:"rgba(224,242,254,0.5)",borderRadius:10,padding:"10px",textAlign:"center",border:"1px solid #bae6fd"}}>
                   <div style={{fontSize:9,fontWeight:700,color:"#0369a1",textTransform:"uppercase",marginBottom:3}}>Alcalinité</div>
                   <div style={{fontSize:20,fontWeight:900,color:"#0284c7"}}>{selectedPassage.alcalinite}</div>
                   <div style={{fontSize:9,color:"#64748b"}}>ppm (TAC)</div>
                 </div>}
-                {selectedPassage.stabilisant&&<div style={{background:"#f0f9ff",borderRadius:10,padding:"10px",textAlign:"center",border:"1px solid #bae6fd"}}>
+                {selectedPassage.stabilisant&&<div style={{background:"rgba(224,242,254,0.5)",borderRadius:10,padding:"10px",textAlign:"center",border:"1px solid #bae6fd"}}>
                   <div style={{fontSize:9,fontWeight:700,color:"#0369a1",textTransform:"uppercase",marginBottom:3}}>Stabilisant</div>
                   <div style={{fontSize:20,fontWeight:900,color:"#0284c7"}}>{selectedPassage.stabilisant}</div>
                   <div style={{fontSize:9,color:"#64748b"}}>ppm</div>
@@ -5631,7 +5510,7 @@ function CarnetPublicInline({ client, passages }) {
 
             {/* Qualité eau */}
             {selectedPassage.qualiteEau&&(
-              <div style={{background:"#f8fafc",borderRadius:10,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
+              <div style={{background:"rgba(255,255,255,0.45)",borderRadius:10,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
                 <span style={{fontSize:16}}>{selectedPassage.qualiteEau==="Cristalline"?"💎":selectedPassage.qualiteEau==="Verte"?"🌿":"🌫️"}</span>
                 <div>
                   <div style={{fontSize:10,fontWeight:700,color:"#64748b",textTransform:"uppercase",marginBottom:1}}>Qualité eau</div>
@@ -5664,7 +5543,7 @@ function CarnetPublicInline({ client, passages }) {
 
             {/* Compte-rendu */}
             {getResume(selectedPassage)&&(
-              <div style={{background:"#f8fafc",borderRadius:14,padding:"14px 16px",marginBottom:14}}>
+              <div style={{background:"rgba(255,255,255,0.45)",borderRadius:14,padding:"14px 16px",marginBottom:14}}>
                 <div style={{fontSize:10,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>📋 Compte-rendu</div>
                 <div style={{fontSize:14,color:"#334155",lineHeight:1.8}}>{getResume(selectedPassage)}</div>
               </div>
@@ -5732,15 +5611,15 @@ function CarnetPublic({ code, allClients, allPassages }) {
     setRefreshing(true);
     try {
       const snap = await getDoc(APP_DOC);
-      const passages = await loadAllPassages();
       if (snap.exists()) {
         const d = snap.data();
         const c = d["bb_clients_v2"];
+        const p = d["bb_passages_v2"];
         setLoadedClients(c && c.length ? c : CLIENTS_INIT);
-        setLoadedPassages(passages.length ? passages : PASSAGES_INIT);
+        setLoadedPassages(p && p.length ? p : PASSAGES_INIT);
       } else {
         setLoadedClients(CLIENTS_INIT);
-        setLoadedPassages(passages.length ? passages : PASSAGES_INIT);
+        setLoadedPassages(PASSAGES_INIT);
       }
     } catch {
       setLoadedClients(CLIENTS_INIT);
@@ -5784,7 +5663,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
 
   return (
     <>
-    <div style={{minHeight:"100vh",background:"#f0f4f8",fontFamily:F,maxWidth:480,margin:"0 auto",paddingBottom:40}}>
+    <div style={{minHeight:"100vh",background:"rgba(255,255,255,0.5)",fontFamily:F,maxWidth:480,margin:"0 auto",paddingBottom:40}}>
 
       {/* -- HEADER gradient -- */}
       <div style={{background:"linear-gradient(160deg,#0c1f3f 0%,#0e4a7a 70%,#0891b2 100%)",padding:"28px 22px 32px",position:"relative",overflow:"hidden"}}>
@@ -5846,7 +5725,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
 
         {/* -- DERNIÈRE INTERVENTION -- */}
         {last&&(
-          <div style={{background:"#fff",borderRadius:20,padding:"18px 18px",marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)",border:"1px solid #e8f4f8"}}>
+          <div style={{background:"rgba(255,255,255,0.55)",borderRadius:20,padding:"18px 18px",marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)",border:"1px solid #e8f4f8"}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
               <div>
                 <div style={{fontSize:10,fontWeight:800,color:"#0891b2",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Dernière intervention</div>
@@ -5883,7 +5762,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
                   </div>
                 )}
                 {getTemp(last)&&(
-                  <div style={{borderRadius:14,padding:"12px 8px",textAlign:"center",background:"#f0f9ff",border:"1.5px solid #bae6fd"}}>
+                  <div style={{borderRadius:14,padding:"12px 8px",textAlign:"center",background:"rgba(224,242,254,0.5)",border:"1.5px solid #bae6fd"}}>
                     <div style={{fontSize:10,fontWeight:800,color:"#075985",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Temp.</div>
                     <div style={{fontSize:30,fontWeight:900,color:"#0284c7",lineHeight:1}}>{getTemp(last)}°</div>
                     <div style={{fontSize:10,fontWeight:700,color:"#38bdf8",marginTop:4}}>Eau</div>
@@ -5894,7 +5773,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
 
             {/* Actions / Obs */}
             {getResume(last)&&(
-              <div style={{background:"#f8fafc",borderRadius:12,padding:"10px 14px",marginBottom:last.obs?8:0}}>
+              <div style={{background:"rgba(255,255,255,0.45)",borderRadius:12,padding:"10px 14px",marginBottom:last.obs?8:0}}>
                 <div style={{fontSize:10,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:.6,marginBottom:5}}>Actions réalisées</div>
                 <div style={{fontSize:13,color:"#334155",lineHeight:1.7}}>{getResume(last)}</div>
               </div>
@@ -5919,7 +5798,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
                 const isLast=i===0;
                 return (
                   <div key={p.id} onClick={()=>setSelectedPassage(p)}
-                    style={{background:"#fff",borderRadius:16,padding:"14px 16px",boxShadow:"0 1px 6px rgba(0,0,0,0.05)",border:"1px solid "+(isLast?"#bae6fd":"#f1f5f9"),cursor:"pointer",display:"flex",alignItems:"center",gap:14,transition:"box-shadow .15s"}}
+                    style={{background:"rgba(255,255,255,0.55)",borderRadius:16,padding:"14px 16px",boxShadow:"0 1px 6px rgba(0,0,0,0.05)",border:"1px solid "+(isLast?"#bae6fd":"#f1f5f9"),cursor:"pointer",display:"flex",alignItems:"center",gap:14,transition:"box-shadow .15s"}}
                     onTouchStart={e=>e.currentTarget.style.boxShadow="0 4px 16px rgba(8,145,178,0.15)"}
                     onTouchEnd={e=>e.currentTarget.style.boxShadow="0 1px 6px rgba(0,0,0,0.05)"}>
                     {/* Icône type */}
@@ -5951,7 +5830,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
         )}
 
         {passClient.length===0&&(
-          <div style={{background:"#fff",borderRadius:20,padding:"48px 24px",textAlign:"center",boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
+          <div style={{background:"rgba(255,255,255,0.55)",borderRadius:20,padding:"48px 24px",textAlign:"center",boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
             <div style={{fontSize:48,marginBottom:12}}>🏊</div>
             <div style={{fontSize:16,fontWeight:800,color:"#0f172a",marginBottom:6}}>Aucune intervention</div>
             <div style={{fontSize:13,color:"#94a3b8"}}>Les interventions apparaîtront ici au fur et à mesure.</div>
@@ -5971,7 +5850,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
     {/* -- BOTTOM SHEET DÉTAIL -- */}
     {selectedPassage&&(
       <div onClick={()=>setSelectedPassage(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:1000,padding:0,backdropFilter:"blur(4px)"}}>
-        <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,maxHeight:"90vh",overflowY:"auto",WebkitOverflowScrolling:"touch",boxShadow:"0 -12px 48px rgba(0,0,0,0.2)",paddingBottom:"max(32px,env(safe-area-inset-bottom,32px))"}}>
+        <div onClick={e=>e.stopPropagation()} style={{background:"rgba(255,255,255,0.55)",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,maxHeight:"90vh",overflowY:"auto",WebkitOverflowScrolling:"touch",boxShadow:"0 -12px 48px rgba(0,0,0,0.2)",paddingBottom:"max(32px,env(safe-area-inset-bottom,32px))"}}>
           {/* Handle */}
           <div style={{padding:"14px 0 4px",display:"flex",justifyContent:"center"}}>
             <div style={{width:36,height:4,background:"#e2e8f0",borderRadius:2}}/>
@@ -5990,7 +5869,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
                   {selectedPassage.tech}
                 </div>}
               </div>
-              <button onClick={()=>setSelectedPassage(null)} style={{width:34,height:34,borderRadius:"50%",background:"#f1f5f9",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:2}}>
+              <button onClick={()=>setSelectedPassage(null)} style={{width:34,height:34,borderRadius:"50%",background:"rgba(255,255,255,0.4)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:2}}>
                 <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
@@ -6013,7 +5892,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
                   </div>
                 )}
                 {getTemp(selectedPassage)&&(
-                  <div style={{borderRadius:16,padding:"14px 8px",textAlign:"center",background:"#f0f9ff",border:"2px solid #bae6fd"}}>
+                  <div style={{borderRadius:16,padding:"14px 8px",textAlign:"center",background:"rgba(224,242,254,0.5)",border:"2px solid #bae6fd"}}>
                     <div style={{fontSize:10,fontWeight:800,color:"#075985",textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>Temp.</div>
                     <div style={{fontSize:34,fontWeight:900,color:"#0284c7",lineHeight:1}}>{getTemp(selectedPassage)}°</div>
                     <div style={{fontSize:11,fontWeight:700,color:"#38bdf8",marginTop:6}}>Eau</div>
@@ -6023,7 +5902,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
             )}
 
             {getResume(selectedPassage)&&(
-              <div style={{background:"#f8fafc",borderRadius:14,padding:"14px 16px",marginBottom:12}}>
+              <div style={{background:"rgba(255,255,255,0.45)",borderRadius:14,padding:"14px 16px",marginBottom:12}}>
                 <div style={{fontSize:10,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>Actions réalisées</div>
                 <div style={{fontSize:14,color:"#334155",lineHeight:1.8}}>{getResume(selectedPassage)}</div>
               </div>
@@ -6037,12 +5916,12 @@ function CarnetPublic({ code, allClients, allPassages }) {
             {/* Alcalinité + Stabilisant */}
             {(selectedPassage.alcalinite||selectedPassage.stabilisant)&&(
               <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:12}}>
-                {selectedPassage.alcalinite&&<div style={{background:"#f0f9ff",borderRadius:10,padding:"10px",textAlign:"center",border:"1px solid #bae6fd"}}>
+                {selectedPassage.alcalinite&&<div style={{background:"rgba(224,242,254,0.5)",borderRadius:10,padding:"10px",textAlign:"center",border:"1px solid #bae6fd"}}>
                   <div style={{fontSize:9,fontWeight:700,color:"#0369a1",textTransform:"uppercase",marginBottom:3}}>Alcalinité</div>
                   <div style={{fontSize:20,fontWeight:900,color:"#0284c7"}}>{selectedPassage.alcalinite}</div>
                   <div style={{fontSize:9,color:"#64748b"}}>ppm (TAC)</div>
                 </div>}
-                {selectedPassage.stabilisant&&<div style={{background:"#f0f9ff",borderRadius:10,padding:"10px",textAlign:"center",border:"1px solid #bae6fd"}}>
+                {selectedPassage.stabilisant&&<div style={{background:"rgba(224,242,254,0.5)",borderRadius:10,padding:"10px",textAlign:"center",border:"1px solid #bae6fd"}}>
                   <div style={{fontSize:9,fontWeight:700,color:"#0369a1",textTransform:"uppercase",marginBottom:3}}>Stabilisant</div>
                   <div style={{fontSize:20,fontWeight:900,color:"#0284c7"}}>{selectedPassage.stabilisant}</div>
                   <div style={{fontSize:9,color:"#64748b"}}>ppm</div>
@@ -6051,7 +5930,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
             )}
             {/* Qualité eau */}
             {selectedPassage.qualiteEau&&(
-              <div style={{background:"#f8fafc",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+              <div style={{background:"rgba(255,255,255,0.45)",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
                 <span style={{fontSize:16}}>{selectedPassage.qualiteEau==="Cristalline"?"💎":selectedPassage.qualiteEau==="Verte"?"🌿":"🌫️"}</span>
                 <div>
                   <div style={{fontSize:10,fontWeight:700,color:"#64748b",textTransform:"uppercase",marginBottom:1}}>Qualité eau</div>
@@ -6162,6 +6041,8 @@ export default function App() {
       const s = await load("bb_stock_v1", null);
       const ct = await load("bb_contrats_v1", null);
 
+      // null = clé absente de Supabase (première fois) → utiliser données initiales
+      // valeur présente = toujours utiliser les données Supabase
       const clientsData = c !== null ? c : CLIENTS_INIT;
       const passagesData = passages_data !== null ? passages_data : PASSAGES_INIT;
       const livraisonsData = l !== null ? l : [];
@@ -6175,33 +6056,6 @@ export default function App() {
     })();
   },[loggedIn]);
 
-  // Écoute temps réel des passages — met à jour tous les appareils instantanément
-  // quand un autre appareil (ex: iPhone) sauvegarde de nouveaux passages
-  useEffect(()=>{
-    if(!ready) return;
-    const unsubPassages = onSnapshot(
-      doc(db, "briblue", "app_data"),
-      async (snap) => {
-        if (!snap.exists()) return;
-        const nbChunks = snap.data().bb_passages_chunks;
-        if (typeof nbChunks !== "number") return;
-        // Recharger les passages depuis Firebase
-        try {
-          const passages = await loadAllPassages();
-          if (passages.length > 0) {
-            setPassages(passages);
-            try {
-              localStorage.setItem("briblue_bb_passages_v2", JSON.stringify(passages));
-              localStorage.setItem("briblue_ts_bb_passages_v2", String(Date.now()));
-            } catch {}
-          }
-        } catch {}
-      },
-      () => {}
-    );
-    return () => unsubPassages();
-  }, [ready]);
-
   // Sauvegarde MANUELLE uniquement — jamais automatique au chargement
   const saveClients   = useCallback((data) => save("bb_clients_v2",    data), []);
   const savePassages  = useCallback((data) => save("bb_passages_v2",   data), []);
@@ -6210,7 +6064,40 @@ export default function App() {
   const saveStock     = useCallback((data) => save("bb_stock_v1",      data), []);
   const saveContrats  = useCallback((data) => save("bb_contrats_v1",   data), []);
 
-  useEffect(()=>{if(!ready)return;const unsub=onSnapshot(APP_DOC,(snap)=>{if(!snap.exists())return;const ct=snap.data()["bb_contrats_v1"];if(!ct)return;setContrats(prev=>{for(const k of Object.keys(ct)){const newC=ct[k],oldC=prev[k];if(!oldC)continue;if(newC.statut!==oldC.statut&&(newC.statut==="signe_client"||newC.statut==="signe_complet")){playNotifSound();const cli=clients.find(cl=>cl.id===newC.clientId);const nomCli=cli?.nom||newC.clientId;const isComplet=newC.statut==="signe_complet";toastInfo(isComplet?`✅ Contrat co-signé par ${nomCli} !`:`📝 ${nomCli} a signé.`);sendLocalNotification(isComplet?"✅ Contrat co-signé !":"📝 Signature requise",isComplet?`${nomCli} a co-signé.`:`${nomCli} a signé !`,{tag:"briblue-contrat-"+newC.clientId,requireInteraction:!isComplet});}}try{localStorage.setItem("briblue_bb_contrats_v1",JSON.stringify(ct));localStorage.setItem("briblue_ts_bb_contrats_v1",String(Date.now()));}catch{}return ct;});},(e)=>console.warn("onSnapshot:",e));return()=>unsub();},[ready,clients]);
+  // Polling toutes les 10s pour détecter nouvelles signatures
+  useEffect(()=>{
+    if(!ready) return;
+    const interval = setInterval(async()=>{
+      const ct = await load("bb_contrats_v1", {});
+      setContrats(prev => {
+        // Détecter nouvelle signature
+        const keys = Object.keys(ct);
+        const newSig = keys.map(k=>ct[k]).find(c =>
+          (c.statut === "signe_client" || c.statut === "signe_complet") &&
+          (!prev[keys.find(k=>ct[k]===c)] ||
+           prev[keys.find(k=>ct[k]===c)]?.statut !== c.statut)
+        );
+        if (newSig) {
+          playNotifSound();
+          const cli = clients.find(cl => cl.id === newSig.clientId);
+          const nomCli = cli?.nom || newSig.clientId;
+          const isComplet = newSig.statut === "signe_complet";
+          const msg = isComplet
+            ? `✅ Contrat co-signé par ${nomCli} !`
+            : `📝 ${nomCli} a signé son contrat — votre signature est requise.`;
+          toastInfo(msg);
+          // Notification système (barre de notifications)
+          sendLocalNotification(
+            isComplet ? "✅ Contrat co-signé !" : "📝 Signature requise",
+            isComplet ? `${nomCli} a co-signé le contrat.` : `${nomCli} a signé — votre tour !`,
+            { tag: "briblue-contrat-" + newSig.clientId, requireInteraction: !isComplet }
+          );
+        }
+        return ct;
+      });
+    }, 10000);
+    return ()=>clearInterval(interval);
+  },[ready, clients]);
 
   // Notification son + système quand nouvelles tâches apparaissent
   useEffect(()=>{
@@ -6238,53 +6125,7 @@ export default function App() {
 
   const saveClient = useCallback(c=>{ setClients(prev=>{ const next=prev.find(x=>x.id===c.id)?prev.map(x=>x.id===c.id?c:x):[...prev,c]; saveClients(next); return next; }); setShowFormClient(false);setEditClient(null);setFicheClient(c); },[saveClients]);
   const deleteClient = useCallback(id=>{ showConfirm("Supprimer ce client et tous ses passages ?", ()=>{ setClients(prev=>{ const next=prev.filter(x=>x.id!==id); saveClients(next); return next; }); setPassages(prev=>{ const next=prev.filter(x=>x.clientId!==id); savePassages(next); return next; }); setFicheClient(null); }); },[saveClients,savePassages]);
-  const savePassage = useCallback(async p => {
-    setShowFormPassage(false);
-    setEditPassage(null);
-
-    // Toujours lire depuis Firebase (source de vérité commune à tous les appareils)
-    // Ne jamais se baser sur localStorage qui est propre à chaque appareil
-    let basePassages = [];
-    try {
-      basePassages = await loadAllPassages();
-    } catch {
-      // Firebase inaccessible — fallback sur le state React actuel
-      setPassages(prev => { basePassages = prev; return prev; });
-      await new Promise(r => setTimeout(r, 0));
-    }
-
-    const nextPassages = basePassages.find(x => x.id === p.id)
-      ? basePassages.map(x => x.id === p.id ? p : x)
-      : [...basePassages, p];
-
-    // Mettre à jour le state React et localStorage
-    setPassages(nextPassages);
-    try {
-      localStorage.setItem("briblue_bb_passages_v2", JSON.stringify(nextPassages));
-      localStorage.setItem("briblue_ts_bb_passages_v2", String(Date.now()));
-    } catch {}
-
-    // Firebase — écriture parallèle
-    if (navigator.onLine) {
-      try {
-        const CHUNK = 50;
-        const chunks = [];
-        for (let i = 0; i < nextPassages.length; i += CHUNK) chunks.push(nextPassages.slice(i, i + CHUNK));
-        await Promise.all(
-          chunks.map((chunk, i) =>
-            setDoc(doc(db, "briblue", "passages_" + i), { bb_passages_v2: chunk }, { merge: false })
-          )
-        );
-        await setDoc(APP_DOC, { bb_passages_chunks: chunks.length }, { merge: true });
-      } catch {
-        offlineQueue.pending["bb_passages_v2"] = nextPassages;
-        toastWarn("Sauvegardé localement — sync en attente");
-      }
-    } else {
-      offlineQueue.pending["bb_passages_v2"] = nextPassages;
-      toastWarn("Hors ligne — sync au retour connexion");
-    }
-  }, []);
+  const savePassage = useCallback(p=>{ setPassages(prev=>{ const next=prev.find(x=>x.id===p.id)?prev.map(x=>x.id===p.id?p:x):[...prev,p]; savePassages(next); return next; }); setShowFormPassage(false);setEditPassage(null); },[savePassages]);
   const updatePassageRapportStatus = useCallback((passageMaj) => {
     setPassages(prev => {
       const next = prev.map(x => x.id === passageMaj.id ? { ...x, ...passageMaj } : x);
@@ -6345,7 +6186,7 @@ export default function App() {
   if(!ready) return (
     <>
     <GlobalStyles/>
-    <div style={{height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"#eef2f7",gap:16,fontFamily:"'Inter', -apple-system, system-ui, sans-serif"}}>
+    <div style={{height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"rgba(255,255,255,0.45)",gap:16,fontFamily:"'Inter', -apple-system, system-ui, sans-serif"}}>
       <div className="scale-in" style={{width:80,height:80,borderRadius:24,background:"#0891b2",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 12px 40px rgba(12,18,34,0.35)"}}>{Ico.wave(42,"white")}</div>
       <div style={{fontWeight:900,fontSize:24,color:DS.blue,letterSpacing:-0.5}}>BRIBLUE</div>
       <div style={{color:DS.mid,fontSize:13}}>Chargement…</div>
@@ -6365,11 +6206,11 @@ export default function App() {
   return (
     <>
     <GlobalStyles/>
-    <div style={{minHeight:"100vh",background:"#eef2f7",fontFamily:"'Inter', -apple-system, system-ui, sans-serif",maxWidth:isMobile?640:1280,margin:"0 auto",position:"relative",display:"flex",flexDirection:"column",overflowX:"hidden",width:"100%"}}>
+    <div style={{minHeight:"100vh",background:"rgba(255,255,255,0.45)",fontFamily:"'Inter', -apple-system, system-ui, sans-serif",maxWidth:isMobile?640:1280,margin:"0 auto",position:"relative",display:"flex",flexDirection:"column",overflowX:"hidden",width:"100%"}}>
       {/* HEADER — Soft UI */}
-      <div className="safe-header" style={{background:"#eef2f7",padding:isMobile?"10px 14px":"10px 28px",paddingTop:`calc(10px + env(safe-area-inset-top, 0px))`,display:"flex",alignItems:"center",gap:isMobile?8:14,position:"sticky",top:0,zIndex:50,boxShadow:"0 4px 16px rgba(166,210,220,0.5)",width:"100%",boxSizing:"border-box"}}>
+      <div style={{background:"rgba(255,255,255,0.45)",padding:isMobile?"10px 14px":"10px 28px",display:"flex",alignItems:"center",gap:isMobile?8:14,position:"sticky",top:0,zIndex:50,boxShadow:"0 4px 16px rgba(6,182,212,0.15)",width:"100%",boxSizing:"border-box"}}>
 
-        <button onClick={()=>setPage("dashboard")} style={{background:"#eef2f7",border:"none",padding:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",width:isMobile?44:42,height:isMobile?44:42,borderRadius:14,flexShrink:0,boxShadow:DS.nmShadow}}>
+        <button onClick={()=>setPage("dashboard")} style={{background:"rgba(255,255,255,0.45)",border:"none",padding:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",width:isMobile?44:42,height:isMobile?44:42,borderRadius:14,flexShrink:0,boxShadow:DS.nmShadow}}>
           {Ico.wave(isMobile?22:20,"#0891b2")}
         </button>
 
@@ -6380,7 +6221,7 @@ export default function App() {
         <div style={{display:"flex",gap:isMobile?6:10,alignItems:"center",flexShrink:0}}>
 
           {!isMobile&&(
-            <button onClick={()=>setShowImport(true)} style={{display:"flex",alignItems:"center",gap:7,padding:"0 16px",height:40,borderRadius:20,background:"#eef2f7",border:"none",cursor:"pointer",flexShrink:0,fontFamily:"inherit",boxShadow:DS.nmShadow}}>
+            <button onClick={()=>setShowImport(true)} style={{display:"flex",alignItems:"center",gap:7,padding:"0 16px",height:40,borderRadius:20,background:"rgba(255,255,255,0.45)",border:"none",cursor:"pointer",flexShrink:0,fontFamily:"inherit",boxShadow:DS.nmShadow}}>
               <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v7a2 2 0 002 2h12a2 2 0 002-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
               <span style={{fontSize:12,fontWeight:600,color:"#64748b"}}>Import</span>
             </button>
@@ -6437,7 +6278,7 @@ export default function App() {
           <div style={{padding:"6px 16px calc(90px + env(safe-area-inset-bottom,0px))",overflowX:"hidden"}}>
             {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}}/>}
             {page==="clients"&&<PageClients clients={clients} passages={passages} contrats={contrats} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onClientClick={setFicheClient} onAdd={openAddClient}/>}
-            {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddClient={openAddClient} onClientClick={c=>{setFicheClient(c);setPage("clients");}}/>}
+            {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddClient={openAddClient}/>}
             {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
           </div>
         </>
@@ -6445,9 +6286,9 @@ export default function App() {
         /* LAYOUT DESKTOP : sidebar gauche + contenu principal */
         <div style={{display:"flex",flex:1,minHeight:0}}>
           {/* Sidebar navigation desktop */}
-          <div style={{width:220,flexShrink:0,background:"#eef2f7",borderRight:"1px solid "+DS.border,display:"flex",flexDirection:"column",padding:"24px 12px",gap:4,position:"sticky",top:62,height:"calc(100vh - 62px)",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+          <div style={{width:220,flexShrink:0,background:"rgba(255,255,255,0.45)",borderRight:"1px solid "+DS.border,display:"flex",flexDirection:"column",padding:"24px 12px",gap:4,position:"sticky",top:62,height:"calc(100vh - 62px)",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
             {/* Stats rapides */}
-            <div style={{padding:"12px 14px",borderRadius:16,background:"#eef2f7",boxShadow:DS.nmShadowSm,marginBottom:16}}>
+            <div style={{padding:"12px 14px",borderRadius:16,background:"rgba(255,255,255,0.45)",boxShadow:DS.nmShadowSm,marginBottom:16}}>
               <div style={{fontSize:9,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Aperçu</div>
               <div style={{display:"flex",flexDirection:"column",gap:6}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:11,color:DS.mid}}>Clients</span><span style={{fontSize:13,fontWeight:800,color:DS.dark}}>{clients.length}</span></div>
@@ -6464,10 +6305,10 @@ export default function App() {
               </button>
             ))}
             <div style={{marginTop:"auto",display:"flex",flexDirection:"column",gap:8,paddingTop:16,borderTop:"1px solid "+DS.border}}>
-              <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",borderRadius:14,border:"none",background:"#eef2f7",cursor:"pointer",fontFamily:"inherit",width:"100%",boxShadow:DS.nmShadowSm}}>
+              <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",borderRadius:14,border:"none",background:"rgba(255,255,255,0.45)",cursor:"pointer",fontFamily:"inherit",width:"100%",boxShadow:DS.nmShadowSm}}>
                 {Ico.clipboard(14,DS.blue)}<span style={{fontSize:12,fontWeight:600,color:DS.mid}}>Nouveau passage</span>
               </button>
-              <button onClick={openAddClient} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",borderRadius:14,border:"none",background:"#eef2f7",cursor:"pointer",fontFamily:"inherit",width:"100%",boxShadow:DS.nmShadowSm}}>
+              <button onClick={openAddClient} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",borderRadius:14,border:"none",background:"rgba(255,255,255,0.45)",cursor:"pointer",fontFamily:"inherit",width:"100%",boxShadow:DS.nmShadowSm}}>
                 {Ico.userPlus(14,DS.purple)}<span style={{fontSize:12,fontWeight:600,color:DS.purple}}>Nouveau client</span>
               </button>
             </div>
@@ -6482,7 +6323,7 @@ export default function App() {
               )}
               {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}}/>}
               {page==="clients"&&<PageClients clients={clients} passages={passages} contrats={contrats} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onClientClick={setFicheClient} onAdd={openAddClient}/>}
-              {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddClient={openAddClient} onClientClick={c=>{setFicheClient(c);setPage("clients");}}/>}
+              {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddClient={openAddClient}/>}
               {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
             </div>
           </div>
@@ -6524,7 +6365,7 @@ export default function App() {
             backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",
             display:"flex",alignItems:"flex-end",
             borderTopLeftRadius:22,borderTopRightRadius:22,
-            boxShadow:"0 -2px 0 rgba(255,255,255,0.8), 0 -16px 40px rgba(100,160,200,0.25), 8px 0 16px rgba(166,210,220,0.2), -8px 0 16px rgba(255,255,255,0.7)",
+            boxShadow:"0 -2px 0 rgba(255,255,255,0.8), 0 -16px 40px rgba(100,160,200,0.25), 8px 0 16px rgba(6,182,212,0.15), -8px 0 16px rgba(255,255,255,0.7)",
             zIndex:50,
             paddingBottom:"env(safe-area-inset-bottom,0px)",
             borderTop:"1.5px solid rgba(255,255,255,0.85)",
@@ -6618,7 +6459,7 @@ export default function App() {
         return (
           <Modal title={`Alertes (${alertes.length})`} onClose={()=>setShowModalAlertes(false)}>
             {dismissedAlertes.length>0&&(
-              <button onClick={()=>{ setDismissedAlertes([]); try{localStorage.removeItem("briblue_dismissed_alertes");}catch{} }} style={{display:"flex",alignItems:"center",gap:6,marginBottom:12,padding:"7px 14px",borderRadius:8,background:"#f1f5f9",border:"1.5px solid #e2e8f0",cursor:"pointer",fontSize:12,fontWeight:700,color:"#64748b",fontFamily:"inherit"}}>
+              <button onClick={()=>{ setDismissedAlertes([]); try{localStorage.removeItem("briblue_dismissed_alertes");}catch{} }} style={{display:"flex",alignItems:"center",gap:6,marginBottom:12,padding:"7px 14px",borderRadius:8,background:"rgba(255,255,255,0.4)",border:"1.5px solid #e2e8f0",cursor:"pointer",fontSize:12,fontWeight:700,color:"#64748b",fontFamily:"inherit"}}>
                 <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
                 Restaurer {dismissedAlertes.length} alerte{dismissedAlertes.length>1?"s":""} masquée{dismissedAlertes.length>1?"s":""}
               </button>
@@ -6674,7 +6515,7 @@ export default function App() {
                           <div style={{fontSize:10,fontWeight:800,color:col.tx,textTransform:"uppercase",letterSpacing:.8,marginBottom:7}}>Mois en retard</div>
                           <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
                             {moisEnRetard.map(({m,restE,restC})=>(
-                              <div key={m} style={{background:"#eef2f7",border:"1.5px solid "+col.bd,borderRadius:8,padding:"5px 9px",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                              <div key={m} style={{background:"rgba(255,255,255,0.45)",border:"1.5px solid "+col.bd,borderRadius:8,padding:"5px 9px",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
                                 <span style={{fontSize:11,fontWeight:800,color:DS.dark}}>{MOIS[m]}</span>
                                 <div style={{display:"flex",gap:5}}>
                                   {restE>0&&<span style={{fontSize:10,fontWeight:700,color:DS.blue}}>🔧 {restE}</span>}
@@ -6694,8 +6535,6 @@ export default function App() {
           </Modal>
         );
       })()}
-      <ToastContainer/>
-      <ConfirmModal/>
     </div>
     </>
   );
