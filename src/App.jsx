@@ -6402,6 +6402,117 @@ function CarnetPublic({ code, allClients, allPassages }) {
   );
 }
 // -- FIN CARNET --------------------------------------------------------------
+function PageDocuments({ clients, contrats, onOpenContrat }) {
+  const isMobile = useIsMobile();
+  const STATUT = {
+    signe_complet: { label:"Signé ✓",      color:"#059669", bg:"#f0fdf4", border:"#86efac" },
+    signe_client:  { label:"En attente",    color:"#4f46e5", bg:"#eef2ff", border:"#a5b4fc" },
+    demande_envoyee:{ label:"Envoyé",       color:"#0891b2", bg:"#e0f2fe", border:"#7dd3fc" },
+    reset:         { label:"Réinitialisé",  color:"#94a3b8", bg:"#f8fafc", border:"#e2e8f0" },
+  };
+
+  // Tous les contrats existants + archives
+  const archives = contrats["__archives__"] || [];
+  const actifs = Object.entries(contrats)
+    .filter(([k]) => k !== "__archives__")
+    .map(([contractId, ct]) => {
+      const client = clients.find(c => c.id === ct.clientId);
+      return { contractId, ct, client };
+    })
+    .filter(x => x.client && x.ct.statut && x.ct.statut !== "reset")
+    .sort((a,b) => (b.ct.signedAt||b.ct.signedByPrestaAt||"").localeCompare(a.ct.signedAt||a.ct.signedByPrestaAt||""));
+
+  const nbSigned = actifs.filter(x=>x.ct.statut==="signe_complet").length;
+
+  return (
+    <div className="fade-in">
+      {/* Stats */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:16}}>
+        {[
+          {label:"Signés",val:nbSigned,color:"#059669",bg:"#f0fdf4"},
+          {label:"En attente",val:actifs.filter(x=>x.ct.statut==="signe_client").length,color:"#4f46e5",bg:"#eef2ff"},
+          {label:"Total",val:actifs.length,color:"#0891b2",bg:"#e0f2fe"},
+        ].map(s=>(
+          <div key={s.label} style={{background:s.bg,borderRadius:14,padding:"12px 8px",textAlign:"center",border:"1px solid "+s.color+"22"}}>
+            <div style={{fontSize:24,fontWeight:900,color:s.color,lineHeight:1}}>{s.val}</div>
+            <div style={{fontSize:10,color:s.color,fontWeight:700,marginTop:3,textTransform:"uppercase",letterSpacing:.4}}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Liste contrats actifs */}
+      {actifs.length===0
+        ? <div style={{textAlign:"center",padding:48,color:"#94a3b8",fontSize:14}}>
+            <div style={{fontSize:48,marginBottom:12}}>📄</div>
+            Aucun contrat enregistré
+          </div>
+        : <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:20}}>
+            {actifs.map(({contractId,ct,client})=>{
+              const s = STATUT[ct.statut] || STATUT.reset;
+              const dateSign = ct.signedAt ? new Date(ct.signedAt).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}) : null;
+              const dateCosign = ct.signedByPrestaAt ? new Date(ct.signedByPrestaAt).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}) : null;
+              return (
+                <div key={contractId} style={{background:"rgba(255,255,255,0.55)",borderRadius:16,border:"1.5px solid "+s.border,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,0.05)"}}>
+                  <div style={{padding:"14px 16px",display:"flex",alignItems:"center",gap:12}}>
+                    <div style={{width:44,height:44,borderRadius:12,background:s.bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:20}}>
+                      {ct.statut==="signe_complet"?"✅":ct.statut==="signe_client"?"✍️":"📄"}
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:800,fontSize:14,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{client.nom}</div>
+                      <div style={{fontSize:11,color:"#64748b",marginTop:2}}>
+                        {client.formule} · {contractId}
+                      </div>
+                      {dateSign&&<div style={{fontSize:11,color:"#94a3b8",marginTop:1}}>Signé le {dateSign}{dateCosign&&` · Co-signé le ${dateCosign}`}</div>}
+                    </div>
+                    <span style={{fontSize:11,fontWeight:700,color:s.color,background:s.bg,padding:"3px 10px",borderRadius:20,border:"1px solid "+s.border,flexShrink:0}}>{s.label}</span>
+                  </div>
+                  {/* Actions */}
+                  <div style={{display:"flex",borderTop:"1px solid #f1f5f9"}}>
+                    <button onClick={()=>onOpenContrat(client,ct)} style={{flex:1,padding:"9px",background:"rgba(255,255,255,0.45)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,fontWeight:700,color:"#0891b2",fontFamily:"inherit"}}>
+                      {Ico.pdf(13,"#0891b2")} Voir contrat
+                    </button>
+                    {ct.signatureClient&&(
+                      <div style={{width:1,background:"#f1f5f9"}}/>
+                    )}
+                    {ct.statut==="signe_client"&&(
+                      <a href={`/sign-prestataire.html?clientId=${client.id}&contractId=${contractId}`} target="_blank" rel="noopener" style={{flex:1,padding:"9px",background:"#f5f3ff",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,fontWeight:700,color:"#4f46e5",fontFamily:"inherit",textDecoration:"none"}}>
+                        {Ico.sign(13,"#4f46e5")} Co-signer
+                      </a>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+      }
+
+      {/* Archives */}
+      {archives.length>0&&(
+        <div>
+          <div style={{fontSize:12,fontWeight:800,color:"#94a3b8",textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>Archives ({archives.length})</div>
+          {archives.map((ct,i)=>{
+            const client = clients.find(c=>c.id===ct.clientId);
+            return (
+              <div key={i} style={{background:"rgba(255,255,255,0.35)",borderRadius:12,border:"1px solid #e2e8f0",padding:"12px 14px",marginBottom:6,display:"flex",alignItems:"center",gap:10,opacity:0.7}}>
+                <span style={{fontSize:18}}>📁</span>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13,fontWeight:700,color:"#475569"}}>{client?.nom||ct.clientId}</div>
+                  <div style={{fontSize:11,color:"#94a3b8"}}>
+                    Archivé le {ct.archivedAt?new Date(ct.archivedAt).toLocaleDateString("fr"):"—"} · {ct.archivedReason||""}
+                  </div>
+                </div>
+                <button onClick={()=>onOpenContrat(client||{nom:ct.clientId,id:ct.clientId},ct)} style={{padding:"6px 10px",borderRadius:8,background:"rgba(255,255,255,0.5)",border:"1px solid #e2e8f0",cursor:"pointer",fontSize:11,fontWeight:700,color:"#64748b",fontFamily:"inherit"}}>
+                  Voir
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   // Détection URL carnet public
   const [carnetCode] = useState(()=>{
@@ -6533,7 +6644,33 @@ export default function App() {
   const handleLogin = useCallback(()=>{ try{sessionStorage.setItem("bb_auth","1");}catch{} setLoggedIn(true); },[]);
   const handleLogout = useCallback(()=>{ try{sessionStorage.removeItem("bb_auth");}catch{} setLoggedIn(false);setReady(false);setClients([]);setPassages([]);setLivraisons([]);setRdvs([]); },[]);
 
-  const saveClient = useCallback(c=>{ setClients(prev=>{ const next=prev.find(x=>x.id===c.id)?prev.map(x=>x.id===c.id?c:x):[...prev,c]; saveClients(next); return next; }); setShowFormClient(false);setEditClient(null);setFicheClient(c); },[saveClients]);
+  const saveClient = useCallback(c=>{ 
+    setClients(prev=>{ const next=prev.find(x=>x.id===c.id)?prev.map(x=>x.id===c.id?c:x):[...prev,c]; saveClients(next); return next; }); 
+    // Réinitialiser la signature si le client existait déjà
+    const existing = clients.find(x=>x.id===c.id);
+    if (existing) {
+      const contractId = `CT-${c.id}`;
+      setContrats(prev=>{
+        if (!prev[contractId]) return prev;
+        // Archiver l'ancien contrat signé avant reset
+        const old = prev[contractId];
+        const archived = old.statut === "signe_complet" ? {
+          ...old,
+          archivedAt: new Date().toISOString(),
+          archivedReason: "Modification du contrat client",
+        } : null;
+        const archives = archived ? [...(prev["__archives__"]||[]), archived] : (prev["__archives__"]||[]);
+        const next = {
+          ...prev,
+          [contractId]: { clientId: c.id, statut: "reset", signatureClient: "", signaturePrestataire: "", signedAt: null },
+          "__archives__": archives,
+        };
+        saveContrats(next);
+        return next;
+      });
+    }
+    setShowFormClient(false);setEditClient(null);setFicheClient(c); 
+  },[saveClients, clients, saveContrats]);
   const deleteClient = useCallback(id=>{ showConfirm("Supprimer ce client et tous ses passages ?", ()=>{ setClients(prev=>{ const next=prev.filter(x=>x.id!==id); saveClients(next); return next; }); setPassages(prev=>{ const next=prev.filter(x=>x.clientId!==id); savePassages(next); return next; }); setFicheClient(null); }); },[saveClients,savePassages]);
   const savePassage = useCallback(p=>{ setPassages(prev=>{ const next=prev.find(x=>x.id===p.id)?prev.map(x=>x.id===p.id?p:x):[...prev,p]; savePassages(next); return next; }); setShowFormPassage(false);setEditPassage(null); },[savePassages]);
   const updatePassageRapportStatus = useCallback((passageMaj) => {
@@ -6609,9 +6746,10 @@ export default function App() {
     { id:"clients",   l:"Clients", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?DS.blue:"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a4 4 0 014-4h8a4 4 0 014 4v2"/></svg> },
     { id:"interventions", l:"Rapports", icon:(a)=><IconFiche size={22} color={a?DS.blue:"#94a3b8"}/> },
     { id:"rdv", l:"Rendez-vous", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#818cf8":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="12" cy="15" r="2.5" fill={a?"#818cf8":"none"}/></svg> },
+    { id:"documents", l:"Documents", icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#059669":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/></svg> },
   ];
 
-  const PAGE_LABELS = { dashboard:`Bonjour Dorian 👋`, clients:"Clients", passages:"Rapports", interventions:"Rapports", rdv:"Rendez-vous" };
+  const PAGE_LABELS = { dashboard:`Bonjour Dorian 👋`, clients:"Clients", passages:"Rapports", interventions:"Rapports", rdv:"Rendez-vous", documents:"Documents" };
 
   return (
     <>
@@ -6692,6 +6830,7 @@ export default function App() {
             {page==="clients"&&<PageClients clients={clients} passages={passages} contrats={contrats} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onClientClick={setFicheClient} onAdd={openAddClient}/>}
             {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddClient={openAddClient}/>}
             {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
+            {page==="documents"&&<PageDocuments clients={clients} contrats={contrats} onOpenContrat={(client,contrat)=>ouvrirContrat(client,contrat?.signaturePrestataire||"",contrat?.signatureClient||"")}/>}
           </div>
         </>
       ) : (
@@ -6737,6 +6876,7 @@ export default function App() {
               {page==="clients"&&<PageClients clients={clients} passages={passages} contrats={contrats} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onClientClick={setFicheClient} onAdd={openAddClient}/>}
               {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddClient={openAddClient}/>}
               {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
+              {page==="documents"&&<PageDocuments clients={clients} contrats={contrats} onOpenContrat={(client,contrat)=>ouvrirContrat(client,contrat?.signaturePrestataire||"",contrat?.signatureClient||"")}/>}
             </div>
           </div>
         </div>
