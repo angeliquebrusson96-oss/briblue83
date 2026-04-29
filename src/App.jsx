@@ -1693,31 +1693,6 @@ async function envoyerEmailLivraison(livraison, client) {
     toastError(`Erreur réseau : ${err.message}`);
   }
 }
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ from: "rapport-piscine@briblue83.com", to: [...], ... }),
-});
-      body: JSON.stringify({
-        from: `BRIBLUE <${FROM}>`,
-        to: [client.email],
-        subject: `Bon de livraison BRIBLUE — ${dateStr}`,
-        text: corps,
-        attachments: [{ filename, content: b64 }],
-      }),
-    });
-
-    const data = await res.json();
-
-    if (res.ok) {
-      toastSuccess(`Email envoyé à ${client.email} !`);
-    } else {
-      console.error("Resend error:", data);
-      toastError(`Erreur envoi : ${data?.message || JSON.stringify(data)}`);
-    }
-  } catch(err) {
-    toastError(`Erreur réseau : ${err.message}`);
-  }
-}
 
 function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave, onClose }) {
   const isEdit = !!initial?.id;
@@ -1728,7 +1703,6 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
   const PLIV = produitsStock.length > 0 ? produitsStock : PRODUITS_DEFAUT;
   const toggleProduit = (p) => { const arr = f.produits.includes(p) ? f.produits.filter(x=>x!==p) : [...f.produits,p]; set("produits",arr); };
 
-  // Brouillon auto
   const { hasDraft, restoreDraft, discardDraft, clearDraft } = useFormDraft(
     `briblue_draft_livraison_${initial?.id||"new"}`,
     f, setF, step, setStep,
@@ -1754,9 +1728,9 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
   };
 
   const STEP_INFO = [
-    { l:"Client & Date",   color:"#0891b2" },
-    { l:"Produits",        color:"#059669" },
-    { l:"Photos & Envoi",  color:"#4f46e5" },
+    { l:"Client & Date", color:"#0891b2" },
+    { l:"Produits",      color:"#059669" },
+    { l:"Photos & Envoi",color:"#4f46e5" },
   ];
   const STEPS = STEP_INFO.length;
   const cur = STEP_INFO[step-1];
@@ -1765,7 +1739,6 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
   return (
     <Modal title={isEdit?"Modifier la livraison":"Nouvelle livraison"} onClose={onClose} wide>
       {hasDraft && !isEdit && <DraftBanner onRestore={restoreDraft} onDiscard={discardDraft}/>}
-      {/* Stepper */}
       <div style={{marginBottom:14}}>
         <div style={{height:4,background:DS.light,borderRadius:99,marginBottom:10,overflow:"hidden"}}>
           <div style={{height:"100%",width:`${pct}%`,background:`linear-gradient(90deg,#0891b2,${cur.color})`,borderRadius:99,transition:"width .4s"}}/>
@@ -3098,7 +3071,7 @@ async function envoyerContratSignature(client) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        from: "rapport-piscine@briblue83.com",
+        from: `BRIBLUE <rapport-piscine@briblue83.com>`,
         to: [client.email],
         subject: `Votre contrat BRIBLUE — À signer`,
         html: htmlEmail,
@@ -3107,10 +3080,10 @@ async function envoyerContratSignature(client) {
     });
     const data = await res.json();
     if (res.ok) {
-      // (signature tracking supprimé - géré localement)
       toastSuccess(`Contrat envoyé à ${client.email} !`);
+    } else {
+      toastError(`Erreur : ${data?.message || JSON.stringify(data)}`);
     }
-    else toastError(`Erreur : ${data?.message}`);
   } catch(err) {
     toastError(`Erreur réseau : ${err.message}`);
   }
