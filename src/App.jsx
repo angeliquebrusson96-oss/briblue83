@@ -3343,6 +3343,8 @@ async function envoyerEmail(passage, client, onSent) {
   console.error("Fetch error:", err);
   toastError(`Erreur réseau : ${err.message}`);
 }
+}
+
 
 // COMPOSANT MROW - défini en dehors pour éviter re-render à chaque frappe
 function MRow({label,unit,value,onChange,ideal,okFn,icon,color="#0891b2"}) {
