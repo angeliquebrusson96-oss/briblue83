@@ -1199,14 +1199,35 @@ function ConfirmModal() {
     if(ok && item.onOk) item.onOk();
     if(!ok && item.onCancel) item.onCancel();
   };
+  const isDelete = item.msg?.toLowerCase().includes("supprim");
+  const isSave   = item.msg?.toLowerCase().includes("enregistr") || item.msg?.toLowerCase().includes("sauvegarder") || item.msg?.toLowerCase().includes("modifier");
+  const isSend   = item.msg?.toLowerCase().includes("envoyer") || item.msg?.toLowerCase().includes("email");
+  const emoji    = isDelete ? "🗑️" : isSend ? "📧" : isSave ? "💾" : "❓";
+  const btnLabel = isDelete ? "Supprimer" : isSend ? "Envoyer" : isSave ? "Confirmer" : "Confirmer";
+  const btnColor = isDelete
+    ? "linear-gradient(135deg,#ef4444,#dc2626)"
+    : isSend
+    ? "linear-gradient(135deg,#059669,#0d9488)"
+    : "linear-gradient(135deg,#0891b2,#06b6d4)";
+  const btnShadow = isDelete
+    ? "0 4px 12px rgba(220,38,38,0.35)"
+    : isSend
+    ? "0 4px 12px rgba(5,150,105,0.35)"
+    : "0 4px 12px rgba(8,145,178,0.35)";
+
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:99998,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>handle(false)}>
-      <div className="scale-in" onClick={e=>e.stopPropagation()} style={{background:"rgba(255,255,255,0.45)",borderRadius:22,padding:"28px 24px",maxWidth:360,width:"100%",boxShadow:"8px 8px 24px rgba(6,182,212,0.15), -5px -5px 16px rgba(255,255,255,0.9)",fontFamily:"Inter,sans-serif"}}>
-        <div style={{fontSize:36,textAlign:"center",marginBottom:12}}>🗑️</div>
-        <div style={{fontSize:15,fontWeight:700,color:"#0c1222",textAlign:"center",marginBottom:8,lineHeight:1.4}}>{item.msg}</div>
-        <div style={{display:"flex",gap:10,marginTop:20}}>
-          <button onClick={()=>handle(false)} style={{flex:1,padding:"12px",borderRadius:14,background:"rgba(255,255,255,0.45)",border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#64748b",fontFamily:"inherit",boxShadow:"4px 4px 8px rgba(6,182,212,0.15), -3px -3px 7px rgba(255,255,255,0.9)"}}>Annuler</button>
-          <button onClick={()=>handle(true)} style={{flex:1,padding:"12px",borderRadius:14,background:"linear-gradient(135deg,#ef4444,#dc2626)",border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#fff",fontFamily:"inherit",boxShadow:"4px 4px 12px rgba(220,38,38,0.35)"}}>Supprimer</button>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:99998,display:"flex",alignItems:"center",justifyContent:"center",padding:20,backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
+      <div className="scale-in" style={{background:"rgba(255,255,255,0.75)",backdropFilter:"blur(20px) saturate(180%)",WebkitBackdropFilter:"blur(20px) saturate(180%)",borderRadius:24,padding:"32px 24px",maxWidth:340,width:"100%",boxShadow:"0 20px 60px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.8)",fontFamily:"Inter,sans-serif",border:"1px solid rgba(255,255,255,0.6)"}}>
+        <div style={{fontSize:44,textAlign:"center",marginBottom:14}}>{emoji}</div>
+        <div style={{fontSize:16,fontWeight:800,color:"#0c1222",textAlign:"center",marginBottom:6,lineHeight:1.4}}>{item.msg}</div>
+        {item.sub&&<div style={{fontSize:13,color:"#64748b",textAlign:"center",marginBottom:0,lineHeight:1.5}}>{item.sub}</div>}
+        <div style={{display:"flex",gap:10,marginTop:24}}>
+          <button onClick={()=>handle(false)} style={{flex:1,padding:"13px",borderRadius:14,background:"rgba(255,255,255,0.6)",border:"1.5px solid rgba(0,0,0,0.08)",cursor:"pointer",fontWeight:700,fontSize:14,color:"#64748b",fontFamily:"inherit"}}>
+            Annuler
+          </button>
+          <button onClick={()=>handle(true)} style={{flex:1,padding:"13px",borderRadius:14,background:btnColor,border:"none",cursor:"pointer",fontWeight:800,fontSize:14,color:"#fff",fontFamily:"inherit",boxShadow:btnShadow}}>
+            {btnLabel}
+          </button>
         </div>
       </div>
     </div>
@@ -1275,7 +1296,6 @@ function Modal({ title, onClose, children, wide }) {
   return (
     <div
       style={{position:"fixed",inset:0,background:"rgba(11,18,32,0.45)",zIndex:200,display:"flex",alignItems:isMobile?"flex-end":"center",justifyContent:"center",padding:isMobile?"0":"12px",backdropFilter:"blur(14px) saturate(140%)",WebkitBackdropFilter:"blur(14px) saturate(140%)"}}
-      onClick={onClose}
     >
       <div className={isMobile?"slide-up":"scale-in"}
         style={{
@@ -1292,15 +1312,14 @@ function Modal({ title, onClose, children, wide }) {
           paddingBottom:"env(safe-area-inset-bottom,0px)",
           overscrollBehavior:"contain",
           WebkitOverflowScrolling:"touch",
-        }}
-        onClick={e=>e.stopPropagation()}>
+        }}>
         {isMobile && <div style={{flexShrink:0,display:"flex",justifyContent:"center",paddingTop:10,paddingBottom:2}}>
           <div style={{width:42,height:5,borderRadius:3,background:"linear-gradient(90deg,#22d3ee,#0891b2)",opacity:0.6}}/>
         </div>}
         <div style={{flexShrink:0,padding:isMobile?"8px 18px 12px":"14px 24px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid rgba(255,255,255,0.45)"}}>
           <span style={{color:DS.dark,fontWeight:800,fontSize:17,letterSpacing:"-0.01em"}}>{title}</span>
-          <button onClick={onClose} style={{width:34,height:34,borderRadius:12,background:"rgba(255,255,255,0.6)",border:"1px solid rgba(255,255,255,0.5)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",boxShadow:"0 2px 8px rgba(15,23,42,0.06)"}}>
-            {Ico.close(13,DS.mid)}
+          <button onClick={onClose} style={{width:44,height:44,borderRadius:14,background:"linear-gradient(135deg,#ef4444,#dc2626)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 12px rgba(220,38,38,0.35)",flexShrink:0}}>
+            {Ico.close(18,"#fff")}
           </button>
         </div>
         <div data-modal-body="1" style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",padding:isMobile?"14px 18px 24px":"20px 24px 24px",overscrollBehavior:"contain"}}>
@@ -1911,7 +1930,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
             ))}
           </div>
           {selectedClient?.email&&(
-            <button onClick={()=>envoyerEmailLivraison({...f,id:isEdit?f.id:uid()}, selectedClient)}
+            <button onClick={()=>showConfirm(`Envoyer le bon de livraison par email à ${selectedClient?.email||"ce client"} ?`,()=>envoyerEmailLivraison({...f,id:isEdit?f.id:uid()}, selectedClient))}
               style={{padding:"11px",borderRadius:DS.radiusSm,background:"rgba(224,242,254,0.5)",border:"1px solid #bae6fd",cursor:"pointer",fontWeight:700,fontSize:13,color:"#0891b2",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
               {Ico.send(13,"#0891b2")} Envoyer par email à {selectedClient.email}
             </button>
@@ -2298,7 +2317,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                                   <button onClick={e=>{e.stopPropagation();ouvrirRapport(ev._p,client);}} style={{flex:1,padding:"7px 10px",borderRadius:8,background:DS.blueSoft,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,color:DS.blue,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
                                     {Ico.pdf(11,DS.blue)} PDF
                                   </button>
-                                  {client.email&&<button onClick={e=>{e.stopPropagation();envoyerEmail(ev._p,client,onUpdatePassageStatus);}} style={{flex:1,padding:"7px 10px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,color:DS.green,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+                                  {client.email&&<button onClick={e=>{e.stopPropagation();showConfirm(`Envoyer le rapport par email à ${client.email} ?`,()=>envoyerEmail(ev._p,client,onUpdatePassageStatus));}} style={{flex:1,padding:"7px 10px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,color:DS.green,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
                                     {Ico.send(11,DS.green)} Email
                                   </button>}
                                   <button onClick={e=>{e.stopPropagation();onEditPassage&&onEditPassage(ev._p);}} style={{padding:"7px 10px",borderRadius:8,background:"rgba(255,255,255,0.7)",border:"1px solid "+DS.border,cursor:"pointer",fontSize:12,fontWeight:700,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
@@ -2309,7 +2328,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                                   <button onClick={e=>{e.stopPropagation();setEditLiv(ev._l);setShowFormLiv(true);}} style={{flex:1,padding:"7px 10px",borderRadius:8,background:"rgba(255,255,255,0.7)",border:"1px solid "+DS.border,cursor:"pointer",fontSize:12,fontWeight:700,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
                                     {Ico.edit(11,DS.mid)} Modifier
                                   </button>
-                                  {client.email&&<button onClick={e=>{e.stopPropagation();envoyerEmailLivraison(ev._l,client);}} style={{flex:1,padding:"7px 10px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,color:DS.green,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+                                  {client.email&&<button onClick={e=>{e.stopPropagation();showConfirm(`Envoyer le bon de livraison par email à ${client.email} ?`,()=>envoyerEmailLivraison(ev._l,client));}} style={{flex:1,padding:"7px 10px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,color:DS.green,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
                                     {Ico.send(11,DS.green)} Email
                                   </button>}
                                 </>}
@@ -2404,7 +2423,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                       {label:"Aperçu",  ico:Ico.search(12,DS.mid),  bg:"#f8fafc", color:DS.dark,   onClick:()=>setDetailPassageFiche(p)},
                       {label:"Modifier",ico:Ico.edit(12,DS.mid),    bg:"#f8fafc", color:DS.mid,    onClick:()=>onEditPassage&&onEditPassage(p)},
                       {label:"Rapport", ico:Ico.pdf(12,DS.blue),    bg:"#eff6ff", color:DS.blue,   onClick:()=>ouvrirRapport(p,client)},
-                      ...(client.email?[{label:"Email",ico:Ico.send(12,DS.green),bg:"#f0fdf4",color:DS.green,onClick:()=>envoyerEmail(p,client,onUpdatePassageStatus)}]:[]),
+                      ...(client.email?[{label:"Email",ico:Ico.send(12,DS.green),bg:"#f0fdf4",color:DS.green,onClick:()=>showConfirm(`Envoyer le rapport par email à ${client.email} ?`,()=>envoyerEmail(p,client,onUpdatePassageStatus))}]:[]),
                       ...(onDeletePassage?[{label:"",ico:Ico.trash(12,DS.red),bg:"#fef2f2",color:DS.red,onClick:()=>showConfirm("Supprimer ce passage ?",()=>onDeletePassage(p.id))}]:[]),
                     ].map((btn,i,arr)=>(
                       <button key={i} onClick={e=>{e.stopPropagation();btn.onClick();}}
@@ -2662,7 +2681,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
                   <div style={{display:"flex",borderTop:"1px solid #f8fafc"}}>
                     <button onClick={()=>{setEditLiv(l);setShowFormLiv(true);}} style={{flex:1,padding:"8px",background:"rgba(255,255,255,0.45)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,fontWeight:700,color:DS.mid,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>{Ico.edit(11,DS.mid)} Modifier</button>
                     {client.email
-                      ?<button onClick={()=>envoyerEmailLivraison(l,client)} style={{flex:1,padding:"8px",background:"#f0fdf4",border:"none",borderLeft:"1px solid #f8fafc",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,fontWeight:700,color:DS.green,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>{Ico.send(11,DS.green)} Email</button>
+                      ?<button onClick={()=>showConfirm(`Envoyer le bon de livraison par email à ${client.email} ?`,()=>envoyerEmailLivraison(l,client))} style={{flex:1,padding:"8px",background:"#f0fdf4",border:"none",borderLeft:"1px solid #f8fafc",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,fontSize:11,fontWeight:700,color:DS.green,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>{Ico.send(11,DS.green)} Email</button>
                       :<div style={{flex:1}}/>
                     }
                     <button onClick={()=>showConfirm("Supprimer ?",()=>onDeleteLivraison(l.id))} style={{width:38,padding:"8px",background:"#fef2f2",border:"none",borderLeft:"1px solid #f8fafc",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",WebkitTapHighlightColor:"transparent"}}>{Ico.trash(11,DS.red)}</button>
@@ -4381,7 +4400,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
                 {Ico.pdf(18,DS.dark)} Télécharger PDF
               </button>
               {client?.email ? (
-                <button onClick={()=>envoyerEmail(f,client)} className="btn-hover" style={{padding:"14px",borderRadius:DS.radiusSm,background:DS.blueGrad,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 16px "+DS.blue+"44"}}>
+                <button onClick={()=>showConfirm(`Envoyer le rapport par email à ${client.email} ?`,()=>envoyerEmail(f,client))} className="btn-hover" style={{padding:"14px",borderRadius:DS.radiusSm,background:DS.blueGrad,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 16px "+DS.blue+"44"}}>
                   {Ico.send(16,"#fff")} Envoyer à {client.email}
                 </button>
               ) : (
@@ -5502,7 +5521,7 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                         {Ico.pdf(14,DS.blue)} Rapport PDF
                       </button>
                       {c?.email
-                        ? <button onClick={()=>envoyerEmail(p,c,onUpdatePassageStatus)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.green,fontFamily:"inherit",fontWeight:700}}>
+                        ? <button onClick={()=>showConfirm(`Envoyer le rapport par email à ${c.email} ?`,()=>envoyerEmail(p,c,onUpdatePassageStatus))} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.green,fontFamily:"inherit",fontWeight:700}}>
                             {Ico.send(13,DS.green)} Envoyer email
                           </button>
                         : <div style={{borderRadius:10,background:DS.light,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:DS.mid,fontWeight:500}}>{Ico.mail(12,DS.mid)} Pas d'email</div>
