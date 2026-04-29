@@ -1,9 +1,12 @@
-import { createClient } from "@supabase/supabase-js";
+import { initializeApp, getApps, cert } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 
-const supabase = createClient(
-  "https://qhemxhnhbgdfvjqedwyi.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFoZW14aG5oYmdkZnZqcWVkd3lpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4ODMzMDksImV4cCI6MjA5MTQ1OTMwOX0.JFcwVtN5QM-kEJISjU4l5qy9O559qo45LM2v62A9rMM"
-);
+if (!getApps().length) {
+  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  initializeApp({ credential: cert(serviceAccount) });
+}
+
+const db = getFirestore();
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -15,14 +18,13 @@ export default async function handler(req, res) {
   if (!clientId) return res.status(400).json({ error: "clientId manquant" });
 
   try {
-    const { data, error } = await supabase
-      .from("app_data").select("data").eq("id", 1).single();
-    if (error) return res.status(500).json({ error: error.message });
+    const snap = await db.collection("briblue").doc("app_data").get();
+    if (!snap.exists) return res.status(500).json({ error: "Document app_data introuvable" });
 
-    const allData = data?.data || {};
+    const allData = snap.data() || {};
     const clients = allData["bb_clients_v2"] || [];
     const client = clients.find(c => c.id === clientId);
-    if (!client) return res.status(404).json({ error: "Client introuvable" });
+    if (!client) return res.status(404).json({ error: `Client introuvable (id: ${clientId})` });
 
     const contrats = allData["bb_contrats_v1"] || {};
     const contractId = `CT-${clientId}`;
@@ -42,12 +44,14 @@ export default async function handler(req, res) {
         dateFin: client.dateFin || "",
         moisParMois: client.moisParMois || {},
         email: client.email || "",
+        notesTarifaires: client.notesTarifaires || "",
       },
       contrat,
       dejaSigné: contrat?.statut === "signe_complet",
       signedAt: contrat?.signedAt || null,
     });
   } catch (err) {
+    console.error("get-contract error:", err);
     return res.status(500).json({ error: err.message });
   }
 }
