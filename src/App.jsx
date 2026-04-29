@@ -6616,6 +6616,8 @@ export default function App() {
   return (
     <>
     <GlobalStyles/>
+    <ToastContainer/>
+    <ConfirmModal/>
     <div style={{minHeight:"100vh",background:"rgba(255,255,255,0.45)",fontFamily:"'Inter', -apple-system, system-ui, sans-serif",maxWidth:isMobile?640:1280,margin:"0 auto",position:"relative",display:"flex",flexDirection:"column",overflowX:"hidden",width:"100%"}}>
       {/* HEADER — Soft UI */}
       <div style={{background:"rgba(255,255,255,0.45)",padding:isMobile?"10px 14px":"10px 28px",display:"flex",alignItems:"center",gap:isMobile?8:14,position:"sticky",top:0,zIndex:50,boxShadow:"0 4px 16px rgba(6,182,212,0.15)",width:"100%",boxSizing:"border-box"}}>
