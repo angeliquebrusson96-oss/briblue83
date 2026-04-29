@@ -1660,9 +1660,6 @@ function genererHTMLLivraison(livraison, client) {
 }
 
 async function envoyerEmailLivraison(livraison, client) {
-  const RESEND_API_KEY = "re_FLTMeUdh_vL8QGqJhP2C293WEVCm9c7rh";
-  const FROM = "rapport-piscine@briblue83.com";
-
   if (!client?.email) { toastWarn("Aucun email renseigné pour ce client."); return; }
 
   const dateStr = new Date(livraison.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"});
@@ -1670,11 +1667,32 @@ async function envoyerEmailLivraison(livraison, client) {
   const html = genererHTMLLivraison(livraison, client);
   const b64 = btoa(unescape(encodeURIComponent(html)));
 
-  const produits = (livraison.produits||[]).length > 0 ? (livraison.produits||[]).join(", ") : "voir document joint";
   const corps = `Bonjour ${client?.nom||""},\n\nVotre bon de livraison du ${dateStr} est disponible.\n\nJe reste a votre disposition pour toute question.\n\nCordialement,\nDorian Briaire\nTechnicien de Piscine - BRI BLUE`;
 
   try {
-  const res = await fetch("/api/send-email", {
+    const res = await fetch("/api/send-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: `BRIBLUE <rapport-piscine@briblue83.com>`,
+        to: [client.email],
+        subject: `Bon de livraison BRIBLUE — ${dateStr}`,
+        text: corps,
+        attachments: [{ filename, content: b64 }],
+      }),
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      toastSuccess(`Email envoyé à ${client.email} !`);
+    } else {
+      console.error("Resend error:", data);
+      toastError(`Erreur envoi : ${data?.message || JSON.stringify(data)}`);
+    }
+  } catch(err) {
+    toastError(`Erreur réseau : ${err.message}`);
+  }
+}
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ from: "rapport-piscine@briblue83.com", to: [...], ... }),
