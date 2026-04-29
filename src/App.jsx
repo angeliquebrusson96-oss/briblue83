@@ -2137,56 +2137,203 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
       <div style={{paddingTop:16}}>
 
       {/* -- HISTORIQUE -- */}
-      {tab==="historique" && (
-        <div className="fade-in">
-          {(()=>{
-            const passClient2 = passages.filter(p=>p.clientId===client.id);
-            const livClient  = (livraisons||[]).filter(l=>l.clientId===client.id);
-            const rdvClient2 = (rdvs||[]).filter(r=>r.clientId===client.id);
-            const events = [
-              ...(client.dateDebut?[{date:client.dateDebut,title:"Début de contrat",sub:client.formule+(client.prix?" · "+client.prix+"€/an":""),dot:"#22d3ee",badge:"Contrat",badgeColor:"#0891b2"}]:[]),
-              ...passClient2.map(p=>({date:p.date,title:p.type||"Passage",sub:[p.tech?"par "+p.tech:null,p.ph?"pH "+p.ph:null,p.chlore?"Cl "+p.chlore:null].filter(Boolean).join(" · "),dot:isControleType(p.type)?"#0e7490":"#0891b2",badge:p.ok?"Effectué":"En cours",badgeColor:p.ok?"#059669":"#f59e0b",_p:p})),
-              ...livClient.map(l=>({date:l.date,title:"Livraison",sub:[l.produits?.slice(0,2).join(", "),l.montant?l.montant+"€":null].filter(Boolean).join(" · "),dot:"#f59e0b",badge:l.statut==="paye"?"Payé":l.statut==="facture"?"Facturé":"À facturer",badgeColor:l.statut==="paye"?"#059669":"#f59e0b",_l:l})),
-              ...rdvClient2.map(r=>({date:r.date,title:r.type||"RDV",sub:[r.heure,r.duree?r.duree+" min":null].filter(Boolean).join(" · "),dot:"#818cf8",badge:r.date>=TODAY?"À venir":"Passé",badgeColor:r.date>=TODAY?"#818cf8":"#94a3b8",_r:r})),
-            ].sort((a,b)=>b.date.localeCompare(a.date));
-            if(!events.length) return <div style={{textAlign:"center",padding:"48px 0",color:"#94a3b8",fontSize:14}}>Aucun historique</div>;
-            const grouped={};
-            events.forEach(ev=>{ const d=new Date(ev.date); const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; if(!grouped[k]) grouped[k]=[]; grouped[k].push(ev); });
-            return Object.keys(grouped).sort((a,b)=>b.localeCompare(a)).map(key=>{
+      {tab==="historique" && (()=>{
+        const [expandedEv, setExpandedEv] = useState(null);
+        const passClient2 = passages.filter(p=>p.clientId===client.id);
+        const livClient   = (livraisons||[]).filter(l=>l.clientId===client.id);
+        const rdvClient2  = (rdvs||[]).filter(r=>r.clientId===client.id);
+
+        const TYPE_CFG = {
+          passage_e: { icon:"🔧", color:"#0891b2", bg:"#eff6ff" },
+          passage_c: { icon:"💧", color:"#0e7490", bg:"#ecfdf5" },
+          livraison: { icon:"📦", color:"#f59e0b", bg:"#fffbeb" },
+          rdv:       { icon:"📅", color:"#818cf8", bg:"#f5f3ff" },
+          contrat:   { icon:"📄", color:"#0891b2", bg:"#e0f2fe" },
+        };
+
+        const events = [
+          ...(client.dateDebut?[{
+            id:"contrat", date:client.dateDebut, kind:"contrat",
+            title:"Début de contrat", sub:client.formule+(client.prix?" · "+client.prix+"€/an":""),
+            badge:"Contrat", badgeColor:"#0891b2",
+          }]:[]),
+          ...passClient2.map(p=>({
+            id:p.id, date:p.date, kind:isControleType(p.type)?"passage_c":"passage_e",
+            title:p.type||"Passage",
+            sub:p.tech?"par "+p.tech:"",
+            badge:p.ok?"Effectué":"En cours",
+            badgeColor:p.ok?"#059669":"#f59e0b",
+            ph:getPH(p), chlore:getCL(p),
+            photo:p.photoArrivee||p.photoDepart||(p.photos||[])[0]||"",
+            resume:getResumePassage(p),
+            _p:p,
+          })),
+          ...livClient.map(l=>({
+            id:l.id, date:l.date, kind:"livraison",
+            title:"Livraison produits",
+            sub:(l.produits||[]).slice(0,3).join(", ")+(l.produits?.length>3?" +"+(l.produits.length-3):""),
+            badge:l.statut==="paye"?"Payé":l.statut==="facture"?"Facturé":"À facturer",
+            badgeColor:l.statut==="paye"?"#059669":"#f59e0b",
+            montant:l.montant, _l:l,
+          })),
+          ...rdvClient2.map(r=>({
+            id:r.id, date:r.date, kind:"rdv",
+            title:r.type||"RDV",
+            sub:[r.heure,r.duree?r.duree+" min":null].filter(Boolean).join(" · "),
+            badge:r.date>=TODAY?"À venir":"Passé",
+            badgeColor:r.date>=TODAY?"#818cf8":"#94a3b8",
+            _r:r,
+          })),
+        ].sort((a,b)=>b.date.localeCompare(a.date));
+
+        if(!events.length) return <div className="fade-in" style={{textAlign:"center",padding:"48px 0",color:"#94a3b8",fontSize:14}}>Aucun historique</div>;
+
+        const grouped={};
+        events.forEach(ev=>{ const d=new Date(ev.date); const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; if(!grouped[k]) grouped[k]=[]; grouped[k].push(ev); });
+
+        return (
+          <div className="fade-in">
+            {/* Stats rapides */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:16}}>
+              {[
+                {label:"Passages",val:passClient2.length,color:"#0891b2",bg:"#eff6ff"},
+                {label:"Livraisons",val:livClient.length,color:"#f59e0b",bg:"#fffbeb"},
+                {label:"RDV",val:rdvClient2.length,color:"#818cf8",bg:"#f5f3ff"},
+              ].map(s=>(
+                <div key={s.label} style={{background:s.bg,borderRadius:12,padding:"10px 8px",textAlign:"center",border:"1px solid "+s.color+"22"}}>
+                  <div style={{fontSize:22,fontWeight:900,color:s.color,lineHeight:1}}>{s.val}</div>
+                  <div style={{fontSize:10,color:s.color,fontWeight:700,marginTop:3,textTransform:"uppercase",letterSpacing:.4}}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {Object.keys(grouped).sort((a,b)=>b.localeCompare(a)).map(key=>{
               const [yr,mo]=key.split("-");
               return (
-                <div key={key} style={{marginBottom:24}}>
-                  <div style={{fontSize:11,fontWeight:800,color:"#0f172a",marginBottom:10,paddingBottom:6,borderBottom:"2px solid #f1f5f9",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                    <span>{MOIS_L[parseInt(mo)]} {yr}</span>
-                    <span style={{fontSize:10,color:"#94a3b8",fontWeight:500}}>{grouped[key].length} événement{grouped[key].length>1?"s":""}</span>
+                <div key={key} style={{marginBottom:20}}>
+                  {/* Header mois */}
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,paddingBottom:6,borderBottom:"2px solid rgba(6,182,212,0.15)"}}>
+                    <span style={{fontSize:13,fontWeight:800,color:"#0f172a",letterSpacing:-0.3}}>{MOIS_L[parseInt(mo)]} {yr}</span>
+                    <span style={{fontSize:11,color:"#94a3b8",fontWeight:600,background:"#f8fafc",padding:"2px 8px",borderRadius:20}}>{grouped[key].length} év.</span>
                   </div>
-                  {grouped[key].map((ev,i)=>{
-                    const d=new Date(ev.date);
-                    const clickable=!!(ev._p||ev._l||ev._r);
-                    return (
-                      <div key={i} onClick={ev._p?()=>setDetailPassageFiche(ev._p):ev._l?()=>{setEditLiv(ev._l);setShowFormLiv(true);}:ev._r?()=>onEditRdv&&onEditRdv(ev._r):undefined}
-                        style={{display:"flex",alignItems:"center",gap:12,padding:"11px 0",borderBottom:i<grouped[key].length-1?"1px solid #f8fafc":"none",cursor:clickable?"pointer":"default"}}>
-                        <div style={{width:36,flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
-                          <div style={{width:10,height:10,borderRadius:"50%",background:ev.dot}}/>
-                          <div style={{fontSize:9,color:"#94a3b8",fontWeight:600,textAlign:"center",lineHeight:1.2}}>{d.toLocaleDateString("fr",{day:"2-digit",month:"short"})}</div>
+
+                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                    {grouped[key].map((ev,i)=>{
+                      const cfg = TYPE_CFG[ev.kind]||TYPE_CFG.passage_e;
+                      const isExp = expandedEv===ev.id;
+                      const d = new Date(ev.date);
+                      const phOk = ev.ph>=7&&ev.ph<=7.6;
+                      const clOk = ev.chlore>=0.5&&ev.chlore<=3;
+
+                      return (
+                        <div key={ev.id||i}
+                          style={{background:"rgba(255,255,255,0.6)",borderRadius:14,border:"1px solid "+(isExp?cfg.color+"44":"rgba(255,255,255,0.5)"),overflow:"hidden",transition:"all .2s",boxShadow:isExp?"0 4px 16px "+cfg.color+"18":"0 1px 4px rgba(0,0,0,0.04)"}}>
+
+                          {/* Ligne principale */}
+                          <div onClick={()=>setExpandedEv(isExp?null:ev.id)}
+                            style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",cursor:"pointer"}}>
+
+                            {/* Icône type */}
+                            <div style={{width:38,height:38,borderRadius:11,background:cfg.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0,border:"1px solid "+cfg.color+"22"}}>
+                              {cfg.icon}
+                            </div>
+
+                            {/* Contenu */}
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{fontSize:13,fontWeight:700,color:"#0f172a",marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ev.title}</div>
+                              <div style={{fontSize:11,color:"#64748b",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                                <span>{d.toLocaleDateString("fr",{day:"2-digit",month:"short"})}</span>
+                                {ev.sub&&<><span style={{color:"#cbd5e1"}}>·</span><span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:120}}>{ev.sub}</span></>}
+                              </div>
+                            </div>
+
+                            {/* Mesures pH/Cl compactes */}
+                            {(ev.ph||ev.chlore)&&(
+                              <div style={{display:"flex",gap:4,flexShrink:0}}>
+                                {ev.ph&&<div style={{background:phOk?"#dcfce7":"#fef3c7",borderRadius:6,padding:"2px 6px",textAlign:"center"}}>
+                                  <div style={{fontSize:8,fontWeight:700,color:phOk?"#166534":"#92400e"}}>pH</div>
+                                  <div style={{fontSize:12,fontWeight:900,color:phOk?"#16a34a":"#d97706",lineHeight:1}}>{ev.ph}</div>
+                                </div>}
+                                {ev.chlore&&<div style={{background:clOk?"#dcfce7":"#fef3c7",borderRadius:6,padding:"2px 6px",textAlign:"center"}}>
+                                  <div style={{fontSize:8,fontWeight:700,color:clOk?"#166534":"#92400e"}}>Cl</div>
+                                  <div style={{fontSize:12,fontWeight:900,color:clOk?"#16a34a":"#d97706",lineHeight:1}}>{ev.chlore}</div>
+                                </div>}
+                              </div>
+                            )}
+
+                            {/* Badge + chevron */}
+                            <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+                              <span style={{fontSize:10,fontWeight:700,color:ev.badgeColor,background:ev.badgeColor+"18",padding:"2px 7px",borderRadius:10,whiteSpace:"nowrap"}}>{ev.badge}</span>
+                              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round" style={{transition:"transform .2s",transform:isExp?"rotate(90deg)":"rotate(0deg)"}}><polyline points="9 18 15 12 9 6"/></svg>
+                            </div>
+                          </div>
+
+                          {/* Détail expandé */}
+                          {isExp&&(
+                            <div style={{borderTop:"1px solid "+cfg.color+"22",padding:"12px 14px",background:cfg.bg+"44"}}>
+
+                              {/* Photo miniature */}
+                              {ev.photo&&(
+                                <div style={{marginBottom:10}}>
+                                  <img src={ev.photo} alt="" style={{width:"100%",maxHeight:120,objectFit:"cover",borderRadius:10,border:"1px solid "+DS.border}}/>
+                                </div>
+                              )}
+
+                              {/* Résumé / notes */}
+                              {ev.resume&&(
+                                <div style={{fontSize:13,color:"#334155",lineHeight:1.6,marginBottom:10,padding:"8px 10px",background:"rgba(255,255,255,0.6)",borderRadius:8}}>{ev.resume}</div>
+                              )}
+
+                              {/* Montant livraison */}
+                              {ev.montant&&(
+                                <div style={{fontSize:15,fontWeight:900,color:cfg.color,marginBottom:10}}>{Number(ev.montant).toLocaleString("fr")} €</div>
+                              )}
+
+                              {/* Boutons d'action */}
+                              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                                {ev._p&&<>
+                                  <button onClick={e=>{e.stopPropagation();setDetailPassageFiche(ev._p);}} style={{flex:1,padding:"7px 10px",borderRadius:8,background:"rgba(255,255,255,0.7)",border:"1px solid "+DS.border,cursor:"pointer",fontSize:12,fontWeight:700,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+                                    {Ico.search(11,DS.mid)} Aperçu
+                                  </button>
+                                  <button onClick={e=>{e.stopPropagation();ouvrirRapport(ev._p,client);}} style={{flex:1,padding:"7px 10px",borderRadius:8,background:DS.blueSoft,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,color:DS.blue,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+                                    {Ico.pdf(11,DS.blue)} PDF
+                                  </button>
+                                  {client.email&&<button onClick={e=>{e.stopPropagation();envoyerEmail(ev._p,client,onUpdatePassageStatus);}} style={{flex:1,padding:"7px 10px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,color:DS.green,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+                                    {Ico.send(11,DS.green)} Email
+                                  </button>}
+                                  <button onClick={e=>{e.stopPropagation();onEditPassage&&onEditPassage(ev._p);}} style={{padding:"7px 10px",borderRadius:8,background:"rgba(255,255,255,0.7)",border:"1px solid "+DS.border,cursor:"pointer",fontSize:12,fontWeight:700,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+                                    {Ico.edit(11,DS.mid)}
+                                  </button>
+                                </>}
+                                {ev._l&&<>
+                                  <button onClick={e=>{e.stopPropagation();setEditLiv(ev._l);setShowFormLiv(true);}} style={{flex:1,padding:"7px 10px",borderRadius:8,background:"rgba(255,255,255,0.7)",border:"1px solid "+DS.border,cursor:"pointer",fontSize:12,fontWeight:700,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+                                    {Ico.edit(11,DS.mid)} Modifier
+                                  </button>
+                                  {client.email&&<button onClick={e=>{e.stopPropagation();envoyerEmailLivraison(ev._l,client);}} style={{flex:1,padding:"7px 10px",borderRadius:8,background:DS.greenSoft,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,color:DS.green,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+                                    {Ico.send(11,DS.green)} Email
+                                  </button>}
+                                </>}
+                                {ev._r&&<>
+                                  <button onClick={e=>{e.stopPropagation();onEditRdv&&onEditRdv(ev._r);}} style={{flex:1,padding:"7px 10px",borderRadius:8,background:"rgba(255,255,255,0.7)",border:"1px solid "+DS.border,cursor:"pointer",fontSize:12,fontWeight:700,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+                                    {Ico.edit(11,DS.mid)} Modifier
+                                  </button>
+                                  <button onClick={e=>{e.stopPropagation();exportRdvToICS(ev._r,client);}} style={{flex:1,padding:"7px 10px",borderRadius:8,background:DS.purpleSoft,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,color:DS.purple,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+                                    {Ico.download(11,DS.purple)} Calendrier
+                                  </button>
+                                </>}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:13,fontWeight:700,color:"#0f172a",marginBottom:2}}>{ev.title}</div>
-                          {ev.sub&&<div style={{fontSize:11,color:"#64748b"}}>{ev.sub}</div>}
-                        </div>
-                        <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
-                          <span style={{fontSize:10,fontWeight:700,color:ev.badgeColor,background:ev.badgeColor+"18",padding:"2px 7px",borderRadius:10,whiteSpace:"nowrap"}}>{ev.badge}</span>
-                          {clickable&&<svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>}
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               );
-            });
-          })()}
-        </div>
-      )}
+            })}
+          </div>
+        );
+      })()}
 
       {/* -- PASSAGES / RAPPORTS -- */}
       {tab==="passages" && (
