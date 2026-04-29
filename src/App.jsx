@@ -2020,6 +2020,7 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
   const [editLiv, setEditLiv] = useState(null);
   const [selectedMois, setSelectedMois] = useState(null);
   const [showCarnetPreview, setShowCarnetPreview] = useState(false);
+  const [expandedEv, setExpandedEv] = useState(null);
   const isMobile = useIsMobile();
   const al = alerteClient(client, passages);
   const col = AC[al];
@@ -2138,7 +2139,6 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
 
       {/* -- HISTORIQUE -- */}
       {tab==="historique" && (()=>{
-        const [expandedEv, setExpandedEv] = useState(null);
         const passClient2 = passages.filter(p=>p.clientId===client.id);
         const livClient   = (livraisons||[]).filter(l=>l.clientId===client.id);
         const rdvClient2  = (rdvs||[]).filter(r=>r.clientId===client.id);
