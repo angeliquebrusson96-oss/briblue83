@@ -1674,12 +1674,11 @@ async function envoyerEmailLivraison(livraison, client) {
   const corps = `Bonjour ${client?.nom||""},\n\nVotre bon de livraison du ${dateStr} est disponible.\n\nJe reste a votre disposition pour toute question.\n\nCordialement,\nDorian Briaire\nTechnicien de Piscine - BRI BLUE`;
 
   try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${RESEND_API_KEY}`,
-      },
+  const res = await fetch("/api/send-email", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ from: "rapport-piscine@briblue83.com", to: [...], ... }),
+});
       body: JSON.stringify({
         from: `BRIBLUE <${FROM}>`,
         to: [client.email],
@@ -3322,41 +3321,36 @@ async function envoyerEmail(passage, client, onSent) {
 </table>
 </body></html>`;
 
-  const RESEND_API_KEY = "re_FLTMeUdh_vL8QGqJhP2C293WEVCm9c7rh";
-
   try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${RESEND_API_KEY}`,
-      },
-      body: JSON.stringify({
-        from: `BRIBLUE <${FROM}>`,
-        to: [client.email],
-        subject: `Rapport entretien piscine — ${dateStr}`,
-        html: htmlEmail,
-        text: `Bonjour ${client?.nom||""},\n\nVotre rapport d'entretien piscine du ${dateStr} est disponible.\n\nJe reste a votre disposition pour toute question.\n\nCordialement,\nDorian Briaire\nTechnicien de Piscine - BRI BLUE`,
-        attachments: [{
-          filename: `Rapport_BRIBLUE_${(client?.nom||"client").replace(/\s/g,"_")}_${passage.date}.html`,
-          content: btoa(unescape(encodeURIComponent(genererHTMLRapport(passage, client)))),
-        }],
-      }),
-    });
+  const res = await fetch("/api/send-email", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: `BRIBLUE <rapport-piscine@briblue83.com>`,
+      to: [client.email],
+      subject: `Rapport entretien piscine — ${dateStr}`,
+      html: htmlEmail,
+      text: `Bonjour ${client?.nom||""},\n\nVotre rapport d'entretien piscine du ${dateStr} est disponible.\n\nJe reste a votre disposition pour toute question.\n\nCordialement,\nDorian Briaire\nTechnicien de Piscine - BRI BLUE`,
+      attachments: [{
+        filename: `Rapport_BRIBLUE_${(client?.nom||"client").replace(/\s/g,"_")}_${passage.date}.html`,
+        content: btoa(unescape(encodeURIComponent(genererHTMLRapport(passage, client)))),
+      }],
+    }),
+  });
 
-    const data = await res.json();
-
-    if (res.ok) {
-      if (onSent) onSent({ ...passage, rapportStatut: "envoye", rapportEnvoyeAt: new Date().toISOString() });
-      toastSuccess(`Fiche envoyée à ${client.email} !`);
-    } else {
-      console.error("Resend error:", data);
-      toastError(`Erreur envoi : ${data?.message || JSON.stringify(data)}`);
-    }
-  } catch(err) {
-    console.error("Fetch error:", err);
-    toastError(`Erreur réseau : ${err.message}`);
+  const data = await res.json();
+  if (res.ok) {
+    if (onSent) onSent({ ...passage, rapportStatut: "envoye", rapportEnvoyeAt: new Date().toISOString() });
+    toastSuccess(`Fiche envoyée à ${client.email} !`);
+  } else {
+    console.error("Resend error:", data);
+    toastError(`Erreur envoi : ${data?.message || JSON.stringify(data)}`);
   }
+} catch(err) {
+  console.error("Fetch error:", err);
+  toastError(`Erreur réseau : ${err.message}`);
 }
 
 // COMPOSANT MROW - défini en dehors pour éviter re-render à chaque frappe
