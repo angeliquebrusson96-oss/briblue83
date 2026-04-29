@@ -318,12 +318,27 @@ function DraftBanner({ onRestore, onDiscard }) {
 //        - visibilitychange (iOS Safari, Android Chrome, quand on switch d'app)
 //        - pagehide         (iOS Safari, fermeture onglet)
 //        - beforeunload     (desktop, rechargement)
-//        - blur de textarea (sécurité supplémentaire)
-//   4) Au chargement : on LIT d'abord Firebase, fallback localStorage si échec
-//   5) Retry auto au retour online
+//   4) Sur iOS Safari : flush via fetch {keepalive:true} → seul mécanisme
+//      garanti quand le process est tué par le bfcache (SDK JS ne survit pas).
+//   5) Au chargement : on LIT d'abord Firebase, fallback localStorage si échec
+//   6) Retry auto au retour online
 //
 // ⚠️ Ne JAMAIS utiliser uniquement beforeunload : Safari iOS ne le déclenche
 //    quasiment jamais (bfcache). C'est LA cause des "rapports qui s'effacent".
+//
+// ⭐ SOLUTION iOS : fetch keepalive via REST Firebase (survit au bfcache kill).
+//    Le SDK JS (@firebase/firestore) utilise WebSocket/long-polling → tué immédiatement.
+//    fetch({keepalive:true}) est la SEULE requête HTTP que le navigateur garantit
+//    d'envoyer même après que le process JS est mort.
+
+// Détection iOS Safari (pas Android, pas desktop Safari)
+const IS_IOS = typeof navigator !== 'undefined' &&
+  /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+// URL REST Firestore pour le document unique de l'app
+const FIRESTORE_REST_URL =
+  `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}` +
+  `/databases/(default)/documents/briblue/app_data`;
 
 async function load(key, fallback) {
   try {
@@ -349,30 +364,74 @@ async function load(key, fallback) {
 // Queue des écritures en attente (clé → dernière valeur)
 const offlineQueue = { pending: {} };
 const _debounceTimers = {};
-const FIREBASE_DEBOUNCE_MS = 800; // ← réduit de 3000 à 800ms (écart sûr + réactif)
+const FIREBASE_DEBOUNCE_MS = 800;
 
+// --- Écriture via SDK JS (normal, desktop + Android) ---
 async function saveToFirebase(key, val) {
   await setDoc(APP_DOC, { [key]: val }, { merge: true });
 }
 
-// Flush SYNCHRONE de tout ce qui est en attente. Les promesses sont lancées
-// mais on ne les await pas : pagehide/visibilitychange ne les attendent pas.
-// C'est acceptable car localStorage est DÉJÀ à jour — on n'aura jamais de perte.
-// À la prochaine ouverture, si Firebase n'a pas tout reçu, le code compare
-// Firebase vs localStorage et re-pousse les divergences.
+// --- Conversion valeur JS → format Firestore Value (pour REST keepalive) ---
+function toFirestoreValue(v) {
+  if (v === null || v === undefined) return { nullValue: null };
+  if (typeof v === 'boolean') return { booleanValue: v };
+  if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+  if (typeof v === 'string') return { stringValue: v };
+  if (Array.isArray(v)) return { arrayValue: { values: v.map(toFirestoreValue) } };
+  if (typeof v === 'object') {
+    const fields = {};
+    for (const [k, fv] of Object.entries(v)) fields[k] = toFirestoreValue(fv);
+    return { mapValue: { fields } };
+  }
+  return { stringValue: String(v) };
+}
+
+// --- Flush iOS via fetch keepalive (survit au bfcache kill) ---
+// On envoie UN SEUL patch PATCH REST pour toutes les clés en attente.
+// fetch({keepalive:true}) est garanti d'être envoyé même après kill du process JS.
+function flushViaKeepalive(pending) {
+  const keys = Object.keys(pending);
+  if (!keys.length) return;
+  const fields = {};
+  const updateMask = [];
+  keys.forEach(key => {
+    fields[key] = toFirestoreValue(pending[key]);
+    updateMask.push(`updateMask.fieldPaths=${encodeURIComponent(key)}`);
+  });
+  const url = `${FIRESTORE_REST_URL}?${updateMask.join('&')}`;
+  try {
+    fetch(url, {
+      method: 'PATCH',
+      keepalive: true, // ← LE point critique : survit au bfcache sur iOS
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields })
+    }).catch(() => {}); // fire-and-forget, localStorage est déjà à jour
+  } catch {}
+}
+
+// Flush SYNCHRONE de tout ce qui est en attente.
+// Sur iOS : keepalive fetch (garanti par le navigateur même si le process est tué).
+// Sur autres : SDK JS classique (promesses non-await, acceptable car localStorage à jour).
 function flushPendingNow() {
   const keys = Object.keys(offlineQueue.pending);
   if (!keys.length) return;
-  // Annule les timers : on envoie maintenant
+  // Annule les timers en cours
   Object.keys(_debounceTimers).forEach(k => { clearTimeout(_debounceTimers[k]); delete _debounceTimers[k]; });
-  keys.forEach(key => {
-    const val = offlineQueue.pending[key];
-    // Le .catch() évite une UnhandledPromiseRejection ; en cas d'échec
-    // la donnée reste en localStorage et sera re-sync au prochain chargement.
-    saveToFirebase(key, val).then(() => {
-      if (offlineQueue.pending[key] === val) delete offlineQueue.pending[key];
-    }).catch(() => {});
-  });
+
+  if (IS_IOS) {
+    // iOS Safari : fetch keepalive — seul mécanisme garanti après bfcache kill
+    flushViaKeepalive({ ...offlineQueue.pending });
+    // On vide la queue optimistiquement (localStorage est la source de vérité)
+    keys.forEach(k => { delete offlineQueue.pending[k]; });
+  } else {
+    // Android / Desktop : SDK JS (WebSocket reste actif)
+    keys.forEach(key => {
+      const val = offlineQueue.pending[key];
+      saveToFirebase(key, val).then(() => {
+        if (offlineQueue.pending[key] === val) delete offlineQueue.pending[key];
+      }).catch(() => {});
+    });
+  }
 }
 
 async function flushOfflineQueue() {
@@ -444,24 +503,36 @@ async function save(key, val) {
   // 1. localStorage IMMÉDIAT — source de vérité locale, jamais de perte
   try { localStorage.setItem('briblue_' + key, JSON.stringify(val)); } catch {}
 
-  // 2. Mémoriser la dernière valeur pour Firebase
+  // 2. Mémoriser la dernière valeur pour le flush de secours
   offlineQueue.pending[key] = val;
 
   if (!navigator.onLine) return; // sera flushé au retour online
 
-  // 3. Firebase debounced (800ms)
-  if (_debounceTimers[key]) clearTimeout(_debounceTimers[key]);
-  _debounceTimers[key] = setTimeout(async () => {
-    delete _debounceTimers[key];
-    const latest = offlineQueue.pending[key];
-    if (latest === undefined) return;
+  if (IS_IOS) {
+    // ⭐ iOS Safari : écriture Firebase IMMÉDIATE (sans debounce)
+    // Le SDK JS peut être tué avant que le debounce ne s'exécute.
+    if (_debounceTimers[key]) { clearTimeout(_debounceTimers[key]); delete _debounceTimers[key]; }
     try {
-      await saveToFirebase(key, latest);
-      if (offlineQueue.pending[key] === latest) delete offlineQueue.pending[key];
+      await saveToFirebase(key, val);
+      if (offlineQueue.pending[key] === val) delete offlineQueue.pending[key];
     } catch {
-      // Reste en queue → sera re-tenté au prochain online / save
+      // localStorage déjà à jour, reconcileOnBoot corrigera au prochain chargement
     }
-  }, FIREBASE_DEBOUNCE_MS);
+  } else {
+    // Desktop / Android : debounced 800ms (regroupe les frappes clavier)
+    if (_debounceTimers[key]) clearTimeout(_debounceTimers[key]);
+    _debounceTimers[key] = setTimeout(async () => {
+      delete _debounceTimers[key];
+      const latest = offlineQueue.pending[key];
+      if (latest === undefined) return;
+      try {
+        await saveToFirebase(key, latest);
+        if (offlineQueue.pending[key] === latest) delete offlineQueue.pending[key];
+      } catch {
+        // Reste en queue → sera re-tenté au prochain online / save
+      }
+    }, FIREBASE_DEBOUNCE_MS);
+  }
 }
 
 // Expose globalement pour debug en prod (console.log briblue._debug())
@@ -470,7 +541,9 @@ if (typeof window !== 'undefined') {
   window.briblue._debug = () => ({
     pending: { ...offlineQueue.pending },
     timers: Object.keys(_debounceTimers),
-    online: navigator.onLine
+    online: navigator.onLine,
+    isIOS: IS_IOS,
+    mode: IS_IOS ? "immediate (iOS)" : "debounced 800ms"
   });
   window.briblue._forceFlush = flushPendingNow;
 }
