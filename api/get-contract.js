@@ -2,7 +2,14 @@ import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
 if (!getApps().length) {
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  const sa = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (!sa) throw new Error("FIREBASE_SERVICE_ACCOUNT manquant");
+  let serviceAccount;
+  try {
+    serviceAccount = JSON.parse(sa);
+  } catch(e) {
+    serviceAccount = JSON.parse(Buffer.from(sa, 'base64').toString('utf8'));
+  }
   initializeApp({ credential: cert(serviceAccount) });
 }
 
