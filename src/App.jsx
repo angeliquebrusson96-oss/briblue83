@@ -1247,6 +1247,208 @@ function BtnPrimary({ children, onClick, bg=DS.blueGrad, color="#fff", icon, sty
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// SunBurstActions — Menu radial réutilisable (style "soleil")
+// Usage : <SunBurstActions actions={[{ic, bg, label, onClick}, ...]} centerLabel="..." onClose={...}/>
+// ═══════════════════════════════════════════════════════════════════════════
+function SunBurstActions({ actions, centerLabel = "FERMER", onClose, size = "auto" }) {
+  const N = actions.length;
+  if (N === 0) return null;
+  const BTN_SIZE = 70;
+  const RADIUS = N <= 4 ? 90 : N <= 6 ? 105 : N <= 8 ? 120 : 130;
+  const PAD = BTN_SIZE / 2 + 16;
+  const SIZE = (RADIUS * 2) + (BTN_SIZE) + 32;
+
+  return (
+    <div className="fade-in" style={{
+      margin:"24px auto 12px",
+      width:SIZE,
+      height:SIZE,
+      position:"relative",
+      maxWidth:"100%",
+    }}>
+      {/* Halo de fond */}
+      <div style={{
+        position:"absolute", inset:PAD,
+        borderRadius:"50%",
+        background:"radial-gradient(circle, rgba(8,145,178,0.10) 0%, rgba(8,145,178,0) 70%)",
+        pointerEvents:"none",
+      }}/>
+      {/* Cercle pointillé */}
+      <div style={{
+        position:"absolute", top:"50%", left:"50%",
+        width:RADIUS*2, height:RADIUS*2,
+        marginLeft:-RADIUS, marginTop:-RADIUS,
+        borderRadius:"50%",
+        border:"1.5px dashed rgba(8,145,178,0.22)",
+        pointerEvents:"none",
+      }}/>
+
+      {/* Centre — bouton FERMER */}
+      <button onClick={onClose} style={{
+        position:"absolute", top:"50%", left:"50%",
+        width:60, height:60,
+        marginLeft:-30, marginTop:-30,
+        borderRadius:"50%",
+        background:"linear-gradient(135deg,#0c1f3f,#0369a1)",
+        border:"3px solid rgba(255,255,255,0.9)",
+        cursor:"pointer",
+        display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:1,
+        boxShadow:"0 8px 24px rgba(12,31,63,0.45), inset 0 2px 6px rgba(255,255,255,0.2)",
+        zIndex:5,
+        fontFamily:"inherit",
+        WebkitTapHighlightColor:"transparent",
+      }}>
+        <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#7dd3fc" strokeWidth="3" strokeLinecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+        <span style={{fontSize:7, fontWeight:900, color:"#7dd3fc", letterSpacing:0.5}}>{centerLabel}</span>
+      </button>
+
+      {/* Boutons en cercle */}
+      {actions.map((act, i) => {
+        const angle = (i / N) * 2 * Math.PI - Math.PI / 2;
+        const x = Math.cos(angle) * RADIUS;
+        const y = Math.sin(angle) * RADIUS;
+        return (
+          <button key={i} onClick={(e)=>{ e.stopPropagation(); act.onClick(); }} style={{
+            position:"absolute",
+            top:`calc(50% + ${y}px)`,
+            left:`calc(50% + ${x}px)`,
+            width:BTN_SIZE, height:BTN_SIZE,
+            marginLeft:-(BTN_SIZE/2), marginTop:-(BTN_SIZE/2),
+            borderRadius:"50%",
+            background:act.bg,
+            border:"3px solid rgba(255,255,255,0.95)",
+            cursor:"pointer",
+            display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:1,
+            boxShadow:"0 8px 22px rgba(0,0,0,0.22), inset 0 1px 3px rgba(255,255,255,0.25)",
+            animation:`burstX-${i}-${N} .4s cubic-bezier(.34,1.56,.64,1) both`,
+            WebkitTapHighlightColor:"transparent",
+            fontFamily:"inherit",
+          }}>
+            {act.ic}
+            <span style={{fontSize:9, fontWeight:800, color:"#fff", lineHeight:1.1, marginTop:2, textShadow:"0 1px 2px rgba(0,0,0,0.3)"}}>{act.label}</span>
+          </button>
+        );
+      })}
+
+      <style>{actions.map((_,i)=>{
+        const angle = (i / N) * 2 * Math.PI - Math.PI / 2;
+        const dx = -Math.cos(angle) * RADIUS * 0.5;
+        const dy = -Math.sin(angle) * RADIUS * 0.5;
+        return `@keyframes burstX-${i}-${N} { 0% { opacity:0; transform: scale(0.3) translate(${dx}px, ${dy}px); } 100% { opacity:1; transform: scale(1) translate(0,0); } }`;
+      }).join(" ")}</style>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SunBurstFormNav — Barre de navigation pour formulaires (avec thème soleil)
+// Affiche : Suivant (gros) / Enregistrer (vert) / Brouillon + Retour (50/50)
+// ═══════════════════════════════════════════════════════════════════════════
+function SunBurstFormNav({
+  step, totalSteps, onNext, onPrev, onSave, onCancel,
+  onSaveDraft, draftSaved,
+  nextLabel, nextColor = "#0891b2",
+  saveLabel = "Enregistrer",
+  showStepIndicator = true,
+  showDraft = true,
+}) {
+  return (
+    <div style={{
+      marginTop:32,
+      paddingTop:20,
+      borderTop:"1px solid rgba(8,145,178,0.15)",
+    }}>
+      {showStepIndicator && totalSteps > 1 && (
+        <div style={{
+          textAlign:"center", fontSize:10, fontWeight:700, color:"#475569",
+          letterSpacing:1.2, textTransform:"uppercase", marginBottom:14,
+        }}>
+          Étape {step} sur {totalSteps}
+        </div>
+      )}
+
+      {/* Bouton SUIVANT (sauf dernière étape) */}
+      {step < totalSteps && onNext && (
+        <button onClick={onNext} style={{
+          width:"100%", minHeight:56, padding:"16px 20px", borderRadius:14,
+          background:`linear-gradient(135deg, ${nextColor}, ${nextColor}cc)`,
+          border:"none", cursor:"pointer",
+          fontWeight:800, fontSize:15, color:"#fff", fontFamily:"inherit",
+          display:"flex", alignItems:"center", justifyContent:"center", gap:10,
+          boxShadow:`0 8px 24px ${nextColor}55`,
+          WebkitTapHighlightColor:"transparent",
+          letterSpacing:0.3, marginBottom:12,
+        }}>
+          <span>Suivant{nextLabel ? ` : ${nextLabel}` : ""}</span>
+          <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"/>
+            <polyline points="12 5 19 12 12 19"/>
+          </svg>
+        </button>
+      )}
+
+      {/* Bouton ENREGISTRER toujours visible */}
+      <button onClick={onSave} style={{
+        width:"100%", minHeight:56, padding:"16px 20px", borderRadius:14,
+        background:"linear-gradient(135deg,#059669,#10b981)",
+        border:"none", cursor:"pointer",
+        fontWeight:800, fontSize:15, color:"#fff", fontFamily:"inherit",
+        display:"flex", alignItems:"center", justifyContent:"center", gap:10,
+        boxShadow:"0 8px 24px rgba(5,150,105,0.45)",
+        WebkitTapHighlightColor:"transparent",
+        letterSpacing:0.3, marginBottom:12,
+      }}>
+        <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+          <polyline points="17 21 17 13 7 13 7 21"/>
+          <polyline points="7 3 7 8 15 8"/>
+        </svg>
+        {saveLabel}
+      </button>
+
+      {/* Brouillon + Retour 50/50 */}
+      <div style={{display:"flex", gap:10}}>
+        {showDraft && onSaveDraft && (
+          <button onClick={onSaveDraft} style={{
+            flex:1, minHeight:48, padding:"12px 14px", borderRadius:12,
+            background:draftSaved ? "linear-gradient(135deg,#059669,#0d9488)" : "rgba(245,158,11,0.12)",
+            border:`1.5px solid ${draftSaved?"#059669":"rgba(245,158,11,0.4)"}`,
+            cursor:"pointer", fontWeight:700, fontSize:13,
+            color:draftSaved?"#fff":"#92400e", fontFamily:"inherit",
+            display:"flex", alignItems:"center", justifyContent:"center", gap:7,
+            transition:"all .3s",
+            WebkitTapHighlightColor:"transparent",
+          }}>
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+              <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+              <polyline points="17 21 17 13 7 13 7 21"/>
+              <polyline points="7 3 7 8 15 8"/>
+            </svg>
+            {draftSaved ? "✓ Sauvegardé" : "Brouillon"}
+          </button>
+        )}
+        <button onClick={step===1 || !onPrev ? onCancel : onPrev} style={{
+          flex:1, minHeight:48, padding:"12px 14px", borderRadius:12,
+          background:"rgba(255,255,255,0.7)",
+          border:"1.5px solid rgba(8,145,178,0.18)",
+          cursor:"pointer", fontWeight:700, fontSize:13, color:"#475569",
+          fontFamily:"inherit",
+          display:"flex", alignItems:"center", justifyContent:"center", gap:7,
+          WebkitTapHighlightColor:"transparent",
+        }}>
+          {(step===1 || !onPrev)
+            ? <><svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Annuler</>
+            : <><svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>Retour</>
+          }
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function RapportStatusPicker({ value, onChange, compact=false }) {
   const current = normalizeRapportStatus(value);
   const meta = RAPPORT_STATUS[current];
@@ -1439,10 +1641,14 @@ function FormClient({ initial, clients, onSave, onClose }) {
           </button>
         </div>
       </Section>
-      <div style={{display:"flex",gap:10}}>
-        <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
-        <BtnPrimary onClick={()=>{ if(!f.nom.trim()){ toastWarn("Nom du client requis"); return; } const prixCalc=totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0); clearDraft(); onSave({...f, prix:prixCalc}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
-      </div>
+      <SunBurstFormNav
+        step={1} totalSteps={1}
+        onSave={()=>{ if(!f.nom.trim()){ toastWarn("Nom du client requis"); return; } const prixCalc=totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0); clearDraft(); onSave({...f, prix:prixCalc}); }}
+        onCancel={onClose}
+        saveLabel="Enregistrer le client"
+        showDraft={false}
+        showStepIndicator={false}
+      />
     </Modal>
   );
 }
@@ -1757,23 +1963,17 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
       )}
 
       {/* Navigation */}
-      <div style={{display:"flex",gap:8,marginTop:16,paddingTop:12,borderTop:"1px solid "+DS.border}}>
-        <button onClick={step===1?onClose:()=>setStep(s=>s-1)}
-          style={{padding:"11px 16px",borderRadius:DS.radiusSm,background:DS.light,border:"1px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:13,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",gap:6}}>
-          {step===1?<>{Ico.close(12,DS.mid)} Annuler</>:<>{Ico.back(12,DS.mid)} Retour</>}
-        </button>
-        <div style={{flex:1}}/>
-        {step<STEPS
-          ? <button onClick={()=>setStep(s=>s+1)}
-              style={{padding:"11px 20px",borderRadius:DS.radiusSm,background:(STEP_INFO[step]||STEP_INFO[STEPS-1]).color,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,boxShadow:`0 3px 10px ${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}33`}}>
-              {(STEP_INFO[step]||STEP_INFO[STEPS-1]).l} {Ico.next(13,"#fff")}
-            </button>
-          : <button onClick={()=>{if(!f.clientId){ toastWarn("Client requis"); return; } if(!f.date){ toastWarn("Date requise"); return; } clearDraft(); onSave({...f,id:isEdit?f.id:uid()});}}
-              style={{padding:"11px 20px",borderRadius:DS.radiusSm,background:"linear-gradient(135deg,#059669,#0d9488)",border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,boxShadow:"0 3px 10px rgba(5,150,105,0.3)"}}>
-              {Ico.save(14,"#fff")} Enregistrer
-            </button>
-        }
-      </div>
+      <SunBurstFormNav
+        step={step} totalSteps={STEPS}
+        onNext={()=>setStep(s=>s+1)}
+        onPrev={()=>setStep(s=>s-1)}
+        onSave={()=>{if(!f.clientId){ toastWarn("Client requis"); return; } if(!f.date){ toastWarn("Date requise"); return; } clearDraft(); onSave({...f,id:isEdit?f.id:uid()});}}
+        onCancel={onClose}
+        nextLabel={(STEP_INFO[step]||STEP_INFO[STEPS-1]).l}
+        nextColor={(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}
+        saveLabel="Enregistrer la livraison"
+        showDraft={false}
+      />
     </Modal>
   );
 }
@@ -1841,10 +2041,15 @@ function FormRdv({ initial, clients, onSave, onClose }) {
         <textarea value={f.description} onChange={e=>set("description",e.target.value)} placeholder="Détails, adresse, notes..."
           style={{width:"100%",padding:"10px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:15,minHeight:64,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,outline:"none"}}/>
       </Section>
-      <div style={{display:"flex",gap:10}}>
-        <button onClick={onClose} className="btn-hover" style={{flex:1,padding:"12px",borderRadius:DS.radiusSm,background:DS.light,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>{Ico.close(13,DS.mid)} Annuler</button>
-        <BtnPrimary onClick={()=>{ if(!f.date){ toastWarn("Date requise"); return; } clearDraft(); onSave({...f,id:isEdit?f.id:uid()}); }} icon={Ico.save(15,"#fff")} style={{flex:2}}>Enregistrer</BtnPrimary>
-      </div>
+      <SunBurstFormNav
+        step={1} totalSteps={1}
+        onSave={()=>{ if(!f.date){ toastWarn("Date requise"); return; } clearDraft(); onSave({...f,id:isEdit?f.id:uid()}); }}
+        onCancel={onClose}
+        saveLabel="Enregistrer le RDV"
+        nextColor="#7c3aed"
+        showDraft={false}
+        showStepIndicator={false}
+      />
     </Modal>
   );
 }
@@ -4249,145 +4454,18 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
         </div>
       )}
 
-      {/* ═══ NAVIGATION FORMULAIRE — design propre et aéré ═══ */}
-      <div style={{
-        marginTop:32,
-        paddingTop:20,
-        borderTop:"1px solid rgba(8,145,178,0.15)",
-      }}>
-        {/* Indicateur étape — discret en haut */}
-        <div style={{
-          textAlign:"center",
-          fontSize:10,
-          fontWeight:700,
-          color:DS.mid,
-          letterSpacing:1.2,
-          textTransform:"uppercase",
-          marginBottom:14,
-        }}>
-          Étape {step} sur {STEPS}
-        </div>
-
-        {/* Bouton SUIVANT principal (large, plein largeur) */}
-        {step<STEPS && (
-          <button onClick={()=>setStep(s=>s+1)} style={{
-            width:"100%",
-            minHeight:56,
-            padding:"16px 20px",
-            borderRadius:14,
-            background:`linear-gradient(135deg, ${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}, ${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}cc)`,
-            border:"none",
-            cursor:"pointer",
-            fontWeight:800,
-            fontSize:15,
-            color:"#fff",
-            fontFamily:"inherit",
-            display:"flex",
-            alignItems:"center",
-            justifyContent:"center",
-            gap:10,
-            boxShadow:`0 8px 24px ${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}55`,
-            WebkitTapHighlightColor:"transparent",
-            letterSpacing:0.3,
-            marginBottom:12,
-          }}>
-            <span>Suivant : {(STEP_INFO[step]||STEP_INFO[STEPS-1]).l}</span>
-            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="5" y1="12" x2="19" y2="12"/>
-              <polyline points="12 5 19 12 12 19"/>
-            </svg>
-          </button>
-        )}
-
-        {/* Bouton ENREGISTRER (vert, large) — visible sur TOUTES les étapes */}
-        <button onClick={handleSave} style={{
-          width:"100%",
-          minHeight:56,
-          padding:"16px 20px",
-          borderRadius:14,
-          background:"linear-gradient(135deg,#059669,#10b981)",
-          border:"none",
-          cursor:"pointer",
-          fontWeight:800,
-          fontSize:15,
-          color:"#fff",
-          fontFamily:"inherit",
-          display:"flex",
-          alignItems:"center",
-          justifyContent:"center",
-          gap:10,
-          boxShadow:"0 8px 24px rgba(5,150,105,0.45)",
-          WebkitTapHighlightColor:"transparent",
-          letterSpacing:0.3,
-          marginBottom:12,
-        }}>
-          <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
-            <polyline points="17 21 17 13 7 13 7 21"/>
-            <polyline points="7 3 7 8 15 8"/>
-          </svg>
-          Enregistrer le rapport
-        </button>
-
-        {/* Boutons secondaires : Brouillon + Retour/Annuler */}
-        <div style={{
-          display:"flex",
-          gap:10,
-        }}>
-          <button onClick={saveDraftManual} style={{
-            flex:1,
-            minHeight:48,
-            padding:"12px 14px",
-            borderRadius:12,
-            background:draftSaved
-              ? "linear-gradient(135deg,#059669,#0d9488)"
-              : "rgba(245,158,11,0.12)",
-            border:`1.5px solid ${draftSaved?"#059669":"rgba(245,158,11,0.4)"}`,
-            cursor:"pointer",
-            fontWeight:700,
-            fontSize:13,
-            color:draftSaved?"#fff":"#92400e",
-            fontFamily:"inherit",
-            display:"flex",
-            alignItems:"center",
-            justifyContent:"center",
-            gap:7,
-            transition:"all .3s",
-            WebkitTapHighlightColor:"transparent",
-          }}>
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-              <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
-              <polyline points="17 21 17 13 7 13 7 21"/>
-              <polyline points="7 3 7 8 15 8"/>
-            </svg>
-            {draftSaved ? "✓ Sauvegardé" : "Brouillon"}
-          </button>
-
-          <button onClick={step===1?onClose:()=>setStep(s=>s-1)} style={{
-            flex:1,
-            minHeight:48,
-            padding:"12px 14px",
-            borderRadius:12,
-            background:"rgba(255,255,255,0.7)",
-            border:"1.5px solid rgba(8,145,178,0.18)",
-            cursor:"pointer",
-            fontWeight:700,
-            fontSize:13,
-            color:DS.mid,
-            fontFamily:"inherit",
-            display:"flex",
-            alignItems:"center",
-            justifyContent:"center",
-            gap:7,
-            WebkitTapHighlightColor:"transparent",
-          }}>
-            {step===1
-              ? <><svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Annuler</>
-              : <><svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>Retour</>
-            }
-          </button>
-        </div>
-      </div>
+      <SunBurstFormNav
+        step={step} totalSteps={STEPS}
+        onNext={()=>setStep(s=>s+1)}
+        onPrev={()=>setStep(s=>s-1)}
+        onSave={handleSave}
+        onCancel={onClose}
+        onSaveDraft={saveDraftManual}
+        draftSaved={draftSaved}
+        nextLabel={(STEP_INFO[step]||STEP_INFO[STEPS-1]).l}
+        nextColor={(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}
+        saveLabel="Enregistrer le rapport"
+      />
 
             {/* Modale confirmation enregistrement */}
       {showConfirmSave && (()=>{
@@ -5105,17 +5183,78 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
     setOpenPicker(null);
   };
 
+  // Calcul des statistiques
+  const statsClients = useMemo(()=>{
+    const sousContrat = clients.filter(c=>{
+      const j = daysUntil(c.dateFin);
+      return j !== null && j >= 0;
+    }).length;
+    const expires = clients.filter(c=>{
+      const j = daysUntil(c.dateFin);
+      return j !== null && j < 30;
+    }).length;
+    return { total: clients.length, sousContrat, alertes: alertCount, expires };
+  }, [clients, alertCount]);
+
   return (
     <div>
-      <div style={{display:"flex",gap:8,marginBottom:14}}>
-        <div style={{flex:1,background:"linear-gradient(135deg,#0891b2,#06b6d4)",borderRadius:16,padding:"14px 16px",display:"flex",alignItems:"center",gap:10,boxShadow:"4px 4px 12px rgba(8,145,178,0.35), -2px -2px 6px rgba(255,255,255,0.5)"}}>
-          <div style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.clients(16,"#fff")}</div>
-          <div><div style={{fontSize:18,fontWeight:800,color:"#fff"}}>{totalAll}</div><div style={{fontSize:10,color:"rgba(255,255,255,0.6)"}}>Clients</div></div>
+      {/* ═══ STATS HEADER — design soleil moderne ═══ */}
+      <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(2,1fr)":"repeat(4,1fr)",gap:10,marginBottom:16}}>
+        {/* Total clients */}
+        <div style={{background:"linear-gradient(135deg,#0c1f3f 0%,#0369a1 100%)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:"0 8px 24px rgba(12,31,63,0.25)"}}>
+          <div style={{position:"absolute",top:-15,right:-15,width:80,height:80,borderRadius:"50%",background:"rgba(56,189,248,0.15)",pointerEvents:"none"}}/>
+          <div style={{display:"flex",alignItems:"center",gap:10,position:"relative"}}>
+            <div style={{width:42,height:42,borderRadius:12,background:"rgba(56,189,248,0.25)",border:"1.5px solid rgba(56,189,248,0.4)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              {Ico.clients(18,"#7dd3fc")}
+            </div>
+            <div>
+              <div style={{fontSize:22,fontWeight:900,color:"#fff",lineHeight:1}}>{statsClients.total}</div>
+              <div style={{fontSize:10,color:"rgba(255,255,255,0.6)",fontWeight:700,textTransform:"uppercase",letterSpacing:0.5,marginTop:2}}>Clients</div>
+            </div>
+          </div>
         </div>
-        {alertCount>0&&<div style={{background:"rgba(255,255,255,0.45)",borderRadius:DS.radiusSm,padding:"10px 14px",display:"flex",alignItems:"center",gap:8,border:"1px solid #fecaca"}}>
-          <div style={{width:36,height:36,borderRadius:10,background:"#fee2e2",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.alert(15,DS.red)}</div>
-          <div><div style={{fontSize:18,fontWeight:800,color:DS.red}}>{alertCount}</div><div style={{fontSize:11,color:DS.red,fontWeight:600}}>Alertes</div></div>
-        </div>}
+
+        {/* Sous contrat */}
+        <div style={{background:"linear-gradient(135deg,#059669,#10b981)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:"0 8px 24px rgba(5,150,105,0.25)"}}>
+          <div style={{position:"absolute",top:-15,right:-15,width:80,height:80,borderRadius:"50%",background:"rgba(255,255,255,0.12)",pointerEvents:"none"}}/>
+          <div style={{display:"flex",alignItems:"center",gap:10,position:"relative"}}>
+            <div style={{width:42,height:42,borderRadius:12,background:"rgba(255,255,255,0.2)",border:"1.5px solid rgba(255,255,255,0.3)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              {Ico.contract(18,"#fff")}
+            </div>
+            <div>
+              <div style={{fontSize:22,fontWeight:900,color:"#fff",lineHeight:1}}>{statsClients.sousContrat}</div>
+              <div style={{fontSize:10,color:"rgba(255,255,255,0.85)",fontWeight:700,textTransform:"uppercase",letterSpacing:0.5,marginTop:2}}>Sous contrat</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Alertes */}
+        <div style={{background:statsClients.alertes>0?"linear-gradient(135deg,#dc2626,#ef4444)":"linear-gradient(135deg,#94a3b8,#64748b)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:`0 8px 24px ${statsClients.alertes>0?"rgba(220,38,38,0.25)":"rgba(100,116,139,0.18)"}`}}>
+          <div style={{position:"absolute",top:-15,right:-15,width:80,height:80,borderRadius:"50%",background:"rgba(255,255,255,0.12)",pointerEvents:"none"}}/>
+          <div style={{display:"flex",alignItems:"center",gap:10,position:"relative"}}>
+            <div style={{width:42,height:42,borderRadius:12,background:"rgba(255,255,255,0.2)",border:"1.5px solid rgba(255,255,255,0.3)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              {Ico.alert(18,"#fff")}
+            </div>
+            <div>
+              <div style={{fontSize:22,fontWeight:900,color:"#fff",lineHeight:1}}>{statsClients.alertes}</div>
+              <div style={{fontSize:10,color:"rgba(255,255,255,0.85)",fontWeight:700,textTransform:"uppercase",letterSpacing:0.5,marginTop:2}}>{statsClients.alertes>1?"Alertes":"Alerte"}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Expirent < 30j */}
+        <div style={{background:statsClients.expires>0?"linear-gradient(135deg,#d97706,#f59e0b)":"linear-gradient(135deg,#94a3b8,#64748b)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:`0 8px 24px ${statsClients.expires>0?"rgba(217,119,6,0.25)":"rgba(100,116,139,0.18)"}`}}>
+          <div style={{position:"absolute",top:-15,right:-15,width:80,height:80,borderRadius:"50%",background:"rgba(255,255,255,0.12)",pointerEvents:"none"}}/>
+          <div style={{display:"flex",alignItems:"center",gap:10,position:"relative"}}>
+            <div style={{width:42,height:42,borderRadius:12,background:"rgba(255,255,255,0.2)",border:"1.5px solid rgba(255,255,255,0.3)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              {Ico.clock(18,"#fff")}
+            </div>
+            <div>
+              <div style={{fontSize:22,fontWeight:900,color:"#fff",lineHeight:1}}>{statsClients.expires}</div>
+              <div style={{fontSize:10,color:"rgba(255,255,255,0.85)",fontWeight:700,textTransform:"uppercase",letterSpacing:0.5,marginTop:2}}>Bientôt fin</div>
+            </div>
+          </div>
+        </div>
       </div>
       <div style={{display:"flex",gap:10,marginBottom:14}}>
         <div style={{flex:1,position:"relative"}}>
