@@ -4,20 +4,6 @@ import { db, auth, storage, APP_DOC } from "./lib/firebase";
 import { save, load, reconcileOnBoot, flushPendingNow, IS_IOS } from "./lib/storage";
 import { getDoc, setDoc } from "firebase/firestore";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyCyRHh4hGaDYU1NumTrRJ-3KKuRxC8NU5k",
-  authDomain: "briblue-729de.firebaseapp.com",
-  projectId: "briblue-729de",
-  storageBucket: "briblue-729de.firebasestorage.app",
-  messagingSenderId: "683737993436",
-  appId: "1:683737993436:web:090e2615396d08c75fe419"
-};
-
-const firebaseApp = initializeApp(firebaseConfig);
-const db = getFirestore(firebaseApp);
-const APP_DOC = doc(db, "briblue", "app_data");
-
-
 const BRAND_LOGO = `data:image/svg+xml;utf8,${encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" width="420" height="96" viewBox="0 0 420 96">
   <defs>
