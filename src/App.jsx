@@ -169,14 +169,14 @@ function useIsMobile() {
     try { return window.innerWidth < 768; } catch { return false; }
   });
   useEffect(()=>{
-    const h = () => setM(window.innerWidth < 768);
-    window.addEventListener("resize", h, {passive:true});
-    window.addEventListener("orientationchange", h, {passive:true});
+    const handleResize = () => setM(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize, {passive:true});
+    window.addEventListener("orientationchange", handleResize, {passive:true});
     // iOS Safari: déclencher au chargement complet
-    window.addEventListener("load", h, {once:true,passive:true});
+    window.addEventListener("load", handleResize, {once:true,passive:true});
     return ()=>{
-      window.removeEventListener("resize", h);
-      window.removeEventListener("orientationchange", h);
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("orientationchange", handleResize);
     };
   },[]);
   return m;
