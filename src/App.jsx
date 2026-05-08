@@ -6099,6 +6099,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
 function CarnetView({ client, passages, onRefresh, refreshing }) {
   const [selectedPassage, setSelectedPassage] = useState(null);
   const [activeTab, setActiveTab] = useState("accueil");
+  const [showSOS, setShowSOS] = useState(false);
 
   const passClient = (passages||[])
     .filter(p => p.clientId === client.id)
@@ -6158,8 +6159,8 @@ function CarnetView({ client, passages, onRefresh, refreshing }) {
 
       <div style={{overflowY:"auto",paddingBottom:70}}>
 
-        {/* HERO BANNER */}
-        <div style={{background:"linear-gradient(135deg,#0891b2 0%,#0e7490 60%,#164e63 100%)",margin:12,borderRadius:16,padding:16,position:"relative",overflow:"hidden"}}>
+        {/* HERO BANNER — always visible */}
+        {(activeTab==="accueil"||activeTab==="historique") && <div style={{background:"linear-gradient(135deg,#0891b2 0%,#0e7490 60%,#164e63 100%)",margin:12,borderRadius:16,padding:16,position:"relative",overflow:"hidden"}}>
           <div style={{position:"absolute",right:-20,top:-20,width:120,height:120,background:"rgba(255,255,255,0.07)",borderRadius:"50%"}}/>
           <div style={{position:"absolute",right:10,bottom:-30,width:80,height:80,background:"rgba(255,255,255,0.05)",borderRadius:"50%"}}/>
           <div style={{position:"relative"}}>
@@ -6201,7 +6202,10 @@ function CarnetView({ client, passages, onRefresh, refreshing }) {
               </div>
             </div>
           </div>
-        </div>
+        </div>}
+
+        {/* SECTIONS ACCUEIL SEULEMENT */}
+        {activeTab==="accueil" && <>
 
         {/* DERNIÈRE INTERVENTION (= "Prochain rendez-vous" section de la maquette) */}
         {last && (
@@ -6265,7 +6269,7 @@ function CarnetView({ client, passages, onRefresh, refreshing }) {
                       </div>
                     )}
                   </div>
-                  <button style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:"#0891b2",background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:8,padding:"5px 9px",cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit"}} onClick={e=>{e.stopPropagation();}}>
+                  <button style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:"#0891b2",background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:8,padding:"5px 9px",cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit"}} onClick={e=>{e.stopPropagation(); ouvrirRapport(p, client);}}>
                     <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     Télécharger
                   </button>
@@ -6305,7 +6309,7 @@ function CarnetView({ client, passages, onRefresh, refreshing }) {
                     Technicien : {last.tech}
                   </div>}
                 </div>
-                <button style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:"#0891b2",background:"#fff",border:"1px solid #bae6fd",borderRadius:8,padding:"6px 10px",cursor:"pointer",flexShrink:0,fontFamily:"inherit"}} onClick={()=>{}}>
+                <button style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:"#0891b2",background:"#fff",border:"1px solid #bae6fd",borderRadius:8,padding:"6px 10px",cursor:"pointer",flexShrink:0,fontFamily:"inherit"}} onClick={()=>ouvrirRapport(last, client)}>
                   <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                   Télécharger
                 </button>
@@ -6365,8 +6369,10 @@ function CarnetView({ client, passages, onRefresh, refreshing }) {
           </div>
         )}
 
+        </> /* END ACCUEIL SECTIONS */}
+
         {/* HISTORIQUE COMPLET (tab) */}
-        {activeTab==="historique" && passClient.length > 0 && (
+        {activeTab==="historique" && (
           <div style={S.sectionWrap}>
             <div style={S.sectionHeader}>
               <div style={S.sectionTitle}>
@@ -6405,6 +6411,77 @@ function CarnetView({ client, passages, onRefresh, refreshing }) {
           </div>
         )}
 
+        {/* PRODUITS TAB */}
+        {activeTab==="produits" && (
+          <div style={S.sectionWrap}>
+            <div style={S.sectionHeader}>
+              <div style={S.sectionTitle}>
+                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+                Produits livrés
+              </div>
+            </div>
+            {passClient.filter(p=>p.livraisonProduits&&(p.produitsLivres||[]).length>0).length===0
+              ? <div style={{background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:"32px",textAlign:"center",color:"#94a3b8",fontSize:13}}>Aucune livraison enregistrée</div>
+              : <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {passClient.filter(p=>p.livraisonProduits&&(p.produitsLivres||[]).length>0).map((p,i)=>(
+                    <div key={p.id||i} style={{background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:"12px 14px",display:"flex",alignItems:"center",gap:12}}>
+                      <div style={{width:40,height:40,background:"#f1f5f9",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+                      </div>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:13,fontWeight:600,color:"#0f172a"}}>{(p.produitsLivres||[]).join(", ")}</div>
+                        <div style={{fontSize:11,color:"#64748b",marginTop:1}}>{fmtDate(p.date,{day:"2-digit",month:"short",year:"numeric"})}</div>
+                      </div>
+                      <span style={{display:"flex",alignItems:"center",gap:4,background:"#f0fdf4",color:"#15803d",borderRadius:8,padding:"4px 9px",fontSize:11,fontWeight:500}}>
+                        <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        Livré
+                      </span>
+                    </div>
+                  ))}
+                </div>
+            }
+          </div>
+        )}
+
+        {/* PROFIL TAB */}
+        {activeTab==="profil" && (
+          <div style={S.sectionWrap}>
+            <div style={S.sectionHeader}>
+              <div style={S.sectionTitle}>
+                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                Mon profil
+              </div>
+            </div>
+            <div style={{background:"#fff",borderRadius:14,border:"1px solid #e2e8f0",overflow:"hidden"}}>
+              <div style={{padding:"20px 16px",display:"flex",alignItems:"center",gap:14,borderBottom:"1px solid #e2e8f0"}}>
+                <div style={{width:54,height:54,background:"#e0f2fe",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </div>
+                <div>
+                  <div style={{fontSize:16,fontWeight:600,color:"#0f172a"}}>{client.nom}</div>
+                  <div style={{display:"inline-flex",alignItems:"center",gap:4,background:contratActif?"#f0fdf4":"#fef2f2",borderRadius:20,padding:"3px 10px",marginTop:4}}>
+                    <span style={{width:6,height:6,borderRadius:"50%",background:contratActif?"#22c55e":"#ef4444",display:"inline-block"}}/>
+                    <span style={{fontSize:11,color:contratActif?"#15803d":"#dc2626",fontWeight:500}}>Contrat {contratActif?"actif":"expiré"}</span>
+                  </div>
+                </div>
+              </div>
+              {[
+                client.bassin&&["Type de bassin",client.bassin],
+                client.volume&&["Volume",client.volume+"m³"],
+                client.formule&&["Formule",client.formule],
+                client.dateDebut&&["Début contrat",fmtDate(client.dateDebut,{day:"2-digit",month:"long",year:"numeric"})],
+                client.dateFin&&["Fin contrat",fmtDate(client.dateFin,{day:"2-digit",month:"long",year:"numeric"})],
+                ["Interventions réalisées",passClient.length+" passage"+(passClient.length!==1?"s":"")],
+              ].filter(Boolean).map(([label,val],i,arr)=>(
+                <div key={label} style={{padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:i<arr.length-1?"1px solid #f1f5f9":"none"}}>
+                  <span style={{fontSize:13,color:"#64748b"}}>{label}</span>
+                  <span style={{fontSize:13,fontWeight:500,color:"#0f172a"}}>{val}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* FOOTER */}
         <div style={{marginTop:24,textAlign:"center",padding:"16px 0 8px"}}>
           <div style={{fontSize:11,color:"#94a3b8",fontWeight:500,lineHeight:2}}>BRIBLUE · Traitement de l'eau · La Seyne-sur-Mer<br/>SIRET 84345436400053</div>
@@ -6412,19 +6489,42 @@ function CarnetView({ client, passages, onRefresh, refreshing }) {
 
       </div>
 
+      {/* SOS MODAL */}
+      {showSOS&&(
+        <div onClick={()=>setShowSOS(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:10003,backdropFilter:"blur(4px)"}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,padding:"24px 22px",paddingBottom:"max(32px,env(safe-area-inset-bottom,32px))"}}>
+            <div style={{display:"flex",justifyContent:"center",marginBottom:16}}><div style={{width:36,height:4,background:"#e2e8f0",borderRadius:2}}/></div>
+            <div style={{textAlign:"center",marginBottom:20}}>
+              <div style={{width:60,height:60,background:"#fee2e2",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px"}}>
+                <svg width={28} height={28} viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              </div>
+              <div style={{fontSize:18,fontWeight:700,color:"#0f172a",marginBottom:6}}>Besoin d'aide ?</div>
+              <div style={{fontSize:13,color:"#64748b"}}>Contactez directement votre technicien BRIBLUE</div>
+            </div>
+            <a href="tel:+33600000000" style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,background:"#0891b2",color:"#fff",borderRadius:14,padding:"16px",fontSize:15,fontWeight:600,textDecoration:"none",marginBottom:10}}>
+              <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.01 1.18 2 2 0 012 0h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 14.92z"/></svg>
+              Appeler BRIBLUE
+            </a>
+            <button onClick={()=>setShowSOS(false)} style={{width:"100%",padding:"14px",background:"#f1f5f9",border:"none",borderRadius:14,fontSize:14,color:"#64748b",fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>
+              Fermer
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* BOTTOM NAV */}
       <div style={{background:"#fff",borderTop:"1px solid #e2e8f0",display:"flex",padding:"8px 0 12px",position:"sticky",bottom:0,zIndex:100}}>
         {[
           {id:"accueil",label:"Accueil",icon:<svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg>},
           {id:"historique",label:"Interventions",icon:<svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>},
-          {id:"sos",label:"SOS",icon:<svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 2C6 2 2 12 2 12s4 10 10 10 10-10 10-10S18 2 12 2z"/><path d="M12 8v4M12 16h.01"/></svg>},
+          {id:"sos",label:"SOS",icon:<svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>},
           {id:"produits",label:"Produits",icon:<svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>},
           {id:"profil",label:"Profil",icon:<svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>},
         ].map(item=>{
-          const isActive = activeTab===item.id;
           const isSos = item.id==="sos";
+          const isActive = !isSos && activeTab===item.id;
           return (
-            <button key={item.id} onClick={()=>setActiveTab(item.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3,cursor:"pointer",border:"none",background:"none",fontFamily:"inherit",padding:0}}>
+            <button key={item.id} onClick={()=>isSos ? setShowSOS(true) : setActiveTab(item.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3,cursor:"pointer",border:"none",background:"none",fontFamily:"inherit",padding:0}}>
               <div style={{
                 width:isSos?40:36,height:isSos?40:36,
                 display:"flex",alignItems:"center",justifyContent:"center",
@@ -6434,7 +6534,7 @@ function CarnetView({ client, passages, onRefresh, refreshing }) {
               }}>
                 {item.icon}
               </div>
-              <span style={{fontSize:10,color:isActive?"#0891b2":"#94a3b8",fontWeight:isActive?600:400}}>
+              <span style={{fontSize:10,color:isActive?"#0891b2":isSos?"#0891b2":"#94a3b8",fontWeight:isActive||isSos?600:400}}>
                 {item.label}
               </span>
             </button>
