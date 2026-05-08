@@ -537,8 +537,7 @@ function setupPWA() {
     const manifest = {
       name:"BRIBLUE CRM", short_name:"BRIBLUE",
       description:"Gestion entretien piscines",
-      start_url: window.location.href,
-      scope: "/",
+      start_url: window.location.origin + window.location.pathname,
       display:"standalone",
       background_color:"#eef2f7",
       theme_color:"#0891b2",
@@ -5149,7 +5148,10 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
 // PAGE CLIENTS
 function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClientClick, onAdd }) {
   const [search, setSearch] = useState("");
+  const [openPicker, setOpenPicker] = useState(null); // clientId du picker ouvert
+  const [filterStat, setFilterStat] = useState("all"); // all | contrat | alertes | expires
   const isMobile = useIsMobile();
+
   const filtered = useMemo(()=>{
     let list = clients.filter(c=>c.nom.toLowerCase().includes(search.toLowerCase())||c.adresse?.toLowerCase().includes(search.toLowerCase()));
     if (filterStat === "contrat") list = list.filter(c=>{ const j=daysUntil(c.dateFin); return j!==null && j>=0; });
@@ -5170,9 +5172,6 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
     { key:"renouveler",    label:"À renouveler",       color:"#b45309", bg:"#fef3c7", border:"#fcd34d" },
     { key:"suspendu",      label:"⏸ Suspendu",            color:"#dc2626", bg:"#fff1f2", border:"#fda4af" },
   ];
-
-  const [openPicker, setOpenPicker] = useState(null); // clientId du picker ouvert
-  const [filterStat, setFilterStat] = useState("all"); // all | contrat | alertes | expires
 
   const getContrat = (clientId) =>
     contrats["CT-"+clientId]
