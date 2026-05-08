@@ -1087,7 +1087,7 @@ function Tag({ children, color=DS.blue, bg, style={} }) {
   );
 }
 
-function Modal({ title, onClose, children, wide }) {
+function Modal({ title, onClose, children, wide, noHeader }) {
   const isMobile = useIsMobile();
   useEffect(()=>{
     // Safari: bloquer le scroll du body sans casser le scroll de la modale
@@ -1133,13 +1133,13 @@ function Modal({ title, onClose, children, wide }) {
         {isMobile && <div style={{flexShrink:0,display:"flex",justifyContent:"center",paddingTop:10,paddingBottom:2}}>
           <div style={{width:42,height:5,borderRadius:3,background:"linear-gradient(90deg,#22d3ee,#0891b2)",opacity:0.6}}/>
         </div>}
-        <div style={{flexShrink:0,padding:isMobile?"8px 18px 12px":"14px 24px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid rgba(255,255,255,0.45)"}}>
+        {!noHeader && <div style={{flexShrink:0,padding:isMobile?"8px 18px 12px":"14px 24px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid rgba(255,255,255,0.45)"}}>
           <span style={{color:DS.dark,fontWeight:800,fontSize:17,letterSpacing:"-0.01em"}}>{title}</span>
           <button onClick={onClose} style={{width:44,height:44,borderRadius:14,background:"linear-gradient(135deg,#ef4444,#dc2626)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 12px rgba(220,38,38,0.35)",flexShrink:0}}>
             {Ico.close(18,"#fff")}
           </button>
-        </div>
-        <div data-modal-body="1" style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",padding:isMobile?"14px 18px 24px":"20px 24px 24px",overscrollBehavior:"contain"}}>
+        </div>}
+        <div data-modal-body="1" style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",padding:noHeader?"0":isMobile?"14px 18px 24px":"20px 24px 24px",overscrollBehavior:"contain"}}>
           {children}
         </div>
       </div>
@@ -1479,176 +1479,294 @@ function RapportStatusPicker({ value, onChange, compact=false }) {
 }
 
 // FORMULAIRE CLIENT (avec Entretien/Contrle par saison + PVC arm)
+// ─── STYLES COMMUNS FORMULAIRES ────────────────────────────────────────────
+const FORM_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  .fm-root * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; font-family:'Inter',system-ui,sans-serif; }
+  @keyframes fm-fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes fm-fadeIn { from{opacity:0} to{opacity:1} }
+  .fm-in { animation: fm-fadeUp 0.3s ease both; }
+  .fm-field input, .fm-field select, .fm-field textarea {
+    width:100%; padding:12px 14px; border-radius:12px;
+    border:1.5px solid #e2e8f0; font-size:14px; color:#0f172a;
+    font-family:'Inter',system-ui,sans-serif; outline:none;
+    background:#fff; transition:border-color 0.15s, box-shadow 0.15s;
+    -webkit-appearance:none;
+  }
+  .fm-field input:focus, .fm-field select:focus, .fm-field textarea:focus {
+    border-color:#0891b2; box-shadow:0 0 0 3px rgba(8,145,178,0.1);
+  }
+  .fm-field label { display:block; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px; }
+  .fm-choice { display:flex; align-items:center; gap:10px; padding:11px 14px; border-radius:12px; border:1.5px solid #e2e8f0; cursor:pointer; transition:all 0.15s; background:#fff; width:100%; text-align:left; font-family:inherit; }
+  .fm-choice.active { border-color:#0891b2; background:#f0f9ff; }
+  .fm-choice:active { transform:scale(0.98); }
+  .fm-save-btn { width:100%; padding:15px; border-radius:14px; border:none; cursor:pointer; font-family:inherit; font-size:15px; font-weight:700; color:#fff; background:linear-gradient(135deg,#0891b2,#0e7490); box-shadow:0 4px 14px rgba(8,145,178,0.35); transition:transform 0.13s,box-shadow 0.13s; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .fm-save-btn:active { transform:scale(0.98); box-shadow:0 2px 8px rgba(8,145,178,0.25); }
+  .fm-cancel-btn { width:100%; padding:13px; border-radius:14px; border:1.5px solid #e2e8f0; cursor:pointer; font-family:inherit; font-size:14px; font-weight:500; color:#64748b; background:#f8fafc; transition:background 0.15s; }
+  .fm-cancel-btn:active { background:#e2e8f0; }
+  .fm-section-title { font-size:11px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.6px; margin-bottom:10px; display:flex; align-items:center; gap:6px; }
+  .fm-section-title::after { content:''; flex:1; height:1px; background:#f1f5f9; }
+  .fm-client-row { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px; border:1.5px solid #e2e8f0; cursor:pointer; transition:all 0.15s; background:#fff; width:100%; text-align:left; font-family:inherit; }
+  .fm-client-row.sel { border-color:#0891b2; background:#f0f9ff; }
+  .fm-client-row:active { transform:scale(0.99); }
+  .fm-step-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; transition:all 0.25s; }
+  .fm-tab { padding:8px 14px; border-radius:20px; border:none; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; transition:all 0.15s; }
+  .fm-tab.active { background:#0891b2; color:#fff; box-shadow:0 2px 8px rgba(8,145,178,0.3); }
+  .fm-tab:not(.active) { background:#f1f5f9; color:#64748b; }
+  .fm-tab:not(.active):active { background:#e2e8f0; }
+  .fm-num-btn { width:32px; height:32px; border-radius:8px; border:none; cursor:pointer; font-size:16px; font-weight:600; display:flex; align-items:center; justify-content:center; transition:all 0.12s; flex-shrink:0; }
+  .fm-num-btn:active { transform:scale(0.9); }
+`;
+
+function FmField({ label, children, style }) {
+  return (
+    <div className="fm-field" style={style}>
+      {label && <label>{label}</label>}
+      {children}
+    </div>
+  );
+}
+
+function FmSectionTitle({ icon, children }) {
+  return (
+    <div className="fm-section-title">
+      {icon && <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.2" strokeLinecap="round">{icon}</svg>}
+      {children}
+    </div>
+  );
+}
+
+function FmHeader({ title, subtitle, color="#0891b2", onClose }) {
+  return (
+    <div style={{background:`linear-gradient(135deg,${color},${color}dd)`,padding:"20px 20px 18px",borderRadius:"18px 18px 0 0",position:"relative",overflow:"hidden"}}>
+      <div style={{position:"absolute",right:-20,top:-20,width:100,height:100,borderRadius:"50%",background:"rgba(255,255,255,0.08)",pointerEvents:"none"}}/>
+      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",position:"relative"}}>
+        <div>
+          <div style={{fontSize:18,fontWeight:700,color:"#fff",letterSpacing:"-0.3px"}}>{title}</div>
+          {subtitle&&<div style={{fontSize:12,color:"rgba(255,255,255,0.7)",marginTop:3}}>{subtitle}</div>}
+        </div>
+        <button onClick={onClose} style={{width:32,height:32,borderRadius:10,background:"rgba(255,255,255,0.18)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:"white"}}>
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FmSteps({ steps, current, color="#0891b2" }) {
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:0,padding:"14px 20px 0"}}>
+      {steps.map((s,i)=>{
+        const done=i<current-1, active=i===current-1;
+        return (
+          <React.Fragment key={i}>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,flex:1}}>
+              <div style={{width:28,height:28,borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center",
+                background:done?"#dcfce7":active?color:"#f1f5f9",
+                border:`2px solid ${done?"#22c55e":active?color:"#e2e8f0"}`,
+                transition:"all 0.25s",
+              }}>
+                {done
+                  ? <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.8" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  : <span style={{fontSize:11,fontWeight:700,color:active?"#fff":"#94a3b8"}}>{i+1}</span>
+                }
+              </div>
+              <span style={{fontSize:10,fontWeight:active?600:400,color:active?color:done?"#16a34a":"#94a3b8",textAlign:"center",letterSpacing:"0.2px"}}>{s}</span>
+            </div>
+            {i<steps.length-1&&<div style={{height:2,flex:1,background:i<current-1?"#bbf7d0":"#f1f5f9",borderRadius:1,marginBottom:18,transition:"background 0.3s"}}/>}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── FORM CLIENT ─────────────────────────────────────────────────────────────
 function FormClient({ initial, clients, onSave, onClose }) {
   const isNew = !initial?.id;
   const isMobile = useIsMobile();
+  const [step, setStep] = useState(1);
   const [f, setF] = useState(() => {
-    if (initial) {
-      return { ...initial, moisParMois: migrateMois(initial.moisParMois||initial.saisons), photoPiscine: initial.photoPiscine||"", prixPassageE: initial.prixPassageE||0, prixPassageC: initial.prixPassageC||0, notesTarifaires: initial.notesTarifaires||"" };
-    }
-    return {
-      id: `C${String(clients.length+1).padStart(3,"0")}`,
-      nom:"", tel:"", email:"", adresse:"", bassin:"Liner", volume:30,
-      formule:"VAC", prix:0, prixPassageE:0, prixPassageC:0, dateDebut:TODAY, photoPiscine:"", notesTarifaires:"",
-      dateFin: `${new Date().getFullYear()+1}-03-31`,
-      moisParMois: {...MOIS_PAR_MOIS_DEF},
-    };
+    if (initial) return { ...initial, moisParMois: migrateMois(initial.moisParMois||initial.saisons), photoPiscine: initial.photoPiscine||"", prixPassageE: initial.prixPassageE||0, prixPassageC: initial.prixPassageC||0, notesTarifaires: initial.notesTarifaires||"" };
+    return { id:`C${String(clients.length+1).padStart(3,"0")}`, nom:"", tel:"", email:"", adresse:"", bassin:"Liner", volume:30, formule:"VAC", prix:0, prixPassageE:0, prixPassageC:0, dateDebut:TODAY, photoPiscine:"", notesTarifaires:"", dateFin:`${new Date().getFullYear()+1}-03-31`, moisParMois:{...MOIS_PAR_MOIS_DEF} };
   });
   const set = (k,v) => setF(p=>({...p,[k]:v}));
   const setMoisVal = (m,type,v) => setF(p=>({...p,moisParMois:{...p.moisParMois,[m]:{...p.moisParMois[m],[type]:Math.max(0,v)}}}));
   const totalE = totalAnnuel(f.moisParMois,"entretien");
   const totalC = totalAnnuel(f.moisParMois,"controle");
-  const total = totalE + totalC;
+  const prixCalc = totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0);
 
-  // Brouillon auto (nouveau client uniquement)
   const { hasDraft, restoreDraft, discardDraft, clearDraft } = useFormDraft(
-    `briblue_draft_client_${initial?.id||"new"}`,
-    f, setF, null, null,
-    () => !!(f.nom?.trim() || f.tel || f.email || f.adresse)
+    `briblue_draft_client_${initial?.id||"new"}`, f, setF, null, null,
+    () => !!(f.nom?.trim() || f.tel || f.email)
   );
 
+  const STEPS = ["Infos", "Contrat", "Planning", "Tarif"];
+
+  const handleSave = () => {
+    if(!f.nom.trim()){ toastWarn("Nom du client requis"); return; }
+    clearDraft(); onSave({...f, prix:prixCalc});
+  };
+
   return (
-    <Modal title={isNew ? "Nouveau client" : `Modifier — ${f.nom}`} onClose={onClose} wide>
-      {hasDraft && !initial?.id && <DraftBanner onRestore={restoreDraft} onDiscard={discardDraft}/>}
-      <Section title="Informations">
-        <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12}}>
-          <div style={{gridColumn:"1/-1"}}><Input label="Nom complet *" value={f.nom} onChange={e=>set("nom",e.target.value)} placeholder="Dupont Marie"/></div>
-          <Input label="Téléphone" value={f.tel} onChange={e=>set("tel",e.target.value)}/>
-          <Input label="Email" type="email" value={f.email} onChange={e=>set("email",e.target.value)}/>
-          <div style={{gridColumn:"1/-1"}}><Input label="Adresse" value={f.adresse} onChange={e=>set("adresse",e.target.value)}/></div>
-          <Select label="Type bassin" value={f.bassin} onChange={e=>set("bassin",e.target.value)} options={["Liner","Béton","Coque polyester","PVC armé","Hors-sol","Autre"]}/>
-          <Input label="Volume (m³)" type="number" style={{fontSize:16}} value={f.volume} onChange={e=>set("volume",+e.target.value)}/>
-        </div>
-      </Section>
-      <Section title="Photo de la piscine">
-        <PhotoPicker value={f.photoPiscine||""} onChange={v=>set("photoPiscine",v)} compact/>
-      </Section>
-      <Section title="Contrat">
-        <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"1fr 1fr 1fr",gap:8}}>
-          <Select label="Formule" value={f.formule} onChange={e=>set("formule",e.target.value)} options={["VAC","VAC+","Confort","Confort+"]}/>
-          <div/>
-          {!isMobile&&<div/>}
-          <Input label="Date début" type="date" value={f.dateDebut} onChange={e=>set("dateDebut",e.target.value)}/>
-          <Input label="Date fin" type="date" value={f.dateFin} onChange={e=>set("dateFin",e.target.value)}/>
-        </div>
-      </Section>
-      <Section title="Passages par mois">
-        <div style={{background:DS.dark,padding:"8px 14px",borderRadius:"12px 12px 0 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <span style={{color:"rgba(255,255,255,0.8)",fontSize:15,fontWeight:700}}>Planning mensuel</span>
-          <span style={{color:"#fff",fontSize:15,fontWeight:800}}>🔧 {totalE}  ·  💧 {totalC}  ·  Total {totalE+totalC}</span>
-        </div>
-        <div style={{padding:"6px 10px",background:"rgba(255,255,255,0.45)",borderLeft:"1px solid "+DS.border,borderRight:"1px solid "+DS.border,display:"flex",justifyContent:"flex-end"}}>
-          <button onClick={()=>setF(p=>({...p,moisParMois:Object.fromEntries([1,2,3,4,5,6,7,8,9,10,11,12].map(m=>[m,{entretien:0,controle:0}]))}))}
-            style={{fontSize:12,fontWeight:700,color:DS.red,background:DS.redSoft,border:"1px solid #fca5a5",borderRadius:6,padding:"4px 12px",cursor:"pointer",fontFamily:"inherit"}}>
-            🔄 Tout remettre à zéro
-          </button>
-        </div>
-        <div style={{border:"1px solid "+DS.border,borderTop:"none",borderRadius:"0 0 12px 12px",overflow:"hidden"}}>
-          {[...Array(12)].map((_,i)=>{
-            const m=i+1; const mv=getMoisVal(f.moisParMois,m); const sc=SAISONS_META[getSaison(m)];
-            return (
-              <div key={m} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderBottom:i<11?"1px solid "+DS.border:"none",background:i%2===0?DS.white:DS.light}}>
-                <div style={{width:36,display:"flex",alignItems:"center",gap:4}}>
-                  <div style={{width:4,height:24,borderRadius:2,background:sc.color}}/>
-                  <span style={{fontSize:15,fontWeight:700,color:sc.color}}>{MOIS[m]}</span>
-                </div>
-                <div style={{flex:1,display:"flex",alignItems:"center",gap:12}}>
-                  <div style={{display:"flex",alignItems:"center",gap:4}}>
-                    <span style={{fontSize:15,color:DS.blue}}>🔧</span>
-                    <button onClick={()=>setMoisVal(m,"entretien",mv.entretien-1)} style={{width:24,height:24,borderRadius:6,border:"none",background:"rgba(255,255,255,0.45)",boxShadow:DS.nmShadowSm,cursor:"pointer",fontSize:15,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
-                    <span style={{fontSize:16,fontWeight:900,color:DS.blue,minWidth:16,textAlign:"center"}}>{mv.entretien}</span>
-                    <button onClick={()=>setMoisVal(m,"entretien",mv.entretien+1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.blue,background:DS.blueSoft,cursor:"pointer",fontSize:15,fontWeight:700,color:DS.blue,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
-                  </div>
-                  <div style={{display:"flex",alignItems:"center",gap:4}}>
-                    <span style={{fontSize:15,color:DS.teal}}>💧</span>
-                    <button onClick={()=>setMoisVal(m,"controle",mv.controle-1)} style={{width:24,height:24,borderRadius:6,border:"none",background:"rgba(255,255,255,0.45)",boxShadow:DS.nmShadowSm,cursor:"pointer",fontSize:15,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
-                    <span style={{fontSize:16,fontWeight:900,color:DS.teal,minWidth:16,textAlign:"center"}}>{mv.controle}</span>
-                    <button onClick={()=>setMoisVal(m,"controle",mv.controle+1)} style={{width:24,height:24,borderRadius:6,border:"1px solid "+DS.teal,background:DS.tealSoft,cursor:"pointer",fontSize:15,fontWeight:700,color:DS.teal,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
-                  </div>
-                </div>
-                <div style={{fontSize:15,fontWeight:700,color:mv.entretien+mv.controle>0?DS.dark:DS.border,minWidth:20,textAlign:"right"}}>{mv.entretien+mv.controle>0?mv.entretien+mv.controle:"—"}</div>
+    <Modal title="" onClose={onClose} wide noHeader>
+      <style>{FORM_CSS}</style>
+      <div className="fm-root">
+        <FmHeader title={isNew?"Nouveau client":`Modifier — ${f.nom||"..."}`} subtitle="Informations et contrat" color="#7c3aed" onClose={onClose}/>
+        <FmSteps steps={STEPS} current={step} color="#7c3aed"/>
+        {hasDraft&&!initial?.id&&<div style={{margin:"10px 20px 0"}}><DraftBanner onRestore={restoreDraft} onDiscard={discardDraft}/></div>}
+
+        <div style={{padding:"16px 20px 20px",display:"flex",flexDirection:"column",gap:16}}>
+
+          {/* ÉTAPE 1 — INFOS */}
+          {step===1&&(
+            <div className="fm-in" style={{display:"flex",flexDirection:"column",gap:12}}>
+              <FmSectionTitle icon={<><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></>}>Identité</FmSectionTitle>
+              <FmField label="Nom complet *">
+                <input value={f.nom} onChange={e=>set("nom",e.target.value)} placeholder="Ex : Mme Dupont"/>
+              </FmField>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <FmField label="Téléphone"><input value={f.tel} onChange={e=>set("tel",e.target.value)} type="tel" placeholder="06 ..."/></FmField>
+                <FmField label="Email"><input value={f.email} onChange={e=>set("email",e.target.value)} type="email" placeholder="@"/></FmField>
               </div>
-            );
-          })}
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginTop:12}}>
-          <Input label="Prix/passage entretien (€)" type="number" style={{fontSize:16}} value={f.prixPassageE||""} onChange={e=>set("prixPassageE",+e.target.value||0)}/>
-          <Input label="Prix/passage contrôle (€)" type="number" style={{fontSize:16}} value={f.prixPassageC||""} onChange={e=>set("prixPassageC",+e.target.value||0)}/>
-        </div>
-        {/* Récap tarification auto */}
-        <div style={{marginTop:12,background:"#0891b2",borderRadius:DS.radiusSm,padding:"14px 16px",color:"#fff"}}>
-          <div style={{fontSize:15,fontWeight:700,textTransform:"uppercase",letterSpacing:1,color:"rgba(255,255,255,0.5)",marginBottom:10}}>Tarification</div>
-          <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{fontSize:15,color:"rgba(255,255,255,0.7)"}}>🔧 {totalE} entretiens × {f.prixPassageE||0}€</span>
-              <span style={{fontSize:15,fontWeight:800}}>{totalE*(f.prixPassageE||0)} €</span>
-            </div>
-            {totalC>0&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{fontSize:15,color:"rgba(255,255,255,0.7)"}}>💧 {totalC} contrôles × {f.prixPassageC||0}€</span>
-              <span style={{fontSize:15,fontWeight:800}}>{totalC*(f.prixPassageC||0)} €</span>
-            </div>}
-            <div style={{borderTop:"1px solid rgba(255,255,255,0.15)",paddingTop:8,marginTop:4}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                <span style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.8)"}}>Prix annuel</span>
-                <span style={{fontSize:20,fontWeight:900,color:"#22d3ee"}}>{(totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0)).toLocaleString("fr")} €</span>
+              <FmField label="Adresse"><input value={f.adresse} onChange={e=>set("adresse",e.target.value)} placeholder="Rue, Ville"/></FmField>
+
+              <FmSectionTitle icon={<><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 12h20"/></>}>Piscine</FmSectionTitle>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <FmField label="Type de bassin">
+                  <select value={f.bassin} onChange={e=>set("bassin",e.target.value)}>
+                    {["Liner","Béton","Coque polyester","PVC armé","Hors-sol","Autre"].map(o=><option key={o}>{o}</option>)}
+                  </select>
+                </FmField>
+                <FmField label="Volume (m³)"><input value={f.volume} onChange={e=>set("volume",+e.target.value)} type="number" placeholder="30"/></FmField>
               </div>
-              {(()=>{
-                const prix = totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0);
-                if (!prix) return null;
-                const {m1,m11,estRond} = calcMensualites(prix);
-                return estRond
-                  ? <div style={{fontSize:12,color:"rgba(255,255,255,0.6)",textAlign:"right"}}>12 × {m11} €/mois</div>
-                  : <div style={{fontSize:12,color:"rgba(255,255,255,0.6)",textAlign:"right"}}>
-                      1er mois : <span style={{color:"#fcd34d",fontWeight:700}}>{m1} €</span> · puis 11 × {m11} €
-                    </div>;
-              })()}
+              <FmSectionTitle icon={<><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></>}>Photo de la piscine</FmSectionTitle>
+              <PhotoPicker value={f.photoPiscine||""} onChange={v=>set("photoPiscine",v)} compact/>
             </div>
+          )}
+
+          {/* ÉTAPE 2 — CONTRAT */}
+          {step===2&&(
+            <div className="fm-in" style={{display:"flex",flexDirection:"column",gap:12}}>
+              <FmSectionTitle icon={<><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></>}>Formule</FmSectionTitle>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                {["VAC","VAC+","Confort","Confort+"].map(v=>(
+                  <button key={v} className={`fm-choice${f.formule===v?" active":""}`} onClick={()=>set("formule",v)} style={{justifyContent:"center",fontWeight:f.formule===v?700:400,color:f.formule===v?"#0891b2":"#64748b",fontSize:14}}>
+                    {f.formule===v&&<svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                    {v}
+                  </button>
+                ))}
+              </div>
+              <FmSectionTitle icon={<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>}>Durée du contrat</FmSectionTitle>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <FmField label="Date de début"><input type="date" value={f.dateDebut} onChange={e=>set("dateDebut",e.target.value)}/></FmField>
+                <FmField label="Date de fin"><input type="date" value={f.dateFin} onChange={e=>set("dateFin",e.target.value)}/></FmField>
+              </div>
+              <FmSectionTitle icon={<><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></>}>Tarification</FmSectionTitle>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <FmField label="Prix entretien (€/passage)"><input type="number" value={f.prixPassageE||""} onChange={e=>set("prixPassageE",+e.target.value||0)} placeholder="0"/></FmField>
+                <FmField label="Prix contrôle (€/passage)"><input type="number" value={f.prixPassageC||""} onChange={e=>set("prixPassageC",+e.target.value||0)} placeholder="0"/></FmField>
+              </div>
+              <FmField label="Notes tarifaires (optionnel)">
+                <textarea value={f.notesTarifaires||""} onChange={e=>set("notesTarifaires",e.target.value)} placeholder="Ex: Produits inclus, remise accordée…" style={{minHeight:60,resize:"vertical"}}/>
+              </FmField>
+            </div>
+          )}
+
+          {/* ÉTAPE 3 — PLANNING */}
+          {step===3&&(
+            <div className="fm-in" style={{display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
+                <div style={{fontSize:13,fontWeight:600,color:"#0f172a"}}>
+                  🔧 {totalE} entretiens · 💧 {totalC} contrôles · <span style={{color:"#0891b2"}}>{totalE+totalC} total</span>
+                </div>
+                <button onClick={()=>setF(p=>({...p,moisParMois:Object.fromEntries([1,2,3,4,5,6,7,8,9,10,11,12].map(m=>[m,{entretien:0,controle:0}]))}))} style={{fontSize:11,color:"#ef4444",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>Réinitialiser</button>
+              </div>
+              <div style={{borderRadius:14,overflow:"hidden",border:"1px solid #e2e8f0"}}>
+                {[...Array(12)].map((_,i)=>{
+                  const m=i+1; const mv=getMoisVal(f.moisParMois,m); const sc=SAISONS_META[getSaison(m)];
+                  return (
+                    <div key={m} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderBottom:i<11?"1px solid #f8fafc":"none",background:i%2===0?"#fff":"#fafafa"}}>
+                      <div style={{width:4,height:28,borderRadius:2,background:sc.color,flexShrink:0}}/>
+                      <span style={{fontSize:13,fontWeight:600,color:"#0f172a",width:28}}>{MOIS[m]}</span>
+                      <div style={{flex:1,display:"flex",alignItems:"center",gap:16}}>
+                        {/* Entretien */}
+                        <div style={{display:"flex",alignItems:"center",gap:6}}>
+                          <span style={{fontSize:12,color:"#0891b2"}}>🔧</span>
+                          <button className="fm-num-btn" onClick={()=>setMoisVal(m,"entretien",mv.entretien-1)} style={{background:"#f1f5f9",color:"#64748b"}}>−</button>
+                          <span style={{fontSize:15,fontWeight:700,color:"#0891b2",minWidth:18,textAlign:"center"}}>{mv.entretien}</span>
+                          <button className="fm-num-btn" onClick={()=>setMoisVal(m,"entretien",mv.entretien+1)} style={{background:"#e0f2fe",color:"#0891b2"}}>+</button>
+                        </div>
+                        {/* Contrôle */}
+                        <div style={{display:"flex",alignItems:"center",gap:6}}>
+                          <span style={{fontSize:12,color:"#0891b2"}}>💧</span>
+                          <button className="fm-num-btn" onClick={()=>setMoisVal(m,"controle",mv.controle-1)} style={{background:"#f1f5f9",color:"#64748b"}}>−</button>
+                          <span style={{fontSize:15,fontWeight:700,color:"#0284c7",minWidth:18,textAlign:"center"}}>{mv.controle}</span>
+                          <button className="fm-num-btn" onClick={()=>setMoisVal(m,"controle",mv.controle+1)} style={{background:"#e0f2fe",color:"#0891b2"}}>+</button>
+                        </div>
+                      </div>
+                      <span style={{fontSize:13,fontWeight:700,color:mv.entretien+mv.controle>0?"#0f172a":"#e2e8f0",minWidth:20,textAlign:"right"}}>{mv.entretien+mv.controle||"—"}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ÉTAPE 4 — RÉCAP TARIF */}
+          {step===4&&(
+            <div className="fm-in" style={{display:"flex",flexDirection:"column",gap:12}}>
+              <FmSectionTitle>Récapitulatif</FmSectionTitle>
+              {/* Info card */}
+              <div style={{background:"#f8fafc",borderRadius:14,padding:"14px 16px",border:"1px solid #e2e8f0"}}>
+                {[["Client",f.nom||"—"],["Formule",f.formule],["Bassin",`${f.bassin}${f.volume?" · "+f.volume+"m³":""}`],["Période",`${f.dateDebut||"—"} → ${f.dateFin||"—"}`],["Total passages",`${totalE} entretiens + ${totalC} contrôles`]].map(([l,v])=>(
+                  <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #f1f5f9",fontSize:13}}>
+                    <span style={{color:"#64748b"}}>{l}</span>
+                    <span style={{fontWeight:600,color:"#0f172a"}}>{v}</span>
+                  </div>
+                ))}
+              </div>
+              {/* Prix */}
+              <div style={{background:"linear-gradient(135deg,#0891b2,#0e7490)",borderRadius:16,padding:"18px 20px",color:"#fff"}}>
+                <div style={{fontSize:11,fontWeight:600,color:"rgba(255,255,255,0.65)",textTransform:"uppercase",letterSpacing:0.6,marginBottom:8}}>Tarification annuelle</div>
+                {totalE>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:5}}>
+                  <span style={{color:"rgba(255,255,255,0.75)"}}>🔧 {totalE} × {f.prixPassageE||0} €</span>
+                  <span style={{fontWeight:600}}>{totalE*(f.prixPassageE||0)} €</span>
+                </div>}
+                {totalC>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:5}}>
+                  <span style={{color:"rgba(255,255,255,0.75)"}}>💧 {totalC} × {f.prixPassageC||0} €</span>
+                  <span style={{fontWeight:600}}>{totalC*(f.prixPassageC||0)} €</span>
+                </div>}
+                <div style={{borderTop:"1px solid rgba(255,255,255,0.2)",paddingTop:10,marginTop:8,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{fontSize:13,fontWeight:600,color:"rgba(255,255,255,0.8)"}}>Total annuel</span>
+                  <span style={{fontSize:26,fontWeight:800,color:"#fff"}}>{prixCalc.toLocaleString("fr")} €</span>
+                </div>
+                {prixCalc>0&&(()=>{
+                  const {m1,m11,estRond}=calcMensualites(prixCalc);
+                  return <div style={{fontSize:12,color:"rgba(255,255,255,0.6)",textAlign:"right",marginTop:4}}>{estRond?`12 × ${m11} €/mois`:`1er mois: ${m1} € · puis 11 × ${m11} €`}</div>;
+                })()}
+              </div>
+            </div>
+          )}
+
+          {/* NAVIGATION */}
+          <div style={{display:"flex",flexDirection:"column",gap:8,paddingTop:4}}>
+            {step<4?(
+              <button className="fm-save-btn" style={{background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}} onClick={()=>setStep(s=>s+1)}>
+                Continuer — {STEPS[step]}
+                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+            ):(
+              <button className="fm-save-btn" style={{background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}} onClick={handleSave}>
+                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                Enregistrer le client
+              </button>
+            )}
+            {step>1&&<button className="fm-cancel-btn" onClick={()=>setStep(s=>s-1)}>← Retour</button>}
+            {step===1&&<button className="fm-cancel-btn" onClick={onClose}>Annuler</button>}
           </div>
         </div>
-      </Section>
-      <Section title="Notes tarifaires (optionnel)">
-        <div style={{fontSize:12,color:DS.mid,marginBottom:8,lineHeight:1.5}}>
-          Ces notes apparaîtront dans le contrat — ex: produits inclus, remise accordée, condition spéciale…
-        </div>
-        <div style={{display:"flex",flexDirection:"column",gap:6}}>
-          {(f.notesTarifaires||"").split("\n").filter((_,i,a)=>i<a.length).map((line,i)=>(
-            <div key={i} style={{display:"flex",alignItems:"center",gap:8}}>
-              <span style={{color:DS.blue,fontWeight:700,flexShrink:0}}>•</span>
-              <input
-                value={line}
-                placeholder={i===0?"Ex: Produits de traitement inclus dans le forfait":"Ajouter une note…"}
-                onChange={e=>{
-                  const lines=(f.notesTarifaires||"").split("\n");
-                  lines[i]=e.target.value;
-                  set("notesTarifaires",lines.join("\n"));
-                }}
-                style={{flex:1,padding:"9px 12px",borderRadius:8,border:"1.5px solid "+DS.border,fontSize:13,outline:"none",color:DS.dark,fontFamily:"inherit"}}
-              />
-              {(f.notesTarifaires||"").split("\n").length>1&&(
-                <button onClick={()=>{
-                  const lines=(f.notesTarifaires||"").split("\n");
-                  lines.splice(i,1);
-                  set("notesTarifaires",lines.join("\n"));
-                }} style={{width:26,height:26,borderRadius:6,background:"#fff1f2",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                  {Ico.close(10,DS.red)}
-                </button>
-              )}
-            </div>
-          ))}
-          <button onClick={()=>set("notesTarifaires",(f.notesTarifaires?f.notesTarifaires+"\n":""))}
-            style={{display:"flex",alignItems:"center",gap:6,padding:"8px 12px",borderRadius:8,background:DS.blueSoft,border:"1px solid "+DS.blue+"33",cursor:"pointer",fontSize:12,fontWeight:700,color:DS.blue,fontFamily:"inherit",alignSelf:"flex-start"}}>
-            {Ico.plus(11,DS.blue)} Ajouter une note
-          </button>
-        </div>
-      </Section>
-      <SunBurstFormNav
-        step={1} totalSteps={1}
-        onSave={()=>{ if(!f.nom.trim()){ toastWarn("Nom du client requis"); return; } const prixCalc=totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0); clearDraft(); onSave({...f, prix:prixCalc}); }}
-        onCancel={onClose}
-        saveLabel="Enregistrer le client"
-        showDraft={false}
-        showStepIndicator={false}
-      />
+      </div>
     </Modal>
   );
 }
@@ -1673,27 +1791,18 @@ function genererHTMLLivraison(livraison, client) {
   .info-box{background:#f8fafc;border-radius:10px;padding:12px 14px;border:1px solid #e2e8f0;}
   .info-label{font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:3px;}
   .info-value{font-size:13px;font-weight:700;color:#1e293b;}
-  ul{margin:0;padding:0 0 0 0;list-style:none;}
+  ul{margin:0;padding:0;list-style:none;}
   .montant{font-size:22px;font-weight:900;color:#0369a1;margin-top:4px;}
   .footer{background:#f0f9ff;padding:16px 32px;border-top:1px solid #e0f2fe;font-size:11px;color:#64748b;text-align:center;}
-  .badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;}
 </style></head><body><div class="wrapper">
-<div class="header">
-  <h1>📦 Bon de livraison</h1>
-  <p>BRIBLUE — Entretien & Traitement de piscines</p>
-</div>
+<div class="header"><h1>📦 Bon de livraison</h1><p>BRIBLUE — Entretien & Traitement de piscines</p></div>
 <div class="body">
-  <div class="section">
-    <div class="section-title">Informations</div>
-    <div class="info-grid">
-      <div class="info-box"><div class="info-label">Client</div><div class="info-value">${client?.nom||"—"}</div></div>
-      <div class="info-box"><div class="info-label">Date</div><div class="info-value">${dateStr}</div></div>
-      ${client?.adresse?`<div class="info-box" style="grid-column:1/-1"><div class="info-label">Adresse</div><div class="info-value">${client.adresse}</div></div>`:""}
-    </div>
-  </div>
-  <div class="section">
-    <div class="section-title">Produits livrés</div>
-    <ul>${produitsList}</ul>
+  <div class="section"><div class="section-title">Informations</div><div class="info-grid">
+    <div class="info-box"><div class="info-label">Client</div><div class="info-value">${client?.nom||"—"}</div></div>
+    <div class="info-box"><div class="info-label">Date</div><div class="info-value">${dateStr}</div></div>
+    ${client?.adresse?`<div class="info-box" style="grid-column:1/-1"><div class="info-label">Adresse</div><div class="info-value">${client.adresse}</div></div>`:""}
+  </div></div>
+  <div class="section"><div class="section-title">Produits livrés</div><ul>${produitsList}</ul>
     ${livraison.description?`<div style="margin-top:10px;background:#f8fafc;border-radius:10px;padding:12px 14px;border:1px solid #e2e8f0;font-size:13px;color:#475569;">${livraison.description}</div>`:""}
   </div>
   ${livraison.montant?`<div class="section"><div class="section-title">Montant</div><div class="montant">${Number(livraison.montant).toLocaleString("fr")} €</div></div>`:""}
@@ -1704,54 +1813,34 @@ function genererHTMLLivraison(livraison, client) {
 
 async function envoyerEmailLivraison(livraison, client) {
   if (!client?.email) { toastWarn("Aucun email renseigné pour ce client."); return; }
-
   const dateStr = new Date(livraison.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"});
   const filename = `BonLivraison_BRIBLUE_${client?.nom?.replace(/\s/g,"_")||"client"}_${livraison.date}.html`;
   const html = genererHTMLLivraison(livraison, client);
   const b64 = btoa(unescape(encodeURIComponent(html)));
-
-  const corps = `Bonjour ${client?.nom||""},\n\nVotre bon de livraison du ${dateStr} est disponible.\n\nJe reste a votre disposition pour toute question.\n\nCordialement,\nDorian Briaire\nTechnicien de Piscine - BRI BLUE`;
-
+  const corps = `Bonjour ${client?.nom||""},\n\nVotre bon de livraison du ${dateStr} est disponible.\n\nCordialement,\nDorian Briaire\nTechnicien de Piscine - BRI BLUE`;
   try {
-    const res = await fetch("/api/send-email", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: `BRIBLUE <rapport-piscine@briblue83.com>`,
-        to: [client.email],
-        subject: `Bon de livraison BRIBLUE — ${dateStr}`,
-        text: corps,
-        attachments: [{ filename, content: b64 }],
-      }),
-    });
-
+    const res = await fetch("/api/send-email", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ from:`BRIBLUE <rapport-piscine@briblue83.com>`, to:[client.email], subject:`Bon de livraison BRIBLUE — ${dateStr}`, text:corps, attachments:[{filename,content:b64}] }) });
     const data = await res.json();
-    if (res.ok) {
-      toastSuccess(`Email envoyé à ${client.email} !`);
-    } else {
-      console.error("Resend error:", data);
-      toastError(`Erreur envoi : ${data?.message || JSON.stringify(data)}`);
-    }
-  } catch(err) {
-    toastError(`Erreur réseau : ${err.message}`);
-  }
+    if (res.ok) toastSuccess(`Email envoyé à ${client.email} !`);
+    else toastError(`Erreur envoi : ${data?.message||JSON.stringify(data)}`);
+  } catch(err) { toastError(`Erreur réseau : ${err.message}`); }
 }
 
+// ─── FORM LIVRAISON ───────────────────────────────────────────────────────────
 function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave, onClose }) {
   const isEdit = !!initial?.id;
   const isMobile = useIsMobile();
-  const [f, setF] = useState(()=>initial || { id:uid(), clientId:clientId||"", date:TODAY, produits:[], description:"", montant:"", statut:"aFacturer", photos:[] });
   const [step, setStep] = useState(1);
+  const [f, setF] = useState(()=>initial || { id:uid(), clientId:clientId||"", date:TODAY, produits:[], description:"", montant:"", statut:"aFacturer", photos:[] });
   const set = (k,v) => setF(p=>({...p,[k]:v}));
   const PLIV = produitsStock.length > 0 ? produitsStock : PRODUITS_DEFAUT;
   const toggleProduit = (p) => { const arr = f.produits.includes(p) ? f.produits.filter(x=>x!==p) : [...f.produits,p]; set("produits",arr); };
+  const selectedClient = clients.find(c=>c.id===f.clientId);
 
   const { hasDraft, restoreDraft, discardDraft, clearDraft } = useFormDraft(
-    `briblue_draft_livraison_${initial?.id||"new"}`,
-    f, setF, step, setStep,
+    `briblue_draft_livraison_${initial?.id||"new"}`, f, setF, step, setStep,
     () => !!(f.produits?.length || f.description?.trim() || f.montant)
   );
-  const selectedClient = clients.find(c=>c.id===f.clientId);
 
   const addPhotos = (e) => {
     const files = Array.from(e.target.files||[]).slice(0, 10-(f.photos||[]).length);
@@ -1760,296 +1849,255 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
     const newPhotos = [...(f.photos||[])];
     files.forEach(file => {
       const reader = new FileReader();
-      reader.onload = () => {
-        newPhotos.push(reader.result);
-        loaded++;
-        if (loaded === files.length) set("photos", newPhotos.slice(0,10));
-      };
+      reader.onload = () => { newPhotos.push(reader.result); loaded++; if(loaded===files.length) set("photos",newPhotos.slice(0,10)); };
       reader.readAsDataURL(file);
     });
     e.target.value="";
   };
 
-  const STEP_INFO = [
-    { l:"Client & Date", color:"#0891b2" },
-    { l:"Produits",      color:"#059669" },
-    { l:"Photos & Envoi",color:"#4f46e5" },
-  ];
-  const STEPS = STEP_INFO.length;
-  const cur = STEP_INFO[step-1];
-  const pct = Math.round((step-1)/STEPS*100);
+  const STEPS = ["Client", "Produits", "Résumé"];
 
   return (
-    <Modal title={isEdit?"Modifier la livraison":"Nouvelle livraison"} onClose={onClose} wide>
-      {hasDraft && !isEdit && <DraftBanner onRestore={restoreDraft} onDiscard={discardDraft}/>}
-      <div style={{marginBottom:14}}>
-        <div style={{height:4,background:DS.light,borderRadius:99,marginBottom:10,overflow:"hidden"}}>
-          <div style={{height:"100%",width:`${pct}%`,background:`linear-gradient(90deg,#0891b2,${cur.color})`,borderRadius:99,transition:"width .4s"}}/>
-        </div>
-        <div style={{display:"flex",gap:4,marginBottom:10}}>
-          {STEP_INFO.map((s,i)=>{
-            const done=i+1<step, active=i+1===step;
-            return (
-              <button key={i} onClick={()=>setStep(i+1)}
-                style={{flex:1,padding:"8px 4px",borderRadius:10,border:"1.5px solid "+(active?s.color:done?"#059669":DS.border),
-                  background:active?s.color+"12":done?"#f0fdf4":DS.white,
-                  cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:700,
-                  color:active?s.color:done?"#059669":DS.mid,transition:"all .2s"}}>
-                {done?"✓ ":""}{s.l}
-              </button>
-            );
-          })}
-        </div>
-        <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:8,background:cur.color+"0d",border:"1px solid "+cur.color+"22"}}>
-          <span style={{width:6,height:6,borderRadius:3,background:cur.color,flexShrink:0,display:"block"}}/>
-          <span style={{fontSize:13,fontWeight:700,color:cur.color}}>{cur.l}</span>
-          <span style={{fontSize:11,color:DS.mid,marginLeft:"auto"}}>Étape {step}/{STEPS}</span>
-        </div>
-      </div>
+    <Modal title="" onClose={onClose} wide noHeader>
+      <style>{FORM_CSS}</style>
+      <div className="fm-root">
+        <FmHeader title={isEdit?"Modifier la livraison":"Nouvelle livraison"} subtitle="Produits & détails" color="#059669" onClose={onClose}/>
+        <FmSteps steps={STEPS} current={step} color="#059669"/>
+        {hasDraft&&!isEdit&&<div style={{margin:"10px 20px 0"}}><DraftBanner onRestore={restoreDraft} onDiscard={discardDraft}/></div>}
 
-      {/* ÉTAPE 1 — Client & Date */}
-      {step===1 && (
-        <div className="fade-in" style={{display:"flex",flexDirection:"column",gap:12}}>
-          {clients.length>1 && (
-            <div>
-              <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:8}}>Client *</span>
-              {isMobile
-                ? <select value={f.clientId} onChange={e=>set("clientId",e.target.value)}
-                    style={{width:"100%",padding:"12px",borderRadius:DS.radiusSm,border:"none",background:"rgba(255,255,255,0.45)",boxShadow:DS.nmShadowSm,fontSize:14,color:DS.dark,fontFamily:"inherit"}}>
-                    <option value="">Choisir…</option>
-                    {clients.map(c=><option key={c.id} value={c.id}>{c.nom}</option>)}
-                  </select>
-                : <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight:160,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+        <div style={{padding:"16px 20px 20px",display:"flex",flexDirection:"column",gap:14}}>
+
+          {/* ÉTAPE 1 — CLIENT & DATE */}
+          {step===1&&(
+            <div className="fm-in" style={{display:"flex",flexDirection:"column",gap:12}}>
+              {clients.length>1&&(
+                <>
+                  <FmSectionTitle icon={<><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></>}>Client *</FmSectionTitle>
+                  <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight:200,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
                     {clients.map(c=>{
                       const sel=f.clientId===c.id;
                       return (
-                        <button key={c.id} onClick={()=>set("clientId",c.id)}
-                          style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:10,
-                            border:"1.5px solid "+(sel?"#0891b2":DS.border),background:sel?"#f0f9ff":DS.white,
-                            cursor:"pointer",textAlign:"left",fontFamily:"inherit"}}>
-                          <Avatar nom={c.nom} size={32}/>
+                        <button key={c.id} className={`fm-client-row${sel?" sel":""}`} onClick={()=>set("clientId",c.id)}>
+                          <Avatar nom={c.nom} size={34}/>
                           <div style={{flex:1,minWidth:0}}>
-                            <div style={{fontWeight:700,fontSize:13,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
-                            <div style={{fontSize:11,color:DS.mid}}>{c.formule}</div>
+                            <div style={{fontSize:13,fontWeight:sel?700:500,color:sel?"#0891b2":"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
+                            <div style={{fontSize:11,color:"#94a3b8"}}>{c.formule}</div>
                           </div>
-                          {sel&&<div style={{width:20,height:20,borderRadius:10,background:"#0891b2",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.check(10,"#fff")}</div>}
+                          {sel&&<div style={{width:20,height:20,borderRadius:"50%",background:"#0891b2",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                            <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                          </div>}
                         </button>
                       );
                     })}
                   </div>
-              }
+                </>
+              )}
+              <FmSectionTitle icon={<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>}>Date & Montant</FmSectionTitle>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <FmField label="Date *"><input type="date" value={f.date} onChange={e=>set("date",e.target.value)}/></FmField>
+                <FmField label="Montant (€)"><input type="number" value={f.montant} onChange={e=>set("montant",e.target.value)} placeholder="0.00"/></FmField>
+              </div>
+              <FmSectionTitle>Statut</FmSectionTitle>
+              <div style={{display:"flex",gap:6}}>
+                {Object.entries(STATUT_LIV).map(([k,s])=>(
+                  <button key={k} onClick={()=>set("statut",k)} style={{flex:1,padding:"10px 4px",borderRadius:10,border:`1.5px solid ${f.statut===k?s.color:"#e2e8f0"}`,background:f.statut===k?s.bg:"#fff",cursor:"pointer",fontSize:12,fontWeight:f.statut===k?700:400,color:f.statut===k?s.color:"#94a3b8",fontFamily:"inherit",transition:"all .15s"}}>
+                    {s.label}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
-          {selectedClient && (
-            <div style={{background:"rgba(224,242,254,0.5)",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10,border:"1px solid #bae6fd"}}>
-              <Avatar nom={selectedClient.nom} size={36}/>
-              <div><div style={{fontWeight:700,fontSize:13,color:DS.dark}}>{selectedClient.nom}</div><div style={{fontSize:11,color:DS.mid}}>{selectedClient.formule}</div></div>
-            </div>
-          )}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10}}>
-            <div>
-              <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>Date *</span>
-              <input type="date" value={f.date} onChange={e=>set("date",e.target.value)}
-                style={{width:"100%",padding:"11px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:14,outline:"none",boxSizing:"border-box",color:DS.dark,fontFamily:"inherit"}}/>
-            </div>
-            <div>
-              <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>Montant €</span>
-              <input type="number" value={f.montant} onChange={e=>set("montant",e.target.value)} placeholder="0.00"
-                style={{width:"100%",padding:"11px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:14,outline:"none",boxSizing:"border-box",color:DS.dark,fontFamily:"inherit"}}/>
-            </div>
-          </div>
-          <div>
-            <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:8}}>Statut</span>
-            <div style={{display:"flex",gap:6}}>
-              {Object.entries(STATUT_LIV).map(([k,s])=>(
-                <button key={k} onClick={()=>set("statut",k)}
-                  style={{flex:1,padding:"9px 4px",borderRadius:10,border:"1.5px solid "+(f.statut===k?s.color:DS.border),
-                    background:f.statut===k?s.bg:DS.white,cursor:"pointer",fontSize:12,fontWeight:700,
-                    color:f.statut===k?s.color:DS.mid,fontFamily:"inherit",transition:"all .15s"}}>
-                  {s.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* ÉTAPE 2 — Produits */}
-      {step===2 && (
-        <div className="fade-in" style={{display:"flex",flexDirection:"column",gap:12}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <span style={{fontSize:13,color:DS.mid,fontWeight:600}}>{f.produits.length} sélectionné{f.produits.length!==1?"s":""}</span>
-            {f.produits.length>0&&<button onClick={()=>set("produits",[])} style={{fontSize:12,color:DS.red,background:"none",border:"none",cursor:"pointer",fontWeight:600}}>Effacer</button>}
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(3,1fr)",gap:5}}>
-            {PLIV.map(p=>{
-              const sel=f.produits.includes(p);
-              return (
-                <button key={p} onClick={()=>toggleProduit(p)}
-                  style={{display:"flex",alignItems:"center",gap:7,padding:"9px 10px",borderRadius:10,cursor:"pointer",
-                    background:sel?"#f0fdf4":DS.white,border:"1.5px solid "+(sel?"#059669":DS.border),
-                    fontFamily:"inherit",textAlign:"left",transition:"all .15s"}}>
-                  <div style={{width:16,height:16,borderRadius:4,border:"2px solid "+(sel?"#059669":DS.border),background:sel?"#059669":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    {sel&&<svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+          {/* ÉTAPE 2 — PRODUITS */}
+          {step===2&&(
+            <div className="fm-in" style={{display:"flex",flexDirection:"column",gap:12}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <FmSectionTitle>{f.produits.length} sélectionné{f.produits.length!==1?"s":""}</FmSectionTitle>
+                {f.produits.length>0&&<button onClick={()=>set("produits",[])} style={{fontSize:11,color:"#ef4444",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:6,padding:"3px 8px",cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>Effacer</button>}
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(3,1fr)",gap:6}}>
+                {PLIV.map(p=>{
+                  const sel=f.produits.includes(p);
+                  return (
+                    <button key={p} onClick={()=>toggleProduit(p)} style={{display:"flex",alignItems:"center",gap:7,padding:"10px 10px",borderRadius:10,cursor:"pointer",background:sel?"#f0fdf4":"#fff",border:`1.5px solid ${sel?"#22c55e":"#e2e8f0"}`,fontFamily:"inherit",textAlign:"left",transition:"all .15s"}}>
+                      <div style={{width:16,height:16,borderRadius:4,border:`2px solid ${sel?"#22c55e":"#e2e8f0"}`,background:sel?"#22c55e":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        {sel&&<svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                      </div>
+                      <span style={{fontSize:12,fontWeight:sel?600:400,color:sel?"#065f46":"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <FmField label="Notes / Quantités">
+                <textarea value={f.description} onChange={e=>set("description",e.target.value)} placeholder="Ex : 2 sacs chlore lent, 1 bidon pH+..." style={{minHeight:60,resize:"vertical"}}/>
+              </FmField>
+              {/* Photos */}
+              <div>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                  <FmSectionTitle icon={<><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></>}>Photos {(f.photos||[]).length>0&&`(${(f.photos||[]).length}/10)`}</FmSectionTitle>
+                  {(f.photos||[]).length<10&&<label style={{display:"flex",alignItems:"center",gap:4,padding:"5px 10px",borderRadius:8,background:"#f0f9ff",border:"1px solid #bae6fd",cursor:"pointer",fontSize:11,fontWeight:600,color:"#0891b2"}}>{Ico.plus(10,"#0891b2")} Ajouter<input type="file" accept="image/*" multiple style={{display:"none"}} onChange={addPhotos}/></label>}
+                </div>
+                {(f.photos||[]).length===0
+                  ? <label style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:14,borderRadius:12,border:"2px dashed #e2e8f0",background:"#f8fafc",cursor:"pointer"}}>{Ico.camera(22,"#94a3b8")}<span style={{fontSize:12,color:"#94a3b8"}}>Ajouter des photos</span><input type="file" accept="image/*" multiple style={{display:"none"}} onChange={addPhotos}/></label>
+                  : <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>{(f.photos||[]).map((ph,i)=>(<div key={i} style={{position:"relative",borderRadius:8,overflow:"hidden"}}><img src={ph} alt="" style={{width:"100%",height:70,objectFit:"cover",display:"block"}}/><button onClick={()=>set("photos",(f.photos||[]).filter((_,j)=>j!==i))} style={{position:"absolute",top:3,right:3,width:20,height:20,borderRadius:10,background:"rgba(0,0,0,0.6)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.close(8,"#fff")}</button></div>))}</div>
+                }
+              </div>
+            </div>
+          )}
+
+          {/* ÉTAPE 3 — RÉSUMÉ */}
+          {step===3&&(
+            <div className="fm-in" style={{display:"flex",flexDirection:"column",gap:12}}>
+              <FmSectionTitle>Récapitulatif</FmSectionTitle>
+              <div style={{background:"#f8fafc",borderRadius:14,border:"1px solid #e2e8f0",overflow:"hidden"}}>
+                {[["Client",selectedClient?.nom||"—"],["Date",f.date?new Date(f.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}):"—"],["Produits",f.produits.length+" article"+(f.produits.length!==1?"s":"")],f.montant?["Montant",f.montant+" €"]:null,["Statut",STATUT_LIV[f.statut]?.label||"—"]].filter(Boolean).map(([l,v],i,a)=>(
+                  <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"10px 14px",borderBottom:i<a.length-1?"1px solid #f1f5f9":"none",fontSize:13}}>
+                    <span style={{color:"#64748b"}}>{l}</span>
+                    <span style={{fontWeight:600,color:"#0f172a"}}>{v}</span>
                   </div>
-                  <span style={{fontSize:12,fontWeight:sel?700:400,color:sel?"#065f46":DS.mid,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p}</span>
+                ))}
+              </div>
+              {selectedClient?.email&&(
+                <button onClick={()=>showConfirm(`Envoyer le bon de livraison à ${selectedClient.email} ?`,()=>envoyerEmailLivraison({...f,id:isEdit?f.id:uid()},selectedClient))} style={{padding:"12px",borderRadius:12,background:"#f0f9ff",border:"1px solid #bae6fd",cursor:"pointer",fontWeight:600,fontSize:13,color:"#0891b2",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                  {Ico.send(13,"#0891b2")} Envoyer par email à {selectedClient.email}
                 </button>
-              );
-            })}
-          </div>
-          <div>
-            <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>Notes / Quantités</span>
-            <textarea value={f.description} onChange={e=>set("description",e.target.value)}
-              placeholder="Ex : 2 sacs chlore lent, 1 bidon pH+..."
-              style={{width:"100%",padding:"10px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:13,minHeight:60,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,outline:"none"}}/>
-          </div>
-        </div>
-      )}
-
-      {/* ÉTAPE 3 — Photos & Envoi */}
-      {step===3 && (
-        <div className="fade-in" style={{display:"flex",flexDirection:"column",gap:12}}>
-          <div>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-              <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>Photos {(f.photos||[]).length>0&&`(${(f.photos||[]).length}/10)`}</span>
-              {(f.photos||[]).length<10&&(
-                <label style={{display:"flex",alignItems:"center",gap:5,padding:"5px 10px",borderRadius:8,background:"rgba(224,242,254,0.5)",border:"1px solid #bae6fd",cursor:"pointer",fontSize:12,fontWeight:700,color:"#0891b2"}}>
-                  {Ico.plus(11,"#0891b2")} Ajouter
-                  <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={addPhotos}/>
-                </label>
               )}
             </div>
-            {(f.photos||[]).length===0
-              ? <label style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8,padding:18,borderRadius:12,border:"2px dashed "+DS.border,background:DS.light,cursor:"pointer"}}>
-                  {Ico.camera(26,DS.mid)}
-                  <span style={{fontSize:13,color:DS.mid,fontWeight:600}}>Ajouter des photos</span>
-                  <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={addPhotos}/>
-                </label>
-              : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:8}}>
-                  {(f.photos||[]).map((ph,i)=>(
-                    <div key={i} style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid "+DS.border}}>
-                      <img src={ph} alt={`Photo ${i+1}`} style={{width:"100%",height:80,objectFit:"cover",display:"block"}}/>
-                      <button onClick={()=>set("photos",(f.photos||[]).filter((_,j)=>j!==i))}
-                        style={{position:"absolute",top:4,right:4,width:22,height:22,borderRadius:11,background:"rgba(0,0,0,0.65)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                        {Ico.close(9,"#fff")}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-            }
-          </div>
-          {/* Récap */}
-          <div style={{background:"rgba(255,255,255,0.45)",borderRadius:10,padding:"12px 14px",border:"1px solid "+DS.border}}>
-            <div style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>Récapitulatif</div>
-            {[
-              ["Client", selectedClient?.nom||"—"],
-              ["Date", f.date?new Date(f.date).toLocaleDateString("fr"):"—"],
-              ["Produits", f.produits.length+" article"+(f.produits.length!==1?"s":"")],
-              f.montant?["Montant", f.montant+" €"]:null,
-            ].filter(Boolean).map(([l,v])=>(
-              <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"3px 0"}}>
-                <span style={{color:DS.mid}}>{l}</span>
-                <span style={{fontWeight:700,color:DS.dark}}>{v}</span>
-              </div>
-            ))}
-          </div>
-          {selectedClient?.email&&(
-            <button onClick={()=>showConfirm(`Envoyer le bon de livraison par email à ${selectedClient?.email||"ce client"} ?`,()=>envoyerEmailLivraison({...f,id:isEdit?f.id:uid()}, selectedClient))}
-              style={{padding:"11px",borderRadius:DS.radiusSm,background:"rgba(224,242,254,0.5)",border:"1px solid #bae6fd",cursor:"pointer",fontWeight:700,fontSize:13,color:"#0891b2",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-              {Ico.send(13,"#0891b2")} Envoyer par email à {selectedClient.email}
-            </button>
           )}
-        </div>
-      )}
 
-      {/* Navigation */}
-      <SunBurstFormNav
-        step={step} totalSteps={STEPS}
-        onNext={()=>setStep(s=>s+1)}
-        onPrev={()=>setStep(s=>s-1)}
-        onSave={()=>{if(!f.clientId){ toastWarn("Client requis"); return; } if(!f.date){ toastWarn("Date requise"); return; } clearDraft(); onSave({...f,id:isEdit?f.id:uid()});}}
-        onCancel={onClose}
-        nextLabel={(STEP_INFO[step]||STEP_INFO[STEPS-1]).l}
-        nextColor={(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}
-        saveLabel="Enregistrer la livraison"
-        showDraft={false}
-      />
+          {/* NAVIGATION */}
+          <div style={{display:"flex",flexDirection:"column",gap:8,paddingTop:4}}>
+            {step<3?(
+              <button className="fm-save-btn" style={{background:"linear-gradient(135deg,#059669,#047857)"}} onClick={()=>{ if(step===1&&!f.clientId&&clients.length>1){ toastWarn("Client requis"); return; } setStep(s=>s+1); }}>
+                Continuer — {STEPS[step]}
+                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+            ):(
+              <button className="fm-save-btn" style={{background:"linear-gradient(135deg,#059669,#047857)"}} onClick={()=>{ if(!f.clientId&&clients.length>1){ toastWarn("Client requis"); return; } if(!f.date){ toastWarn("Date requise"); return; } clearDraft(); onSave({...f,id:isEdit?f.id:uid()}); }}>
+                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                Enregistrer la livraison
+              </button>
+            )}
+            {step>1&&<button className="fm-cancel-btn" onClick={()=>setStep(s=>s-1)}>← Retour</button>}
+            {step===1&&<button className="fm-cancel-btn" onClick={onClose}>Annuler</button>}
+          </div>
+        </div>
+      </div>
     </Modal>
   );
 }
 
-
+// ─── FORM RDV ─────────────────────────────────────────────────────────────────
 function FormRdv({ initial, clients, onSave, onClose }) {
   const isEdit = !!initial?.id;
-  const [f, setF] = useState(()=> initial || {
-    id: uid(), clientId:"", date:TODAY, heure:"09:00", duree:"60",
-    type:"Rendez-vous client", description:"", rappel:false
-  });
+  const [f, setF] = useState(()=> initial || { id:uid(), clientId:"", date:TODAY, heure:"09:00", duree:"60", type:"Rendez-vous client", description:"", rappel:false });
   const set = (k,v) => setF(p=>({...p,[k]:v}));
 
-  // Brouillon auto (nouveau RDV uniquement)
   const { hasDraft, restoreDraft, discardDraft, clearDraft } = useFormDraft(
-    `briblue_draft_rdv_${initial?.id||"new"}`,
-    f, setF, null, null,
+    `briblue_draft_rdv_${initial?.id||"new"}`, f, setF, null, null,
     () => !!(f.clientId || f.description?.trim() || (f.type && f.type !== "Rendez-vous client"))
   );
 
+  const TYPES_RDV = [
+    {v:"Rendez-vous client", ico:"🤝", color:"#0891b2"},
+    {v:"Mise en route", ico:"▶️", color:"#16a34a"},
+    {v:"Hivernage", ico:"❄️", color:"#0284c7"},
+    {v:"Devis / Visite technique", ico:"📋", color:"#7c3aed"},
+    {v:"Réparation / SAV", ico:"🔧", color:"#d97706"},
+    {v:"Autre", ico:"📌", color:"#64748b"},
+  ];
+  const selectedType = TYPES_RDV.find(t=>t.v===f.type)||TYPES_RDV[0];
+  const selectedClient = clients.find(c=>c.id===f.clientId);
+
   return (
-    <Modal title={isEdit ? "Modifier le RDV" : "Nouveau rendez-vous"} onClose={onClose}>
-      {hasDraft && !isEdit && <DraftBanner onRestore={restoreDraft} onDiscard={discardDraft}/>}
-      <Section title="Client (optionnel)">
-        <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:180,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
-          <button onClick={()=>set("clientId","")} style={{padding:"8px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+(f.clientId===""?DS.blue:DS.border),background:f.clientId===""?DS.blueSoft:DS.white,cursor:"pointer",textAlign:"left",fontFamily:"inherit",fontSize:15,fontWeight:f.clientId===""?700:400,color:f.clientId===""?DS.blue:DS.mid}}>— Aucun client —</button>
-          {clients.map(c=>{
-            const sel = f.clientId===c.id;
-            return (
-              <button key={c.id} onClick={()=>set("clientId",c.id)} className="card-hover" style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+(sel?DS.blue:DS.border),background:sel?DS.blueSoft:DS.white,cursor:"pointer",textAlign:"left",fontFamily:"inherit"}}>
-                <Avatar nom={c.nom} size={30}/>
-                <span style={{fontWeight:sel?700:400,fontSize:15,color:sel?DS.dark:DS.mid}}>{c.nom}</span>
-              </button>
-            );
-          })}
+    <Modal title="" onClose={onClose} noHeader>
+      <style>{FORM_CSS}</style>
+      <div className="fm-root">
+        <FmHeader title={isEdit?"Modifier le RDV":"Nouveau rendez-vous"} subtitle={f.type||"Planifier une intervention"} color="#7c3aed" onClose={onClose}/>
+        {hasDraft&&!isEdit&&<div style={{margin:"10px 20px 0"}}><DraftBanner onRestore={restoreDraft} onDiscard={discardDraft}/></div>}
+
+        <div style={{padding:"16px 20px 20px",display:"flex",flexDirection:"column",gap:14}}>
+
+          {/* TYPE */}
+          <div>
+            <FmSectionTitle icon={<><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></>}>Type de rendez-vous</FmSectionTitle>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+              {TYPES_RDV.map(({v,ico,color})=>{
+                const sel=f.type===v;
+                return (
+                  <button key={v} onClick={()=>set("type",v)} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",borderRadius:12,border:`1.5px solid ${sel?color:"#e2e8f0"}`,background:sel?color+"12":"#fff",cursor:"pointer",textAlign:"left",fontFamily:"inherit",transition:"all .15s"}}>
+                    <span style={{fontSize:16,flexShrink:0}}>{ico}</span>
+                    <span style={{fontSize:12,fontWeight:sel?700:400,color:sel?color:"#64748b",lineHeight:1.3}}>{v}</span>
+                    {sel&&<svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" style={{marginLeft:"auto",flexShrink:0}}><polyline points="20 6 9 17 4 12"/></svg>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* DATE & HEURE */}
+          <div>
+            <FmSectionTitle icon={<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>}>Date & heure</FmSectionTitle>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+              <FmField label="Date *" style={{gridColumn:"span 1"}}><input type="date" value={f.date} onChange={e=>set("date",e.target.value)}/></FmField>
+              <FmField label="Heure"><input type="time" value={f.heure} onChange={e=>set("heure",e.target.value)}/></FmField>
+              <FmField label="Durée (min)"><input type="number" value={f.duree} onChange={e=>set("duree",e.target.value)} placeholder="60"/></FmField>
+            </div>
+          </div>
+
+          {/* CLIENT */}
+          <div>
+            <FmSectionTitle icon={<><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></>}>Client (optionnel)</FmSectionTitle>
+            <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:160,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+              <button className={`fm-client-row${f.clientId===""?" sel":""}`} onClick={()=>set("clientId","")} style={{justifyContent:"center",fontSize:13,color:f.clientId===""?"#0891b2":"#94a3b8",fontFamily:"inherit",fontWeight:f.clientId===""?600:400}}>— Aucun client —</button>
+              {clients.map(c=>{
+                const sel=f.clientId===c.id;
+                return (
+                  <button key={c.id} className={`fm-client-row${sel?" sel":""}`} onClick={()=>set("clientId",c.id)}>
+                    <Avatar nom={c.nom} size={32}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:sel?700:500,color:sel?"#0891b2":"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
+                      <div style={{fontSize:11,color:"#94a3b8"}}>{c.adresse?.split(",").pop()?.trim()||c.formule}</div>
+                    </div>
+                    {sel&&<div style={{width:20,height:20,borderRadius:"50%",background:"#0891b2",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* DESCRIPTION */}
+          <div>
+            <FmSectionTitle icon={<><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></>}>Notes</FmSectionTitle>
+            <FmField>
+              <textarea value={f.description} onChange={e=>set("description",e.target.value)} placeholder="Détails, adresse, instructions particulières…" style={{minHeight:72,resize:"vertical"}}/>
+            </FmField>
+          </div>
+
+          {/* Récap rapide */}
+          {(f.date||selectedClient)&&(
+            <div style={{background:"#f0f9ff",borderRadius:12,padding:"12px 14px",border:"1px solid #bae6fd",display:"flex",alignItems:"center",gap:10}}>
+              <div style={{width:36,height:36,borderRadius:10,background:selectedType.color+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{selectedType.ico}</div>
+              <div>
+                <div style={{fontSize:13,fontWeight:600,color:"#0f172a"}}>{f.type}</div>
+                <div style={{fontSize:11,color:"#64748b",marginTop:1}}>
+                  {f.date&&new Date(f.date).toLocaleDateString("fr",{weekday:"long",day:"2-digit",month:"long"})}{f.heure&&` · ${f.heure}`}{f.duree&&` · ${f.duree} min`}
+                  {selectedClient&&<> · {selectedClient.nom}</>}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SAVE */}
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <button className="fm-save-btn" style={{background:`linear-gradient(135deg,${selectedType.color},${selectedType.color}cc)`}} onClick={()=>{ if(!f.date){ toastWarn("Date requise"); return; } clearDraft(); onSave({...f,id:isEdit?f.id:uid()}); }}>
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+              {isEdit?"Modifier le RDV":"Créer le rendez-vous"}
+            </button>
+            <button className="fm-cancel-btn" onClick={onClose}>Annuler</button>
+          </div>
         </div>
-      </Section>
-      <Section title="Date & heure">
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-          <Input label="Date *" type="date" value={f.date} onChange={e=>set("date",e.target.value)}/>
-          <Input label="Heure" type="time" value={f.heure} onChange={e=>set("heure",e.target.value)}/>
-        </div>
-        <div style={{marginTop:10}}>
-          <Input label="Durée (min)" type="number" style={{fontSize:16}} value={f.duree} onChange={e=>set("duree",e.target.value)}/>
-        </div>
-      </Section>
-      <Section title="Type">
-        <div style={{display:"flex",flexDirection:"column",gap:5}}>
-          {[
-            {v:"Rendez-vous client",ico:"🤝"},{v:"Mise en route",ico:"▶️"},{v:"Hivernage",ico:"❄️"},
-            {v:"Devis / Visite technique",ico:"📋"},{v:"Réparation / SAV",ico:"🔧"},{v:"Autre",ico:"📌"}
-          ].map(({v,ico})=>{
-            const sel=f.type===v;
-            return (
-              <button key={v} onClick={()=>set("type",v)} className="btn-hover" style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",borderRadius:12,border:`1.5px solid ${sel?DS.purple:DS.border}`,background:sel?DS.purpleSoft:DS.white,cursor:"pointer",textAlign:"left",fontFamily:"inherit",transition:"all .2s"}}>
-                <span style={{fontSize:16}}>{ico}</span>
-                <span style={{fontSize:15,fontWeight:sel?700:400,color:sel?DS.purple:DS.mid,flex:1}}>{v}</span>
-                {sel && <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={DS.purple} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-              </button>
-            );
-          })}
-        </div>
-      </Section>
-      <Section title="Description">
-        <textarea value={f.description} onChange={e=>set("description",e.target.value)} placeholder="Détails, adresse, notes..."
-          style={{width:"100%",padding:"10px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:15,minHeight:64,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,outline:"none"}}/>
-      </Section>
-      <SunBurstFormNav
-        step={1} totalSteps={1}
-        onSave={()=>{ if(!f.date){ toastWarn("Date requise"); return; } clearDraft(); onSave({...f,id:isEdit?f.id:uid()}); }}
-        onCancel={onClose}
-        saveLabel="Enregistrer le RDV"
-        nextColor="#7c3aed"
-        showDraft={false}
-        showStepIndicator={false}
-      />
+      </div>
     </Modal>
   );
 }
@@ -4875,7 +4923,7 @@ function DashboardHero({ clients, passages, rdvs, saisonNow, isMobile, onAddPass
           {/* Salutation */}
           <div style={{marginBottom:16}}>
             <div style={{fontSize:22,fontWeight:800,color:"#fff",lineHeight:1.2,letterSpacing:"-0.5px"}}>
-              {salut} Dorian ☀️
+              {salut} Thomas ☀️
             </div>
             <div style={{fontSize:12,color:"rgba(255,255,255,0.65)",marginTop:3,fontWeight:400}}>
               {rdvsToday.length > 0 ? `${rdvsToday.length} rendez-vous aujourd'hui` : "Bonne journée sur le terrain"}
@@ -4913,8 +4961,8 @@ function DashboardHero({ clients, passages, rdvs, saisonNow, isMobile, onAddPass
           {[
             {label:"Nouvelle\nintervention", icon:<><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><line x1="12" y1="13" x2="12" y2="17"/><line x1="10" y1="15" x2="14" y2="15"/></>, color:"#0891b2", bg:"linear-gradient(135deg,#e0f2fe,#f0f9ff)", border:"#bae6fd", onClick:onAddPassage},
             {label:"Nouveau\nclient", icon:<><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></>, color:"#7c3aed", bg:"linear-gradient(135deg,#ede9fe,#f5f3ff)", border:"#ddd6fe", onClick:onAddClient},
-            {label:"Rapport /\nAnalyse", icon:<><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></>, color:"#0891b2", bg:"linear-gradient(135deg,#e0f2fe,#f0f9ff)", border:"#bae6fd", onClick:onAddPassage},
-            {label:"Devis ou\nfacture", icon:<><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="12" y2="15"/></>, color:"#059669", bg:"linear-gradient(135deg,#d1fae5,#f0fdf4)", border:"#a7f3d0", onClick:onAddRdv},
+            {label:"Livraison\nproduits", icon:<><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></>, color:"#059669", bg:"linear-gradient(135deg,#d1fae5,#f0fdf4)", border:"#a7f3d0", onClick:onAddLivraison},
+            {label:"Nouveau\nRDV", icon:<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="14" x2="12" y2="18"/><line x1="10" y1="16" x2="14" y2="16"/></>, color:"#7c3aed", bg:"linear-gradient(135deg,#ede9fe,#f5f3ff)", border:"#ddd6fe", onClick:onAddRdv},
           ].map(a=>(
             <button key={a.label} className="db-btn" onClick={a.onClick} style={{background:a.bg,border:`1px solid ${a.border}`,borderRadius:14,padding:"12px 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:7,cursor:"pointer",fontFamily:"inherit",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
               <div style={{width:34,height:34,borderRadius:10,background:"white",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 8px rgba(0,0,0,0.08)"}}>
