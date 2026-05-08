@@ -6484,7 +6484,7 @@ function CarnetView({ client, passages, onRefresh, refreshing }) {
 
         {/* FOOTER */}
         <div style={{marginTop:24,textAlign:"center",padding:"16px 0 8px"}}>
-          <div style={{fontSize:11,color:"#94a3b8",fontWeight:500,lineHeight:2}}>BRIBLUE · Traitement de l'eau · La Seyne-sur-Mer<br/>SIRET 84345436400053</div>
+          <div style={{fontSize:11,color:"#94a3b8",fontWeight:500,lineHeight:2}}>BRIBLUE </div>
         </div>
 
       </div>
