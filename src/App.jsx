@@ -1,7 +1,8 @@
 // @ts-nocheck
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+import { db, auth, storage, APP_DOC } from "./lib/firebase";
+import { save, load, reconcileOnBoot, flushPendingNow, IS_IOS } from "./lib/storage";
+import { getDoc, setDoc } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCyRHh4hGaDYU1NumTrRJ-3KKuRxC8NU5k",
