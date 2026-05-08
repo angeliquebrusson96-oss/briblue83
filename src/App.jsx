@@ -3418,6 +3418,16 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
   });
   const [step,setStep]=useState(1);
   const [showConfirmSave, setShowConfirmSave] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
+
+  // Sauvegarde manuelle brouillon
+  const saveDraftManual = () => {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({...f, _savedAt: Date.now(), _step: step}));
+      setDraftSaved(true);
+      setTimeout(() => setDraftSaved(false), 2500);
+    } catch {}
+  };
 
   // Sauvegarde du brouillon à chaque changement (debounced 400ms)
   const draftTimerRef = useRef(null);
@@ -3662,6 +3672,52 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
 
   return (
     <Modal title={isEdit ? "Modifier le passage" : "Rapport"} onClose={onClose} wide>
+
+      {/* ═══ BOUTON BROUILLON STICKY EN HAUT ═══ */}
+      <div style={{
+        position:"sticky", top:0, zIndex:50,
+        margin:"-4px -28px 14px",
+        marginLeft:"var(--modal-padding-left,-28px)",
+        marginRight:"var(--modal-padding-right,-28px)",
+        padding:"8px 16px",
+        background:"rgba(255,255,255,0.92)",
+        backdropFilter:"blur(12px)",
+        WebkitBackdropFilter:"blur(12px)",
+        borderBottom:"1px solid rgba(8,145,178,0.12)",
+        display:"flex", alignItems:"center", justifyContent:"space-between", gap:10,
+      }}>
+        <div style={{display:"flex",alignItems:"center",gap:7}}>
+          <div style={{width:8,height:8,borderRadius:4,background:draftSaved?"#059669":"#f59e0b",transition:"background .4s"}}/>
+          <span style={{fontSize:12,fontWeight:700,color:draftSaved?"#059669":"#92400e"}}>
+            {draftSaved ? "✓ Brouillon sauvegardé" : "Brouillon en cours"}
+          </span>
+        </div>
+        <button
+          onClick={saveDraftManual}
+          style={{
+            padding:"7px 14px",
+            borderRadius:10,
+            background:draftSaved?"linear-gradient(135deg,#059669,#0d9488)":"linear-gradient(135deg,#f59e0b,#d97706)",
+            border:"none",
+            cursor:"pointer",
+            color:"#fff",
+            fontWeight:800,
+            fontSize:12,
+            fontFamily:"inherit",
+            display:"flex", alignItems:"center", gap:6,
+            boxShadow:draftSaved?"0 3px 10px rgba(5,150,105,0.3)":"0 3px 10px rgba(245,158,11,0.3)",
+            transition:"all .3s",
+          }}
+        >
+          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+            <polyline points="17 21 17 13 7 13 7 21"/>
+            <polyline points="7 3 7 8 15 8"/>
+          </svg>
+          {draftSaved ? "Sauvegardé !" : "Sauvegarder brouillon"}
+        </button>
+      </div>
+
       {/* ═══ BROUILLON DÉTECTÉ ═══ */}
       {hasDraft && (
         <div className="fade-in" style={{margin:"-4px 0 14px",padding:"14px 16px",borderRadius:16,background:"linear-gradient(135deg,rgba(245,158,11,0.18),rgba(217,119,6,0.12))",border:"1px solid rgba(245,158,11,0.35)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
