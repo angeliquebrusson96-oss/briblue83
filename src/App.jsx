@@ -1879,6 +1879,12 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
   const eff = passContrat.length;
   const jours = daysUntil(client.dateFin);
   const rest = Math.max(0,total-eff);
+  // Passages restants CE MOIS (pour planning)
+  const moisNow = new Date().getMonth()+1;
+  const yearNow = new Date().getFullYear();
+  const passagesCeMois = passContrat.filter(p=>new Date(p.date).getMonth()+1===moisNow&&new Date(p.date).getFullYear()===yearNow).length;
+  const prevuCeMois = (getMoisVal(client.moisParMois||client.saisons||{},moisNow).entretien||0)+(getMoisVal(client.moisParMois||client.saisons||{},moisNow).controle||0);
+  const restantsCeMois = Math.max(0, prevuCeMois - passagesCeMois);
   const pct = total>0?Math.round(eff/total*100):0;
   const mensualite = (()=>{const {m11}=calcMensualites(client.prix||0);return m11;})();
 
@@ -1942,7 +1948,8 @@ function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[
             {[
               {label:"Entretiens",val:`${effE}/${totalE}`,ok:effE>=totalE,sub:"effectués"},
               {label:"Contrôles", val:`${effC}/${totalC}`,ok:effC>=totalC,sub:"effectués"},
-              {label:"Restants",  val:rest,ok:rest===0,sub:"passages",highlight:rest>0},
+              {label:"Restants",  val:rest,ok:rest===0,sub:"contrat",highlight:rest>0},
+              {label:"Ce mois",   val:restantsCeMois,ok:restantsCeMois===0,sub:"à planifier",highlight:restantsCeMois>0},
               {label:"Mensualité",val:mensualite+"€",ok:true,sub:"/mois"},
             ].map(({label,val,ok,sub,highlight},i)=>(
               <div key={i} style={{background:"rgba(255,255,255,0.6)",borderRadius:14,padding:"11px 6px",textAlign:"center",border:"1px solid rgba(255,255,255,0.5)",backdropFilter:"blur(14px) saturate(180%)",WebkitBackdropFilter:"blur(14px) saturate(180%)",boxShadow:"0 4px 14px rgba(6,182,212,0.10)"}}>
@@ -5237,24 +5244,40 @@ function PassageDetailModal({ passage, client, onClose }) {
 }
 
 // PAGE PASSAGES
-function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePassageStatus, onAddClient }) {
+function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePassageStatus, onAddClient, onValider, onChangeStatut }) {
   const [filter,setFilter]=useState("mois");
   const [detailPassage, setDetailPassage] = useState(null);
   const now=new Date();
+  const todayStr = now.toISOString().split("T")[0];
+
+  const STATUT_META = {
+    a_faire:  { label:"À faire",  color:"#d97706", bg:"#fef3c7" },
+    en_cours: { label:"En cours", color:"#0891b2", bg:"#e0f2fe" },
+    validee:  { label:"Validée",  color:"#059669", bg:"#d1fae5" },
+  };
+
   const filtered=useMemo(()=>{
     return passages.filter(p=>{
       const d=new Date(p.date);
+      if(filter==="jour") return String(p.date).slice(0,10)===todayStr;
       if(filter==="semaine") return (now-d)/86400000<=7&&d<=now;
       if(filter==="mois") return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();
       return true;
-    }).sort((a,b)=>new Date(b.date)-new Date(a.date));
-  },[passages,filter]);
+    }).sort((a,b)=>{
+      // En cours en premier, puis à faire, puis validées
+      const ordre = { en_cours:0, a_faire:1, validee:2 };
+      const oa = ordre[a.statut]??1, ob = ordre[b.statut]??1;
+      if(oa!==ob) return oa-ob;
+      return new Date(b.date)-new Date(a.date);
+    });
+  },[passages,filter,todayStr]);
 
   const counts = useMemo(()=>({
+    jour: passages.filter(p=>String(p.date).slice(0,10)===todayStr).length,
     semaine: passages.filter(p=>{const d=new Date(p.date);return (now-d)/86400000<=7&&d<=now;}).length,
     mois: passages.filter(p=>{const d=new Date(p.date);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();}).length,
     tout: passages.length,
-  }),[passages]);
+  }),[passages,todayStr]);
 
   return (
     <div>
@@ -5265,7 +5288,7 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
       </div>
       <div style={{display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
         <div style={{display:"flex",gap:6,flex:1,background:DS.light,borderRadius:DS.radius,padding:4}}>
-          {[["semaine","7 jours",Ico.clock],[" mois","Ce mois",Ico.calendar],["tout","Tout",Ico.clipboard]].map(([v,l,ico])=>{
+          {[["jour","Auj.",Ico.clock],["semaine","7j",Ico.clock],[" mois","Mois",Ico.calendar],["tout","Tout",Ico.clipboard]].map(([v,l,ico])=>{
             const key=v.trim(); const active=filter===key;
             return (
               <button key={key} onClick={()=>setFilter(key)} className="btn-hover" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"8px 4px",borderRadius:DS.radiusSm,border:"none",cursor:"pointer",fontFamily:"inherit",background:active?DS.white:"transparent",color:active?DS.dark:DS.mid,boxShadow:active?"0 1px 4px rgba(0,0,0,0.08)":"none",transition:"all .2s"}}>
@@ -5309,7 +5332,9 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                           {p.tech&&<><span>·</span>{Ico.user(10,DS.mid)}<span>{p.tech}</span></>}
                         </div>
                       </div>
-                      <div style={{display:"flex",gap:3,alignItems:"center"}}>
+                      <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                        {/* Badge statut */}
+                        {(()=>{const sm=STATUT_META[p.statut]||(p.ok?STATUT_META.validee:STATUT_META.a_faire);return(<span style={{padding:"2px 8px",borderRadius:20,background:sm.bg,color:sm.color,fontSize:10,fontWeight:800}}>{sm.label}</span>);})()}
                         {p.ok?<IcoBubble ico={Ico.check(11,DS.green)} color={DS.green} size={24}/>:<IcoBubble ico={Ico.x(11,DS.red)} color={DS.red} size={24}/>}
                       </div>
                     </div>
@@ -5344,12 +5369,36 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                           </button>
                         : <div style={{borderRadius:10,background:DS.light,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:DS.mid,fontWeight:500}}>{Ico.mail(12,DS.mid)} Pas d'email</div>
                       }
-                      <button onClick={()=>onEdit(p)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>
-                        {Ico.edit(13,DS.mid)} Modifier
-                      </button>
-                      <button onClick={()=>showConfirm("Supprimer ce passage ?",()=>onDelete(p.id))} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.red,fontFamily:"inherit",fontWeight:700}}>
-                        {Ico.trash(13,DS.red)} Supprimer
-                      </button>
+                      {/* Changer statut */}
+                      {p.statut!=="validee" && onChangeStatut && (
+                        <div style={{display:"flex",gap:4}}>
+                          {["a_faire","en_cours"].map(s=>{
+                            const sm=STATUT_META[s];
+                            return(<button key={s} onClick={()=>onChangeStatut(p.id,s)} style={{flex:1,padding:"8px 4px",borderRadius:10,border:`1.5px solid ${p.statut===s?sm.color:"transparent"}`,background:p.statut===s?sm.bg:DS.light,color:p.statut===s?sm.color:DS.mid,fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{sm.label}</button>);
+                          })}
+                        </div>
+                      )}
+                      {/* Valider = verrouiller */}
+                      {p.statut!=="validee" && onValider && (
+                        <button onClick={()=>showConfirm("Valider cette intervention ? Elle sera verrouillée.",()=>onValider(p.id))} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.green,fontFamily:"inherit",fontWeight:700}}>
+                          {Ico.check(13,DS.green)} Valider
+                        </button>
+                      )}
+                      {p.statut!=="validee" && (
+                        <button onClick={()=>onEdit(p)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>
+                          {Ico.edit(13,DS.mid)} Modifier
+                        </button>
+                      )}
+                      {p.statut!=="validee" && (
+                        <button onClick={()=>showConfirm("Supprimer ce passage ?",()=>onDelete(p.id))} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.red,fontFamily:"inherit",fontWeight:700}}>
+                          {Ico.trash(13,DS.red)} Supprimer
+                        </button>
+                      )}
+                      {p.statut==="validee" && (
+                        <div style={{padding:"10px",borderRadius:10,background:DS.greenSoft,display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.green,fontWeight:700}}>
+                          {Ico.check(13,DS.green)} Intervention verrouillée
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -5832,6 +5881,7 @@ function CarnetPublic({ code, allClients, allPassages }) {
   const [loadedPassages, setLoadedPassages] = useState(null);
   const [selectedPassage, setSelectedPassage] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const MOIS_FR_COURT = ["","Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
 
   const loadData = useCallback(async () => {
     setRefreshing(true);
@@ -6490,7 +6540,16 @@ export default function App() {
     setShowFormClient(false);setEditClient(null);setFicheClient(c); 
   },[saveClients, clients, saveContrats]);
   const deleteClient = useCallback(id=>{ showConfirm("Supprimer ce client et tous ses passages ?", ()=>{ setClients(prev=>{ const next=prev.filter(x=>x.id!==id); saveClients(next); return next; }); setPassages(prev=>{ const next=prev.filter(x=>x.clientId!==id); savePassages(next); return next; }); setFicheClient(null); }); },[saveClients,savePassages]);
-  const savePassage = useCallback(p=>{ setPassages(prev=>{ const next=prev.find(x=>x.id===p.id)?prev.map(x=>x.id===p.id?p:x):[...prev,p]; savePassages(next); return next; }); setShowFormPassage(false);setEditPassage(null); },[savePassages]);
+  const savePassage = useCallback(p=>{ 
+    // Verrouillage : intervention validée non modifiable
+    const existing = passages.find(x=>x.id===p.id);
+    if(existing?.statut==="validee" && p.statut!=="validee"){ 
+      toastError("Cette intervention est validée et ne peut plus être modifiée."); 
+      return; 
+    }
+    setPassages(prev=>{ const next=prev.find(x=>x.id===p.id)?prev.map(x=>x.id===p.id?p:x):[...prev,p]; savePassages(next); return next; }); 
+    setShowFormPassage(false);setEditPassage(null); 
+  },[savePassages, passages]);
   const updatePassageRapportStatus = useCallback((passageMaj) => {
     setPassages(prev => {
       const next = prev.map(x => x.id === passageMaj.id ? { ...x, ...passageMaj } : x);
@@ -6498,7 +6557,30 @@ export default function App() {
       return next;
     });
   }, [savePassages]);
-  const deletePassage = useCallback(id=>{ setPassages(prev=>{ const next=prev.filter(x=>x.id!==id); savePassages(next); return next; }); },[savePassages]);
+  const deletePassage = useCallback(id=>{ 
+    const p = passages.find(x=>x.id===id);
+    if(p?.statut==="validee"){ toastError("Impossible de supprimer une intervention validée."); return; }
+    setPassages(prev=>{ const next=prev.filter(x=>x.id!==id); savePassages(next); return next; }); 
+  },[savePassages, passages]);
+
+  // Valider une intervention — la verrouille définitivement
+  const validerPassage = useCallback(id=>{ 
+    setPassages(prev=>{ 
+      const next=prev.map(x=>x.id===id?{...x,statut:"validee",ok:true,valideAt:new Date().toISOString()}:x); 
+      savePassages(next); 
+      return next; 
+    }); 
+  },[savePassages]);
+
+  // Changer le statut (a_faire / en_cours / validee)
+  const updateStatutPassage = useCallback((id, statut)=>{ 
+    setPassages(prev=>{ 
+      const next=prev.map(x=>x.id===id?{...x,statut}:x); 
+      savePassages(next); 
+      return next; 
+    }); 
+  },[savePassages]);
+
   const openAddPassageFromClient = useCallback(cid=>{ setEditPassage(null);setDefaultClientId(cid);setShowFormPassage(true); },[]);
   const openEditPassage = useCallback(p=>{ setEditPassage(p);setDefaultClientId(p.clientId);setShowFormPassage(true); },[]);
   const saveLivraison = useCallback(l=>{ 
@@ -6541,10 +6623,17 @@ export default function App() {
   const nbAlertes = useMemo(()=>clients.filter(c=>alerteClient(c,passages)!=="ok"&&!dismissedAlertes.includes(c.id)).length,[clients,passages,dismissedAlertes]);
   const nbAFacturer = useMemo(()=>livraisons.filter(l=>l.statut==="aFacturer").length,[livraisons]);
 
+  // Indicateur iOS en haut de page (debug discret)
+  const iosIndicator = IS_IOS ? (
+    <div style={{position:"fixed",bottom:4,right:4,zIndex:99999,fontSize:9,color:"rgba(8,145,178,0.5)",fontWeight:700,pointerEvents:"none"}}>
+      iOS ✓
+    </div>
+  ) : null;
+
   // Carnet public — accessible sans login
   if(carnetCode) return <><GlobalStyles/><CarnetPublic code={carnetCode} allClients={clients.length?clients:CLIENTS_INIT} allPassages={passages.length?passages:PASSAGES_INIT}/></>;
 
-  if(!loggedIn) return <><GlobalStyles/>
+  if(!loggedIn) return <><GlobalStyles/>{iosIndicator}
       <ToastContainer/>
       <ConfirmModal/><LoginScreen onLogin={handleLogin}/></>;
 
@@ -6646,7 +6735,7 @@ export default function App() {
           <div style={{padding:"6px 16px calc(90px + env(safe-area-inset-bottom,0px))",overflowX:"hidden"}}>
             {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}}/>}
             {page==="clients"&&<PageClients clients={clients} passages={passages} contrats={contrats} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onClientClick={setFicheClient} onAdd={openAddClient}/>}
-            {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddClient={openAddClient}/>}
+            {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddClient={openAddClient} onValider={validerPassage} onChangeStatut={updateStatutPassage}/>}
             {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
             {page==="documents"&&<PageDocuments clients={clients} contrats={contrats} onOpenContrat={(client,contrat)=>ouvrirContrat(client,contrat?.signaturePrestataire||"",contrat?.signatureClient||"")}/>}
           </div>
@@ -6692,7 +6781,7 @@ export default function App() {
               )}
               {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}}/>}
               {page==="clients"&&<PageClients clients={clients} passages={passages} contrats={contrats} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onClientClick={setFicheClient} onAdd={openAddClient}/>}
-              {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddClient={openAddClient}/>}
+              {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddClient={openAddClient} onValider={validerPassage} onChangeStatut={updateStatutPassage}/>}
               {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
               {page==="documents"&&<PageDocuments clients={clients} contrats={contrats} onOpenContrat={(client,contrat)=>ouvrirContrat(client,contrat?.signaturePrestataire||"",contrat?.signatureClient||"")}/>}
             </div>
