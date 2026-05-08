@@ -6596,46 +6596,48 @@ export default function App() {
     setShowFormClient(false);setEditClient(null);setFicheClient(c); 
   },[saveClients, clients, saveContrats]);
   const deleteClient = useCallback(id=>{ showConfirm("Supprimer ce client et tous ses passages ?", ()=>{ setClients(prev=>{ const next=prev.filter(x=>x.id!==id); saveClients(next); return next; }); setPassages(prev=>{ const next=prev.filter(x=>x.clientId!==id); savePassages(next); return next; }); setFicheClient(null); }); },[saveClients,savePassages]);
-  const savePassage = useCallback(p=>{ 
+  const savePassage = useCallback(async p=>{ 
     // Verrouillage : intervention validée non modifiable
     const existing = passages.find(x=>x.id===p.id);
     if(existing?.statut==="validee" && p.statut!=="validee"){ 
       toastError("Cette intervention est validée et ne peut plus être modifiée."); 
       return; 
     }
-    setPassages(prev=>{ const next=prev.find(x=>x.id===p.id)?prev.map(x=>x.id===p.id?p:x):[...prev,p]; savePassages(next); return next; }); 
+    // iOS FIX : calculer next AVANT setState, puis sauvegarder APRÈS
+    const next = passages.find(x=>x.id===p.id)
+      ? passages.map(x=>x.id===p.id?p:x)
+      : [...passages, p];
+    setPassages(next);
+    // await garantit que la sauvegarde se termine AVANT que iOS tue le process
+    await savePassages(next);
     setShowFormPassage(false);setEditPassage(null); 
   },[savePassages, passages]);
-  const updatePassageRapportStatus = useCallback((passageMaj) => {
-    setPassages(prev => {
-      const next = prev.map(x => x.id === passageMaj.id ? { ...x, ...passageMaj } : x);
-      savePassages(next);
-      return next;
-    });
-  }, [savePassages]);
-  const deletePassage = useCallback(id=>{ 
+  const updatePassageRapportStatus = useCallback(async (passageMaj) => {
+    const next = passages.map(x => x.id === passageMaj.id ? { ...x, ...passageMaj } : x);
+    setPassages(next);
+    await savePassages(next);
+  }, [savePassages, passages]);
+  const deletePassage = useCallback(async id=>{ 
     const p = passages.find(x=>x.id===id);
     if(p?.statut==="validee"){ toastError("Impossible de supprimer une intervention validée."); return; }
-    setPassages(prev=>{ const next=prev.filter(x=>x.id!==id); savePassages(next); return next; }); 
+    const next = passages.filter(x=>x.id!==id);
+    setPassages(next);
+    await savePassages(next);
   },[savePassages, passages]);
 
   // Valider une intervention — la verrouille définitivement
-  const validerPassage = useCallback(id=>{ 
-    setPassages(prev=>{ 
-      const next=prev.map(x=>x.id===id?{...x,statut:"validee",ok:true,valideAt:new Date().toISOString()}:x); 
-      savePassages(next); 
-      return next; 
-    }); 
-  },[savePassages]);
+  const validerPassage = useCallback(async id=>{ 
+    const next = passages.map(x=>x.id===id?{...x,statut:"validee",ok:true,valideAt:new Date().toISOString()}:x);
+    setPassages(next);
+    await savePassages(next);
+  },[savePassages, passages]);
 
   // Changer le statut (a_faire / en_cours / validee)
-  const updateStatutPassage = useCallback((id, statut)=>{ 
-    setPassages(prev=>{ 
-      const next=prev.map(x=>x.id===id?{...x,statut}:x); 
-      savePassages(next); 
-      return next; 
-    }); 
-  },[savePassages]);
+  const updateStatutPassage = useCallback(async (id, statut)=>{ 
+    const next = passages.map(x=>x.id===id?{...x,statut}:x);
+    setPassages(next);
+    await savePassages(next);
+  },[savePassages, passages]);
 
   const openAddPassageFromClient = useCallback(cid=>{ setEditPassage(null);setDefaultClientId(cid);setShowFormPassage(true); },[]);
   const openEditPassage = useCallback(p=>{ setEditPassage(p);setDefaultClientId(p.clientId);setShowFormPassage(true); },[]);
