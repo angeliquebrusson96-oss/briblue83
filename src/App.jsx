@@ -4295,13 +4295,20 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
       )}
 
       {/* Navigation */}
-      <div style={{display:"flex",gap:10,marginTop:20,paddingTop:14,borderTop:"1px solid "+DS.border,alignItems:"center"}}>
+      <div style={{display:"flex",gap:10,marginTop:20,paddingTop:14,borderTop:"1px solid "+DS.border,alignItems:"center",flexWrap:"wrap"}}>
         <button onClick={step===1?onClose:()=>setStep(s=>s-1)} className="btn-hover" style={{minHeight:52,padding:"14px 20px",borderRadius:DS.radiusSm,background:DS.light,border:"1.5px solid "+DS.border,cursor:"pointer",fontWeight:700,fontSize:14,color:DS.mid,fontFamily:"inherit",display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
           {step===1
             ? <><svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Annuler</>
             : <><svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg> Retour</>
           }
         </button>
+
+        {/* Bouton brouillon présent sur TOUTES les étapes */}
+        <button onClick={saveDraftManual} style={{minHeight:52,padding:"14px 16px",borderRadius:DS.radiusSm,background:draftSaved?"linear-gradient(135deg,#059669,#0d9488)":"rgba(245,158,11,0.12)",border:`1.5px solid ${draftSaved?"#059669":"rgba(245,158,11,0.4)"}`,cursor:"pointer",fontWeight:700,fontSize:13,color:draftSaved?"#fff":"#92400e",fontFamily:"inherit",display:"flex",alignItems:"center",gap:7,flexShrink:0,transition:"all .3s",WebkitTapHighlightColor:"transparent"}}>
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          {draftSaved ? "✓ Sauvegardé" : "Brouillon"}
+        </button>
+
         <div style={{flex:1}}/>
         {step<STEPS
           ? <button onClick={()=>setStep(s=>s+1)} className="btn-hover" style={{minHeight:52,padding:"14px 24px",borderRadius:DS.radiusSm,background:(STEP_INFO[step]||STEP_INFO[STEPS-1]).color,border:"none",cursor:"pointer",fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:8,boxShadow:`0 4px 16px ${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}44`,flexShrink:0}}>
@@ -5303,6 +5310,8 @@ function PassageDetailModal({ passage, client, onClose }) {
 function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePassageStatus, onAddClient, onValider, onChangeStatut }) {
   const [filter,setFilter]=useState("mois");
   const [detailPassage, setDetailPassage] = useState(null);
+  const [accordionOpen, setAccordionOpen] = useState(null); // id du passage ouvert
+  const isMobile = useIsMobile();
   const now=new Date();
   const todayStr = now.toISOString().split("T")[0];
 
@@ -5412,47 +5421,108 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                     )}
                     
                     
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:6,marginTop:10,paddingTop:10,borderTop:"1px solid "+DS.border}}>
-                      <button onClick={()=>setDetailPassage(p)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.light,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.dark,fontFamily:"inherit",fontWeight:700}}>
-                        {Ico.search(13,DS.mid)} Aperçu
-                      </button>
-                      <button onClick={()=>ouvrirRapport(p,c)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.blueSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.blue,fontFamily:"inherit",fontWeight:700,boxShadow:"0 1px 4px "+DS.blue+"22"}}>
-                        {Ico.pdf(14,DS.blue)} Rapport PDF
-                      </button>
-                      {c?.email
-                        ? <button onClick={()=>showConfirm(`Envoyer le rapport par email à ${c.email} ?`,()=>envoyerEmail(p,c,onUpdatePassageStatus))} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.green,fontFamily:"inherit",fontWeight:700}}>
-                            {Ico.send(13,DS.green)} Envoyer email
+                    {/* ═══ ACTIONS : accordéon mobile / grille desktop ═══ */}
+                    <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid "+DS.border}}>
+                      {isMobile ? (
+                        // ── MOBILE : bouton "Actions" qui ouvre l'accordéon ──
+                        <>
+                          <button
+                            onClick={()=>setAccordionOpen(accordionOpen===p.id ? null : p.id)}
+                            style={{width:"100%",padding:"10px 14px",borderRadius:12,border:"1.5px solid "+DS.border,background:accordionOpen===p.id?DS.blueSoft:DS.light,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",fontFamily:"inherit",fontWeight:700,fontSize:13,color:accordionOpen===p.id?DS.blue:DS.dark,WebkitTapHighlightColor:"transparent"}}
+                          >
+                            <span style={{display:"flex",alignItems:"center",gap:7}}>
+                              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+                              Actions
+                            </span>
+                            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{transform:accordionOpen===p.id?"rotate(180deg)":"rotate(0deg)",transition:"transform .2s"}}><polyline points="6 9 12 15 18 9"/></svg>
                           </button>
-                        : <div style={{borderRadius:10,background:DS.light,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:DS.mid,fontWeight:500}}>{Ico.mail(12,DS.mid)} Pas d'email</div>
-                      }
-                      {/* Changer statut */}
-                      {p.statut!=="validee" && onChangeStatut && (
-                        <div style={{display:"flex",gap:4}}>
-                          {["a_faire","en_cours"].map(s=>{
-                            const sm=STATUT_META[s];
-                            return(<button key={s} onClick={()=>onChangeStatut(p.id,s)} style={{flex:1,padding:"8px 4px",borderRadius:10,border:`1.5px solid ${p.statut===s?sm.color:"transparent"}`,background:p.statut===s?sm.bg:DS.light,color:p.statut===s?sm.color:DS.mid,fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{sm.label}</button>);
-                          })}
-                        </div>
-                      )}
-                      {/* Valider = verrouiller */}
-                      {p.statut!=="validee" && onValider && (
-                        <button onClick={()=>showConfirm("Valider cette intervention ? Elle sera verrouillée.",()=>onValider(p.id))} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.green,fontFamily:"inherit",fontWeight:700}}>
-                          {Ico.check(13,DS.green)} Valider
-                        </button>
-                      )}
-                      {p.statut!=="validee" && (
-                        <button onClick={()=>onEdit(p)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>
-                          {Ico.edit(13,DS.mid)} Modifier
-                        </button>
-                      )}
-                      {p.statut!=="validee" && (
-                        <button onClick={()=>showConfirm("Supprimer ce passage ?",()=>onDelete(p.id))} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.red,fontFamily:"inherit",fontWeight:700}}>
-                          {Ico.trash(13,DS.red)} Supprimer
-                        </button>
-                      )}
-                      {p.statut==="validee" && (
-                        <div style={{padding:"10px",borderRadius:10,background:DS.greenSoft,display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.green,fontWeight:700}}>
-                          {Ico.check(13,DS.green)} Intervention verrouillée
+                          {accordionOpen===p.id && (
+                            <div className="fade-in" style={{marginTop:8,display:"flex",flexDirection:"column",gap:6}}>
+                              <button onClick={()=>setDetailPassage(p)} style={{padding:"12px 14px",borderRadius:12,background:DS.light,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontFamily:"inherit",fontWeight:700,fontSize:13,color:DS.dark,WebkitTapHighlightColor:"transparent"}}>
+                                {Ico.search(15,DS.mid)}<span>Aperçu</span>
+                              </button>
+                              <button onClick={()=>ouvrirRapport(p,c)} style={{padding:"12px 14px",borderRadius:12,background:DS.blueSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontFamily:"inherit",fontWeight:700,fontSize:13,color:DS.blue,WebkitTapHighlightColor:"transparent"}}>
+                                {Ico.pdf(15,DS.blue)}<span>Rapport PDF</span>
+                              </button>
+                              {c?.email && (
+                                <button onClick={()=>showConfirm(`Envoyer à ${c.email} ?`,()=>envoyerEmail(p,c,onUpdatePassageStatus))} style={{padding:"12px 14px",borderRadius:12,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontFamily:"inherit",fontWeight:700,fontSize:13,color:DS.green,WebkitTapHighlightColor:"transparent"}}>
+                                  {Ico.send(15,DS.green)}<span>Envoyer email</span>
+                                </button>
+                              )}
+                              {p.statut!=="validee" && onChangeStatut && (
+                                <div style={{display:"flex",gap:6}}>
+                                  {["a_faire","en_cours"].map(s=>{
+                                    const sm=STATUT_META[s];
+                                    return(<button key={s} onClick={()=>onChangeStatut(p.id,s)} style={{flex:1,padding:"12px 8px",borderRadius:12,border:`2px solid ${p.statut===s?sm.color:DS.border}`,background:p.statut===s?sm.bg:DS.light,color:p.statut===s?sm.color:DS.mid,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>{sm.label}</button>);
+                                  })}
+                                </div>
+                              )}
+                              {p.statut!=="validee" && onValider && (
+                                <button onClick={()=>showConfirm("Valider cette intervention ? Elle sera verrouillée.",()=>{ onValider(p.id); setAccordionOpen(null); })} style={{padding:"12px 14px",borderRadius:12,background:"linear-gradient(135deg,#059669,#0d9488)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontFamily:"inherit",fontWeight:800,fontSize:13,color:"#fff",WebkitTapHighlightColor:"transparent"}}>
+                                  {Ico.check(15,"#fff")}<span>✓ Valider l'intervention</span>
+                                </button>
+                              )}
+                              {p.statut!=="validee" && (
+                                <button onClick={()=>{ onEdit(p); setAccordionOpen(null); }} style={{padding:"12px 14px",borderRadius:12,background:DS.light,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontFamily:"inherit",fontWeight:700,fontSize:13,color:DS.mid,WebkitTapHighlightColor:"transparent"}}>
+                                  {Ico.edit(15,DS.mid)}<span>Modifier</span>
+                                </button>
+                              )}
+                              {p.statut!=="validee" && (
+                                <button onClick={()=>showConfirm("Supprimer ce passage ?",()=>{ onDelete(p.id); setAccordionOpen(null); })} style={{padding:"12px 14px",borderRadius:12,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontFamily:"inherit",fontWeight:700,fontSize:13,color:DS.red,WebkitTapHighlightColor:"transparent"}}>
+                                  {Ico.trash(15,DS.red)}<span>Supprimer</span>
+                                </button>
+                              )}
+                              {p.statut==="validee" && (
+                                <div style={{padding:"12px 14px",borderRadius:12,background:DS.greenSoft,display:"flex",alignItems:"center",gap:10,fontSize:13,color:DS.green,fontWeight:700}}>
+                                  {Ico.check(15,DS.green)}<span>Intervention verrouillée</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        // ── DESKTOP : grille de boutons ──
+                        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:6}}>
+                          <button onClick={()=>setDetailPassage(p)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.light,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.dark,fontFamily:"inherit",fontWeight:700}}>
+                            {Ico.search(13,DS.mid)} Aperçu
+                          </button>
+                          <button onClick={()=>ouvrirRapport(p,c)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.blueSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.blue,fontFamily:"inherit",fontWeight:700}}>
+                            {Ico.pdf(14,DS.blue)} Rapport PDF
+                          </button>
+                          {c?.email
+                            ? <button onClick={()=>showConfirm(`Envoyer à ${c.email} ?`,()=>envoyerEmail(p,c,onUpdatePassageStatus))} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.green,fontFamily:"inherit",fontWeight:700}}>
+                                {Ico.send(13,DS.green)} Email
+                              </button>
+                            : <div style={{borderRadius:10,background:DS.light,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:DS.mid}}>{Ico.mail(12,DS.mid)} Pas d'email</div>
+                          }
+                          {p.statut!=="validee" && onChangeStatut && (
+                            <div style={{display:"flex",gap:4}}>
+                              {["a_faire","en_cours"].map(s=>{
+                                const sm=STATUT_META[s];
+                                return(<button key={s} onClick={()=>onChangeStatut(p.id,s)} style={{flex:1,padding:"8px 4px",borderRadius:10,border:`1.5px solid ${p.statut===s?sm.color:"transparent"}`,background:p.statut===s?sm.bg:DS.light,color:p.statut===s?sm.color:DS.mid,fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{sm.label}</button>);
+                              })}
+                            </div>
+                          )}
+                          {p.statut!=="validee" && onValider && (
+                            <button onClick={()=>showConfirm("Valider ?",()=>onValider(p.id))} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.greenSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.green,fontFamily:"inherit",fontWeight:700}}>
+                              {Ico.check(13,DS.green)} Valider
+                            </button>
+                          )}
+                          {p.statut!=="validee" && (
+                            <button onClick={()=>onEdit(p)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.light,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.mid,fontFamily:"inherit",fontWeight:700}}>
+                              {Ico.edit(13,DS.mid)} Modifier
+                            </button>
+                          )}
+                          {p.statut!=="validee" && (
+                            <button onClick={()=>showConfirm("Supprimer ?",()=>onDelete(p.id))} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.red,fontFamily:"inherit",fontWeight:700}}>
+                              {Ico.trash(13,DS.red)} Supprimer
+                            </button>
+                          )}
+                          {p.statut==="validee" && (
+                            <div style={{padding:"10px",borderRadius:10,background:DS.greenSoft,display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.green,fontWeight:700}}>
+                              {Ico.check(13,DS.green)} Verrouillée
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
