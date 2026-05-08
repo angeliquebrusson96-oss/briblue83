@@ -1260,8 +1260,8 @@ function SunBurstActions({ actions, centerLabel = "FERMER", onClose, size = "aut
   const SIZE = (RADIUS * 2) + (BTN_SIZE) + 32;
 
   return (
+    <div style={{display:"flex",justifyContent:"center",alignItems:"center",width:"100%",margin:"24px 0 12px"}}>
     <div className="fade-in" style={{
-      margin:"24px auto 12px",
       width:SIZE,
       height:SIZE,
       position:"relative",
@@ -1339,6 +1339,7 @@ function SunBurstActions({ actions, centerLabel = "FERMER", onClose, size = "aut
         const dy = -Math.sin(angle) * RADIUS * 0.5;
         return `@keyframes burstX-${i}-${N} { 0% { opacity:0; transform: scale(0.3) translate(${dx}px, ${dy}px); } 100% { opacity:1; transform: scale(1) translate(0,0); } }`;
       }).join(" ")}</style>
+    </div>
     </div>
   );
 }
@@ -5149,7 +5150,13 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
 function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClientClick, onAdd }) {
   const [search, setSearch] = useState("");
   const isMobile = useIsMobile();
-  const filtered = useMemo(()=>clients.filter(c=>c.nom.toLowerCase().includes(search.toLowerCase())||c.adresse?.toLowerCase().includes(search.toLowerCase())),[clients,search]);
+  const filtered = useMemo(()=>{
+    let list = clients.filter(c=>c.nom.toLowerCase().includes(search.toLowerCase())||c.adresse?.toLowerCase().includes(search.toLowerCase()));
+    if (filterStat === "contrat") list = list.filter(c=>{ const j=daysUntil(c.dateFin); return j!==null && j>=0; });
+    if (filterStat === "alertes") list = list.filter(c=>alerteClient(c,passages)!=="ok");
+    if (filterStat === "expires") list = list.filter(c=>{ const j=daysUntil(c.dateFin); return j!==null && j<30; });
+    return list;
+  },[clients,search,filterStat,passages]);
   const totalAll = clients.length;
   const alertCount = clients.filter(c=>alerteClient(c,passages)!=="ok").length;
 
@@ -5165,6 +5172,7 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
   ];
 
   const [openPicker, setOpenPicker] = useState(null); // clientId du picker ouvert
+  const [filterStat, setFilterStat] = useState("all"); // all | contrat | alertes | expires
 
   const getContrat = (clientId) =>
     contrats["CT-"+clientId]
@@ -5201,7 +5209,7 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
       {/* ═══ STATS HEADER — design soleil moderne ═══ */}
       <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(2,1fr)":"repeat(4,1fr)",gap:10,marginBottom:16}}>
         {/* Total clients */}
-        <div style={{background:"linear-gradient(135deg,#0c1f3f 0%,#0369a1 100%)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:"0 8px 24px rgba(12,31,63,0.25)"}}>
+        <div onClick={()=>setFilterStat("all")} style={{cursor:"pointer",transform:filterStat==="all"?"scale(1.04)":"scale(1)",transition:"transform .2s",background:"linear-gradient(135deg,#0c1f3f 0%,#0369a1 100%)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:"0 8px 24px rgba(12,31,63,0.25)"}}>
           <div style={{position:"absolute",top:-15,right:-15,width:80,height:80,borderRadius:"50%",background:"rgba(56,189,248,0.15)",pointerEvents:"none"}}/>
           <div style={{display:"flex",alignItems:"center",gap:10,position:"relative"}}>
             <div style={{width:42,height:42,borderRadius:12,background:"rgba(56,189,248,0.25)",border:"1.5px solid rgba(56,189,248,0.4)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -5215,7 +5223,7 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
         </div>
 
         {/* Sous contrat */}
-        <div style={{background:"linear-gradient(135deg,#059669,#10b981)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:"0 8px 24px rgba(5,150,105,0.25)"}}>
+        <div onClick={()=>setFilterStat(filterStat==="contrat"?"all":"contrat")} style={{cursor:"pointer",transform:filterStat==="contrat"?"scale(1.04)":"scale(1)",transition:"transform .2s",background:"linear-gradient(135deg,#059669,#10b981)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:"0 8px 24px rgba(5,150,105,0.25)"}}>
           <div style={{position:"absolute",top:-15,right:-15,width:80,height:80,borderRadius:"50%",background:"rgba(255,255,255,0.12)",pointerEvents:"none"}}/>
           <div style={{display:"flex",alignItems:"center",gap:10,position:"relative"}}>
             <div style={{width:42,height:42,borderRadius:12,background:"rgba(255,255,255,0.2)",border:"1.5px solid rgba(255,255,255,0.3)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -5229,7 +5237,7 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
         </div>
 
         {/* Alertes */}
-        <div style={{background:statsClients.alertes>0?"linear-gradient(135deg,#dc2626,#ef4444)":"linear-gradient(135deg,#94a3b8,#64748b)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:`0 8px 24px ${statsClients.alertes>0?"rgba(220,38,38,0.25)":"rgba(100,116,139,0.18)"}`}}>
+        <div onClick={()=>setFilterStat(filterStat==="alertes"?"all":"alertes")} style={{cursor:"pointer",transform:filterStat==="alertes"?"scale(1.04)":"scale(1)",transition:"transform .2s",background:statsClients.alertes>0?"linear-gradient(135deg,#dc2626,#ef4444)":"linear-gradient(135deg,#94a3b8,#64748b)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:`0 8px 24px ${statsClients.alertes>0?"rgba(220,38,38,0.25)":"rgba(100,116,139,0.18)"}`}}>
           <div style={{position:"absolute",top:-15,right:-15,width:80,height:80,borderRadius:"50%",background:"rgba(255,255,255,0.12)",pointerEvents:"none"}}/>
           <div style={{display:"flex",alignItems:"center",gap:10,position:"relative"}}>
             <div style={{width:42,height:42,borderRadius:12,background:"rgba(255,255,255,0.2)",border:"1.5px solid rgba(255,255,255,0.3)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -5243,7 +5251,7 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
         </div>
 
         {/* Expirent < 30j */}
-        <div style={{background:statsClients.expires>0?"linear-gradient(135deg,#d97706,#f59e0b)":"linear-gradient(135deg,#94a3b8,#64748b)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:`0 8px 24px ${statsClients.expires>0?"rgba(217,119,6,0.25)":"rgba(100,116,139,0.18)"}`}}>
+        <div onClick={()=>setFilterStat(filterStat==="expires"?"all":"expires")} style={{cursor:"pointer",transform:filterStat==="expires"?"scale(1.04)":"scale(1)",transition:"transform .2s",background:statsClients.expires>0?"linear-gradient(135deg,#d97706,#f59e0b)":"linear-gradient(135deg,#94a3b8,#64748b)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:`0 8px 24px ${statsClients.expires>0?"rgba(217,119,6,0.25)":"rgba(100,116,139,0.18)"}`}}>
           <div style={{position:"absolute",top:-15,right:-15,width:80,height:80,borderRadius:"50%",background:"rgba(255,255,255,0.12)",pointerEvents:"none"}}/>
           <div style={{display:"flex",alignItems:"center",gap:10,position:"relative"}}>
             <div style={{width:42,height:42,borderRadius:12,background:"rgba(255,255,255,0.2)",border:"1.5px solid rgba(255,255,255,0.3)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -5256,6 +5264,20 @@ function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClient
           </div>
         </div>
       </div>
+      {/* Badge filtre actif */}
+      {filterStat !== "all" && (
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,padding:"8px 12px",borderRadius:12,background:"linear-gradient(135deg, rgba(8,145,178,0.1), rgba(8,145,178,0.05))",border:"1px solid rgba(8,145,178,0.2)"}}>
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.4" strokeLinecap="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+          <span style={{fontSize:12,fontWeight:700,color:"#0891b2",flex:1}}>
+            Filtre actif : {filterStat === "contrat" ? "Sous contrat" : filterStat === "alertes" ? "Avec alertes" : "Bientôt fin"} — {filtered.length} client{filtered.length>1?"s":""}
+          </span>
+          <button onClick={()=>setFilterStat("all")} style={{padding:"4px 10px",borderRadius:8,background:"rgba(255,255,255,0.7)",border:"1px solid rgba(8,145,178,0.25)",cursor:"pointer",fontSize:11,fontWeight:700,color:"#0891b2",fontFamily:"inherit",display:"flex",alignItems:"center",gap:4}}>
+            <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Effacer
+          </button>
+        </div>
+      )}
+
       <div style={{display:"flex",gap:10,marginBottom:14}}>
         <div style={{flex:1,position:"relative"}}>
           <div style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}>{Ico.search(16,"#94a3b8")}</div>
@@ -5672,8 +5694,8 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                             const SIZE = (RADIUS * 2) + (BTN_SIZE) + 32;
                             
                             return (
+                              <div style={{display:"flex",justifyContent:"center",alignItems:"center",width:"100%",margin:"24px 0 12px"}}>
                               <div className="fade-in" style={{
-                                margin:"24px auto 12px",
                                 width:SIZE,
                                 height:SIZE,
                                 position:"relative",
@@ -5765,6 +5787,7 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                                 })}
                                 
                                 <style>{actions.map((_,i)=>`@keyframes burst-${i} { 0% { opacity:0; transform: scale(0.3) translate(${-Math.cos((i/N)*2*Math.PI - Math.PI/2)*RADIUS*0.5}px, ${-Math.sin((i/N)*2*Math.PI - Math.PI/2)*RADIUS*0.5}px); } 100% { opacity:1; transform: scale(1) translate(0,0); } }`).join(" ")}</style>
+                              </div>
                               </div>
                             );
                           })()}
