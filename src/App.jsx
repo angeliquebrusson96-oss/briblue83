@@ -3673,78 +3673,7 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
   return (
     <Modal title={isEdit ? "Modifier le passage" : "Rapport"} onClose={onClose} wide>
 
-      {/* ═══ BANDEAU INFO BROUILLON STICKY ═══ */}
-      <div style={{
-        position:"sticky", top:0, zIndex:50,
-        margin:isMobile ? "-18px -20px 14px" : "-24px -28px 14px",
-        padding:"10px 16px",
-        background: draftSaved 
-          ? "linear-gradient(135deg, rgba(5,150,105,0.95), rgba(13,148,136,0.95))"
-          : "linear-gradient(135deg, rgba(255,255,255,0.92), rgba(255,255,255,0.88))",
-        backdropFilter:"blur(20px) saturate(180%)",
-        WebkitBackdropFilter:"blur(20px) saturate(180%)",
-        borderBottom: draftSaved ? "1px solid rgba(5,150,105,0.3)" : "1px solid rgba(8,145,178,0.12)",
-        display:"flex", alignItems:"center", justifyContent:"space-between", gap:10,
-        transition:"all .4s ease",
-      }}>
-        <div style={{display:"flex",alignItems:"center",gap:9}}>
-          {/* Pastille animée */}
-          <div style={{position:"relative",width:10,height:10}}>
-            <div style={{
-              position:"absolute",inset:0,
-              borderRadius:5,
-              background:draftSaved?"#fff":"#f59e0b",
-              boxShadow:draftSaved?"0 0 0 4px rgba(255,255,255,0.3)":"0 0 0 4px rgba(245,158,11,0.18)",
-              animation:draftSaved?"none":"pulse 2s ease-in-out infinite",
-            }}/>
-          </div>
-          <span style={{
-            fontSize:13,
-            fontWeight:800,
-            color:draftSaved?"#fff":"#92400e",
-            letterSpacing:0.2,
-          }}>
-            {draftSaved ? "✓ Brouillon sauvegardé" : "Saisie en cours"}
-          </span>
-        </div>
-
-        <button
-          onClick={saveDraftManual}
-          style={{
-            padding:"8px 14px",
-            borderRadius:10,
-            background:draftSaved
-              ? "rgba(255,255,255,0.25)"
-              : "linear-gradient(135deg,#f59e0b,#d97706)",
-            border:draftSaved?"1.5px solid rgba(255,255,255,0.4)":"none",
-            cursor:"pointer",
-            color:"#fff",
-            fontWeight:800,
-            fontSize:12,
-            fontFamily:"inherit",
-            display:"flex", alignItems:"center", gap:6,
-            boxShadow:draftSaved?"none":"0 3px 12px rgba(245,158,11,0.4)",
-            transition:"all .3s",
-            WebkitTapHighlightColor:"transparent",
-          }}
-        >
-          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
-            <polyline points="17 21 17 13 7 13 7 21"/>
-            <polyline points="7 3 7 8 15 8"/>
-          </svg>
-          {draftSaved ? "Sauvegardé" : "Sauver brouillon"}
-        </button>
-
-        <style>{`
-          @keyframes pulse {
-            0%,100% { transform: scale(1); opacity: 1; }
-            50%     { transform: scale(1.3); opacity: 0.7; }
-          }
-        `}</style>
-      </div>
-
-      {/* ═══ BROUILLON DÉTECTÉ ═══ */}
+            {/* ═══ BROUILLON DÉTECTÉ ═══ */}
       {hasDraft && (
         <div className="fade-in" style={{margin:"-4px 0 14px",padding:"14px 16px",borderRadius:16,background:"linear-gradient(135deg,rgba(245,158,11,0.18),rgba(217,119,6,0.12))",border:"1px solid rgba(245,158,11,0.35)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
           <div style={{width:40,height:40,borderRadius:12,background:"linear-gradient(135deg,#f59e0b,#d97706)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"0 6px 20px rgba(245,158,11,0.35)"}}>
@@ -4320,63 +4249,110 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
         </div>
       )}
 
-      {/* ═══ NAVIGATION FORMULAIRE — design soigné, sticky en bas ═══ */}
+      {/* ═══ NAVIGATION FORMULAIRE — design propre et aéré ═══ */}
       <div style={{
-        position:"sticky", bottom:0, zIndex:40,
-        marginTop:24,
-        marginLeft:isMobile?"-20px":"-28px",
-        marginRight:isMobile?"-20px":"-28px",
-        marginBottom:isMobile?"-18px":"-24px",
-        padding:"14px 16px",
-        paddingBottom:"calc(14px + env(safe-area-inset-bottom, 0px))",
-        background:"linear-gradient(180deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.95) 30%)",
-        backdropFilter:"blur(20px) saturate(180%)",
-        WebkitBackdropFilter:"blur(20px) saturate(180%)",
+        marginTop:32,
+        paddingTop:20,
         borderTop:"1px solid rgba(8,145,178,0.15)",
-        boxShadow:"0 -8px 30px rgba(12,31,63,0.08)",
       }}>
-        {/* Ligne 1 : Retour | Brouillon | Enregistrer rapide */}
-        <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:isMobile?8:0}}>
-          {/* Retour / Annuler */}
-          <button onClick={step===1?onClose:()=>setStep(s=>s-1)} style={{
-            minHeight:48,
-            padding:isMobile?"10px 12px":"12px 16px",
-            borderRadius:12,
-            background:"rgba(255,255,255,0.7)",
-            border:"1.5px solid rgba(8,145,178,0.18)",
-            cursor:"pointer",
-            fontWeight:700,
-            fontSize:13,
-            color:DS.mid,
-            fontFamily:"inherit",
-            display:"flex",alignItems:"center",gap:6,
-            flexShrink:0,
-            WebkitTapHighlightColor:"transparent",
-          }}>
-            {step===1
-              ? <><svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>{!isMobile && " Annuler"}</>
-              : <><svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>{!isMobile && " Retour"}</>
-            }
-          </button>
+        {/* Indicateur étape — discret en haut */}
+        <div style={{
+          textAlign:"center",
+          fontSize:10,
+          fontWeight:700,
+          color:DS.mid,
+          letterSpacing:1.2,
+          textTransform:"uppercase",
+          marginBottom:14,
+        }}>
+          Étape {step} sur {STEPS}
+        </div>
 
-          {/* Brouillon — toutes étapes */}
+        {/* Bouton SUIVANT principal (large, plein largeur) */}
+        {step<STEPS && (
+          <button onClick={()=>setStep(s=>s+1)} style={{
+            width:"100%",
+            minHeight:56,
+            padding:"16px 20px",
+            borderRadius:14,
+            background:`linear-gradient(135deg, ${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}, ${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}cc)`,
+            border:"none",
+            cursor:"pointer",
+            fontWeight:800,
+            fontSize:15,
+            color:"#fff",
+            fontFamily:"inherit",
+            display:"flex",
+            alignItems:"center",
+            justifyContent:"center",
+            gap:10,
+            boxShadow:`0 8px 24px ${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}55`,
+            WebkitTapHighlightColor:"transparent",
+            letterSpacing:0.3,
+            marginBottom:12,
+          }}>
+            <span>Suivant : {(STEP_INFO[step]||STEP_INFO[STEPS-1]).l}</span>
+            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"/>
+              <polyline points="12 5 19 12 12 19"/>
+            </svg>
+          </button>
+        )}
+
+        {/* Bouton ENREGISTRER (vert, large) — visible sur TOUTES les étapes */}
+        <button onClick={handleSave} style={{
+          width:"100%",
+          minHeight:56,
+          padding:"16px 20px",
+          borderRadius:14,
+          background:"linear-gradient(135deg,#059669,#10b981)",
+          border:"none",
+          cursor:"pointer",
+          fontWeight:800,
+          fontSize:15,
+          color:"#fff",
+          fontFamily:"inherit",
+          display:"flex",
+          alignItems:"center",
+          justifyContent:"center",
+          gap:10,
+          boxShadow:"0 8px 24px rgba(5,150,105,0.45)",
+          WebkitTapHighlightColor:"transparent",
+          letterSpacing:0.3,
+          marginBottom:12,
+        }}>
+          <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+            <polyline points="17 21 17 13 7 13 7 21"/>
+            <polyline points="7 3 7 8 15 8"/>
+          </svg>
+          Enregistrer le rapport
+        </button>
+
+        {/* Boutons secondaires : Brouillon + Retour/Annuler */}
+        <div style={{
+          display:"flex",
+          gap:10,
+        }}>
           <button onClick={saveDraftManual} style={{
+            flex:1,
             minHeight:48,
-            padding:isMobile?"10px 14px":"12px 18px",
+            padding:"12px 14px",
             borderRadius:12,
             background:draftSaved
               ? "linear-gradient(135deg,#059669,#0d9488)"
-              : "linear-gradient(135deg,rgba(245,158,11,0.18),rgba(217,119,6,0.12))",
+              : "rgba(245,158,11,0.12)",
             border:`1.5px solid ${draftSaved?"#059669":"rgba(245,158,11,0.4)"}`,
             cursor:"pointer",
-            fontWeight:800,
+            fontWeight:700,
             fontSize:13,
             color:draftSaved?"#fff":"#92400e",
             fontFamily:"inherit",
-            display:"flex",alignItems:"center",gap:7,
-            flexShrink:0,
+            display:"flex",
+            alignItems:"center",
+            justifyContent:"center",
+            gap:7,
             transition:"all .3s",
-            boxShadow:draftSaved?"0 4px 14px rgba(5,150,105,0.35)":"none",
             WebkitTapHighlightColor:"transparent",
           }}>
             <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
@@ -4387,65 +4363,33 @@ function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraiso
             {draftSaved ? "✓ Sauvegardé" : "Brouillon"}
           </button>
 
-          <div style={{flex:1}}/>
-
-          {/* Bouton ENREGISTRER toujours visible (à droite) */}
-          <button onClick={handleSave} style={{
+          <button onClick={step===1?onClose:()=>setStep(s=>s-1)} style={{
+            flex:1,
             minHeight:48,
-            padding:isMobile?"10px 14px":"12px 20px",
+            padding:"12px 14px",
             borderRadius:12,
-            background:"linear-gradient(135deg,#059669,#10b981)",
-            border:"none",
+            background:"rgba(255,255,255,0.7)",
+            border:"1.5px solid rgba(8,145,178,0.18)",
             cursor:"pointer",
-            fontWeight:800,
+            fontWeight:700,
             fontSize:13,
-            color:"#fff",
+            color:DS.mid,
             fontFamily:"inherit",
-            display:"flex",alignItems:"center",gap:7,
-            flexShrink:0,
-            boxShadow:"0 5px 16px rgba(5,150,105,0.4)",
+            display:"flex",
+            alignItems:"center",
+            justifyContent:"center",
+            gap:7,
             WebkitTapHighlightColor:"transparent",
           }}>
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M5 12l5 5L20 7"/>
-            </svg>
-            Enregistrer
+            {step===1
+              ? <><svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Annuler</>
+              : <><svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>Retour</>
+            }
           </button>
-        </div>
-
-        {/* Ligne 2 : Suivant en grand (large bouton coloré) */}
-        {step<STEPS && (
-          <button onClick={()=>setStep(s=>s+1)} style={{
-            width:"100%",
-            minHeight:54,
-            padding:"14px 20px",
-            borderRadius:14,
-            background:`linear-gradient(135deg, ${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}, ${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}dd)`,
-            border:"none",
-            cursor:"pointer",
-            fontWeight:800,
-            fontSize:15,
-            color:"#fff",
-            fontFamily:"inherit",
-            display:"flex",alignItems:"center",justifyContent:"center",gap:10,
-            boxShadow:`0 6px 20px ${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}55`,
-            WebkitTapHighlightColor:"transparent",
-            letterSpacing:0.2,
-          }}>
-            <span>Suivant : {(STEP_INFO[step]||STEP_INFO[STEPS-1]).l}</span>
-            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="5" y1="12" x2="19" y2="12"/>
-              <polyline points="12 5 19 12 12 19"/>
-            </svg>
-          </button>
-        )}
-
-        {/* Indicateur étape */}
-        <div style={{textAlign:"center",fontSize:10,color:DS.mid,fontWeight:600,marginTop:8,letterSpacing:0.5,textTransform:"uppercase"}}>
-          Étape {step} sur {STEPS} — {(STEP_INFO[step-1]||STEP_INFO[0]).l}
         </div>
       </div>
-      {/* Modale confirmation enregistrement */}
+
+            {/* Modale confirmation enregistrement */}
       {showConfirmSave && (()=>{
         const clientSel = clients.find(c=>c.id===f.clientId);
         const dateStr = f.date ? new Date(f.date).toLocaleDateString("fr",{weekday:"long",day:"2-digit",month:"long",year:"numeric"}) : "—";
@@ -5566,42 +5510,86 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                             {accordionOpen===p.id ? "Fermer" : "Actions"}
                           </button>
 
-                          {/* MENU RADIAL "SOLEIL" — boutons disposés en cercle */}
+                          {/* MENU "SOLEIL" — boutons en cercle autour d'un centre */}
                           {accordionOpen===p.id && (()=>{
-                            // Liste dynamique des actions selon le statut
                             const isVal = p.statut === "validee";
                             const actions = [
-                              { ic: Ico.search(20,"#fff"),  bg:"linear-gradient(135deg,#64748b,#475569)", label:"Aperçu",    onClick:()=>setDetailPassage(p) },
-                              { ic: Ico.pdf(20,"#fff"),     bg:"linear-gradient(135deg,#0891b2,#0e7490)", label:"PDF",       onClick:()=>ouvrirRapport(p,c) },
-                              ...(c?.email ? [{ ic: Ico.send(20,"#fff"), bg:"linear-gradient(135deg,#059669,#0d9488)", label:"Email", onClick:()=>showConfirm(`Envoyer à ${c.email} ?`,()=>envoyerEmail(p,c,onUpdatePassageStatus)) }] : []),
+                              { ic: Ico.search(22,"#fff"),  bg:"linear-gradient(135deg,#64748b,#475569)", label:"Aperçu",   onClick:()=>setDetailPassage(p) },
+                              { ic: Ico.pdf(22,"#fff"),     bg:"linear-gradient(135deg,#0891b2,#0e7490)", label:"PDF",      onClick:()=>ouvrirRapport(p,c) },
+                              ...(c?.email ? [{ ic: Ico.send(22,"#fff"), bg:"linear-gradient(135deg,#059669,#0d9488)", label:"Email", onClick:()=>showConfirm(`Envoyer à ${c.email} ?`,()=>envoyerEmail(p,c,onUpdatePassageStatus)) }] : []),
                               ...(!isVal && onChangeStatut ? [
-                                { ic: Ico.clock(20,"#fff"),   bg:"linear-gradient(135deg,#f59e0b,#d97706)", label:"À faire",  onClick:()=>onChangeStatut(p.id,"a_faire") },
-                                { ic: Ico.wrench(20,"#fff"),  bg:"linear-gradient(135deg,#0ea5e9,#0369a1)", label:"En cours", onClick:()=>onChangeStatut(p.id,"en_cours") },
+                                { ic: Ico.clock(22,"#fff"),  bg:"linear-gradient(135deg,#f59e0b,#d97706)", label:"À faire",  onClick:()=>onChangeStatut(p.id,"a_faire") },
+                                { ic: Ico.wrench(22,"#fff"), bg:"linear-gradient(135deg,#0ea5e9,#0369a1)", label:"En cours", onClick:()=>onChangeStatut(p.id,"en_cours") },
                               ] : []),
-                              ...(!isVal && onValider ? [{ ic: Ico.check(20,"#fff"), bg:"linear-gradient(135deg,#10b981,#059669)", label:"Valider", onClick:()=>showConfirm("Valider l'intervention ? Elle sera verrouillée.",()=>{ onValider(p.id); setAccordionOpen(null); }) }] : []),
-                              ...(!isVal ? [{ ic: Ico.edit(20,"#fff"), bg:"linear-gradient(135deg,#7c3aed,#4f46e5)", label:"Modifier", onClick:()=>{ onEdit(p); setAccordionOpen(null); } }] : []),
-                              ...(!isVal ? [{ ic: Ico.trash(20,"#fff"), bg:"linear-gradient(135deg,#ef4444,#dc2626)", label:"Suppr.", onClick:()=>showConfirm("Supprimer ce passage ?",()=>{ onDelete(p.id); setAccordionOpen(null); }) }] : []),
+                              ...(!isVal && onValider ? [{ ic: Ico.check(22,"#fff"), bg:"linear-gradient(135deg,#10b981,#059669)", label:"Valider", onClick:()=>showConfirm("Valider l\'intervention ? Elle sera verrouillée.",()=>{ onValider(p.id); setAccordionOpen(null); }) }] : []),
+                              ...(!isVal ? [{ ic: Ico.edit(22,"#fff"), bg:"linear-gradient(135deg,#7c3aed,#4f46e5)", label:"Modifier", onClick:()=>{ onEdit(p); setAccordionOpen(null); } }] : []),
+                              ...(!isVal ? [{ ic: Ico.trash(22,"#fff"), bg:"linear-gradient(135deg,#ef4444,#dc2626)", label:"Suppr.", onClick:()=>showConfirm("Supprimer ce passage ?",()=>{ onDelete(p.id); setAccordionOpen(null); }) }] : []),
                             ];
                             const N = actions.length;
-                            // Rayon ajusté selon le nombre de boutons
-                            const RADIUS = N <= 6 ? 110 : N <= 8 ? 125 : 135;
-                            const BTN_SIZE = 64;
-                            const CONTAINER_SIZE = (RADIUS + BTN_SIZE/2) * 2 + 20;
+                            const BTN_SIZE = 70;
+                            // Rayon ajusté pour ne pas sortir
+                            const RADIUS = N <= 4 ? 90 : N <= 6 ? 105 : N <= 8 ? 120 : 130;
+                            const PAD = BTN_SIZE / 2 + 16;
+                            const SIZE = (RADIUS * 2) + (BTN_SIZE) + 32;
                             
                             return (
-                              <div className="fade-in" style={{display:"flex",justifyContent:"center",alignItems:"center",margin:"20px 0 8px",position:"relative",height:CONTAINER_SIZE,WebkitTapHighlightColor:"transparent"}}>
-                                {/* Cercle décoratif central */}
-                                <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",width:CONTAINER_SIZE-40,height:CONTAINER_SIZE-40,borderRadius:"50%",background:"radial-gradient(circle, rgba(8,145,178,0.06) 0%, rgba(8,145,178,0) 70%)",pointerEvents:"none"}}/>
-                                <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",width:RADIUS*2-20,height:RADIUS*2-20,borderRadius:"50%",border:"1.5px dashed rgba(8,145,178,0.18)",pointerEvents:"none"}}/>
+                              <div className="fade-in" style={{
+                                margin:"24px auto 12px",
+                                width:SIZE,
+                                height:SIZE,
+                                position:"relative",
+                                maxWidth:"100%",
+                              }}>
+                                {/* Halo de fond */}
+                                <div style={{
+                                  position:"absolute",
+                                  inset:PAD,
+                                  borderRadius:"50%",
+                                  background:"radial-gradient(circle, rgba(8,145,178,0.08) 0%, rgba(8,145,178,0) 70%)",
+                                  pointerEvents:"none",
+                                }}/>
+                                {/* Cercle pointillé décoratif */}
+                                <div style={{
+                                  position:"absolute",
+                                  top:"50%",left:"50%",
+                                  width:RADIUS*2,
+                                  height:RADIUS*2,
+                                  marginLeft:-RADIUS,
+                                  marginTop:-RADIUS,
+                                  borderRadius:"50%",
+                                  border:"1.5px dashed rgba(8,145,178,0.22)",
+                                  pointerEvents:"none",
+                                }}/>
                                 
-                                {/* Bouton central */}
-                                <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",width:54,height:54,borderRadius:"50%",background:"linear-gradient(135deg,#0c1f3f,#0369a1)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 6px 20px rgba(12,31,63,0.4), inset 0 2px 4px rgba(255,255,255,0.15)",zIndex:5}}>
-                                  <span style={{fontSize:9,fontWeight:900,color:"#7dd3fc",letterSpacing:0.5}}>RAPPORT</span>
-                                </div>
+                                {/* Centre — bouton fermer */}
+                                <button
+                                  onClick={()=>setAccordionOpen(null)}
+                                  style={{
+                                    position:"absolute",
+                                    top:"50%",left:"50%",
+                                    width:60,height:60,
+                                    marginLeft:-30,marginTop:-30,
+                                    borderRadius:"50%",
+                                    background:"linear-gradient(135deg,#0c1f3f,#0369a1)",
+                                    border:"3px solid rgba(255,255,255,0.9)",
+                                    cursor:"pointer",
+                                    display:"flex",alignItems:"center",justifyContent:"center",
+                                    flexDirection:"column",gap:1,
+                                    boxShadow:"0 8px 24px rgba(12,31,63,0.45), inset 0 2px 6px rgba(255,255,255,0.2)",
+                                    zIndex:5,
+                                    fontFamily:"inherit",
+                                    WebkitTapHighlightColor:"transparent",
+                                  }}
+                                >
+                                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#7dd3fc" strokeWidth="3" strokeLinecap="round">
+                                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                                  </svg>
+                                  <span style={{fontSize:7,fontWeight:900,color:"#7dd3fc",letterSpacing:0.5}}>FERMER</span>
+                                </button>
                                 
                                 {/* Boutons en cercle */}
                                 {actions.map((act, i) => {
-                                  const angle = (i / N) * 2 * Math.PI - Math.PI / 2; // Premier bouton en haut
+                                  const angle = (i / N) * 2 * Math.PI - Math.PI / 2;
                                   const x = Math.cos(angle) * RADIUS;
                                   const y = Math.sin(angle) * RADIUS;
                                   return (
@@ -5610,41 +5598,39 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                                       onClick={(e)=>{ e.stopPropagation(); act.onClick(); }}
                                       style={{
                                         position:"absolute",
-                                        top:"50%",left:"50%",
-                                        transform:`translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
-                                        width:BTN_SIZE,height:BTN_SIZE,
+                                        top:`calc(50% + ${y}px)`,
+                                        left:`calc(50% + ${x}px)`,
+                                        width:BTN_SIZE,
+                                        height:BTN_SIZE,
+                                        marginLeft:-(BTN_SIZE/2),
+                                        marginTop:-(BTN_SIZE/2),
                                         borderRadius:"50%",
                                         background:act.bg,
-                                        border:"3px solid rgba(255,255,255,0.85)",
+                                        border:"3px solid rgba(255,255,255,0.95)",
                                         cursor:"pointer",
                                         display:"flex",
                                         flexDirection:"column",
                                         alignItems:"center",
                                         justifyContent:"center",
-                                        gap:2,
-                                        boxShadow:"0 6px 18px rgba(0,0,0,0.18)",
-                                        animation:`sunburst .35s cubic-bezier(.34,1.56,.64,1) ${i * 0.04}s both`,
+                                        gap:1,
+                                        boxShadow:"0 8px 22px rgba(0,0,0,0.22), inset 0 1px 3px rgba(255,255,255,0.25)",
+                                        animation:`burst-${i} .4s cubic-bezier(.34,1.56,.64,1) both`,
                                         WebkitTapHighlightColor:"transparent",
                                         fontFamily:"inherit",
                                       }}
                                     >
                                       {act.ic}
-                                      <span style={{fontSize:9,fontWeight:800,color:"#fff",lineHeight:1,marginTop:1}}>{act.label}</span>
+                                      <span style={{fontSize:9,fontWeight:800,color:"#fff",lineHeight:1.1,marginTop:2,textShadow:"0 1px 2px rgba(0,0,0,0.3)"}}>{act.label}</span>
                                     </button>
                                   );
                                 })}
                                 
-                                <style>{`
-                                  @keyframes sunburst {
-                                    0%   { opacity:0; transform: translate(-50%, -50%) scale(0.3); }
-                                    100% { transform: translate(calc(-50% + var(--tx, 0px)), calc(-50% + var(--ty, 0px))); }
-                                  }
-                                `}</style>
+                                <style>{actions.map((_,i)=>`@keyframes burst-${i} { 0% { opacity:0; transform: scale(0.3) translate(${-Math.cos((i/N)*2*Math.PI - Math.PI/2)*RADIUS*0.5}px, ${-Math.sin((i/N)*2*Math.PI - Math.PI/2)*RADIUS*0.5}px); } 100% { opacity:1; transform: scale(1) translate(0,0); } }`).join(" ")}</style>
                               </div>
                             );
                           })()}
                           
-                          {p.statut==="validee" && !accordionOpen && (
+                                                    {p.statut==="validee" && !accordionOpen && (
                             <div style={{marginTop:8,padding:"12px 14px",borderRadius:12,background:DS.greenSoft,display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontSize:12,color:DS.green,fontWeight:700}}>
                               {Ico.check(14,DS.green)} Intervention verrouillée
                             </div>
