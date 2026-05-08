@@ -6032,286 +6032,13 @@ function ModalStock({ stock, onClose, onUpdateStock, onAddProduit, onDeleteProdu
 
 
 // -- CARNET INLINE (aperçu interne, données déjà chargées) ------------------
+// -- CARNET INLINE (aperçu interne, données déjà chargées) ------------------
 function CarnetPublicInline({ client, passages }) {
-  const [selectedPassage, setSelectedPassage] = useState(null);
-
-  // Tous les passages du client, sans filtre ok
-  const passClient = (passages||[])
-    .filter(p => p.clientId === client.id)
-    .sort((a,b) => new Date(b.date) - new Date(a.date));
-
-  const last = passClient[0] || null;
-  const F = "system-ui,-apple-system,sans-serif";
-
-  const phOk = v => v >= 7 && v <= 7.6;
-  const clOk = v => v >= 0.5 && v <= 3;
-  const fmtDate = (d, opts) => new Date(d).toLocaleDateString("fr", opts);
-  const getResume = getResumePassage;
-  const isCtrl = p => p.type && p.type.toLowerCase().includes("contrôle");
-
-  return (
-    <>
-    <div style={{minHeight:"100vh",background:"rgba(255,255,255,0.5)",fontFamily:F,maxWidth:480,margin:"0 auto",paddingBottom:40}}>
-
-      {/* Header */}
-      <div style={{background:"linear-gradient(160deg,#0c1f3f 0%,#0e4a7a 70%,#0891b2 100%)",padding:"28px 22px 32px",position:"relative",overflow:"hidden"}}>
-        <div style={{position:"absolute",right:-50,top:-50,width:200,height:200,borderRadius:"50%",background:"rgba(56,189,248,0.07)"}}/>
-        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:20,position:"relative"}}>
-          <div style={{width:32,height:32,borderRadius:9,background:"rgba(255,255,255,0.12)",display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <svg width={18} height={13} viewBox="0 0 32 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/><path d="M2 16c2.5 3 5 3 7.5 0S14 13 16.5 16s5 3 7.5 0"/></svg>
-          </div>
-          <span style={{fontSize:13,fontWeight:800,color:"rgba(255,255,255,0.9)",letterSpacing:.3}}>BRIBLUE</span>
-          <span style={{fontSize:11,color:"rgba(255,255,255,0.35)",marginLeft:4}}>Carnet d'entretien</span>
-        </div>
-        <div style={{position:"relative"}}>
-          <div style={{fontSize:24,fontWeight:900,color:"#fff",lineHeight:1.1,marginBottom:6}}>{client.nom}</div>
-          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:16}}>
-            {[client.bassin,client.formule,client.volume?client.volume+"m³":null].filter(Boolean).map((t,i)=>(
-              <span key={i} style={{fontSize:11,fontWeight:600,color:"rgba(255,255,255,0.65)",background:"rgba(255,255,255,0.08)",borderRadius:20,padding:"3px 10px"}}>{t}</span>
-            ))}
-          </div>
-          <div style={{display:"inline-flex",alignItems:"center",gap:10,background:"rgba(255,255,255,0.08)",borderRadius:12,padding:"10px 16px",border:"1px solid rgba(255,255,255,0.1)"}}>
-            <div style={{textAlign:"center"}}>
-              <div style={{fontSize:26,fontWeight:900,color:"#38bdf8",lineHeight:1}}>{passClient.length}</div>
-              <div style={{fontSize:10,color:"rgba(255,255,255,0.5)",fontWeight:600,marginTop:2}}>intervention{passClient.length!==1?"s":""}</div>
-            </div>
-            {last&&(<><div style={{width:1,height:36,background:"rgba(255,255,255,0.1)"}}/>
-              <div>
-                <div style={{fontSize:11,color:"rgba(255,255,255,0.45)",fontWeight:600,marginBottom:2}}>Dernière visite</div>
-                <div style={{fontSize:13,fontWeight:800,color:"#e0f2fe"}}>{fmtDate(last.date,{day:"2-digit",month:"short",year:"numeric"})}</div>
-              </div>
-            </>)}
-          </div>
-        </div>
-      </div>
-
-      <div style={{padding:"0 16px",marginTop:12}}>
-
-        {passClient.length===0&&(
-          <div style={{background:"rgba(255,255,255,0.55)",borderRadius:20,padding:"48px 24px",textAlign:"center"}}>
-            <div style={{fontSize:48,marginBottom:12}}>🏊</div>
-            <div style={{fontSize:16,fontWeight:800,color:"#0f172a",marginBottom:6}}>Aucune intervention</div>
-            <div style={{fontSize:13,color:"#94a3b8"}}>Les interventions apparaîtront ici.</div>
-          </div>
-        )}
-
-        {/* Dernière intervention */}
-        {last&&(
-          <div style={{background:"rgba(255,255,255,0.55)",borderRadius:20,padding:"18px",marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)",border:"1px solid #e8f4f8"}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-              <div>
-                <div style={{fontSize:10,fontWeight:800,color:"#0891b2",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Dernière intervention</div>
-                <div style={{fontSize:17,fontWeight:900,color:"#0f172a"}}>{last.type||"Entretien"}</div>
-                <div style={{fontSize:12,color:"#64748b",marginTop:3}}>📅 {fmtDate(last.date,{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}</div>
-                {last.tech&&<div style={{fontSize:12,color:"#64748b",marginTop:2}}>👤 {last.tech}</div>}
-              </div>
-              <div style={{width:48,height:48,borderRadius:14,background:"linear-gradient(135deg,#0891b2,#0e7490)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>
-                {isCtrl(last)?"💧":"🔧"}
-              </div>
-            </div>
-            {/* Mesures */}
-            {(getPH(last)||getCL(last))&&(
-              <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:getResume(last)?14:0}}>
-                {getPH(last)&&(<div style={{borderRadius:14,padding:"12px 8px",textAlign:"center",background:phOk(getPH(last))?"#f0fdf4":"#fff7ed",border:"1.5px solid "+(phOk(getPH(last))?"#86efac":"#fed7aa")}}>
-                  <div style={{fontSize:10,fontWeight:800,color:phOk(getPH(last))?"#166534":"#92400e",textTransform:"uppercase",marginBottom:4}}>pH</div>
-                  <div style={{fontSize:30,fontWeight:900,color:phOk(getPH(last))?"#16a34a":"#d97706",lineHeight:1}}>{getPH(last)}</div>
-                  <div style={{fontSize:10,fontWeight:700,color:phOk(getPH(last))?"#22c55e":"#f59e0b",marginTop:4}}>{phOk(getPH(last))?"✓ Idéal":"⚠ Revoir"}</div>
-                </div>)}
-                {getCL(last)&&(<div style={{borderRadius:14,padding:"12px 8px",textAlign:"center",background:clOk(getCL(last))?"#f0fdf4":"#fff7ed",border:"1.5px solid "+(clOk(getCL(last))?"#86efac":"#fed7aa")}}>
-                  <div style={{fontSize:10,fontWeight:800,color:clOk(getCL(last))?"#166534":"#92400e",textTransform:"uppercase",marginBottom:4}}>Chlore</div>
-                  <div style={{fontSize:30,fontWeight:900,color:clOk(getCL(last))?"#16a34a":"#d97706",lineHeight:1}}>{getCL(last)}</div>
-                  <div style={{fontSize:10,fontWeight:700,color:clOk(getCL(last))?"#22c55e":"#f59e0b",marginTop:4}}>{clOk(getCL(last))?"✓ Idéal":"⚠ Revoir"}</div>
-                </div>)}
-              </div>
-            )}
-            {getResume(last)&&(
-              <div style={{background:"rgba(255,255,255,0.45)",borderRadius:12,padding:"10px 14px"}}>
-                <div style={{fontSize:10,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:.6,marginBottom:5}}>Compte-rendu</div>
-                <div style={{fontSize:13,color:"#334155",lineHeight:1.7}}>{getResume(last)}</div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Historique */}
-        {passClient.length>0&&(
-          <div>
-            <div style={{fontSize:11,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:.8,marginBottom:10,paddingLeft:2}}>
-              Historique ({passClient.length} intervention{passClient.length>1?"s":""})
-            </div>
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {passClient.map((p,i)=>{
-                const ph=getPH(p); const cl=getCL(p); const resume=getResume(p);
-                return (
-                  <div key={p.id||i} onClick={()=>setSelectedPassage(p)}
-                    style={{background:"rgba(255,255,255,0.55)",borderRadius:16,padding:"14px 16px",boxShadow:"0 1px 6px rgba(0,0,0,0.05)",border:"1px solid "+(i===0?"#bae6fd":"#f1f5f9"),cursor:"pointer",display:"flex",alignItems:"center",gap:14,touchAction:"manipulation"}}>
-                    <div style={{width:42,height:42,borderRadius:12,background:isCtrl(p)?"#ecfdf5":"#eff6ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
-                      {isCtrl(p)?"💧":"🔧"}
-                    </div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:14,fontWeight:800,color:"#0f172a",marginBottom:2}}>{p.type||"Entretien"}</div>
-                      <div style={{fontSize:12,color:"#64748b"}}>
-                        {fmtDate(p.date,{day:"2-digit",month:"long",year:"numeric"})}
-                        {p.tech&&<span style={{color:"#94a3b8"}}> · {p.tech}</span>}
-                      </div>
-                      {(ph||cl)&&(
-                        <div style={{display:"flex",gap:6,marginTop:5}}>
-                          {ph&&<span style={{fontSize:11,fontWeight:700,padding:"2px 7px",borderRadius:6,background:phOk(ph)?"#dcfce7":"#fef3c7",color:phOk(ph)?"#166534":"#92400e"}}>pH {ph}</span>}
-                          {cl&&<span style={{fontSize:11,fontWeight:700,padding:"2px 7px",borderRadius:6,background:clOk(cl)?"#dcfce7":"#fef3c7",color:clOk(cl)?"#166534":"#92400e"}}>Cl {cl}</span>}
-                        </div>
-                      )}
-                      {!ph&&!cl&&resume&&<div style={{fontSize:11,color:"#94a3b8",marginTop:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{resume}</div>}
-                    </div>
-                    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round" style={{flexShrink:0}}><polyline points="9 18 15 12 9 6"/></svg>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        <div style={{marginTop:32,textAlign:"center",padding:"16px 0"}}>
-          <div style={{fontSize:11,color:"#94a3b8",fontWeight:600,lineHeight:2}}>BRIBLUE · La Seyne-sur-Mer · SIRET 84345436400053</div>
-        </div>
-      </div>
-    </div>
-
-    {/* Bottom sheet détail passage */}
-    {selectedPassage&&(
-      <div onClick={()=>setSelectedPassage(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:10002,WebkitBackdropFilter:"blur(4px)",backdropFilter:"blur(4px)"}}>
-        <div onClick={e=>e.stopPropagation()} style={{background:"rgba(255,255,255,0.55)",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,maxHeight:"88vh",overflowY:"auto",WebkitOverflowScrolling:"touch",boxShadow:"0 -12px 48px rgba(0,0,0,0.2)",paddingBottom:"max(32px,env(safe-area-inset-bottom,32px))"}}>
-          <div style={{padding:"14px 0 4px",display:"flex",justifyContent:"center"}}><div style={{width:36,height:4,background:"#e2e8f0",borderRadius:2}}/></div>
-          <div style={{padding:"12px 22px 16px"}}>
-            {/* Titre */}
-            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:16}}>
-              <div>
-                <div style={{fontSize:20,fontWeight:900,color:"#0f172a",marginBottom:4}}>{selectedPassage.type||"Entretien"}</div>
-                <div style={{fontSize:13,color:"#64748b"}}>📅 {fmtDate(selectedPassage.date,{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}</div>
-                {selectedPassage.tech&&<div style={{fontSize:12,color:"#64748b",marginTop:3}}>👤 {selectedPassage.tech}</div>}
-              </div>
-              <button onClick={()=>setSelectedPassage(null)} style={{width:34,height:34,borderRadius:"50%",background:"rgba(255,255,255,0.4)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,touchAction:"manipulation"}}>
-                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
-            </div>
-
-            {/* Mesures pH / Chlore */}
-            {(getPH(selectedPassage)||getCL(selectedPassage))&&(
-              <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,marginBottom:14}}>
-                {getPH(selectedPassage)&&(<div style={{borderRadius:16,padding:"14px 8px",textAlign:"center",background:phOk(getPH(selectedPassage))?"#f0fdf4":"#fff7ed",border:"2px solid "+(phOk(getPH(selectedPassage))?"#86efac":"#fed7aa")}}>
-                  <div style={{fontSize:10,fontWeight:800,color:phOk(getPH(selectedPassage))?"#166534":"#92400e",textTransform:"uppercase",marginBottom:6}}>pH</div>
-                  <div style={{fontSize:34,fontWeight:900,color:phOk(getPH(selectedPassage))?"#16a34a":"#d97706",lineHeight:1}}>{getPH(selectedPassage)}</div>
-                  <div style={{fontSize:11,fontWeight:700,color:phOk(getPH(selectedPassage))?"#22c55e":"#f59e0b",marginTop:6}}>{phOk(getPH(selectedPassage))?"✓ Idéal":"⚠ Revoir"}</div>
-                </div>)}
-                {getCL(selectedPassage)&&(<div style={{borderRadius:16,padding:"14px 8px",textAlign:"center",background:clOk(getCL(selectedPassage))?"#f0fdf4":"#fff7ed",border:"2px solid "+(clOk(getCL(selectedPassage))?"#86efac":"#fed7aa")}}>
-                  <div style={{fontSize:10,fontWeight:800,color:clOk(getCL(selectedPassage))?"#166534":"#92400e",textTransform:"uppercase",marginBottom:6}}>Chlore</div>
-                  <div style={{fontSize:34,fontWeight:900,color:clOk(getCL(selectedPassage))?"#16a34a":"#d97706",lineHeight:1}}>{getCL(selectedPassage)}</div>
-                  <div style={{fontSize:11,fontWeight:700,color:clOk(getCL(selectedPassage))?"#22c55e":"#f59e0b",marginTop:6}}>{clOk(getCL(selectedPassage))?"✓ Idéal":"⚠ Revoir"}</div>
-                </div>)}
-              </div>
-            )}
-
-            {/* Alcalinité + Stabilisant */}
-            {(selectedPassage.alcalinite||selectedPassage.stabilisant)&&(
-              <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:14}}>
-                {selectedPassage.alcalinite&&<div style={{background:"rgba(224,242,254,0.5)",borderRadius:10,padding:"10px",textAlign:"center",border:"1px solid #bae6fd"}}>
-                  <div style={{fontSize:9,fontWeight:700,color:"#0369a1",textTransform:"uppercase",marginBottom:3}}>Alcalinité</div>
-                  <div style={{fontSize:20,fontWeight:900,color:"#0284c7"}}>{selectedPassage.alcalinite}</div>
-                  <div style={{fontSize:9,color:"#64748b"}}>ppm (TAC)</div>
-                </div>}
-                {selectedPassage.stabilisant&&<div style={{background:"rgba(224,242,254,0.5)",borderRadius:10,padding:"10px",textAlign:"center",border:"1px solid #bae6fd"}}>
-                  <div style={{fontSize:9,fontWeight:700,color:"#0369a1",textTransform:"uppercase",marginBottom:3}}>Stabilisant</div>
-                  <div style={{fontSize:20,fontWeight:900,color:"#0284c7"}}>{selectedPassage.stabilisant}</div>
-                  <div style={{fontSize:9,color:"#64748b"}}>ppm</div>
-                </div>}
-              </div>
-            )}
-
-            {/* Qualité eau */}
-            {selectedPassage.qualiteEau&&(
-              <div style={{background:"rgba(255,255,255,0.45)",borderRadius:10,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:16}}>{selectedPassage.qualiteEau==="Cristalline"?"💎":selectedPassage.qualiteEau==="Verte"?"🌿":"🌫️"}</span>
-                <div>
-                  <div style={{fontSize:10,fontWeight:700,color:"#64748b",textTransform:"uppercase",marginBottom:1}}>Qualité eau</div>
-                  <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{selectedPassage.qualiteEau}</div>
-                </div>
-              </div>
-            )}
-
-            {/* Produits apportés */}
-            {(selectedPassage.corrChlore||selectedPassage.corrPH||selectedPassage.corrAlgicide||selectedPassage.corrAlcafix||selectedPassage.corrSel||selectedPassage.corrChloreChoc||selectedPassage.corrPeroxyde||selectedPassage.corrPhosphate||selectedPassage.corrAutre)&&(
-              <div style={{background:"#f5f3ff",borderRadius:14,padding:"12px 14px",marginBottom:14}}>
-                <div style={{fontSize:10,fontWeight:800,color:"#4f46e5",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>⚗️ Produits apportés</div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                  {[
-                    ["Chlore",selectedPassage.corrChlore],
-                    ["pH",selectedPassage.corrPH],
-                    ["Sel",selectedPassage.corrSel],
-                    ["Algicide",selectedPassage.corrAlgicide],
-                    ["Chlore choc",selectedPassage.corrChloreChoc],
-                    ["Peroxyde",selectedPassage.corrPeroxyde],
-                    ["Phosphate",selectedPassage.corrPhosphate],
-                    ["Alcafix",selectedPassage.corrAlcafix],
-                    ["Autre",selectedPassage.corrAutre],
-                  ].filter(([,v])=>v).map(([k,v])=>(
-                    <span key={k} style={{fontSize:12,fontWeight:600,color:"#4f46e5",background:"#ede9fe",borderRadius:8,padding:"4px 10px"}}>{k}: {v}</span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Compte-rendu */}
-            {getResume(selectedPassage)&&(
-              <div style={{background:"rgba(255,255,255,0.45)",borderRadius:14,padding:"14px 16px",marginBottom:14}}>
-                <div style={{fontSize:10,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>📋 Compte-rendu</div>
-                <div style={{fontSize:14,color:"#334155",lineHeight:1.8}}>{getResume(selectedPassage)}</div>
-              </div>
-            )}
-
-            {/* Produits livrés */}
-            {selectedPassage.livraisonProduits&&(selectedPassage.produitsLivres||[]).length>0&&(
-              <div style={{background:"#ecfdf5",borderRadius:14,padding:"12px 14px",marginBottom:14}}>
-                <div style={{fontSize:10,fontWeight:800,color:"#059669",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>📦 Produits livrés</div>
-                <div style={{fontSize:13,color:"#065f46"}}>{selectedPassage.produitsLivres.join(", ")}</div>
-              </div>
-            )}
-
-            {/* Photos */}
-            {(selectedPassage.photoArrivee||selectedPassage.photoDepart||(selectedPassage.photos||[]).some(Boolean))&&(
-              <div style={{marginBottom:14}}>
-                <div style={{fontSize:10,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>📸 Photos</div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8}}>
-                  {[
-                    selectedPassage.photoArrivee?{src:selectedPassage.photoArrivee,lbl:"Arrivée"}:null,
-                    ...((selectedPassage.photos||[]).filter(Boolean).map((s,i)=>({src:s,lbl:`Photo ${i+2}`}))),
-                    selectedPassage.photoDepart?{src:selectedPassage.photoDepart,lbl:"Départ"}:null,
-                  ].filter(Boolean).map((ph,i)=>(
-                    <div key={i} style={{position:"relative",borderRadius:10,overflow:"hidden"}}>
-                      <img src={ph.src} alt={ph.lbl} style={{width:"100%",height:110,objectFit:"cover",display:"block"}}/>
-                      <span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>{ph.lbl}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Message si vraiment aucune donnée */}
-            {!getPH(selectedPassage)&&!getCL(selectedPassage)&&!getResume(selectedPassage)&&!selectedPassage.qualiteEau&&(
-              <div style={{textAlign:"center",padding:"24px 0",color:"#94a3b8",fontSize:14}}>
-                <div style={{fontSize:32,marginBottom:8}}>📝</div>
-                Aucune mesure enregistrée pour ce passage.
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    )}
-    </>
-  );
+  return <CarnetView client={client} passages={passages} onRefresh={null} refreshing={false}/>;
 }
 
 // -- CARNET PUBLIC (URL ?carnet=CODE) ----------------------------------------─
 function generateCarnetCode(clientId) {
-  // Code court et mémorisable basé sur l'id client
   const hash = clientId.split("").reduce((a,c)=>((a<<5)-a)+c.charCodeAt(0)|0,0);
   const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
   const prefix = letters[(Math.abs(hash)%24)] + letters[(Math.abs(hash>>4)%24)];
@@ -6322,9 +6049,7 @@ function generateCarnetCode(clientId) {
 function CarnetPublic({ code, allClients, allPassages }) {
   const [loadedClients, setLoadedClients] = useState(null);
   const [loadedPassages, setLoadedPassages] = useState(null);
-  const [selectedPassage, setSelectedPassage] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
-  const MOIS_FR_COURT = ["","Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
 
   const loadData = useCallback(async () => {
     setRefreshing(true);
@@ -6351,197 +6076,327 @@ function CarnetPublic({ code, allClients, allPassages }) {
   useEffect(() => { loadData(); }, [loadData]);
 
   if (loadedClients === null) return (
-    <div style={{minHeight:"100vh",background:"#0c1f3f",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,fontFamily:"system-ui,sans-serif"}}>
-      <div style={{width:48,height:48,border:"4px solid rgba(255,255,255,0.1)",borderTop:"4px solid #38bdf8",borderRadius:"50%",animation:"spin 0.8s linear infinite",marginBottom:20}}/>
-      <div style={{fontSize:15,color:"rgba(255,255,255,0.6)",fontWeight:600}}>Chargement de votre carnet…</div>
+    <div style={{minHeight:"100vh",background:"#f0f6fb",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,fontFamily:"system-ui,sans-serif"}}>
+      <div style={{width:48,height:48,border:"4px solid #e0f2fe",borderTop:"4px solid #0891b2",borderRadius:"50%",animation:"spin 0.8s linear infinite",marginBottom:20}}/>
+      <div style={{fontSize:15,color:"#0891b2",fontWeight:600}}>Chargement de votre carnet…</div>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 
   const client = loadedClients.find(c=>generateCarnetCode(c.id)===code.toUpperCase());
   if (!client) return (
-    <div style={{minHeight:"100vh",background:"#0c1f3f",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,fontFamily:"system-ui,sans-serif"}}>
+    <div style={{minHeight:"100vh",background:"#f0f6fb",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,fontFamily:"system-ui,sans-serif"}}>
       <div style={{fontSize:48,marginBottom:16}}>🔒</div>
-      <div style={{fontSize:18,fontWeight:800,color:"#fff",marginBottom:8}}>Code invalide</div>
-      <div style={{fontSize:14,color:"rgba(255,255,255,0.5)"}}>Vérifiez le code fourni par votre technicien.</div>
+      <div style={{fontSize:18,fontWeight:700,color:"#0f172a",marginBottom:8}}>Code invalide</div>
+      <div style={{fontSize:14,color:"#64748b"}}>Vérifiez le code fourni par votre technicien.</div>
     </div>
   );
 
-  const passClient = (loadedPassages||[])
-    .filter(p=>p.clientId===client.id)
-    .sort((a,b)=>new Date(b.date)-new Date(a.date));
+  return <CarnetView client={client} passages={loadedPassages||[]} onRefresh={loadData} refreshing={refreshing}/>;
+}
 
-  const last = passClient[0]||null;
-  const F = "system-ui,-apple-system,sans-serif";
+// -- VUE CARNET COMMUNE (partagée entre CarnetPublicInline et CarnetPublic) --
+function CarnetView({ client, passages, onRefresh, refreshing }) {
+  const [selectedPassage, setSelectedPassage] = useState(null);
+  const [activeTab, setActiveTab] = useState("accueil");
 
-  // helpers globaux réutilisés
+  const passClient = (passages||[])
+    .filter(p => p.clientId === client.id)
+    .sort((a,b) => new Date(b.date) - new Date(a.date));
+
+  const last = passClient[0] || null;
+  const phOk  = v => v >= 7 && v <= 7.6;
+  const clOk  = v => v >= 0.5 && v <= 3;
+  const fmtDate = (d, opts) => new Date(d).toLocaleDateString("fr", opts);
   const getResume = getResumePassage;
-  const phOk  = v => v>=7 && v<=7.6;
-  const clOk  = v => v>=0.5 && v<=3;
-  const fmtDate = (d,opts) => new Date(d).toLocaleDateString("fr",opts);
+
+  // Calcul visites restantes depuis le contrat
+  const totalVisitesPrevues = (() => {
+    if (!client.moisParMois) return 20;
+    return Object.values(client.moisParMois).reduce((s, m) => s + (m.entretien||0) + (m.controle||0), 0);
+  })();
+  const visitesEffectuees = passClient.length;
+  const visitesRestantes = Math.max(0, totalVisitesPrevues - visitesEffectuees);
+
+  // Prochain RDV fictif basé sur la date courante (pas stocké ici, on affiche le dernier passage)
+  const daysUntilFin = client.dateFin ? Math.ceil((new Date(client.dateFin) - new Date()) / (1000*60*60*24)) : null;
+  const contratActif = daysUntilFin === null || daysUntilFin > 0;
+
+  // Styles communs
+  const S = {
+    app: {background:"#f0f6fb",minHeight:"100vh",maxWidth:480,margin:"0 auto",fontFamily:"system-ui,-apple-system,sans-serif"},
+    header: {background:"#fff",padding:"14px 16px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid #e2e8f0"},
+    headerTitle: {fontSize:15,fontWeight:600,color:"#0f172a",textAlign:"center",flex:1},
+    headerSub: {fontSize:11,color:"#64748b",textAlign:"center"},
+    iconBtn: {width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:8,border:"none",background:"transparent",cursor:"pointer",color:"#64748b"},
+    sectionWrap: {padding:"0 12px 12px"},
+    sectionHeader: {display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 0 8px"},
+    sectionTitle: {fontSize:14,fontWeight:600,color:"#0f172a",display:"flex",alignItems:"center",gap:6},
+    voirTout: {fontSize:12,color:"#0891b2",cursor:"pointer",border:"none",background:"none",fontFamily:"inherit"},
+  };
 
   return (
-    <>
-    <div style={{minHeight:"100vh",fontFamily:F,maxWidth:480,margin:"0 auto",paddingBottom:40,position:"relative"}}>
-
-      {/* -- HEADER GLASS LUMINEUX -- */}
-      <div style={{background:"linear-gradient(135deg, rgba(34,211,238,0.35) 0%, rgba(6,182,212,0.45) 45%, rgba(99,102,241,0.38) 100%)",backdropFilter:"blur(30px) saturate(180%)",WebkitBackdropFilter:"blur(30px) saturate(180%)",padding:"32px 22px 42px",position:"relative",overflow:"hidden",borderBottom:"1px solid rgba(255,255,255,0.35)"}}>
-        <div style={{position:"absolute",right:-70,top:-70,width:240,height:240,borderRadius:"50%",background:"radial-gradient(circle, rgba(34,211,238,0.5) 0%, transparent 70%)",filter:"blur(24px)"}}/>
-        <div style={{position:"absolute",left:-50,bottom:-50,width:180,height:180,borderRadius:"50%",background:"radial-gradient(circle, rgba(168,85,247,0.35) 0%, transparent 70%)",filter:"blur(20px)"}}/>
-
-        {/* Logo ligne */}
-        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:22,position:"relative"}}>
-          <div style={{width:38,height:38,borderRadius:12,background:"rgba(255,255,255,0.75)",display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",boxShadow:"0 4px 12px rgba(6,182,212,0.25)"}}>
-            <svg width={20} height={14} viewBox="0 0 32 24" fill="none" stroke="#0891b2" strokeWidth="2.8" strokeLinecap="round">
-              <path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/>
-              <path d="M2 16c2.5 3 5 3 7.5 0S14 13 16.5 16s5 3 7.5 0"/>
-            </svg>
-          </div>
-          <div style={{display:"flex",flexDirection:"column"}}>
-            <span style={{fontSize:14,fontWeight:900,color:"#0b1220",letterSpacing:.3}}>BRIBLUE</span>
-            <span style={{fontSize:10,color:"rgba(11,18,32,0.55)",fontWeight:600,marginTop:-2}}>Carnet d'entretien</span>
-          </div>
-          <button onClick={loadData} disabled={refreshing} style={{marginLeft:"auto",width:38,height:38,borderRadius:12,background:"rgba(255,255,255,0.65)",border:"1px solid rgba(255,255,255,0.5)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#0e4f6f",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",boxShadow:"0 4px 12px rgba(6,182,212,0.15)",transition:"opacity .2s",opacity:refreshing?0.5:1}} title="Actualiser">
-            {refreshing
-              ? <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{animation:"spin .7s linear infinite"}}><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-              : <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-            }
-          </button>
+    <div style={S.app}>
+      {/* HEADER */}
+      <div style={S.header}>
+        <div style={S.iconBtn}>
+          <svg width={18} height={14} viewBox="0 0 24 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="0" y1="2" x2="24" y2="2"/><line x1="0" y1="9" x2="24" y2="9"/><line x1="0" y1="16" x2="24" y2="16"/>
+          </svg>
         </div>
-
-        {/* Nom client + infos */}
-        <div style={{position:"relative"}}>
-          <div style={{fontSize:28,fontWeight:900,color:"#0b1220",lineHeight:1.1,marginBottom:8,letterSpacing:-0.5}}>{client.nom}</div>
-          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:20}}>
-            {[
-              client.bassin,
-              client.formule,
-              client.volume ? client.volume+"m³" : null,
-              client.dateDebut ? "Suivi depuis "+fmtDate(client.dateDebut,{month:"long",year:"numeric"}) : null,
-            ].filter(Boolean).map((t,i)=>(
-              <span key={i} style={{fontSize:11,fontWeight:700,color:"#0e4f6f",background:"rgba(255,255,255,0.65)",borderRadius:20,padding:"4px 11px",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",border:"1px solid rgba(255,255,255,0.5)"}}>{t}</span>
-            ))}
-          </div>
-
-          {/* Stat rapide : nb passages */}
-          <div style={{display:"inline-flex",alignItems:"center",gap:14,background:"rgba(255,255,255,0.65)",borderRadius:18,padding:"14px 20px",border:"1px solid rgba(255,255,255,0.6)",backdropFilter:"blur(16px) saturate(180%)",WebkitBackdropFilter:"blur(16px) saturate(180%)",boxShadow:"0 8px 26px rgba(6,182,212,0.18)"}}>
-            <div style={{textAlign:"center"}}>
-              <div style={{fontSize:30,fontWeight:900,color:"#0891b2",lineHeight:1,letterSpacing:-1,background:"linear-gradient(135deg,#06b6d4,#0891b2)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text"}}>{passClient.length}</div>
-              <div style={{fontSize:10,color:"#475569",fontWeight:700,marginTop:3,textTransform:"uppercase",letterSpacing:0.4}}>intervention{passClient.length!==1?"s":""}</div>
-            </div>
-            {last&&(
-              <>
-                <div style={{width:1,height:42,background:"rgba(11,18,32,0.12)"}}/>
-                <div>
-                  <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:3,textTransform:"uppercase",letterSpacing:0.4}}>Dernière visite</div>
-                  <div style={{fontSize:14,fontWeight:800,color:"#0b1220"}}>{fmtDate(last.date,{day:"2-digit",month:"short",year:"numeric"})}</div>
-                </div>
-              </>
-            )}
-          </div>
+        <div>
+          <div style={S.headerTitle}>Carnet d'entretien</div>
+          <div style={S.headerSub}>Votre piscine, notre expertise</div>
         </div>
+        <button style={S.iconBtn} onClick={onRefresh||undefined} title="Actualiser">
+          {refreshing
+            ? <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.5" strokeLinecap="round" style={{animation:"spin .7s linear infinite"}}><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+            : <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M18 8A6 6 0 006 8v0"/><path d="M6 16a6 6 0 0012 0v0"/><polyline points="21 8 18 8 18 5"/><polyline points="3 16 6 16 6 19"/></svg>
+          }
+        </button>
       </div>
 
-      <div style={{padding:"0 16px",marginTop:-18,position:"relative",zIndex:2}}>
+      <div style={{overflowY:"auto",paddingBottom:70}}>
 
-        {/* -- DERNIÈRE INTERVENTION -- */}
-        {last&&(
-          <div style={{background:"rgba(255,255,255,0.55)",borderRadius:20,padding:"18px 18px",marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)",border:"1px solid #e8f4f8"}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-              <div>
-                <div style={{fontSize:10,fontWeight:800,color:"#0891b2",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Dernière intervention</div>
-                <div style={{fontSize:17,fontWeight:900,color:"#0f172a"}}>{last.type||"Entretien"}</div>
-                <div style={{fontSize:12,color:"#64748b",marginTop:3,display:"flex",alignItems:"center",gap:5}}>
-                  <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                  {fmtDate(last.date,{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}
-                </div>
-                {last.tech&&<div style={{fontSize:12,color:"#64748b",marginTop:2,display:"flex",alignItems:"center",gap:5}}>
-                  <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                  {last.tech}
-                </div>}
+        {/* HERO BANNER */}
+        <div style={{background:"linear-gradient(135deg,#0891b2 0%,#0e7490 60%,#164e63 100%)",margin:12,borderRadius:16,padding:16,position:"relative",overflow:"hidden"}}>
+          <div style={{position:"absolute",right:-20,top:-20,width:120,height:120,background:"rgba(255,255,255,0.07)",borderRadius:"50%"}}/>
+          <div style={{position:"absolute",right:10,bottom:-30,width:80,height:80,background:"rgba(255,255,255,0.05)",borderRadius:"50%"}}/>
+          <div style={{position:"relative"}}>
+            {/* Logo + avatar */}
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+              <div style={{width:44,height:44,background:"rgba(255,255,255,0.2)",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <svg width={22} height={16} viewBox="0 0 32 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/>
+                  <path d="M2 16c2.5 3 5 3 7.5 0S14 13 16.5 16s5 3 7.5 0"/>
+                </svg>
               </div>
-              <div style={{width:48,height:48,borderRadius:14,background:"linear-gradient(135deg,#0891b2,#0e7490)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>
-                {isControleType(last.type)?"💧":"🔧"}
+              <div>
+                <div style={{fontSize:18,fontWeight:700,color:"#fff",lineHeight:1.2}}>{client.nom}</div>
+                <div style={{display:"inline-flex",alignItems:"center",gap:5,marginTop:4,background:"rgba(255,255,255,0.18)",borderRadius:20,padding:"3px 10px"}}>
+                  <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke={contratActif?"#4ade80":"#fca5a5"} strokeWidth="2.5" strokeLinecap="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                  <span style={{fontSize:11,color:"#fff",fontWeight:500}}>{contratActif?"Contrat actif":"Contrat expiré"}</span>
+                </div>
               </div>
             </div>
+            {/* Stats cards */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:4}}>
+              <div style={{background:"rgba(255,255,255,0.15)",borderRadius:10,padding:"10px 12px"}}>
+                <div style={{fontSize:10,color:"rgba(255,255,255,0.7)",marginBottom:2,display:"flex",alignItems:"center",gap:4}}>
+                  <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  Fin de contrat
+                </div>
+                <div style={{fontSize:15,fontWeight:600,color:"#fff"}}>
+                  {client.dateFin ? fmtDate(client.dateFin,{day:"2-digit",month:"short",year:"numeric"}) : "—"}
+                </div>
+              </div>
+              <div style={{background:"rgba(255,255,255,0.15)",borderRadius:10,padding:"10px 12px"}}>
+                <div style={{fontSize:10,color:"rgba(255,255,255,0.7)",marginBottom:2,display:"flex",alignItems:"center",gap:4}}>
+                  <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><polyline points="9 11 12 14 22 4"/></svg>
+                  Visites restantes
+                </div>
+                <div style={{fontSize:15,fontWeight:600,color:"#fff"}}>
+                  {visitesRestantes} <span style={{fontSize:11,fontWeight:400,color:"rgba(255,255,255,0.6)"}}>sur {totalVisitesPrevues}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
-            {/* Mesures en gros */}
-            {(getPH(last)||getCL(last)||getTemp(last))&&(
-              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:last.obs||last.actions?14:0}}>
-                {getPH(last)&&(
-                  <div style={{borderRadius:14,padding:"12px 8px",textAlign:"center",background:phOk(getPH(last))?"#f0fdf4":"#fff7ed",border:"1.5px solid "+(phOk(getPH(last))?"#86efac":"#fed7aa")}}>
-                    <div style={{fontSize:10,fontWeight:800,color:phOk(getPH(last))?"#166534":"#92400e",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>pH</div>
-                    <div style={{fontSize:30,fontWeight:900,color:phOk(getPH(last))?"#16a34a":"#d97706",lineHeight:1}}>{getPH(last)}</div>
-                    <div style={{fontSize:10,fontWeight:700,color:phOk(getPH(last))?"#22c55e":"#f59e0b",marginTop:4}}>{phOk(getPH(last))?"✓ Idéal":"⚠ Revoir"}</div>
-                  </div>
-                )}
-                {getCL(last)&&(
-                  <div style={{borderRadius:14,padding:"12px 8px",textAlign:"center",background:clOk(getCL(last))?"#f0fdf4":"#fff7ed",border:"1.5px solid "+(clOk(getCL(last))?"#86efac":"#fed7aa")}}>
-                    <div style={{fontSize:10,fontWeight:800,color:clOk(getCL(last))?"#166534":"#92400e",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Chlore</div>
-                    <div style={{fontSize:30,fontWeight:900,color:clOk(getCL(last))?"#16a34a":"#d97706",lineHeight:1}}>{getCL(last)}</div>
-                    <div style={{fontSize:10,fontWeight:700,color:clOk(getCL(last))?"#22c55e":"#f59e0b",marginTop:4}}>{clOk(getCL(last))?"✓ Idéal":"⚠ Revoir"}</div>
-                  </div>
-                )}
-                {getTemp(last)&&(
-                  <div style={{borderRadius:14,padding:"12px 8px",textAlign:"center",background:"rgba(224,242,254,0.5)",border:"1.5px solid #bae6fd"}}>
-                    <div style={{fontSize:10,fontWeight:800,color:"#075985",textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Temp.</div>
-                    <div style={{fontSize:30,fontWeight:900,color:"#0284c7",lineHeight:1}}>{getTemp(last)}°</div>
-                    <div style={{fontSize:10,fontWeight:700,color:"#38bdf8",marginTop:4}}>Eau</div>
-                  </div>
-                )}
+        {/* DERNIÈRE INTERVENTION (= "Prochain rendez-vous" section de la maquette) */}
+        {last && (
+          <div style={S.sectionWrap}>
+            <div style={S.sectionHeader}>
+              <div style={S.sectionTitle}>
+                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                Dernière intervention
               </div>
-            )}
-
-            {/* Actions / Obs */}
-            {getResume(last)&&(
-              <div style={{background:"rgba(255,255,255,0.45)",borderRadius:12,padding:"10px 14px",marginBottom:last.obs?8:0}}>
-                <div style={{fontSize:10,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:.6,marginBottom:5}}>Actions réalisées</div>
-                <div style={{fontSize:13,color:"#334155",lineHeight:1.7}}>{getResume(last)}</div>
+            </div>
+            <div style={{background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:"14px",display:"flex",alignItems:"center",gap:14,cursor:"pointer"}} onClick={()=>setSelectedPassage(last)}>
+              <div style={{textAlign:"center",minWidth:50}}>
+                <div style={{fontSize:10,color:"#64748b",textTransform:"uppercase",letterSpacing:0.5}}>
+                  {fmtDate(last.date,{weekday:"short"})}
+                </div>
+                <div style={{fontSize:26,fontWeight:700,color:"#0891b2",lineHeight:1}}>
+                  {fmtDate(last.date,{day:"2-digit"})}
+                </div>
+                <div style={{fontSize:11,color:"#0891b2"}}>
+                  {fmtDate(last.date,{month:"short",year:"numeric"})}
+                </div>
               </div>
-            )}
-            {last.obs&&(
-              <div style={{background:"#fffbeb",borderRadius:12,padding:"10px 14px",borderLeft:"3px solid #fbbf24"}}>
-                <div style={{fontSize:10,fontWeight:800,color:"#92400e",textTransform:"uppercase",letterSpacing:.6,marginBottom:5}}>Observations</div>
-                <div style={{fontSize:13,color:"#78350f",lineHeight:1.7}}>{last.obs}</div>
+              <div style={{width:1,background:"#e2e8f0",alignSelf:"stretch"}}/>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,fontWeight:600,color:"#0f172a",display:"flex",alignItems:"center",gap:5,marginBottom:3}}>
+                  <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  {last.heure||"09:00"}
+                </div>
+                <div style={{fontSize:13,fontWeight:600,color:"#0f172a"}}>{last.type||"Entretien"}</div>
+                {last.tech && <div style={{fontSize:12,color:"#64748b",marginTop:2}}>Technicien : {last.tech}</div>}
               </div>
-            )}
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
           </div>
         )}
 
-        {/* -- HISTORIQUE -- */}
-        {passClient.length>1&&(
-          <div>
-            <div style={{fontSize:11,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:.8,marginBottom:10,paddingLeft:2}}>
-              Historique ({passClient.length} interventions)
+        {/* RAPPORTS D'INTERVENTION */}
+        <div style={S.sectionWrap}>
+          <div style={S.sectionHeader}>
+            <div style={S.sectionTitle}>
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              Rapports d'intervention
+            </div>
+            <button style={S.voirTout} onClick={()=>setActiveTab("historique")}>Voir tout</button>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {passClient.slice(0,3).map((p,i)=>{
+              const ph=getPH(p); const cl=getCL(p);
+              return (
+                <div key={p.id||i} style={{background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:"12px 14px",display:"flex",alignItems:"center",gap:12,cursor:"pointer"}} onClick={()=>setSelectedPassage(p)}>
+                  <div style={{width:36,height:36,background:"#e0f2fe",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round"><path d="M12 2C6 2 2 12 2 12s4 10 10 10 10-10 10-10S18 2 12 2z"/></svg>
+                  </div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:600,color:"#0f172a"}}>{p.type||"Contrôle de l'eau"}</div>
+                    <div style={{fontSize:11,color:"#64748b",marginTop:1}}>{fmtDate(p.date,{weekday:"long",day:"2-digit",month:"short",year:"numeric"})}</div>
+                    {(ph||cl)&&(
+                      <div style={{display:"flex",gap:5,marginTop:5}}>
+                        {ph&&<span style={{fontSize:11,fontWeight:600,padding:"2px 7px",borderRadius:6,background:"#fff7ed",color:"#c2410c"}}>pH {ph}</span>}
+                        {cl&&<span style={{fontSize:11,fontWeight:600,padding:"2px 7px",borderRadius:6,background:"#f0fdf4",color:"#15803d"}}>Chlore {cl}</span>}
+                      </div>
+                    )}
+                  </div>
+                  <button style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:"#0891b2",background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:8,padding:"5px 9px",cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit"}} onClick={e=>{e.stopPropagation();}}>
+                    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Télécharger
+                  </button>
+                </div>
+              );
+            })}
+            {passClient.length === 0 && (
+              <div style={{background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:"32px",textAlign:"center",color:"#94a3b8",fontSize:13}}>
+                Aucune intervention enregistrée
+              </div>
+            )}
+          </div>
+          {passClient.length > 3 && (
+            <button style={{width:"100%",padding:"10px 0 4px",fontSize:12,color:"#0891b2",border:"none",background:"none",fontFamily:"inherit",cursor:"pointer",textAlign:"center"}} onClick={()=>setActiveTab("historique")}>
+              Voir tous les rapports
+            </button>
+          )}
+        </div>
+
+        {/* DERNIER RAPPORT DÉTAILLÉ */}
+        {last && (getPH(last)||getCL(last)||last.alcalinite||last.stabilisant||getTemp(last)) && (
+          <div style={S.sectionWrap}>
+            <div style={S.sectionHeader}>
+              <div style={S.sectionTitle}>
+                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round"><path d="M12 2C6 2 2 12 2 12s4 10 10 10 10-10 10-10S18 2 12 2z"/></svg>
+                Dernier rapport détaillé
+              </div>
+            </div>
+            <div style={{background:"#fff",borderRadius:14,border:"1px solid #e2e8f0",overflow:"hidden"}}>
+              {/* Header rapport */}
+              <div style={{padding:"14px 16px 10px",borderBottom:"1px solid #e2e8f0",display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
+                <div>
+                  <div style={{fontSize:14,fontWeight:600,color:"#0891b2",marginBottom:3}}>{last.type||"Contrôle de l'eau"}</div>
+                  <div style={{fontSize:11,color:"#64748b"}}>{fmtDate(last.date,{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}{last.heure?` à ${last.heure}`:""}</div>
+                  {last.tech&&<div style={{fontSize:11,color:"#94a3b8",marginTop:2,display:"flex",alignItems:"center",gap:4}}>
+                    <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    Technicien : {last.tech}
+                  </div>}
+                </div>
+                <button style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:"#0891b2",background:"#fff",border:"1px solid #bae6fd",borderRadius:8,padding:"6px 10px",cursor:"pointer",flexShrink:0,fontFamily:"inherit"}} onClick={()=>{}}>
+                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Télécharger
+                </button>
+              </div>
+              {/* Grille paramètres */}
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)"}}>
+                {[
+                  {label:"pH", val:getPH(last), unit:"", isOk:v=>phOk(v), statusOk:"Idéal", statusBad:"Revoir", colorOk:"#ea580c", statusColorOk:"#16a34a", statusColorBad:"#dc2626"},
+                  {label:"Chlore libre", val:getCL(last), unit:"mg/L", isOk:v=>clOk(v), statusOk:"Idéal", statusBad:"Revoir", colorOk:"#16a34a", statusColorOk:"#16a34a", statusColorBad:"#dc2626"},
+                  {label:"Température", val:getTemp(last), unit:"°C", isOk:()=>true, statusOk:"Eau idéale", statusBad:"", colorOk:"#0891b2", statusColorOk:"#0891b2"},
+                  {label:"Alcalinité (TAC)", val:last.alcalinite, unit:"mg/L", isOk:v=>v>=80&&v<=120, statusOk:"Correct", statusBad:"Revoir", colorOk:"#0891b2", statusColorOk:"#0891b2", statusColorBad:"#dc2626"},
+                  {label:"Stabilisant (CYA)", val:last.stabilisant, unit:"mg/L", isOk:v=>v>=20&&v<=50, statusOk:"Correct", statusBad:"Revoir", colorOk:"#0891b2", statusColorOk:"#0891b2", statusColorBad:"#dc2626"},
+                ].filter(item=>item.val!==null&&item.val!==undefined&&item.val!=="").map((item,i,arr)=>{
+                  const ok = item.isOk ? item.isOk(parseFloat(item.val)) : true;
+                  const isLast = i === arr.length-1;
+                  const isThird = (i+1) % 3 === 0;
+                  const colSpan = isLast && arr.length % 3 !== 0 ? `span ${3 - ((arr.length-1) % 3)}` : "span 1";
+                  return (
+                    <div key={item.label} style={{
+                      padding:"12px 14px",
+                      borderRight: isThird||isLast ? "none" : "1px solid #e2e8f0",
+                      borderBottom: i < arr.length-3 ? "1px solid #e2e8f0" : "none",
+                      gridColumn: colSpan,
+                    }}>
+                      <div style={{fontSize:10,color:"#94a3b8",marginBottom:4}}>{item.label}</div>
+                      <div style={{fontSize:item.label==="pH"?22:18,fontWeight:600,color:ok?item.colorOk:"#dc2626",lineHeight:1}}>
+                        {item.val}{item.unit&&<span style={{fontSize:11,fontWeight:400,color:"#94a3b8",marginLeft:1}}>{item.unit}</span>}
+                      </div>
+                      <div style={{fontSize:10,marginTop:3,display:"flex",alignItems:"center",gap:3}}>
+                        <span style={{width:6,height:6,borderRadius:"50%",background:ok?(item.statusColorOk||"#22c55e"):"#ef4444",display:"inline-block"}}/>
+                        <span style={{color:ok?(item.statusColorOk||"#16a34a"):"#dc2626"}}>{ok?(item.statusOk||"Idéal"):(item.statusBad||"Revoir")}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Remarques */}
+              {getResume(last)&&(
+                <div style={{padding:"12px 16px",background:"#f8fafc",borderTop:"1px solid #e2e8f0",display:"flex",alignItems:"flex-start",gap:10}}>
+                  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" style={{flexShrink:0,marginTop:1}}><path d="M3 12c0-4.97 4.03-9 9-9s9 4.03 9 9"/><path d="M12 21c-4.97 0-9-4.03-9-9"/><path d="M15 17c-1 2-3 2-3 2s-1-2-3-2"/></svg>
+                  <div>
+                    <div style={{fontSize:11,fontWeight:600,color:"#0f172a",marginBottom:3}}>Remarques</div>
+                    <div style={{fontSize:12,color:"#64748b",lineHeight:1.5}}>{getResume(last)}</div>
+                  </div>
+                </div>
+              )}
+              {last.obs&&(
+                <div style={{padding:"12px 16px",background:"#fffbeb",borderTop:"1px solid #fef3c7",display:"flex",alignItems:"flex-start",gap:10}}>
+                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" style={{flexShrink:0,marginTop:1}}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  <div>
+                    <div style={{fontSize:11,fontWeight:600,color:"#92400e",marginBottom:3}}>Observations</div>
+                    <div style={{fontSize:12,color:"#78350f",lineHeight:1.5}}>{last.obs}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* HISTORIQUE COMPLET (tab) */}
+        {activeTab==="historique" && passClient.length > 0 && (
+          <div style={S.sectionWrap}>
+            <div style={S.sectionHeader}>
+              <div style={S.sectionTitle}>
+                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Historique ({passClient.length} interventions)
+              </div>
+              <button style={S.voirTout} onClick={()=>setActiveTab("accueil")}>Réduire</button>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {passClient.map((p,i)=>{
-                const isLast=i===0;
+                const ph=getPH(p); const cl=getCL(p); const tmp=getTemp(p);
                 return (
-                  <div key={p.id} onClick={()=>setSelectedPassage(p)}
-                    style={{background:"rgba(255,255,255,0.55)",borderRadius:16,padding:"14px 16px",boxShadow:"0 1px 6px rgba(0,0,0,0.05)",border:"1px solid "+(isLast?"#bae6fd":"#f1f5f9"),cursor:"pointer",display:"flex",alignItems:"center",gap:14,transition:"box-shadow .15s"}}
-                    onTouchStart={e=>e.currentTarget.style.boxShadow="0 4px 16px rgba(8,145,178,0.15)"}
-                    onTouchEnd={e=>e.currentTarget.style.boxShadow="0 1px 6px rgba(0,0,0,0.05)"}>
-                    {/* Icône type */}
-                    <div style={{width:42,height:42,borderRadius:12,background:isControleType(p.type)?"#ecfdf5":"#eff6ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
-                      {isControleType(p.type)?"💧":"🔧"}
+                  <div key={p.id||i} style={{background:"#fff",borderRadius:12,border:`1px solid ${i===0?"#bae6fd":"#e2e8f0"}`,padding:"14px 16px",display:"flex",alignItems:"center",gap:14,cursor:"pointer"}} onClick={()=>setSelectedPassage(p)}>
+                    <div style={{width:42,height:42,borderRadius:12,background:isControleType(p.type)?"#ecfdf5":"#eff6ff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      {isControleType(p.type)
+                        ? <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round"><path d="M12 2C6 2 2 12 2 12s4 10 10 10 10-10 10-10S18 2 12 2z"/></svg>
+                        : <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+                      }
                     </div>
-                    {/* Contenu */}
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:14,fontWeight:800,color:"#0f172a",marginBottom:2}}>{p.type||"Entretien"}</div>
-                      <div style={{fontSize:12,color:"#64748b"}}>
-                        {fmtDate(p.date,{day:"2-digit",month:"long",year:"numeric"})}
-                        {p.tech&&<span style={{color:"#94a3b8"}}> · {p.tech}</span>}
-                      </div>
-                      {(getPH(p)||getCL(p)||getTemp(p))&&(
-                        <div style={{display:"flex",gap:6,marginTop:5,flexWrap:"wrap"}}>
-                          {getPH(p)&&<span style={{fontSize:11,fontWeight:700,padding:"2px 7px",borderRadius:6,background:phOk(getPH(p))?"#dcfce7":"#fef3c7",color:phOk(getPH(p))?"#166534":"#92400e"}}>pH {getPH(p)}</span>}
-                          {getCL(p)&&<span style={{fontSize:11,fontWeight:700,padding:"2px 7px",borderRadius:6,background:clOk(getCL(p))?"#dcfce7":"#fef3c7",color:clOk(getCL(p))?"#166534":"#92400e"}}>Cl {getCL(p)}</span>}
-                          {getTemp(p)&&<span style={{fontSize:11,fontWeight:700,padding:"2px 7px",borderRadius:6,background:"#e0f2fe",color:"#0369a1"}}>{getTemp(p)}°C</span>}
+                      <div style={{fontSize:14,fontWeight:600,color:"#0f172a",marginBottom:2}}>{p.type||"Entretien"}</div>
+                      <div style={{fontSize:12,color:"#64748b"}}>{fmtDate(p.date,{day:"2-digit",month:"long",year:"numeric"})}{p.tech&&<span style={{color:"#94a3b8"}}> · {p.tech}</span>}</div>
+                      {(ph||cl||tmp)&&(
+                        <div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap"}}>
+                          {ph&&<span style={{fontSize:11,fontWeight:600,padding:"2px 7px",borderRadius:6,background:phOk(ph)?"#dcfce7":"#fef3c7",color:phOk(ph)?"#166534":"#92400e"}}>pH {ph}</span>}
+                          {cl&&<span style={{fontSize:11,fontWeight:600,padding:"2px 7px",borderRadius:6,background:clOk(cl)?"#dcfce7":"#fef3c7",color:clOk(cl)?"#166534":"#92400e"}}>Cl {cl}</span>}
+                          {tmp&&<span style={{fontSize:11,fontWeight:600,padding:"2px 7px",borderRadius:6,background:"#e0f2fe",color:"#0369a1"}}>{tmp}°C</span>}
                         </div>
                       )}
                     </div>
-                    {/* Flèche */}
                     <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round" style={{flexShrink:0}}><polyline points="9 18 15 12 9 6"/></svg>
                   </div>
                 );
@@ -6550,166 +6405,195 @@ function CarnetPublic({ code, allClients, allPassages }) {
           </div>
         )}
 
-        {passClient.length===0&&(
-          <div style={{background:"rgba(255,255,255,0.55)",borderRadius:20,padding:"48px 24px",textAlign:"center",boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
-            <div style={{fontSize:48,marginBottom:12}}>🏊</div>
-            <div style={{fontSize:16,fontWeight:800,color:"#0f172a",marginBottom:6}}>Aucune intervention</div>
-            <div style={{fontSize:13,color:"#94a3b8"}}>Les interventions apparaîtront ici au fur et à mesure.</div>
-          </div>
-        )}
-
-        {/* Footer */}
-        <div style={{marginTop:32,textAlign:"center",padding:"16px 0"}}>
-          <div style={{fontSize:11,color:"#94a3b8",fontWeight:600,lineHeight:2}}>
-            BRIBLUE · Traitement de l'eau · La Seyne-sur-Mer<br/>
-            SIRET 84345436400053
-          </div>
+        {/* FOOTER */}
+        <div style={{marginTop:24,textAlign:"center",padding:"16px 0 8px"}}>
+          <div style={{fontSize:11,color:"#94a3b8",fontWeight:500,lineHeight:2}}>BRIBLUE · Traitement de l'eau · La Seyne-sur-Mer<br/>SIRET 84345436400053</div>
         </div>
-      </div>
-    </div>
 
-    {/* -- BOTTOM SHEET DÉTAIL -- */}
-    {selectedPassage&&(
-      <div onClick={()=>setSelectedPassage(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:1000,padding:0,backdropFilter:"blur(4px)"}}>
-        <div onClick={e=>e.stopPropagation()} style={{background:"rgba(255,255,255,0.55)",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,maxHeight:"90vh",overflowY:"auto",WebkitOverflowScrolling:"touch",boxShadow:"0 -12px 48px rgba(0,0,0,0.2)",paddingBottom:"max(32px,env(safe-area-inset-bottom,32px))"}}>
-          {/* Handle */}
-          <div style={{padding:"14px 0 4px",display:"flex",justifyContent:"center"}}>
-            <div style={{width:36,height:4,background:"#e2e8f0",borderRadius:2}}/>
-          </div>
-          <div style={{padding:"12px 22px 0"}}>
-            {/* Header */}
-            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:20}}>
-              <div>
-                <div style={{fontSize:20,fontWeight:900,color:"#0f172a",marginBottom:4}}>{selectedPassage.type||"Entretien"}</div>
-                <div style={{fontSize:13,color:"#64748b",display:"flex",alignItems:"center",gap:5}}>
-                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                  {fmtDate(selectedPassage.date,{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}
-                </div>
-                {selectedPassage.tech&&<div style={{fontSize:12,color:"#64748b",marginTop:3,display:"flex",alignItems:"center",gap:5}}>
-                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                  {selectedPassage.tech}
-                </div>}
+      </div>
+
+      {/* BOTTOM NAV */}
+      <div style={{background:"#fff",borderTop:"1px solid #e2e8f0",display:"flex",padding:"8px 0 12px",position:"sticky",bottom:0,zIndex:100}}>
+        {[
+          {id:"accueil",label:"Accueil",icon:<svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg>},
+          {id:"historique",label:"Interventions",icon:<svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>},
+          {id:"sos",label:"SOS",icon:<svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 2C6 2 2 12 2 12s4 10 10 10 10-10 10-10S18 2 12 2z"/><path d="M12 8v4M12 16h.01"/></svg>},
+          {id:"produits",label:"Produits",icon:<svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>},
+          {id:"profil",label:"Profil",icon:<svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>},
+        ].map(item=>{
+          const isActive = activeTab===item.id;
+          const isSos = item.id==="sos";
+          return (
+            <button key={item.id} onClick={()=>setActiveTab(item.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3,cursor:"pointer",border:"none",background:"none",fontFamily:"inherit",padding:0}}>
+              <div style={{
+                width:isSos?40:36,height:isSos?40:36,
+                display:"flex",alignItems:"center",justifyContent:"center",
+                borderRadius:"50%",
+                background:isSos?"#0891b2":isActive?"#e0f2fe":"transparent",
+                color:isSos?"#fff":isActive?"#0891b2":"#94a3b8",
+              }}>
+                {item.icon}
               </div>
-              <button onClick={()=>setSelectedPassage(null)} style={{width:34,height:34,borderRadius:"50%",background:"rgba(255,255,255,0.4)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:2}}>
-                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
+              <span style={{fontSize:10,color:isActive?"#0891b2":"#94a3b8",fontWeight:isActive?600:400}}>
+                {item.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* BOTTOM SHEET DÉTAIL PASSAGE */}
+      {selectedPassage&&(
+        <div onClick={()=>setSelectedPassage(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:10002,backdropFilter:"blur(4px)"}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,maxHeight:"90vh",overflowY:"auto",WebkitOverflowScrolling:"touch",boxShadow:"0 -12px 48px rgba(0,0,0,0.2)",paddingBottom:"max(32px,env(safe-area-inset-bottom,32px))"}}>
+            <div style={{padding:"14px 0 4px",display:"flex",justifyContent:"center"}}>
+              <div style={{width:36,height:4,background:"#e2e8f0",borderRadius:2}}/>
             </div>
-
-            {/* Mesures grandes */}
-            {(getPH(selectedPassage)||getCL(selectedPassage)||getTemp(selectedPassage))&&(
-              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:18}}>
-                {getPH(selectedPassage)&&(
-                  <div style={{borderRadius:16,padding:"14px 8px",textAlign:"center",background:phOk(getPH(selectedPassage))?"#f0fdf4":"#fff7ed",border:"2px solid "+(phOk(getPH(selectedPassage))?"#86efac":"#fed7aa")}}>
-                    <div style={{fontSize:10,fontWeight:800,color:phOk(getPH(selectedPassage))?"#166534":"#92400e",textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>pH</div>
-                    <div style={{fontSize:34,fontWeight:900,color:phOk(getPH(selectedPassage))?"#16a34a":"#d97706",lineHeight:1}}>{getPH(selectedPassage)}</div>
-                    <div style={{fontSize:11,fontWeight:700,color:phOk(getPH(selectedPassage))?"#22c55e":"#f59e0b",marginTop:6}}>{phOk(getPH(selectedPassage))?"✓ Idéal":"⚠ Revoir"}</div>
-                  </div>
-                )}
-                {getCL(selectedPassage)&&(
-                  <div style={{borderRadius:16,padding:"14px 8px",textAlign:"center",background:clOk(getCL(selectedPassage))?"#f0fdf4":"#fff7ed",border:"2px solid "+(clOk(getCL(selectedPassage))?"#86efac":"#fed7aa")}}>
-                    <div style={{fontSize:10,fontWeight:800,color:clOk(getCL(selectedPassage))?"#166534":"#92400e",textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>Chlore</div>
-                    <div style={{fontSize:34,fontWeight:900,color:clOk(getCL(selectedPassage))?"#16a34a":"#d97706",lineHeight:1}}>{getCL(selectedPassage)}</div>
-                    <div style={{fontSize:11,fontWeight:700,color:clOk(getCL(selectedPassage))?"#22c55e":"#f59e0b",marginTop:6}}>{clOk(getCL(selectedPassage))?"✓ Idéal":"⚠ Revoir"}</div>
-                  </div>
-                )}
-                {getTemp(selectedPassage)&&(
-                  <div style={{borderRadius:16,padding:"14px 8px",textAlign:"center",background:"rgba(224,242,254,0.5)",border:"2px solid #bae6fd"}}>
-                    <div style={{fontSize:10,fontWeight:800,color:"#075985",textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>Temp.</div>
-                    <div style={{fontSize:34,fontWeight:900,color:"#0284c7",lineHeight:1}}>{getTemp(selectedPassage)}°</div>
-                    <div style={{fontSize:11,fontWeight:700,color:"#38bdf8",marginTop:6}}>Eau</div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {getResume(selectedPassage)&&(
-              <div style={{background:"rgba(255,255,255,0.45)",borderRadius:14,padding:"14px 16px",marginBottom:12}}>
-                <div style={{fontSize:10,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>Actions réalisées</div>
-                <div style={{fontSize:14,color:"#334155",lineHeight:1.8}}>{getResume(selectedPassage)}</div>
-              </div>
-            )}
-            {(selectedPassage.obs||selectedPassage.commentaires)&&(
-              <div style={{background:"#fffbeb",borderRadius:14,padding:"14px 16px",marginBottom:12,borderLeft:"4px solid #fbbf24"}}>
-                <div style={{fontSize:10,fontWeight:800,color:"#92400e",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>Observations</div>
-                <div style={{fontSize:14,color:"#78350f",lineHeight:1.8}}>{selectedPassage.obs||selectedPassage.commentaires}</div>
-              </div>
-            )}
-            {/* Alcalinité + Stabilisant */}
-            {(selectedPassage.alcalinite||selectedPassage.stabilisant)&&(
-              <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:12}}>
-                {selectedPassage.alcalinite&&<div style={{background:"rgba(224,242,254,0.5)",borderRadius:10,padding:"10px",textAlign:"center",border:"1px solid #bae6fd"}}>
-                  <div style={{fontSize:9,fontWeight:700,color:"#0369a1",textTransform:"uppercase",marginBottom:3}}>Alcalinité</div>
-                  <div style={{fontSize:20,fontWeight:900,color:"#0284c7"}}>{selectedPassage.alcalinite}</div>
-                  <div style={{fontSize:9,color:"#64748b"}}>ppm (TAC)</div>
-                </div>}
-                {selectedPassage.stabilisant&&<div style={{background:"rgba(224,242,254,0.5)",borderRadius:10,padding:"10px",textAlign:"center",border:"1px solid #bae6fd"}}>
-                  <div style={{fontSize:9,fontWeight:700,color:"#0369a1",textTransform:"uppercase",marginBottom:3}}>Stabilisant</div>
-                  <div style={{fontSize:20,fontWeight:900,color:"#0284c7"}}>{selectedPassage.stabilisant}</div>
-                  <div style={{fontSize:9,color:"#64748b"}}>ppm</div>
-                </div>}
-              </div>
-            )}
-            {/* Qualité eau */}
-            {selectedPassage.qualiteEau&&(
-              <div style={{background:"rgba(255,255,255,0.45)",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:16}}>{selectedPassage.qualiteEau==="Cristalline"?"💎":selectedPassage.qualiteEau==="Verte"?"🌿":"🌫️"}</span>
+            <div style={{padding:"12px 22px 0"}}>
+              {/* Header */}
+              <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:20}}>
                 <div>
-                  <div style={{fontSize:10,fontWeight:700,color:"#64748b",textTransform:"uppercase",marginBottom:1}}>Qualité eau</div>
-                  <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{selectedPassage.qualiteEau}</div>
+                  <div style={{fontSize:18,fontWeight:700,color:"#0f172a",marginBottom:4}}>{selectedPassage.type||"Entretien"}</div>
+                  <div style={{fontSize:13,color:"#64748b",display:"flex",alignItems:"center",gap:5}}>
+                    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    {fmtDate(selectedPassage.date,{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}
+                  </div>
+                  {selectedPassage.tech&&<div style={{fontSize:12,color:"#64748b",marginTop:3,display:"flex",alignItems:"center",gap:5}}>
+                    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    {selectedPassage.tech}
+                  </div>}
                 </div>
+                <button onClick={()=>setSelectedPassage(null)} style={{width:34,height:34,borderRadius:"50%",background:"#f1f5f9",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
               </div>
-            )}
-            {/* Produits apportés */}
-            {(selectedPassage.corrChlore||selectedPassage.corrPH||selectedPassage.corrAlgicide||selectedPassage.corrAlcafix||selectedPassage.corrSel||selectedPassage.corrChloreChoc||selectedPassage.corrPeroxyde||selectedPassage.corrPhosphate||selectedPassage.corrAutre)&&(
-              <div style={{background:"#f5f3ff",borderRadius:14,padding:"12px 14px",marginBottom:12}}>
-                <div style={{fontSize:10,fontWeight:800,color:"#4f46e5",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>⚗️ Produits apportés</div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                  {[
-                    ["Chlore",selectedPassage.corrChlore],
-                    ["pH",selectedPassage.corrPH],
-                    ["Sel",selectedPassage.corrSel],
-                    ["Algicide",selectedPassage.corrAlgicide],
-                    ["Chlore choc",selectedPassage.corrChloreChoc],
-                    ["Peroxyde",selectedPassage.corrPeroxyde],
-                    ["Phosphate",selectedPassage.corrPhosphate],
-                    ["Alcafix",selectedPassage.corrAlcafix],
-                    ["Autre",selectedPassage.corrAutre],
-                  ].filter(([,v])=>v).map(([k,v])=>(
-                    <span key={k} style={{fontSize:12,fontWeight:600,color:"#4f46e5",background:"#ede9fe",borderRadius:8,padding:"4px 10px"}}>{k}: {v}</span>
-                  ))}
-                </div>
-              </div>
-            )}
-            {/* Photos */}
-            {(selectedPassage.photoArrivee||selectedPassage.photoDepart||(selectedPassage.photos||[]).some(Boolean))&&(
-              <div style={{marginBottom:12}}>
-                <div style={{fontSize:10,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>📸 Photos</div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8}}>
-                  {[
-                    selectedPassage.photoArrivee?{src:selectedPassage.photoArrivee,lbl:"Arrivée"}:null,
-                    ...((selectedPassage.photos||[]).filter(Boolean).map((s,i)=>({src:s,lbl:`Photo ${i+2}`}))),
-                    selectedPassage.photoDepart?{src:selectedPassage.photoDepart,lbl:"Départ"}:null,
-                  ].filter(Boolean).map((ph,i)=>(
-                    <div key={i} style={{position:"relative",borderRadius:10,overflow:"hidden"}}>
-                      <img src={ph.src} alt={ph.lbl} style={{width:"100%",height:110,objectFit:"cover",display:"block"}}/>
-                      <span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>{ph.lbl}</span>
+
+              {/* Mesures */}
+              {(getPH(selectedPassage)||getCL(selectedPassage)||getTemp(selectedPassage))&&(
+                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:16}}>
+                  {getPH(selectedPassage)&&(
+                    <div style={{borderRadius:14,padding:"12px 8px",textAlign:"center",background:phOk(getPH(selectedPassage))?"#f0fdf4":"#fff7ed",border:`2px solid ${phOk(getPH(selectedPassage))?"#86efac":"#fed7aa"}`}}>
+                      <div style={{fontSize:10,fontWeight:700,color:phOk(getPH(selectedPassage))?"#166534":"#92400e",textTransform:"uppercase",marginBottom:5}}>pH</div>
+                      <div style={{fontSize:28,fontWeight:700,color:phOk(getPH(selectedPassage))?"#16a34a":"#d97706",lineHeight:1}}>{getPH(selectedPassage)}</div>
+                      <div style={{fontSize:10,fontWeight:600,color:phOk(getPH(selectedPassage))?"#22c55e":"#f59e0b",marginTop:4}}>{phOk(getPH(selectedPassage))?"✓ Idéal":"⚠ Revoir"}</div>
                     </div>
-                  ))}
+                  )}
+                  {getCL(selectedPassage)&&(
+                    <div style={{borderRadius:14,padding:"12px 8px",textAlign:"center",background:clOk(getCL(selectedPassage))?"#f0fdf4":"#fff7ed",border:`2px solid ${clOk(getCL(selectedPassage))?"#86efac":"#fed7aa"}`}}>
+                      <div style={{fontSize:10,fontWeight:700,color:clOk(getCL(selectedPassage))?"#166534":"#92400e",textTransform:"uppercase",marginBottom:5}}>Chlore</div>
+                      <div style={{fontSize:28,fontWeight:700,color:clOk(getCL(selectedPassage))?"#16a34a":"#d97706",lineHeight:1}}>{getCL(selectedPassage)}</div>
+                      <div style={{fontSize:10,fontWeight:600,color:clOk(getCL(selectedPassage))?"#22c55e":"#f59e0b",marginTop:4}}>{clOk(getCL(selectedPassage))?"✓ Idéal":"⚠ Revoir"}</div>
+                    </div>
+                  )}
+                  {getTemp(selectedPassage)&&(
+                    <div style={{borderRadius:14,padding:"12px 8px",textAlign:"center",background:"#e0f2fe",border:"2px solid #bae6fd"}}>
+                      <div style={{fontSize:10,fontWeight:700,color:"#075985",textTransform:"uppercase",marginBottom:5}}>Temp.</div>
+                      <div style={{fontSize:28,fontWeight:700,color:"#0284c7",lineHeight:1}}>{getTemp(selectedPassage)}°</div>
+                      <div style={{fontSize:10,fontWeight:600,color:"#38bdf8",marginTop:4}}>Eau</div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
-            {/* Aucune donnée */}
-            {!getPH(selectedPassage)&&!getCL(selectedPassage)&&!getResume(selectedPassage)&&!selectedPassage.qualiteEau&&(
-              <div style={{textAlign:"center",padding:"24px 0",color:"#94a3b8",fontSize:14}}>
-                <div style={{fontSize:32,marginBottom:8}}>📝</div>
-                Aucune mesure enregistrée pour ce passage.
-              </div>
-            )}
+              )}
+
+              {/* Alcalinité + Stabilisant */}
+              {(selectedPassage.alcalinite||selectedPassage.stabilisant)&&(
+                <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:14}}>
+                  {selectedPassage.alcalinite&&<div style={{background:"#e0f2fe",borderRadius:10,padding:"10px",textAlign:"center",border:"1px solid #bae6fd"}}>
+                    <div style={{fontSize:9,fontWeight:700,color:"#0369a1",textTransform:"uppercase",marginBottom:3}}>Alcalinité (TAC)</div>
+                    <div style={{fontSize:20,fontWeight:700,color:"#0284c7"}}>{selectedPassage.alcalinite}</div>
+                    <div style={{fontSize:9,color:"#64748b"}}>mg/L</div>
+                  </div>}
+                  {selectedPassage.stabilisant&&<div style={{background:"#e0f2fe",borderRadius:10,padding:"10px",textAlign:"center",border:"1px solid #bae6fd"}}>
+                    <div style={{fontSize:9,fontWeight:700,color:"#0369a1",textTransform:"uppercase",marginBottom:3}}>Stabilisant (CYA)</div>
+                    <div style={{fontSize:20,fontWeight:700,color:"#0284c7"}}>{selectedPassage.stabilisant}</div>
+                    <div style={{fontSize:9,color:"#64748b"}}>mg/L</div>
+                  </div>}
+                </div>
+              )}
+
+              {/* Qualité eau */}
+              {selectedPassage.qualiteEau&&(
+                <div style={{background:"#f8fafc",borderRadius:10,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:8,border:"1px solid #e2e8f0"}}>
+                  <span style={{fontSize:16}}>{selectedPassage.qualiteEau==="Cristalline"?"💎":selectedPassage.qualiteEau==="Verte"?"🌿":"🌫️"}</span>
+                  <div>
+                    <div style={{fontSize:10,fontWeight:600,color:"#64748b",textTransform:"uppercase",marginBottom:1}}>Qualité eau</div>
+                    <div style={{fontSize:13,fontWeight:600,color:"#0f172a"}}>{selectedPassage.qualiteEau}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Produits apportés */}
+              {(selectedPassage.corrChlore||selectedPassage.corrPH||selectedPassage.corrAlgicide||selectedPassage.corrAlcafix||selectedPassage.corrSel||selectedPassage.corrChloreChoc||selectedPassage.corrPeroxyde||selectedPassage.corrPhosphate||selectedPassage.corrAutre)&&(
+                <div style={{background:"#f5f3ff",borderRadius:12,padding:"12px 14px",marginBottom:14}}>
+                  <div style={{fontSize:10,fontWeight:700,color:"#4f46e5",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>⚗️ Produits apportés</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                    {[
+                      ["Chlore",selectedPassage.corrChlore],["pH",selectedPassage.corrPH],["Sel",selectedPassage.corrSel],
+                      ["Algicide",selectedPassage.corrAlgicide],["Chlore choc",selectedPassage.corrChloreChoc],
+                      ["Peroxyde",selectedPassage.corrPeroxyde],["Phosphate",selectedPassage.corrPhosphate],
+                      ["Alcafix",selectedPassage.corrAlcafix],["Autre",selectedPassage.corrAutre],
+                    ].filter(([,v])=>v).map(([k,v])=>(
+                      <span key={k} style={{fontSize:12,fontWeight:600,color:"#4f46e5",background:"#ede9fe",borderRadius:8,padding:"4px 10px"}}>{k}: {v}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Compte-rendu */}
+              {getResume(selectedPassage)&&(
+                <div style={{background:"#f8fafc",borderRadius:12,padding:"12px 14px",marginBottom:14,border:"1px solid #e2e8f0"}}>
+                  <div style={{fontSize:10,fontWeight:700,color:"#64748b",textTransform:"uppercase",letterSpacing:.7,marginBottom:6}}>Compte-rendu</div>
+                  <div style={{fontSize:13,color:"#334155",lineHeight:1.7}}>{getResume(selectedPassage)}</div>
+                </div>
+              )}
+
+              {/* Observations */}
+              {(selectedPassage.obs||selectedPassage.commentaires)&&(
+                <div style={{background:"#fffbeb",borderRadius:12,padding:"12px 14px",marginBottom:14,borderLeft:"4px solid #fbbf24"}}>
+                  <div style={{fontSize:10,fontWeight:700,color:"#92400e",textTransform:"uppercase",letterSpacing:.7,marginBottom:6}}>Observations</div>
+                  <div style={{fontSize:13,color:"#78350f",lineHeight:1.7}}>{selectedPassage.obs||selectedPassage.commentaires}</div>
+                </div>
+              )}
+
+              {/* Produits livrés */}
+              {selectedPassage.livraisonProduits&&(selectedPassage.produitsLivres||[]).length>0&&(
+                <div style={{background:"#f0fdf4",borderRadius:12,padding:"12px 14px",marginBottom:14}}>
+                  <div style={{fontSize:10,fontWeight:700,color:"#059669",textTransform:"uppercase",letterSpacing:.7,marginBottom:6}}>📦 Produits livrés</div>
+                  <div style={{fontSize:13,color:"#065f46"}}>{selectedPassage.produitsLivres.join(", ")}</div>
+                </div>
+              )}
+
+              {/* Photos */}
+              {(selectedPassage.photoArrivee||selectedPassage.photoDepart||(selectedPassage.photos||[]).some(Boolean))&&(
+                <div style={{marginBottom:14}}>
+                  <div style={{fontSize:10,fontWeight:700,color:"#64748b",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>📸 Photos</div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8}}>
+                    {[
+                      selectedPassage.photoArrivee?{src:selectedPassage.photoArrivee,lbl:"Arrivée"}:null,
+                      ...((selectedPassage.photos||[]).filter(Boolean).map((s,i)=>({src:s,lbl:`Photo ${i+2}`}))),
+                      selectedPassage.photoDepart?{src:selectedPassage.photoDepart,lbl:"Départ"}:null,
+                    ].filter(Boolean).map((ph,i)=>(
+                      <div key={i} style={{position:"relative",borderRadius:10,overflow:"hidden"}}>
+                        <img src={ph.src} alt={ph.lbl} style={{width:"100%",height:110,objectFit:"cover",display:"block"}}/>
+                        <span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>{ph.lbl}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {!getPH(selectedPassage)&&!getCL(selectedPassage)&&!getResume(selectedPassage)&&!selectedPassage.qualiteEau&&(
+                <div style={{textAlign:"center",padding:"24px 0",color:"#94a3b8",fontSize:13}}>
+                  <div style={{fontSize:32,marginBottom:8}}>📝</div>
+                  Aucune mesure enregistrée pour ce passage.
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
-    )}
-    </>
+      )}
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
   );
 }
 // -- FIN CARNET --------------------------------------------------------------
