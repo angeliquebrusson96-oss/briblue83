@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { db, auth, storage, APP_DOC } from "./lib/firebase";
 import { save, load, reconcileOnBoot, flushPendingNow, IS_IOS } from "./lib/storage";
 import { getDoc } from "firebase/firestore";
@@ -956,6 +956,52 @@ const GlobalStyles = () => (
       -webkit-backdrop-filter: blur(28px) saturate(200%);
       border: 1px solid rgba(255,255,255,0.65);
     }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       FORMULAIRES PREMIUM
+       ═══════════════════════════════════════════════════════════════════ */
+    @keyframes fm-fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+    .fm-in { animation: fm-fadeUp 0.3s ease both; }
+    .fm-field label { display:block; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px; }
+    .fm-field input, .fm-field select, .fm-field textarea {
+      width:100%; padding:12px 14px; border-radius:12px;
+      border:1.5px solid #e2e8f0; font-size:14px; color:#0f172a;
+      font-family:'Inter',system-ui,sans-serif; outline:none;
+      background:#fff; transition:border-color 0.15s, box-shadow 0.15s;
+      -webkit-appearance:none; box-sizing:border-box;
+    }
+    .fm-field input:focus, .fm-field select:focus, .fm-field textarea:focus {
+      border-color:#0891b2; box-shadow:0 0 0 3px rgba(8,145,178,0.1);
+    }
+    .fm-choice { display:flex; align-items:center; gap:10px; padding:11px 14px; border-radius:12px; border:1.5px solid #e2e8f0; cursor:pointer; transition:all 0.15s; background:#fff; width:100%; text-align:left; font-family:inherit; }
+    .fm-choice.active { border-color:#0891b2; background:#f0f9ff; }
+    .fm-choice:active { transform:scale(0.98); }
+    .fm-save-btn { width:100%; padding:15px; border-radius:14px; border:none; cursor:pointer; font-family:inherit; font-size:15px; font-weight:700; color:#fff; box-shadow:0 4px 14px rgba(8,145,178,0.35); transition:transform 0.13s,box-shadow 0.13s; display:flex; align-items:center; justify-content:center; gap:8px; }
+    .fm-save-btn:active { transform:scale(0.98); box-shadow:0 2px 8px rgba(8,145,178,0.25); }
+    .fm-cancel-btn { width:100%; padding:13px; border-radius:14px; border:1.5px solid #e2e8f0; cursor:pointer; font-family:inherit; font-size:14px; font-weight:500; color:#64748b; background:#f8fafc; transition:background 0.15s; }
+    .fm-cancel-btn:active { background:#e2e8f0; }
+    .fm-section-title { font-size:11px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.6px; margin-bottom:10px; display:flex; align-items:center; gap:6px; }
+    .fm-section-title::after { content:''; flex:1; height:1px; background:#f1f5f9; }
+    .fm-client-row { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px; border:1.5px solid #e2e8f0; cursor:pointer; transition:all 0.15s; background:#fff; width:100%; text-align:left; font-family:inherit; }
+    .fm-client-row.sel { border-color:#0891b2; background:#f0f9ff; }
+    .fm-client-row:active { transform:scale(0.99); }
+    .fm-num-btn { width:32px; height:32px; border-radius:8px; border:none; cursor:pointer; font-size:16px; font-weight:600; display:flex; align-items:center; justify-content:center; transition:all 0.12s; flex-shrink:0; }
+    .fm-num-btn:active { transform:scale(0.9); }
+    .db-btn { transition: transform 0.13s, box-shadow 0.13s; cursor:pointer; }
+    .db-btn:active { transform:scale(0.95) !important; }
+    .db-card { transition: box-shadow 0.15s, transform 0.15s; }
+    .db-rdv-row { transition: background 0.15s; cursor:pointer; }
+    .db-rdv-row:active { background: #f0f9ff !important; }
+    @keyframes db-fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes db-wave { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+    @keyframes db-shimmer { 0%{background-position:-200% center} 100%{background-position:200% center} }
+    .db-s1 { animation: db-fadeUp 0.45s ease both 0.05s; }
+    .db-s2 { animation: db-fadeUp 0.45s ease both 0.12s; }
+    .db-s3 { animation: db-fadeUp 0.45s ease both 0.19s; }
+    .db-s4 { animation: db-fadeUp 0.45s ease both 0.26s; }
+    .db-s5 { animation: db-fadeUp 0.45s ease both 0.33s; }
+    .db-s6 { animation: db-fadeUp 0.45s ease both 0.40s; }
+    .db-stat-shimmer { background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.18) 50%, transparent 60%); background-size:200% 100%; animation: db-shimmer 2.5s infinite; }
   `}</style>
 );
 
@@ -1479,45 +1525,6 @@ function RapportStatusPicker({ value, onChange, compact=false }) {
 }
 
 // FORMULAIRE CLIENT (avec Entretien/Contrle par saison + PVC arm)
-// ─── STYLES COMMUNS FORMULAIRES ────────────────────────────────────────────
-const FORM_CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-  .fm-root * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; font-family:'Inter',system-ui,sans-serif; }
-  @keyframes fm-fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
-  @keyframes fm-fadeIn { from{opacity:0} to{opacity:1} }
-  .fm-in { animation: fm-fadeUp 0.3s ease both; }
-  .fm-field input, .fm-field select, .fm-field textarea {
-    width:100%; padding:12px 14px; border-radius:12px;
-    border:1.5px solid #e2e8f0; font-size:14px; color:#0f172a;
-    font-family:'Inter',system-ui,sans-serif; outline:none;
-    background:#fff; transition:border-color 0.15s, box-shadow 0.15s;
-    -webkit-appearance:none;
-  }
-  .fm-field input:focus, .fm-field select:focus, .fm-field textarea:focus {
-    border-color:#0891b2; box-shadow:0 0 0 3px rgba(8,145,178,0.1);
-  }
-  .fm-field label { display:block; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px; }
-  .fm-choice { display:flex; align-items:center; gap:10px; padding:11px 14px; border-radius:12px; border:1.5px solid #e2e8f0; cursor:pointer; transition:all 0.15s; background:#fff; width:100%; text-align:left; font-family:inherit; }
-  .fm-choice.active { border-color:#0891b2; background:#f0f9ff; }
-  .fm-choice:active { transform:scale(0.98); }
-  .fm-save-btn { width:100%; padding:15px; border-radius:14px; border:none; cursor:pointer; font-family:inherit; font-size:15px; font-weight:700; color:#fff; background:linear-gradient(135deg,#0891b2,#0e7490); box-shadow:0 4px 14px rgba(8,145,178,0.35); transition:transform 0.13s,box-shadow 0.13s; display:flex; align-items:center; justify-content:center; gap:8px; }
-  .fm-save-btn:active { transform:scale(0.98); box-shadow:0 2px 8px rgba(8,145,178,0.25); }
-  .fm-cancel-btn { width:100%; padding:13px; border-radius:14px; border:1.5px solid #e2e8f0; cursor:pointer; font-family:inherit; font-size:14px; font-weight:500; color:#64748b; background:#f8fafc; transition:background 0.15s; }
-  .fm-cancel-btn:active { background:#e2e8f0; }
-  .fm-section-title { font-size:11px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.6px; margin-bottom:10px; display:flex; align-items:center; gap:6px; }
-  .fm-section-title::after { content:''; flex:1; height:1px; background:#f1f5f9; }
-  .fm-client-row { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px; border:1.5px solid #e2e8f0; cursor:pointer; transition:all 0.15s; background:#fff; width:100%; text-align:left; font-family:inherit; }
-  .fm-client-row.sel { border-color:#0891b2; background:#f0f9ff; }
-  .fm-client-row:active { transform:scale(0.99); }
-  .fm-step-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; transition:all 0.25s; }
-  .fm-tab { padding:8px 14px; border-radius:20px; border:none; cursor:pointer; font-family:inherit; font-size:12px; font-weight:600; transition:all 0.15s; }
-  .fm-tab.active { background:#0891b2; color:#fff; box-shadow:0 2px 8px rgba(8,145,178,0.3); }
-  .fm-tab:not(.active) { background:#f1f5f9; color:#64748b; }
-  .fm-tab:not(.active):active { background:#e2e8f0; }
-  .fm-num-btn { width:32px; height:32px; border-radius:8px; border:none; cursor:pointer; font-size:16px; font-weight:600; display:flex; align-items:center; justify-content:center; transition:all 0.12s; flex-shrink:0; }
-  .fm-num-btn:active { transform:scale(0.9); }
-`;
-
 function FmField({ label, children, style }) {
   return (
     <div className="fm-field" style={style}>
@@ -1610,8 +1617,7 @@ function FormClient({ initial, clients, onSave, onClose }) {
 
   return (
     <Modal title="" onClose={onClose} wide noHeader>
-      <style>{FORM_CSS}</style>
-      <div className="fm-root">
+      <div>
         <FmHeader title={isNew?"Nouveau client":`Modifier — ${f.nom||"..."}`} subtitle="Informations et contrat" color="#7c3aed" onClose={onClose}/>
         <FmSteps steps={STEPS} current={step} color="#7c3aed"/>
         {hasDraft&&!initial?.id&&<div style={{margin:"10px 20px 0"}}><DraftBanner onRestore={restoreDraft} onDiscard={discardDraft}/></div>}
@@ -1859,8 +1865,7 @@ function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave
 
   return (
     <Modal title="" onClose={onClose} wide noHeader>
-      <style>{FORM_CSS}</style>
-      <div className="fm-root">
+      <div>
         <FmHeader title={isEdit?"Modifier la livraison":"Nouvelle livraison"} subtitle="Produits & détails" color="#059669" onClose={onClose}/>
         <FmSteps steps={STEPS} current={step} color="#059669"/>
         {hasDraft&&!isEdit&&<div style={{margin:"10px 20px 0"}}><DraftBanner onRestore={restoreDraft} onDiscard={discardDraft}/></div>}
@@ -2011,8 +2016,7 @@ function FormRdv({ initial, clients, onSave, onClose }) {
 
   return (
     <Modal title="" onClose={onClose} noHeader>
-      <style>{FORM_CSS}</style>
-      <div className="fm-root">
+      <div>
         <FmHeader title={isEdit?"Modifier le RDV":"Nouveau rendez-vous"} subtitle={f.type||"Planifier une intervention"} color="#7c3aed" onClose={onClose}/>
         {hasDraft&&!isEdit&&<div style={{margin:"10px 20px 0"}}><DraftBanner onRestore={restoreDraft} onDiscard={discardDraft}/></div>}
 
@@ -4854,36 +4858,9 @@ function DashboardHero({ clients, passages, rdvs, saisonNow, isMobile, onAddPass
   const rdvsFuturs = rdvs.filter(r => r.date >= TODAY).sort((a,b) => a.date.localeCompare(b.date));
   const rdvsToday = rdvsFuturs.filter(r => r.date === TODAY);
 
-  const css = `
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-    .db-root * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; font-family:'Inter',system-ui,sans-serif; }
-    @keyframes db-fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
-    @keyframes db-fadeIn { from{opacity:0} to{opacity:1} }
-    @keyframes db-wave { from{transform:translateX(0)} to{transform:translateX(-50%)} }
-    @keyframes db-pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
-    @keyframes db-shimmer { 0%{background-position:-200% center} 100%{background-position:200% center} }
-    .db-s1 { animation: db-fadeUp 0.45s ease both 0.05s; }
-    .db-s2 { animation: db-fadeUp 0.45s ease both 0.12s; }
-    .db-s3 { animation: db-fadeUp 0.45s ease both 0.19s; }
-    .db-s4 { animation: db-fadeUp 0.45s ease both 0.26s; }
-    .db-s5 { animation: db-fadeUp 0.45s ease both 0.33s; }
-    .db-s6 { animation: db-fadeUp 0.45s ease both 0.40s; }
-    .db-btn { transition: transform 0.13s, box-shadow 0.13s; cursor:pointer; }
-    .db-btn:active { transform:scale(0.95) !important; }
-    .db-card { transition: box-shadow 0.15s, transform 0.15s; }
-    .db-card:active { transform:scale(0.98); }
-    .db-rdv-row { transition: background 0.15s; }
-    .db-rdv-row:active { background: #f0f9ff !important; }
-    .db-stat-shimmer {
-      background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.18) 50%, transparent 60%);
-      background-size:200% 100%;
-      animation: db-shimmer 2.5s infinite;
-    }
-  `;
 
   return (
-    <div className="db-root">
-      <style>{css}</style>
+    <div>
 
       {/* ── HERO ── */}
       <div className="db-s1" style={{borderRadius:20,overflow:"hidden",marginBottom:12,position:"relative",boxShadow:"0 8px 32px rgba(8,145,178,0.28)"}}>
@@ -5013,7 +4990,7 @@ function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, on
   const pctGlobal = totalPrevus>0?Math.round(totalDone/totalPrevus*100):100;
 
   return (
-    <div className="db-root">
+    <div>
       {/* HERO */}
       <DashboardHero clients={clients} passages={passages} rdvs={rdvs} saisonNow={saisonNow} isMobile={isMobile} onAddPassage={onAddPassage} onAddLivraison={onAddLivraison} onAddClient={onAddClient} onAddRdv={onAddRdv}/>
 
@@ -6152,34 +6129,6 @@ function CarnetView({ client, passages, onRefresh, refreshing }) {
   const daysUntilFin = client.dateFin ? Math.ceil((new Date(client.dateFin) - new Date()) / (1000*60*60*24)) : null;
   const contratActif = daysUntilFin === null || daysUntilFin > 0;
 
-  const css = `
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    .cv-root * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    .cv-root { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
-    @keyframes cv-spin { to { transform: rotate(360deg); } }
-    @keyframes cv-fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
-    @keyframes cv-fadeIn { from { opacity:0; } to { opacity:1; } }
-    @keyframes cv-shimmer { 0%,100% { opacity:0.6; } 50% { opacity:1; } }
-    @keyframes cv-wave { 0%,100% { transform: translateX(0); } 50% { transform: translateX(-12px); } }
-    @keyframes cv-progress { from { width:0%; } to { width: var(--pw); } }
-    .cv-card-hover { transition: transform 0.15s ease, box-shadow 0.15s ease; }
-    .cv-card-hover:active { transform: scale(0.985); }
-    .cv-btn-press:active { transform: scale(0.96); }
-    .cv-tab-active { position:relative; }
-    .cv-tab-active::after { content:''; position:absolute; bottom:-1px; left:50%; transform:translateX(-50%); width:4px; height:4px; background:#0891b2; border-radius:50%; }
-    .cv-scroll { overflow-y:auto; -webkit-overflow-scrolling:touch; scroll-behavior:smooth; }
-    .cv-scroll::-webkit-scrollbar { display:none; }
-    .cv-stagger-1 { animation: cv-fadeUp 0.4s ease both 0.05s; }
-    .cv-stagger-2 { animation: cv-fadeUp 0.4s ease both 0.12s; }
-    .cv-stagger-3 { animation: cv-fadeUp 0.4s ease both 0.19s; }
-    .cv-stagger-4 { animation: cv-fadeUp 0.4s ease both 0.26s; }
-    .cv-stagger-5 { animation: cv-fadeUp 0.4s ease both 0.33s; }
-    .cv-glass { background: rgba(255,255,255,0.12); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.2); }
-    .cv-param-cell { transition: background 0.2s; }
-    .cv-param-cell:active { background: #f0f9ff !important; }
-    .cv-rapport-row { transition: background 0.15s, transform 0.12s; cursor:pointer; }
-    .cv-rapport-row:active { background: #f0f9ff !important; transform: scale(0.99); }
-  `;
 
   const WAVES_SVG = (
     <svg viewBox="0 0 400 60" preserveAspectRatio="none" style={{position:"absolute",bottom:0,left:0,right:0,width:"100%",height:60,opacity:0.15}} aria-hidden="true">
