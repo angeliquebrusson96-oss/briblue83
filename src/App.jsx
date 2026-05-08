@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { db, auth, storage, APP_DOC } from "./lib/firebase";
 import { save, load, reconcileOnBoot, flushPendingNow, IS_IOS } from "./lib/storage";
-import { getDoc, setDoc } from "firebase/firestore";
+import { getDoc } from "firebase/firestore";
 
 const BRAND_LOGO = `data:image/svg+xml;utf8,${encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" width="420" height="96" viewBox="0 0 420 96">
