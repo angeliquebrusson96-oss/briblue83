@@ -186,12 +186,12 @@ function useOnlineStatus() {
   const [online, setOnline] = useState(navigator.onLine);
   const [pendingCount, setPendingCount] = useState(0);
   useEffect(()=>{
-    const onOn = ()=>{ setOnline(true); flushOfflineQueue().then(()=>setPendingCount(0)); };
+    const onOn = ()=>{ setOnline(true); flushPendingNow(); setPendingCount(0); };
     const onOff = ()=>setOnline(false);
     window.addEventListener('online', onOn);
     window.addEventListener('offline', onOff);
-    // Vérifier la queue toutes les 30s
-    const interval = setInterval(()=>{ setPendingCount(Object.keys(offlineQueue.pending).length); }, 5000);
+    // Vérifier le statut toutes les 5s
+    const interval = setInterval(()=>{ setPendingCount(window.briblue?._debug?.()?.pending ? Object.keys(window.briblue._debug().pending).length : 0); }, 5000);
     return ()=>{ window.removeEventListener('online', onOn); window.removeEventListener('offline', onOff); clearInterval(interval); };
   },[]);
   return { online, pendingCount };
