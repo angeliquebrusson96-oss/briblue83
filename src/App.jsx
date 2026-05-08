@@ -5652,8 +5652,6 @@ function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePass
                         </>
                       ) : (
                         // ── DESKTOP : grille de boutons ──
-                      ) : (
-                        // ── DESKTOP : grille de boutons ──
                         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:6}}>
                           <button onClick={()=>setDetailPassage(p)} className="btn-hover" style={{padding:"10px",borderRadius:10,background:DS.light,border:"1px solid "+DS.border,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:DS.dark,fontFamily:"inherit",fontWeight:700}}>
                             {Ico.search(13,DS.mid)} Aperçu
