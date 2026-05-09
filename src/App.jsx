@@ -197,6 +197,9 @@ function useOnlineStatus() {
   return { online, pendingCount };
 }
 
+// Protection module-level contre double-load iOS
+let _BB_BOOT_DONE = false;
+
 // ═══════════════════════════════════════════════════════════════════════════
 // useFormDraft — brouillons auto réutilisable pour TOUS les formulaires
 // Sauve en localStorage toutes les 400ms + flush garanti iOS/Android/Desktop
@@ -6895,7 +6898,7 @@ export default function App() {
   const [showStock, setShowStock] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [contrats, setContrats] = useState({});
-  const [initialLoaded, setInitialLoaded] = useState(false);
+  const [initialLoaded, setInitialLoaded] = useState(() => { try { return sessionStorage.getItem('bb_initial_loaded') === '1'; } catch { return false; } });
   const [ready, setReady] = useState(false);
   const [ficheClient, setFicheClient] = useState(null);
   const [showFormClient, setShowFormClient] = useState(false);
@@ -6915,8 +6918,25 @@ export default function App() {
 
   useEffect(()=>{ setupPWA(); try { if(sessionStorage.getItem("bb_auth")==="1") setLoggedIn(true); } catch {} },[]);
 
+  // ⚠️ IOS : flush des données en attente quand l'app passe en arrière-plan
+  // Évite la perte de données si iOS tue le process après inactivité
   useEffect(()=>{
-    if(!loggedIn) return;
+    const onVis = () => {
+      if (document.visibilityState === 'hidden') {
+        try { flushPendingNow(); } catch {}
+      }
+    };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('pagehide', ()=>{ try { flushPendingNow(); } catch {}});
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
+
+  useEffect(()=>{
+    // ⚠️ PROTECTION IOS : ne charger qu'une seule fois par session
+    // Sur iOS, le composant peut remonter quand l'app revient au premier plan
+    // sans ce guard, le rechargement Supabase écraserait les données locales en cours
+    if(!loggedIn || initialLoaded || _BB_BOOT_DONE) return;
+    _BB_BOOT_DONE = true;
     (async()=>{
       const c = await load("bb_clients_v2", null);
       const passages_data = await load("bb_passages_v2", null);
@@ -6936,9 +6956,9 @@ export default function App() {
       const sWithDefaults = {...Object.fromEntries(PRODUITS_DEFAUT.map(nom=>[nom,0])), ...stockData};
 
       const cMigrated = clientsData.map(cl => ({...cl, moisParMois: migrateMois(cl.moisParMois||cl.saisons), photoPiscine: cl.photoPiscine||"", prixPassageE: cl.prixPassageE||0, prixPassageC: cl.prixPassageC||0}));
-      setClients(cMigrated); setPassages(passagesData); setLivraisons(livraisonsData); setRdvs(rdvsData); setStock(sWithDefaults); setContrats(contratsData); setReady(true); setInitialLoaded(true);
+      setClients(cMigrated); setPassages(passagesData); setLivraisons(livraisonsData); setRdvs(rdvsData); setStock(sWithDefaults); setContrats(contratsData); setReady(true); setInitialLoaded(true); try { sessionStorage.setItem('bb_initial_loaded', '1'); } catch {}
     })();
-  },[loggedIn]);
+  },[loggedIn, initialLoaded]);
 
   // Sauvegarde MANUELLE uniquement — jamais automatique au chargement
   const saveClients   = useCallback((data) => save("bb_clients_v2",    data), []);
