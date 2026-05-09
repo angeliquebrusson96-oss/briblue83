@@ -10,21 +10,43 @@ const FIREBASE_DEBOUNCE_MS = 800;
 const offlineQueue    = { pending: {} };
 const _debounceTimers = {};
 
+// ─── TOKEN ──────────────────────────────────────────────────────────────────
 let _cachedAuthToken = null;
+let _tokenPromise    = null; // évite les refreshs simultanés
 
-async function refreshAuthToken() {
-  try {
-    const user = auth.currentUser;
-    if (!user) return;
-    _cachedAuthToken = await user.getIdToken(false);
-  } catch {}
+async function refreshAuthToken(forceRefresh = false) {
+  if (_tokenPromise) return _tokenPromise;
+  _tokenPromise = (async () => {
+    try {
+      const user = auth.currentUser;
+      if (!user) return null;
+      _cachedAuthToken = await user.getIdToken(forceRefresh);
+      return _cachedAuthToken;
+    } catch {
+      return _cachedAuthToken; // garde l'ancien si refresh échoue
+    } finally {
+      _tokenPromise = null;
+    }
+  })();
+  return _tokenPromise;
+}
+
+// Obtenir un token valide (refresh si absent ou expiré)
+async function getAuthToken() {
+  if (_cachedAuthToken) return _cachedAuthToken;
+  return refreshAuthToken(false);
 }
 
 if (typeof window !== "undefined") {
-  setTimeout(refreshAuthToken, 2000);
-  setInterval(refreshAuthToken, 45 * 60 * 1000);
+  // Refresh initial dès que l'auth est prête
+  auth.onAuthStateChanged(user => {
+    if (user) refreshAuthToken(false);
+  });
+  // Refresh toutes les 45 min pour éviter l'expiration
+  setInterval(() => refreshAuthToken(true), 45 * 60 * 1000);
 }
 
+// ─── FIRESTORE REST ─────────────────────────────────────────────────────────
 function toFirestoreValue(v) {
   if (v === null || v === undefined) return { nullValue: null };
   if (typeof v === "boolean")  return { booleanValue: v };
@@ -39,9 +61,20 @@ function toFirestoreValue(v) {
   return { stringValue: String(v) };
 }
 
-function flushViaKeepalive(pending) {
+// Sauvegarde REST Firestore (fonctionne sur iOS, survit au background)
+async function saveViaREST(pending, keepalive = false) {
   const keys = Object.keys(pending);
   if (!keys.length) return;
+
+  const token = await getAuthToken();
+  if (!token) {
+    // Pas de token → fallback SDK
+    for (const key of keys) {
+      await saveToFirebaseSDK(key, pending[key]);
+    }
+    return;
+  }
+
   const fields = {};
   const updateMask = [];
   keys.forEach(key => {
@@ -50,46 +83,69 @@ function flushViaKeepalive(pending) {
   });
   fields["_lastSavedAt"] = { stringValue: new Date().toISOString() };
   updateMask.push("updateMask.fieldPaths=_lastSavedAt");
+
   const url = `${FIRESTORE_REST_URL}?${updateMask.join("&")}`;
-  const headers = { "Content-Type": "application/json" };
-  if (_cachedAuthToken) headers["Authorization"] = `Bearer ${_cachedAuthToken}`;
-  try {
-    fetch(url, { method: "PATCH", keepalive: true, headers, body: JSON.stringify({ fields }) }).catch(() => {});
-  } catch {}
-}
+  const opts = {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+    body: JSON.stringify({ fields }),
+  };
+  if (keepalive) opts.keepalive = true;
 
-export function flushPendingNow() {
-  const keys = Object.keys(offlineQueue.pending);
-  if (!keys.length) return;
-  Object.keys(_debounceTimers).forEach(k => { clearTimeout(_debounceTimers[k]); delete _debounceTimers[k]; });
-  if (IS_IOS) {
-    flushViaKeepalive({ ...offlineQueue.pending });
-    keys.forEach(k => { delete offlineQueue.pending[k]; });
-  } else {
-    keys.forEach(key => {
-      const val = offlineQueue.pending[key];
-      saveToFirebase(key, val)
-        .then(() => { if (offlineQueue.pending[key] === val) delete offlineQueue.pending[key]; })
-        .catch(() => {});
-    });
+  const res = await fetch(url, opts);
+
+  // Token expiré → refresh et retry une fois
+  if (res.status === 401) {
+    const newToken = await refreshAuthToken(true);
+    if (newToken) {
+      opts.headers["Authorization"] = `Bearer ${newToken}`;
+      opts.keepalive = false; // keepalive + retry peut échouer
+      await fetch(url, opts).catch(() => {});
+    }
+    return;
   }
+  if (!res.ok) throw new Error(`REST ${res.status}`);
 }
 
-async function saveToFirebase(key, val) {
+// ─── FIREBASE SDK (desktop/Android, connexion stable) ───────────────────────
+async function saveToFirebaseSDK(key, val) {
   await setDoc(APP_DOC, { [key]: val, _lastSavedAt: new Date().toISOString() }, { merge: true });
 }
 
+// ─── FLUSH (iOS background / fermeture de page) ─────────────────────────────
+export function flushPendingNow() {
+  const keys = Object.keys(offlineQueue.pending);
+  if (!keys.length) return;
+  // Annuler tous les timers en cours
+  Object.keys(_debounceTimers).forEach(k => { clearTimeout(_debounceTimers[k]); delete _debounceTimers[k]; });
+
+  const snapshot = { ...offlineQueue.pending };
+  keys.forEach(k => { delete offlineQueue.pending[k]; });
+
+  // Toujours utiliser keepalive REST pour le flush (iOS ET desktop)
+  // C'est le seul moyen fiable de survivre à la fermeture de page
+  saveViaREST(snapshot, true).catch(() => {
+    // Si REST échoue, remettre dans la queue
+    Object.assign(offlineQueue.pending, snapshot);
+  });
+}
+
+// ─── FLUSH ONLINE (reconnexion réseau) ──────────────────────────────────────
 async function flushOfflineQueue() {
   const keys = Object.keys(offlineQueue.pending);
   if (!keys.length) return;
-  for (const key of keys) {
-    try {
-      await saveToFirebase(key, offlineQueue.pending[key]);
-      delete offlineQueue.pending[key];
-    } catch {}
+  const snapshot = { ...offlineQueue.pending };
+  keys.forEach(k => { delete offlineQueue.pending[k]; });
+  try {
+    await saveViaREST(snapshot, false);
+  } catch {
+    // Remettre dans la queue si échec
+    Object.assign(offlineQueue.pending, snapshot);
   }
 }
 
+// ─── RECONCILE AU BOOT ──────────────────────────────────────────────────────
+// ⚠️ PROTECTION : ne jamais écraser des données locales plus récentes que Firebase
 export async function reconcileOnBoot() {
   try {
     const snap    = await getDoc(APP_DOC);
@@ -98,53 +154,103 @@ export async function reconcileOnBoot() {
     const KEYS = ["bb_clients_v2","bb_passages_v2","bb_livraisons_v1","bb_rdvs_v1","bb_stock_v1","bb_contrats_v1"];
     const toPush = {};
     let needsPush = false;
+
     for (const key of KEYS) {
       let local = null;
       try { const ls = localStorage.getItem("briblue_" + key); if (ls) local = JSON.parse(ls); } catch {}
+
       if (local == null) {
-        if (remote[key] != null) { try { localStorage.setItem("briblue_" + key, JSON.stringify(remote[key])); } catch {} }
+        // Rien en local → prendre Firebase
+        if (remote[key] != null) {
+          try { localStorage.setItem("briblue_" + key, JSON.stringify(remote[key])); } catch {}
+        }
         continue;
       }
-      if (remote[key] == null) { toPush[key] = local; needsPush = true; continue; }
+
+      if (remote[key] == null) {
+        // Rien sur Firebase → pousser le local
+        toPush[key] = local; needsPush = true; continue;
+      }
+
+      // Les deux existent → comparer les timestamps
       let localTime = 0;
       try { const m = localStorage.getItem("briblue_meta_" + key); if (m) localTime = JSON.parse(m).savedAt || 0; } catch {}
-      if (localTime > remoteTime) {
+
+      if (localTime >= remoteTime) {
+        // Local plus récent ou égal → pousser vers Firebase
         toPush[key] = local; needsPush = true;
       } else {
-        try {
-          localStorage.setItem("briblue_" + key, JSON.stringify(remote[key]));
-          localStorage.setItem("briblue_meta_" + key, JSON.stringify({ savedAt: remoteTime }));
-        } catch {}
+        // Firebase plus récent → mettre à jour le local
+        // ⚠️ Seulement si aucune donnée n'est en attente d'envoi pour cette clé
+        if (!offlineQueue.pending[key]) {
+          try {
+            localStorage.setItem("briblue_" + key, JSON.stringify(remote[key]));
+            localStorage.setItem("briblue_meta_" + key, JSON.stringify({ savedAt: remoteTime }));
+          } catch {}
+        }
       }
     }
-    if (needsPush) { toPush["_lastSavedAt"] = new Date().toISOString(); await setDoc(APP_DOC, toPush, { merge: true }); }
+
+    if (needsPush) {
+      toPush["_lastSavedAt"] = new Date().toISOString();
+      await setDoc(APP_DOC, toPush, { merge: true });
+    }
   } catch (e) { console.warn("[briblue] reconcile skipped:", e?.message); }
 }
 
+// ─── SAVE ────────────────────────────────────────────────────────────────────
 export async function save(key, val) {
+  // 1. Sauvegarder localement en priorité absolue
   try {
     localStorage.setItem("briblue_" + key, JSON.stringify(val));
     localStorage.setItem("briblue_meta_" + key, JSON.stringify({ savedAt: Date.now() }));
   } catch {}
+
+  // 2. Mettre dans la queue (protection si le réseau échoue)
   offlineQueue.pending[key] = val;
+
   if (!navigator.onLine) return;
+
   if (IS_IOS) {
+    // iOS : annuler le timer précédent et utiliser REST directement
+    // Le SDK Firebase peut être tué par iOS en arrière-plan
     if (_debounceTimers[key]) { clearTimeout(_debounceTimers[key]); delete _debounceTimers[key]; }
-    try {
-      await saveToFirebase(key, val);
-      if (offlineQueue.pending[key] === val) delete offlineQueue.pending[key];
-    } catch {}
+
+    // Debounce court pour éviter les appels trop fréquents
+    _debounceTimers[key] = setTimeout(async () => {
+      delete _debounceTimers[key];
+      const latest = offlineQueue.pending[key];
+      if (latest === undefined) return;
+      try {
+        await saveViaREST({ [key]: latest }, false);
+        if (offlineQueue.pending[key] === latest) delete offlineQueue.pending[key];
+      } catch {
+        // Garde dans la queue → sera envoyé au prochain flush
+      }
+    }, 400);
+
   } else {
+    // Desktop/Android : debounce SDK Firebase (plus fiable sur connexion stable)
     if (_debounceTimers[key]) clearTimeout(_debounceTimers[key]);
     _debounceTimers[key] = setTimeout(async () => {
       delete _debounceTimers[key];
       const latest = offlineQueue.pending[key];
       if (latest === undefined) return;
-      try { await saveToFirebase(key, latest); if (offlineQueue.pending[key] === latest) delete offlineQueue.pending[key]; } catch {}
+      try {
+        await saveToFirebaseSDK(key, latest);
+        if (offlineQueue.pending[key] === latest) delete offlineQueue.pending[key];
+      } catch {
+        // Fallback REST si le SDK échoue
+        try {
+          await saveViaREST({ [key]: latest }, false);
+          if (offlineQueue.pending[key] === latest) delete offlineQueue.pending[key];
+        } catch {}
+      }
     }, FIREBASE_DEBOUNCE_MS);
   }
 }
 
+// ─── LOAD ─────────────────────────────────────────────────────────────────────
 export async function load(key, fallback) {
   try {
     const snap = await getDoc(APP_DOC);
@@ -164,17 +270,50 @@ export async function load(key, fallback) {
   }
 }
 
+// ─── EVENT LISTENERS ─────────────────────────────────────────────────────────
 if (typeof window !== "undefined") {
+  // Flush quand réseau revient
   window.addEventListener("online", () => { flushOfflineQueue(); });
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushPendingNow(); });
+
+  // Flush garanti quand l'app passe en arrière-plan (iOS critical)
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushPendingNow();
+  });
+
+  // Double protection iOS : pagehide se déclenche même quand visibilitychange ne l'est pas
   window.addEventListener("pagehide", () => { flushPendingNow(); });
+
+  // Desktop
   window.addEventListener("beforeunload", () => { flushPendingNow(); });
+
+  // Reconcile au boot (après que l'auth soit prête)
+  const doReconcile = () => {
+    // Attendre que l'auth soit initialisée avant de reconcilier
+    const unsubscribe = auth.onAuthStateChanged(user => {
+      unsubscribe();
+      if (user) {
+        refreshAuthToken(false).then(() => {
+          setTimeout(reconcileOnBoot, 500); // petit délai pour laisser l'app charger
+        });
+      }
+    });
+  };
+
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => { reconcileOnBoot(); });
+    document.addEventListener("DOMContentLoaded", doReconcile);
   } else {
-    setTimeout(reconcileOnBoot, 0);
+    doReconcile();
   }
+
+  // Debug helpers
   window.briblue = window.briblue || {};
-  window.briblue._debug = () => ({ pending: {...offlineQueue.pending}, online: navigator.onLine, isIOS: IS_IOS, hasToken: !!_cachedAuthToken });
+  window.briblue._debug = () => ({
+    pending: {...offlineQueue.pending},
+    online: navigator.onLine,
+    isIOS: IS_IOS,
+    hasToken: !!_cachedAuthToken,
+    pendingCount: Object.keys(offlineQueue.pending).length,
+  });
   window.briblue._forceFlush = flushPendingNow;
+  window.briblue._forceReconcile = reconcileOnBoot;
 }
