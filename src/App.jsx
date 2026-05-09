@@ -1005,6 +1005,29 @@ const GlobalStyles = () => (
     .db-s5 { animation: db-fadeUp 0.45s ease both 0.33s; }
     .db-s6 { animation: db-fadeUp 0.45s ease both 0.40s; }
     .db-stat-shimmer { background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.18) 50%, transparent 60%); background-size:200% 100%; animation: db-shimmer 2.5s infinite; }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       CARNET CLIENT (CarnetView)
+       ═══════════════════════════════════════════════════════════════════ */
+    @keyframes cv-spin { to { transform: rotate(360deg); } }
+    @keyframes cv-fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes cv-fadeIn { from { opacity:0; } to { opacity:1; } }
+    @keyframes cv-progress { from { width:0%; } to { width: var(--pw); } }
+    .cv-card-hover { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+    .cv-card-hover:active { transform: scale(0.985); }
+    .cv-btn-press:active { transform: scale(0.96); }
+    .cv-glass { background: rgba(255,255,255,0.12); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.2); }
+    .cv-param-cell { transition: background 0.2s; }
+    .cv-param-cell:active { background: #f0f9ff !important; }
+    .cv-rapport-row { transition: background 0.15s, transform 0.12s; cursor:pointer; }
+    .cv-rapport-row:active { background: #f0f9ff !important; transform: scale(0.99); }
+    .cv-scroll { overflow-y:auto; -webkit-overflow-scrolling:touch; scroll-behavior:smooth; }
+    .cv-scroll::-webkit-scrollbar { display:none; }
+    .cv-stagger-1 { animation: cv-fadeUp 0.4s ease both 0.05s; }
+    .cv-stagger-2 { animation: cv-fadeUp 0.4s ease both 0.12s; }
+    .cv-stagger-3 { animation: cv-fadeUp 0.4s ease both 0.19s; }
+    .cv-stagger-4 { animation: cv-fadeUp 0.4s ease both 0.26s; }
+    .cv-stagger-5 { animation: cv-fadeUp 0.4s ease both 0.33s; }
   `}</style>
 );
 
@@ -6711,8 +6734,6 @@ function CarnetView({ client, passages, onRefresh, refreshing }) {
   // ─── RENDER ────────────────────────────────────────────────────────────────
   return (
     <div className="cv-root" style={{background:"#f0f6fb",minHeight:"100vh",maxWidth:480,margin:"0 auto"}}>
-      <style>{css}</style>
-
       {/* HEADER */}
       <div style={{background:"rgba(255,255,255,0.9)",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",padding:"13px 16px 11px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid rgba(226,232,240,0.8)",position:"sticky",top:0,zIndex:100}}>
         <div style={{width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:8,color:"#94a3b8"}}>
