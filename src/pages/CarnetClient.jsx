@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { getDoc } from "firebase/firestore";
 import { APP_DOC } from "../lib/firebase";
-import { getPH, getCL, getTemp, getResumePassage, isControleType, generateCarnetCode } from "../utils/helpers";
+import { getPH, getCL, getTemp, getResumePassage, isControleType, generateCarnetCode, calculerPassagesPrevusContrat, isPassageEffectue, isPassageDansContrat } from "../utils/helpers";
 
 // Génération autonome du rapport client : évite le bouton PDF cassé si App.jsx n'est pas chargé ici.
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
@@ -47,8 +47,9 @@ const getProduitsLivres = (p = {}) => {
     p.produitsLivree,
   ].flatMap(toArray);
 
-  // Compatibilité avec les anciens rapports : parfois seule la case livraisonProduits était cochée
-  // et les produits étaient saisis dans un champ texte générique.
+  // livraisonAutre = champ texte libre "autre" du formulaire passage
+  if (p.livraisonAutre && String(p.livraisonAutre).trim()) raw.push(String(p.livraisonAutre).trim());
+  // Compatibilité anciens rapports : case cochée mais sans produit sélectionné
   if ((p.livraisonProduits || p.produitLivre || p.produitsLivresCheck) && raw.length === 0) {
     raw.push(p.produitLivreTexte || p.produitLivre || p.nomProduit || p.produit || p.designationProduit || "Produits livrés");
   }
@@ -117,179 +118,6 @@ function telechargerRapport(passage, client, existingUrl) {
 }
 
 // Fallback init data (mirrors App.jsx)
-
-const toNumber = (v, fallback = 0) => {
-  if (v === undefined || v === null || v === "") return fallback;
-  const n = Number(String(v).replace(",", "."));
-  return Number.isFinite(n) ? n : fallback;
-};
-const dateOnly = (value) => {
-  if (!value) return null;
-  const [y, m, d] = String(value).slice(0, 10).split("-").map(Number);
-  if (!y || !m || !d) return null;
-  return new Date(y, m - 1, d);
-};
-const firstDayOfMonth = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
-const addMonths = (d, n) => new Date(d.getFullYear(), d.getMonth() + n, 1);
-// Lecture UNIQUE du planning mensuel, avec fusion des sources.
-// IMPORTANT : si le planning est modifié dans une autre page/fenêtre,
-// on ne garde pas l'ancien objet en priorité : on fusionne les valeurs et
-// les données du contrat/planning passent en dernier pour écraser les anciennes valeurs.
-const mergePlanObjects = (...plans) => {
-  const merged = {};
-  plans.filter(Boolean).forEach((plan) => {
-    if (typeof plan !== "object" || Array.isArray(plan)) return;
-    Object.entries(plan).forEach(([key, value]) => {
-      if (value === undefined || value === null || value === "") return;
-      if (typeof value === "object" && !Array.isArray(value) && typeof merged[key] === "object" && !Array.isArray(merged[key])) {
-        merged[key] = { ...merged[key], ...value };
-      } else {
-        merged[key] = value;
-      }
-    });
-  });
-  return merged;
-};
-
-const getMonthlyPlanObject = (client = {}) => {
-  return mergePlanObjects(
-    client.moisParMois,
-    client.passagesParMois,
-    client.planningMensuel,
-    client.planningPassages,
-    client.planMensuel,
-    client.saisons,
-    client.planning?.moisParMois,
-    client.planning?.passagesParMois,
-    client.planning?.planningMensuel,
-    client.contrat?.moisParMois,
-    client.contrat?.passagesParMois,
-    client.contrat?.planningMensuel,
-    client.contrat?.planningPassages,
-    client.contrat?.planMensuel,
-    client.contrat?.saisons,
-    client.contrat?.planning?.moisParMois,
-    client.contrat?.planning?.passagesParMois,
-    client.contrat?.planning?.planningMensuel
-  );
-};
-const getMonthPlanEntry = (plan = {}, monthNumber) => {
-  const monthNames = {
-    1: ["janvier"],
-    2: ["fevrier", "février"],
-    3: ["mars"],
-    4: ["avril"],
-    5: ["mai"],
-    6: ["juin"],
-    7: ["juillet"],
-    8: ["aout", "août"],
-    9: ["septembre"],
-    10: ["octobre"],
-    11: ["novembre"],
-    12: ["decembre", "décembre"],
-  };
-  const names = monthNames[monthNumber] || [];
-  return plan[monthNumber]
-    ?? plan[String(monthNumber)]
-    ?? plan[String(monthNumber).padStart(2, "0")]
-    ?? names.map(n => plan[n] ?? plan[n.toUpperCase()] ?? plan[n.charAt(0).toUpperCase() + n.slice(1)]).find(v => v !== undefined)
-    ?? {};
-};
-const getPlanForMonth = (client = {}, monthNumber) => {
-  const plan = getMonthlyPlanObject(client);
-  const m = getMonthPlanEntry(plan, monthNumber);
-  if (typeof m === "number" || typeof m === "string") return { entretien: toNumber(m), controle: 0 };
-  return {
-    entretien: toNumber(m.entretien ?? m.passages ?? m.prevus ?? m.prévus ?? m.nb ?? m.nombre ?? m.total ?? 0),
-    controle: toNumber(m.controle ?? m.contrôle ?? m.controles ?? m.contrôles ?? 0),
-  };
-};
-const hasMonthlyPlan = (client = {}) => Object.keys(getMonthlyPlanObject(client) || {}).length > 0;
-const getPassagesAnnuelsSaisis = (client = {}) => {
-  const value = client.passagesAnnuels
-    ?? client.nbPassagesAnnuels
-    ?? client.nombrePassagesAnnuels
-    ?? client.nombrePassagesAnnuel
-    ?? client.totalPassagesAnnuels
-    ?? client.totalPassagesAnnuel
-    ?? client.passagesContrat
-    ?? client.nbPassagesContrat
-    ?? client.nombrePassagesContrat
-    ?? client.passagesPrevusContrat
-    ?? client.passagesPrévusContrat
-    ?? client.passagesPrevus
-    ?? client.nbPassagesPrevus
-    ?? client.nbPassages
-    ?? client.nombrePassages
-    ?? client.contrat?.passagesAnnuels
-    ?? client.contrat?.nbPassagesAnnuels
-    ?? client.contrat?.nombrePassagesAnnuels
-    ?? client.contrat?.passagesPrevus
-    ?? client.contrat?.nbPassages
-    ?? client.contrat?.nombrePassages;
-  return toNumber(value, 0);
-};
-const calculerPassagesPrevusContrat = (client = {}) => {
-  // Le comptage se base sur les dates du contrat.
-  // Exemple : contrat de septembre à août => on additionne uniquement ces mois-là.
-  // Le total annuel saisi sert de secours seulement si aucun détail mensuel n'existe.
-  const debut = dateOnly(client.dateDebut || client.contrat?.dateDebut || client.contrat?.debut);
-  const fin = dateOnly(client.dateFin || client.contrat?.dateFin || client.contrat?.fin);
-
-  if (debut && fin && hasMonthlyPlan(client)) {
-    let cursor = firstDayOfMonth(debut);
-    let endMonth = firstDayOfMonth(fin);
-
-    // Si la fin tombe le même jour ou avant le jour de début, on considère que le mois de fin
-    // est la bascule du nouveau contrat et on ne le recompte pas.
-    // Ex : 29/09/2025 → 29/09/2026 = sept. 2025 à août 2026.
-    // Ex : 01/01/2026 → 31/12/2026 = janv. à déc. 2026.
-    const includeEndMonth = fin.getDate() > debut.getDate();
-    const stop = includeEndMonth ? addMonths(endMonth, 1) : endMonth;
-
-    let total = 0;
-    let guard = 0;
-    while (cursor < stop && guard < 60) {
-      const monthNumber = cursor.getMonth() + 1;
-      const m = getPlanForMonth(client, monthNumber);
-      total += m.entretien + m.controle;
-      cursor = addMonths(cursor, 1);
-      guard += 1;
-    }
-    return total;
-  }
-
-  const totalSaisi = getPassagesAnnuelsSaisis(client);
-  if (totalSaisi > 0) return totalSaisi;
-
-  if (hasMonthlyPlan(client)) {
-    return Array.from({ length: 12 }, (_, i) => {
-      const m = getPlanForMonth(client, i + 1);
-      return m.entretien + m.controle;
-    }).reduce((a, b) => a + b, 0);
-  }
-  return 0;
-};
-const isPassageEffectue = (p = {}) => {
-  // Un passage se déduit seulement quand un vrai rapport/intervention est créé.
-  // Les rendez-vous prévus/planifiés ne doivent PAS être comptés comme effectués.
-  const status = String(p.statut ?? p.status ?? p.etat ?? p.état ?? "").toLowerCase();
-  const type = String(p.type ?? p.categorie ?? "").toLowerCase();
-  if (/annul|prévu|prevu|planif|rdv|rendez|a venir|à venir/.test(status)) return false;
-  if (/rdv|rendez|prévu|prevu|planif/.test(type)) return false;
-  if (p.annule || p.annulé || p.cancelled || p.planifie || p.planifié || p.rdvSeulement || p.isRdvOnly) return false;
-  if (p.ok === false || p.valide === false || p.validé === false) return false;
-  return true;
-};
-const isPassageDansContrat = (p = {}, client = {}) => {
-  if (!p.date) return true;
-  const d = String(p.date).slice(0, 10);
-  const debut = client.dateDebut ? String(client.dateDebut).slice(0, 10) : null;
-  const fin = client.dateFin ? String(client.dateFin).slice(0, 10) : null;
-  if (debut && d < debut) return false;
-  if (fin && d > fin) return false;
-  return true;
-};
 
 const CLIENTS_INIT = [
   { id:"C001", nom:"GAMBIN IMMO - COPRO O GARDEN", tel:"", email:"", adresse:"", bassin:"Liner", volume:0, formule:"Confort+", prix:2418, prixPassageE:78, prixPassageC:0, dateDebut:"2025-09-29", dateFin:"2026-09-29", photoPiscine:"", moisParMois:{1:{entretien:1,controle:0},2:{entretien:2,controle:0},3:{entretien:2,controle:0},4:{entretien:2,controle:0},5:{entretien:2,controle:0},6:{entretien:4,controle:0},7:{entretien:4,controle:0},8:{entretien:4,controle:0},9:{entretien:4,controle:0},10:{entretien:2,controle:0},11:{entretien:2,controle:0},12:{entretien:2,controle:0}} },
@@ -713,15 +541,17 @@ export function CarnetView({ client, passages, livraisons=[], onRefresh, refresh
 
   // ─── PRODUITS TAB ──────────────────────────────────────────────────────────
   const ProduitsTab = () => {
-    // Produits livrés lors des passages (détection robuste multi-champs)
-    const livsPassage = passClient
-      .filter(p => getProduitsLivres(p).length > 0)
-      .map(p => ({ id:p.id, date:p.date, produits:getProduitsLivres(p), source:"passage" }));
-    // Livraisons séparées (bb_livraisons_v1)
+    // Livraisons séparées (bb_livraisons_v1) — créées automatiquement à chaque passage avec produits
     const livsDirectes = (livraisons||[])
-      .filter(l => (l.produits||[]).length > 0 || l.description)
-      .map(l => ({ id:l.id, date:l.date, produits:l.produits||[], description:l.description, source:"livraison" }));
-    const all = [...livsPassage, ...livsDirectes].sort((a,b)=>b.date.localeCompare(a.date));
+      .filter(l => (l.produits||[]).length > 0 || (l.description && String(l.description).trim()))
+      .map(l => ({ id:l.id, date:l.date, produits:l.produits||[], description:l.description||"", source:"livraison" }));
+    // Dates déjà couvertes par une livraison directe (évite les doublons)
+    const livraisonDates = new Set(livsDirectes.map(l => String(l.date).slice(0,10)));
+    // Produits livrés lors des passages — uniquement si aucune livraison directe ce jour-là
+    const livsPassage = passClient
+      .filter(p => getProduitsLivres(p).length > 0 && !livraisonDates.has(String(p.date).slice(0,10)))
+      .map(p => ({ id:p.id, date:p.date, produits:getProduitsLivres(p), source:"passage" }));
+    const all = [...livsDirectes, ...livsPassage].sort((a,b)=>b.date.localeCompare(a.date));
 
     return (
       <div style={{padding:"0 12px"}}>

@@ -5,7 +5,8 @@ import {
   alerteClient, totalAnnuel, isEntretienType, isControleType, daysUntil,
   getMoisVal, getPlanningMois, getSaison, calcMensualites, getPH, getCL, getTemp,
   getResumePassage, getRapportStatus, generateCarnetCode, exportRdvToICS,
-  TODAY, MOIS_NOW, YEAR_NOW
+  TODAY, MOIS_NOW, YEAR_NOW,
+  calculerPassagesPrevusContrat, isPassageDansContrat, isPassageEffectue
 } from "../utils/helpers";
 import { useIsMobile, Modal, RapportStatusPicker, Avatar } from "./ui";
 import { showConfirm, toastSuccess } from "../styles";
@@ -201,10 +202,11 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
   const contratClient = Object.values(contrats).find(c=>c.clientId===client.id) || null;
   const totalE = totalAnnuel(client.moisParMois||client.saisons,"entretien");
   const totalC = totalAnnuel(client.moisParMois||client.saisons,"controle");
-  const total = totalE + totalC;
-  const effE = passContrat.filter(p=>isEntretienType(p.type)).length;
-  const effC = passContrat.filter(p=>isControleType(p.type)).length;
-  const eff = passContrat.length;
+  const total = calculerPassagesPrevusContrat(client);
+  const passEffectues = passC.filter(p=>isPassageDansContrat(p,client)&&isPassageEffectue(p));
+  const effE = passEffectues.filter(p=>isEntretienType(p.type)).length;
+  const effC = passEffectues.filter(p=>isControleType(p.type)).length;
+  const eff = passEffectues.length;
   const jours = daysUntil(client.dateFin);
   const rest = Math.max(0,total-eff);
   const moisNow = new Date().getMonth()+1;

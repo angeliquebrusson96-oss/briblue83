@@ -252,3 +252,112 @@ export function exportRdvToICS(rdv, client) {
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 3000);
 }
+
+// ─── CALCUL PASSAGES / CONTRAT ────────────────────────────────────────────────
+
+export const toNumber = (v, fallback = 0) => {
+  if (v === undefined || v === null || v === "") return fallback;
+  const n = Number(String(v).replace(",", "."));
+  return Number.isFinite(n) ? n : fallback;
+};
+export const dateOnly = (value) => {
+  if (!value) return null;
+  const [y, m, d] = String(value).slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+};
+const _firstDayOfMonth = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
+const _addMonths = (d, n) => new Date(d.getFullYear(), d.getMonth() + n, 1);
+const _mergePlanObjects = (...plans) => {
+  const merged = {};
+  plans.filter(Boolean).forEach((plan) => {
+    if (typeof plan !== "object" || Array.isArray(plan)) return;
+    Object.entries(plan).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === "") return;
+      if (typeof value === "object" && !Array.isArray(value) && typeof merged[key] === "object" && !Array.isArray(merged[key])) {
+        merged[key] = { ...merged[key], ...value };
+      } else { merged[key] = value; }
+    });
+  });
+  return merged;
+};
+const _getMonthlyPlanObject = (client = {}) => _mergePlanObjects(
+  client.moisParMois, client.passagesParMois, client.planningMensuel, client.planningPassages,
+  client.planMensuel, client.saisons, client.planning?.moisParMois, client.planning?.passagesParMois,
+  client.planning?.planningMensuel, client.contrat?.moisParMois, client.contrat?.passagesParMois,
+  client.contrat?.planningMensuel, client.contrat?.planningPassages, client.contrat?.planMensuel,
+  client.contrat?.saisons, client.contrat?.planning?.moisParMois, client.contrat?.planning?.passagesParMois,
+  client.contrat?.planning?.planningMensuel
+);
+const _getMonthPlanEntry = (plan = {}, monthNumber) => {
+  const monthNames = { 1:["janvier"],2:["fevrier","février"],3:["mars"],4:["avril"],5:["mai"],6:["juin"],7:["juillet"],8:["aout","août"],9:["septembre"],10:["octobre"],11:["novembre"],12:["decembre","décembre"] };
+  const names = monthNames[monthNumber] || [];
+  return plan[monthNumber]
+    ?? plan[String(monthNumber)]
+    ?? plan[String(monthNumber).padStart(2,"0")]
+    ?? names.map(n=>plan[n]??plan[n.toUpperCase()]??plan[n.charAt(0).toUpperCase()+n.slice(1)]).find(v=>v!==undefined)
+    ?? {};
+};
+export const getPlanForMonth = (client = {}, monthNumber) => {
+  const plan = _getMonthlyPlanObject(client);
+  const m = _getMonthPlanEntry(plan, monthNumber);
+  if (typeof m === "number" || typeof m === "string") return { entretien: toNumber(m), controle: 0 };
+  return {
+    entretien: toNumber(m.entretien ?? m.passages ?? m.prevus ?? m.prévus ?? m.nb ?? m.nombre ?? m.total ?? 0),
+    controle: toNumber(m.controle ?? m.contrôle ?? m.controles ?? m.contrôles ?? 0),
+  };
+};
+const _hasMonthlyPlan = (client = {}) => Object.keys(_getMonthlyPlanObject(client) || {}).length > 0;
+const _getPassagesAnnuelsSaisis = (client = {}) => {
+  const value = client.passagesAnnuels ?? client.nbPassagesAnnuels ?? client.nombrePassagesAnnuels
+    ?? client.nombrePassagesAnnuel ?? client.totalPassagesAnnuels ?? client.totalPassagesAnnuel
+    ?? client.passagesContrat ?? client.nbPassagesContrat ?? client.nombrePassagesContrat
+    ?? client.passagesPrevusContrat ?? client.passagesPrévusContrat ?? client.passagesPrevus
+    ?? client.nbPassagesPrevus ?? client.nbPassages ?? client.nombrePassages
+    ?? client.contrat?.passagesAnnuels ?? client.contrat?.nbPassagesAnnuels
+    ?? client.contrat?.nombrePassagesAnnuels ?? client.contrat?.passagesPrevus
+    ?? client.contrat?.nbPassages ?? client.contrat?.nombrePassages;
+  return toNumber(value, 0);
+};
+export function calculerPassagesPrevusContrat(client = {}) {
+  const debut = dateOnly(client.dateDebut || client.contrat?.dateDebut || client.contrat?.debut);
+  const fin = dateOnly(client.dateFin || client.contrat?.dateFin || client.contrat?.fin);
+  if (debut && fin && _hasMonthlyPlan(client)) {
+    let cursor = _firstDayOfMonth(debut);
+    const endMonth = _firstDayOfMonth(fin);
+    const includeEndMonth = fin.getDate() > debut.getDate();
+    const stop = includeEndMonth ? _addMonths(endMonth, 1) : endMonth;
+    let total = 0, guard = 0;
+    while (cursor < stop && guard < 60) {
+      const m = getPlanForMonth(client, cursor.getMonth() + 1);
+      total += m.entretien + m.controle;
+      cursor = _addMonths(cursor, 1);
+      guard++;
+    }
+    return total;
+  }
+  const totalSaisi = _getPassagesAnnuelsSaisis(client);
+  if (totalSaisi > 0) return totalSaisi;
+  if (_hasMonthlyPlan(client)) {
+    return Array.from({ length: 12 }, (_, i) => { const m = getPlanForMonth(client, i+1); return m.entretien + m.controle; }).reduce((a,b)=>a+b,0);
+  }
+  return 0;
+}
+export function isPassageEffectue(p = {}) {
+  const status = String(p.statut ?? p.status ?? p.etat ?? p.état ?? "").toLowerCase();
+  const type = String(p.type ?? p.categorie ?? "").toLowerCase();
+  if (/annul|prévu|prevu|planif|rdv|rendez|a venir|à venir/.test(status)) return false;
+  if (/rdv|rendez|prévu|prevu|planif/.test(type)) return false;
+  if (p.annule || p.annulé || p.cancelled || p.planifie || p.planifié || p.rdvSeulement || p.isRdvOnly) return false;
+  if (p.ok === false || p.valide === false || p.validé === false) return false;
+  return true;
+}
+export function isPassageDansContrat(p = {}, client = {}) {
+  if (!p.date) return true;
+  const d = String(p.date).slice(0, 10);
+  const debut = client.dateDebut ? String(client.dateDebut).slice(0, 10) : null;
+  const fin = client.dateFin ? String(client.dateFin).slice(0, 10) : null;
+  if (debut && d < debut) return false;
+  if (fin && d > fin) return false;
+  return true;
+}

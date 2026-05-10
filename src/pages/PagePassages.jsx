@@ -20,13 +20,7 @@ function IconFiche({ size=18, color="currentColor" }) {
   );
 }
 
-// Stub — genererHTMLRapport is in App.jsx; will be wired when App is refactored
-function ouvrirRapport(passage, client) {
-  console.warn("[ouvrirRapport] stub — genererHTMLRapport not yet extracted", passage?.id);
-}
-async function envoyerEmail(passage, client, onSent) {
-  console.warn("[envoyerEmail] stub — genererHTMLRapport not yet extracted", passage?.id);
-}
+import { ouvrirRapport, envoyerEmail } from "../components/FormPassage";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PAGE PASSAGES
