@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { save, flushPendingNow, IS_IOS, reconcileOnBoot } from "./lib/storage";
+import { save, load, flushPendingNow, IS_IOS, reconcileOnBoot } from "./lib/storage";
 
 import { DS, Ico, IconFiche, CLIENTS_INIT, PASSAGES_INIT, PRODUITS_DEFAUT, MOIS, AC } from "./utils/constants";
 import { migrateMois, alerteClient, getEntretienMois, getControleMois, isEntretienType, isControleType, TODAY, MOIS_NOW, YEAR_NOW, totalAnnuel, getMoisVal, daysUntil } from "./utils/helpers";
@@ -23,7 +23,7 @@ let _BB_BOOT_DONE = false;
 
 // Lecture localStorage synchrone (zéro réseau)
 function readLS(key, fallback) {
-  try { const s = localStorage.getItem("briblue_" + key); if (s !== null) return JSON.parse(s); } catch {}
+  try { const s = localStorage.getItem("briblue_" + key); if (s !== null) return JSON.parse(s); } catch { /* noop */ }
   return fallback;
 }
 
