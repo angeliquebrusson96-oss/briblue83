@@ -34,8 +34,20 @@ async function envoyerEmail(passage, client, onSent) {
 export function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePassageStatus, onAddClient, onValider, onChangeStatut }) {
   const [filter,setFilter]=useState("mois");
   const [detailPassage, setDetailPassage] = useState(null);
-  const [accordionOpen, setAccordionOpen] = useState(null); // id du passage ouvert
+  const [accordionOpen, setAccordionOpen] = useState(null);
+  const [typeDropdownId, setTypeDropdownId] = useState(null);
   const isMobile = useIsMobile();
+
+  const TYPES_PASSAGE = [
+    { v:"Entretien complet",    col:"#0284c7", bg:"#e0f2fe" },
+    { v:"Contrôle d'eau",       col:"#0891b2", bg:"#e0f7fa" },
+    { v:"Visite technique",     col:"#4f46e5", bg:"#eef2ff" },
+    { v:"Bassin en rattrapage", col:"#b45309", bg:"#fef3c7" },
+    { v:"Fin de rattrapage",    col:"#059669", bg:"#d1fae5" },
+    { v:"SAV",                  col:"#dc2626", bg:"#fef2f2" },
+    { v:"Demande de devis",     col:"#7c3aed", bg:"#f5f3ff" },
+    { v:"Passage sans données", col:"#64748b", bg:"#f1f5f9" },
+  ];
   const now=new Date();
   const todayStr = now.toISOString().split("T")[0];
 
@@ -128,11 +140,43 @@ export function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpd
                       </div>
                     </div>
                     <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap",alignItems:"center"}}>
-                      <Tag color={isCtrl?DS.teal:DS.blue} style={{fontSize:11}}>
-                        <span style={{display:"flex",alignItems:"center",gap:4}}>
-                          {isCtrl ? Ico.drop(11,DS.teal) : Ico.wrench(11,DS.blue)} {p.type}
-                        </span>
-                      </Tag>
+                      {p.statut!=="validee" ? (
+                        <div style={{position:"relative"}}>
+                          <button
+                            onClick={(e)=>{ e.stopPropagation(); setTypeDropdownId(typeDropdownId===p.id?null:p.id); }}
+                            style={{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 8px",borderRadius:20,background:isCtrl?"#e0f7fa":"#eff6ff",border:`1px solid ${isCtrl?DS.teal:DS.blue}`,color:isCtrl?DS.teal:DS.blue,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}
+                          >
+                            {isCtrl?Ico.drop(11,DS.teal):Ico.wrench(11,DS.blue)} {p.type}
+                            <svg width={8} height={8} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+                          </button>
+                          {typeDropdownId===p.id && (
+                            <>
+                              <div onClick={()=>setTypeDropdownId(null)} style={{position:"fixed",inset:0,zIndex:99}}/>
+                              <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,zIndex:100,background:"#fff",borderRadius:12,boxShadow:"0 8px 24px rgba(0,0,0,0.15)",border:"1px solid "+DS.border,minWidth:195,overflow:"hidden"}}>
+                                {TYPES_PASSAGE.map(t=>(
+                                  <button
+                                    key={t.v}
+                                    onClick={(e)=>{ e.stopPropagation(); onUpdatePassageStatus({...p,type:t.v}); setTypeDropdownId(null); }}
+                                    style={{width:"100%",padding:"9px 12px",border:"none",background:t.v===p.type?t.bg:"#fff",color:t.col,fontSize:12,fontWeight:700,cursor:"pointer",textAlign:"left",fontFamily:"inherit",display:"flex",alignItems:"center",gap:8}}
+                                    onMouseEnter={e=>e.currentTarget.style.background=t.bg}
+                                    onMouseLeave={e=>e.currentTarget.style.background=t.v===p.type?t.bg:"#fff"}
+                                  >
+                                    <span style={{width:8,height:8,borderRadius:"50%",background:t.col,display:"inline-block",flexShrink:0}}/>
+                                    {t.v}
+                                    {t.v===p.type&&<svg style={{marginLeft:"auto"}} width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={t.col} strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ) : (
+                        <Tag color={isCtrl?DS.teal:DS.blue} style={{fontSize:11}}>
+                          <span style={{display:"flex",alignItems:"center",gap:4}}>
+                            {isCtrl?Ico.drop(11,DS.teal):Ico.wrench(11,DS.blue)} {p.type}
+                          </span>
+                        </Tag>
+                      )}
                       {_ph&&<Tag color={phOk?DS.green:DS.red} style={{fontSize:11}}>pH {_ph}</Tag>}
                       {_cl&&<Tag color={clOk?DS.green:DS.red} style={{fontSize:11}}>Cl {_cl}</Tag>}
                       <Tag color={rapportMeta.color} bg={rapportMeta.bg} style={{fontSize:11}}>{rapportMeta.label}</Tag>
