@@ -4,12 +4,155 @@ import { getDoc } from "firebase/firestore";
 import { APP_DOC } from "../lib/firebase";
 import { getPH, getCL, getTemp, getResumePassage, isControleType, generateCarnetCode } from "../utils/helpers";
 
-// Stub — genererHTMLRapport is in App.jsx; will be wired when App is refactored
+// Génération autonome du rapport client : évite le bouton PDF cassé si App.jsx n'est pas chargé ici.
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+const cleanFileName = (v) => String(v || "rapport").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase();
+const hasProductShape = (v) => v && typeof v === "object" && !Array.isArray(v) && (
+  "nom" in v || "produit" in v || "label" in v || "name" in v || "designation" in v ||
+  "titre" in v || "qte" in v || "quantite" in v || "quantité" in v || "qty" in v
+);
+const toArray = (v) => {
+  if (!v) return [];
+  if (Array.isArray(v)) return v.flatMap(toArray);
+  if (typeof v === "string") return v.split(/[\n,;]+/).map(x => x.trim()).filter(Boolean);
+  if (typeof v === "object") {
+    if (hasProductShape(v)) return [v];
+    return Object.values(v).flatMap(toArray);
+  }
+  return [String(v)];
+};
+const formatProduitLivre = (item) => {
+  if (typeof item === "string") return item.trim();
+  if (!item || typeof item !== "object") return "";
+  const nom = item.nom || item.produit || item.label || item.name || item.designation || item.titre || "Produit";
+  const qte = item.qte || item.quantite || item.quantité || item.qty || item.dose || item.volume || item.quantiteLivree || item.quantitéLivrée || "";
+  const unite = item.unite || item.unité || item.unit || "";
+  return `${nom}${qte ? ` — ${qte}${unite ? ` ${unite}` : ""}` : ""}`.trim();
+};
+const getProduitsLivres = (p = {}) => {
+  const raw = [
+    p.produitsLivres,
+    p.produitsLivresTexte,
+    p.produitsLivrés,
+    p.produitsLivresClient,
+    p.produitsLivresAuClient,
+    p.produitsLivresClientTexte,
+    p.livraisonProduitsListe,
+    p.livraisonProduitsTexte,
+    p.livraison,
+    p.livraisons,
+    p.produits,
+    p.produitsLivre,
+    p.produitsLivree,
+  ].flatMap(toArray);
+
+  // Compatibilité avec les anciens rapports : parfois seule la case livraisonProduits était cochée
+  // et les produits étaient saisis dans un champ texte générique.
+  if ((p.livraisonProduits || p.produitLivre || p.produitsLivresCheck) && raw.length === 0) {
+    raw.push(p.produitLivreTexte || p.produitLivre || p.nomProduit || p.produit || p.designationProduit || "Produits livrés");
+  }
+
+  return raw.map(formatProduitLivre).filter(Boolean);
+};
+const getProduitsApportes = (p = {}) => [
+  ["Chlore", p.corrChlore], ["pH", p.corrPH], ["Sel", p.corrSel], ["Algicide", p.corrAlgicide],
+  ["Chlore choc", p.corrChloreChoc], ["Peroxyde", p.corrPeroxyde], ["Phosphate", p.corrPhosphate],
+  ["Alcafix", p.corrAlcafix], ["Autre", p.corrAutre],
+].filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== "");
 function ouvrirRapport(passage, client) {
-  console.warn("[ouvrirRapport] stub — genererHTMLRapport not yet extracted", passage?.id);
+  const p = passage || {};
+  const fmt = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day:"2-digit", month:"long", year:"numeric" }) : "—";
+  const produitsLivres = getProduitsLivres(p);
+  const produitsApportes = getProduitsApportes(p);
+  const mesures = [
+    ["pH", p.ph ?? p.pH ?? p.tauxPH ?? p.tauxPh],
+    ["Chlore", p.chlore ?? p.cl ?? p.tauxChlore],
+    ["Température", p.temp ?? p.temperature ?? p.temperatureEau],
+    ["Sel", p.sel ?? p.tauxSel],
+    ["Phosphate", p.phosphate ?? p.tauxPhosphate],
+    ["Stabilisant", p.stabilisant ?? p.tauxStabilisant],
+    ["TAC", p.alcalinite ?? p.tac],
+  ].filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== "");
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Rapport ${esc(client?.nom)}</title>
+    <style>
+      @page{size:A4;margin:14mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#0f172a;margin:0;background:#eef6fb}.page{max-width:820px;margin:0 auto;background:#fff;min-height:100vh;padding:30px}.head{background:linear-gradient(135deg,#0891b2,#0e7490);color:white;border-radius:18px;padding:24px;margin-bottom:18px}.brand{font-size:13px;letter-spacing:2px;font-weight:700;opacity:.9}.title{font-size:28px;font-weight:800;margin:8px 0 4px}.sub{font-size:14px;opacity:.9}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}.card{border:1px solid #e2e8f0;border-radius:14px;padding:14px;background:#f8fafc}.label{font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;letter-spacing:.5px;margin-bottom:5px}.val{font-size:15px;font-weight:700}.section{margin-top:18px;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden}.section h2{font-size:15px;margin:0;padding:12px 14px;background:#f0f9ff;color:#075985}.section .content{padding:14px;line-height:1.55}.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{background:#e0f2fe;color:#075985;border-radius:999px;padding:7px 11px;font-size:13px;font-weight:700}.green{background:#f0fdf4;color:#166534}.muted{color:#64748b}.print{position:fixed;right:18px;bottom:18px;border:0;border-radius:999px;background:#0891b2;color:white;padding:13px 18px;font-weight:800;cursor:pointer;box-shadow:0 10px 25px rgba(8,145,178,.35)}@media print{body{background:white}.page{padding:0}.print{display:none}}
+    </style></head><body><button class="print" onclick="window.print()">Enregistrer en PDF</button><main class="page">
+      <div class="head"><div class="brand">BRIBLUE</div><div class="title">Rapport d'intervention</div><div class="sub">Carnet d'entretien piscine</div></div>
+      <div class="grid"><div class="card"><div class="label">Client</div><div class="val">${esc(client?.nom)}</div></div><div class="card"><div class="label">Date</div><div class="val">${esc(fmt(p.date))}${p.heure ? ` · ${esc(p.heure)}` : ""}</div></div><div class="card"><div class="label">Type</div><div class="val">${esc(p.type || "Entretien")}</div></div><div class="card"><div class="label">Technicien</div><div class="val">${esc(p.tech || "BRIBLUE")}</div></div></div>
+      ${mesures.length ? `<div class="section"><h2>Mesures de l'eau</h2><div class="content chips">${mesures.map(([k,v])=>`<span class="chip">${esc(k)} : ${esc(v)}</span>`).join("")}</div></div>` : ""}
+      ${(p.actions || p.travaux || p.resume || p.compteRendu) ? `<div class="section"><h2>Compte-rendu</h2><div class="content">${esc(p.actions || p.travaux || p.resume || p.compteRendu)}</div></div>` : ""}
+      ${(p.obs || p.commentaires) ? `<div class="section"><h2>Observations</h2><div class="content">${esc(p.obs || p.commentaires)}</div></div>` : ""}
+      ${produitsApportes.length ? `<div class="section"><h2>Produits apportés</h2><div class="content chips">${produitsApportes.map(([k,v])=>`<span class="chip">${esc(k)} : ${esc(v)}</span>`).join("")}</div></div>` : ""}
+      ${produitsLivres.length ? `<div class="section"><h2>Produits livrés au client</h2><div class="content chips">${produitsLivres.map(x=>`<span class="chip green">${esc(x)}</span>`).join("")}</div></div>` : ""}
+      <p class="muted" style="margin-top:28px;font-size:12px">BRIBLUE · La Seyne-sur-Mer · SIRET 84345436400053</p>
+    </main><script>setTimeout(()=>window.print(),350)</script></body></html>`;
+  const w = window.open("", "_blank", "noopener,noreferrer");
+  if (w) {
+    w.document.open(); w.document.write(html); w.document.close();
+  } else {
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${cleanFileName(client?.nom)}-${cleanFileName(p.date)}-rapport.html`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
 }
 
 // Fallback init data (mirrors App.jsx)
+
+const toNumber = (v, fallback = 0) => {
+  if (v === undefined || v === null || v === "") return fallback;
+  const n = Number(String(v).replace(",", "."));
+  return Number.isFinite(n) ? n : fallback;
+};
+const getPlanForMonth = (client = {}, monthNumber) => {
+  const plan = client.moisParMois || client.passagesParMois || client.planningMensuel || {};
+  const m = plan[monthNumber] || plan[String(monthNumber)] || {};
+  if (typeof m === "number" || typeof m === "string") return { entretien: toNumber(m), controle: 0 };
+  return {
+    entretien: toNumber(m.entretien ?? m.passages ?? m.prevus ?? m.prévus ?? m.nb ?? m.nombre ?? 0),
+    controle: toNumber(m.controle ?? m.contrôle ?? m.controles ?? m.contrôles ?? 0),
+  };
+};
+const getPassagesAnnuelsSaisis = (client = {}) => {
+  const value = client.passagesAnnuels
+    ?? client.nbPassagesAnnuels
+    ?? client.nombrePassagesAnnuels
+    ?? client.nombrePassagesAnnuel
+    ?? client.totalPassagesAnnuels
+    ?? client.totalPassagesAnnuel
+    ?? client.passagesPrevusContrat
+    ?? client.passagesPrévusContrat
+    ?? client.passagesPrevus
+    ?? client.nbPassagesPrevus
+    ?? client.nbPassages
+    ?? client.nombrePassages;
+  return toNumber(value, 0);
+};
+const calculerPassagesPrevusContrat = (client = {}) => {
+  // IMPORTANT : le total du contrat doit rester celui saisi manuellement
+  // Exemple : 26 passages annuels. Les champs mois par mois servent au planning, pas à remplacer le contrat.
+  const totalSaisi = getPassagesAnnuelsSaisis(client);
+  if (totalSaisi > 0) return totalSaisi;
+
+  // Fallback uniquement pour les anciens clients qui n'ont pas encore de total annuel saisi.
+  const plan = client.moisParMois || client.passagesParMois || client.planningMensuel;
+  if (!plan) return 0;
+  return Array.from({ length: 12 }, (_, i) => {
+    const m = getPlanForMonth(client, i + 1);
+    return m.entretien + m.controle;
+  }).reduce((a, b) => a + b, 0);
+};
+const isPassageEffectue = (p = {}) => {
+  const status = String(p.statut ?? p.status ?? p.etat ?? p.état ?? "").toLowerCase();
+  if (/annul|prévu|prevu|planif|rdv|rendez|a venir|à venir/.test(status)) return false;
+  if (p.annule || p.annulé || p.cancelled || p.planifie || p.planifié || p.rdvSeulement) return false;
+  if (p.ok === false || p.valide === false || p.validé === false) return false;
+  // Si un rapport est créé/sauvegardé, il se déduit automatiquement car il est présent dans passClient.
+  return true;
+};
+
 const CLIENTS_INIT = [
   { id:"C001", nom:"GAMBIN IMMO - COPRO O GARDEN", tel:"", email:"", adresse:"", bassin:"Liner", volume:0, formule:"Confort+", prix:2418, prixPassageE:78, prixPassageC:0, dateDebut:"2025-09-29", dateFin:"2026-09-29", photoPiscine:"", moisParMois:{1:{entretien:1,controle:0},2:{entretien:2,controle:0},3:{entretien:2,controle:0},4:{entretien:2,controle:0},5:{entretien:2,controle:0},6:{entretien:4,controle:0},7:{entretien:4,controle:0},8:{entretien:4,controle:0},9:{entretien:4,controle:0},10:{entretien:2,controle:0},11:{entretien:2,controle:0},12:{entretien:2,controle:0}} },
   { id:"C002", nom:"Mme HAMMER", tel:"", email:"", adresse:"", bassin:"Liner", volume:0, formule:"Confort", prix:2210, prixPassageE:85, prixPassageC:0, dateDebut:"2026-03-01", dateFin:"2027-03-01", photoPiscine:"", moisParMois:{1:{entretien:1,controle:0},2:{entretien:1,controle:0},3:{entretien:2,controle:0},4:{entretien:2,controle:0},5:{entretien:2,controle:0},6:{entretien:4,controle:0},7:{entretien:4,controle:0},8:{entretien:4,controle:0},9:{entretien:4,controle:0},10:{entretien:1,controle:0},11:{entretien:1,controle:0},12:{entretien:1,controle:0}} },
@@ -105,11 +248,9 @@ export function CarnetView({ client, passages, onRefresh, refreshing }) {
   const fmtDate = (d, opts) => new Date(d).toLocaleDateString("fr", opts);
   const getResume = getResumePassage;
 
-  const totalVisitesPrevues = (() => {
-    if (!client.moisParMois) return 20;
-    return Object.values(client.moisParMois).reduce((s, m) => s + (m.entretien||0) + (m.controle||0), 0);
-  })();
-  const visitesEffectuees = passClient.length;
+  const totalVisitesPrevues = calculerPassagesPrevusContrat(client);
+  const passagesDeduits = passClient.filter(isPassageEffectue);
+  const visitesEffectuees = passagesDeduits.length;
   const visitesRestantes = Math.max(0, totalVisitesPrevues - visitesEffectuees);
   const progressPct = totalVisitesPrevues > 0 ? Math.min(100, (visitesEffectuees / totalVisitesPrevues) * 100) : 0;
 
@@ -218,6 +359,7 @@ export function CarnetView({ client, passages, onRefresh, refreshing }) {
               {visitesRestantes}
               <span style={{fontSize:11,fontWeight:400,color:"rgba(255,255,255,0.55)"}}>/ {totalVisitesPrevues}</span>
             </div>
+            <div style={{fontSize:9,color:"rgba(255,255,255,0.55)",marginTop:2}}>1 rapport créé = 1 passage déduit</div>
             {/* Progress bar */}
             <div style={{marginTop:6,height:3,background:"rgba(255,255,255,0.2)",borderRadius:2,overflow:"hidden"}}>
               <div style={{width:`${progressPct}%`,height:"100%",background:"rgba(255,255,255,0.8)",borderRadius:2,animation:"cv-progress 1s ease both 0.4s"}}/>
@@ -432,7 +574,7 @@ export function CarnetView({ client, passages, onRefresh, refreshing }) {
 
   // ─── PRODUITS TAB ──────────────────────────────────────────────────────────
   const ProduitsTab = () => {
-    const livs = passClient.filter(p=>p.livraisonProduits&&(p.produitsLivres||[]).length>0);
+    const livs = passClient.filter(p=>getProduitsLivres(p).length>0);
     return (
       <div style={{padding:"0 12px"}}>
         <SectionHead
@@ -454,7 +596,7 @@ export function CarnetView({ client, passages, onRefresh, refreshing }) {
                     <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
                   </div>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:13,fontWeight:600,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{(p.produitsLivres||[]).join(", ")}</div>
+                    <div style={{fontSize:13,fontWeight:600,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{getProduitsLivres(p).join(", ")}</div>
                     <div style={{fontSize:11,color:"#64748b",marginTop:1}}>{fmtDate(p.date,{day:"2-digit",month:"short",year:"numeric"})}</div>
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:4,background:"#f0fdf4",color:"#15803d",borderRadius:8,padding:"4px 9px",fontSize:11,fontWeight:600,flexShrink:0,border:"1px solid #bbf7d0"}}>
@@ -498,7 +640,9 @@ export function CarnetView({ client, passages, onRefresh, refreshing }) {
           client.formule&&{label:"Formule",val:client.formule,icon:<><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></>},
           client.dateDebut&&{label:"Début contrat",val:fmtDate(client.dateDebut,{day:"2-digit",month:"long",year:"numeric"}),icon:<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>},
           client.dateFin&&{label:"Fin contrat",val:fmtDate(client.dateFin,{day:"2-digit",month:"long",year:"numeric"}),icon:<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>},
-          {label:"Interventions",val:`${passClient.length} passage${passClient.length!==1?"s":""}`,icon:<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>},
+          {label:"Passages prévus contrat",val:`${totalVisitesPrevues} passage${totalVisitesPrevues!==1?"s":""}`,icon:<><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></>},
+          {label:"Rapports déduits",val:`${visitesEffectuees} passage${visitesEffectuees!==1?"s":""}`,icon:<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>},
+          {label:"Passages restants",val:`${visitesRestantes} passage${visitesRestantes!==1?"s":""}`,icon:<><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></>},
         ].filter(Boolean).map((row,i,arr)=>(
           <div key={row.label} style={{padding:"12px 16px",display:"flex",alignItems:"center",gap:12,borderBottom:i<arr.length-1?"1px solid #f8fafc":"none"}}>
             <div style={{width:30,height:30,background:"#f0f9ff",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -622,13 +766,13 @@ export function CarnetView({ client, passages, onRefresh, refreshing }) {
             )}
 
             {/* Produits livrés */}
-            {p.livraisonProduits&&(p.produitsLivres||[]).length>0&&(
+            {getProduitsLivres(p).length>0&&(
               <div style={{background:"#f0fdf4",borderRadius:12,padding:"12px 14px",marginBottom:12,border:"1px solid #bbf7d0"}}>
                 <div style={{fontSize:10,fontWeight:700,color:"#15803d",textTransform:"uppercase",letterSpacing:.7,marginBottom:6,display:"flex",alignItems:"center",gap:5}}>
                   <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                   Produits livrés
                 </div>
-                <div style={{fontSize:13,color:"#065f46",lineHeight:1.6}}>{p.produitsLivres.join(", ")}</div>
+                <div style={{fontSize:13,color:"#065f46",lineHeight:1.6}}>{getProduitsLivres(p).join(", ")}</div>
               </div>
             )}
 
