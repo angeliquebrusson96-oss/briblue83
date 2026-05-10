@@ -38,7 +38,7 @@ export function PassageDetailModal({ passage, client, onClose }) {
   ].filter(Boolean);
 
   const rapportStatus = getRapportStatus(passage);
-  const rapportMeta = RAPPORT_STATUS[rapportStatus];
+  const rapportMeta = RAPPORT_STATUS[rapportStatus] || RAPPORT_STATUS.cree;
   const isCtrl = isControleType_(passage.type);
 
   // Icônes SVG modernes
