@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useState, useMemo } from "react";
 import { DS, Ico, RAPPORT_STATUS } from "../utils/constants";
-import { alerteClient, daysUntil, isEntretienType, isControleType, totalAnnuel, getRapportStatus, YEAR_NOW } from "../utils/helpers";
+import { alerteClient, daysUntil, isEntretienType, isControleType, totalAnnuel, getRapportStatus, YEAR_NOW, calculerPassagesPrevusContrat, isPassageDansContrat, isPassageEffectue } from "../utils/helpers";
 import { useIsMobile, Avatar, Modal, Tag, BtnPrimary } from "../components/ui";
 
 // ─── Alert color map (mirrors App.jsx AC) ────────────────────────────────────
@@ -328,12 +328,10 @@ export function PageClients({ clients, passages, contrats={}, onUpdateContrat, o
       <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:10}}>
         {filtered.map((c,idx)=>{
           const al=alerteClient(c,passages); const col=AC[al];
-          const mpm=c.moisParMois||c.saisons||{};
-          const tE=totalAnnuel(mpm,"entretien"), tC=totalAnnuel(mpm,"controle"), tot=tE+tC;
-          const cs=c.dateDebut?c.dateDebut.slice(0,10):null; const ce=c.dateFin?c.dateFin.slice(0,10):null;
-          const inC=(p)=>{const ds=String(p.date).slice(0,10);return cs&&ce?ds>=cs&&ds<=ce:new Date(p.date).getFullYear()===YEAR_NOW;};
-          const eE=passages.filter(p=>p.clientId===c.id&&inC(p)&&isEntretienType(p.type)).length;
-          const eC=passages.filter(p=>p.clientId===c.id&&inC(p)&&isControleType(p.type)).length;
+          const tot=calculerPassagesPrevusContrat(c);
+          const passEff=passages.filter(p=>p.clientId===c.id&&isPassageDansContrat(p,c)&&isPassageEffectue(p));
+          const eE=passEff.filter(p=>isEntretienType(p.type)).length;
+          const eC=passEff.filter(p=>isControleType(p.type)).length;
           const eff=eE+eC;
           const pct=tot>0?Math.round(eff/tot*100):0;
           const rest=Math.max(0,tot-eff);
