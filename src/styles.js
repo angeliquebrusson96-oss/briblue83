@@ -211,9 +211,11 @@ export const GlobalStyles = () => (
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
       min-height: 100vh;
+      min-height: 100dvh;
       color: #0b1220;
       position: relative;
     }
+    /* Blobs décoratifs : désactivés sur mobile (trop lourds sur iPhone) */
     body::before, body::after {
       content: '';
       position: fixed;
@@ -235,6 +237,15 @@ export const GlobalStyles = () => (
       background: radial-gradient(circle, #a855f7 0%, transparent 70%);
       bottom: -150px; right: -150px;
       animation: blobFloat2 26s ease-in-out infinite;
+    }
+    /* Sur écrans tactiles (mobiles/tablettes) : supprimer les blobs et ralentir l'animation du fond */
+    @media (pointer: coarse) {
+      body { animation: none; }
+      body::before, body::after { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      body, body::before, body::after { animation: none !important; }
+      .fade-in, .slide-up, .scale-in, .fm-in { animation: none !important; }
     }
     #root, .root-wrap { position: relative; z-index: 1; }
 

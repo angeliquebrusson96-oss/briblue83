@@ -250,24 +250,61 @@ export async function save(key, val) {
   }
 }
 
+// ─── CACHE getDoc (partage la requête entre les 6 load() simultanés du boot) ──
+let _getDocCache = null;
+let _getDocCacheAt = 0;
+let _getDocPromise = null;
+const GET_DOC_CACHE_MS = 8_000; // 8s : couvre le boot, périmé avant le poll des contrats (10s)
+
+async function fetchAppDoc() {
+  const now = Date.now();
+  if (_getDocCache && now - _getDocCacheAt < GET_DOC_CACHE_MS) return _getDocCache;
+  if (_getDocPromise) return _getDocPromise;
+  _getDocPromise = getDoc(APP_DOC).then(snap => {
+    _getDocCache = snap;
+    _getDocCacheAt = Date.now();
+    _getDocPromise = null;
+    return snap;
+  }).catch(e => { _getDocPromise = null; throw e; });
+  return _getDocPromise;
+}
+
 // ─── LOAD ─────────────────────────────────────────────────────────────────────
+// Priorité au local s'il est aussi récent ou plus récent que Firebase.
+// Évite d'écraser des sauvegardes iOS dont le push réseau a été interrompu.
 export async function load(key, fallback) {
+  // 1. Lire localStorage en premier (instantané, sans réseau)
+  let localData = null;
+  let localTime = 0;
   try {
-    const snap = await getDoc(APP_DOC);
+    const ls = localStorage.getItem("briblue_" + key);
+    if (ls !== null) localData = JSON.parse(ls);
+    const m = localStorage.getItem("briblue_meta_" + key);
+    if (m) localTime = JSON.parse(m).savedAt || 0;
+  } catch {}
+
+  // 2. Ne jamais écraser une donnée en attente d'envoi
+  if (offlineQueue.pending[key] !== undefined) return localData ?? fallback;
+
+  // 3. Firebase avec vérification de timestamp
+  try {
+    const snap = await fetchAppDoc();
     if (snap.exists()) {
       const allData = snap.data();
+      const remoteTime = allData["_lastSavedAt"] ? new Date(allData["_lastSavedAt"]).getTime() : 0;
       if (key in allData) {
+        if (localData !== null && localTime >= remoteTime) {
+          // Local identique ou plus récent → ne pas écraser
+          return localData;
+        }
+        // Firebase plus récent → mettre à jour le cache local
         try { localStorage.setItem("briblue_" + key, JSON.stringify(allData[key])); } catch {}
         return allData[key];
       }
     }
-    const ls = localStorage.getItem("briblue_" + key);
-    if (ls) return JSON.parse(ls);
-    return fallback;
-  } catch {
-    try { const ls = localStorage.getItem("briblue_" + key); if (ls) return JSON.parse(ls); } catch {}
-    return fallback;
-  }
+  } catch { /* réseau indisponible → utiliser local */ }
+
+  return localData ?? fallback;
 }
 
 // ─── EVENT LISTENERS ─────────────────────────────────────────────────────────

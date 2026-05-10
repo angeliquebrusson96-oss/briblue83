@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { save, load, flushPendingNow, IS_IOS } from "./lib/storage";
+import { save, flushPendingNow, IS_IOS, reconcileOnBoot } from "./lib/storage";
 
 import { DS, Ico, IconFiche, CLIENTS_INIT, PASSAGES_INIT, PRODUITS_DEFAUT, MOIS, AC } from "./utils/constants";
 import { migrateMois, alerteClient, getEntretienMois, getControleMois, isEntretienType, isControleType, TODAY, MOIS_NOW, YEAR_NOW, totalAnnuel, getMoisVal, daysUntil } from "./utils/helpers";
@@ -20,6 +20,12 @@ import { PageDocuments } from "./pages/PageDocuments";
 
 // Protection module-level contre double-load iOS
 let _BB_BOOT_DONE = false;
+
+// Lecture localStorage synchrone (zéro réseau)
+function readLS(key, fallback) {
+  try { const s = localStorage.getItem("briblue_" + key); if (s !== null) return JSON.parse(s); } catch {}
+  return fallback;
+}
 
 // ─── AUTH ────────────────────────────────────────────────────────────────────
 const AUTH = { email: "briblue83@hotmail.com", code: "2004" };
@@ -42,7 +48,7 @@ function LoginScreen({ onLogin }) {
   };
 
   return (
-    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px 20px",fontFamily:"'Inter', -apple-system, system-ui, sans-serif",position:"relative",overflow:"hidden"}}>
+    <div style={{minHeight:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"max(24px, env(safe-area-inset-top, 24px)) 20px 24px",fontFamily:"'Inter', -apple-system, system-ui, sans-serif",position:"relative",overflow:"hidden"}}>
       <div className="scale-in" style={{marginBottom:32,display:"flex",flexDirection:"column",alignItems:"center",gap:14,position:"relative"}}>
         <div style={{width:90,height:90,borderRadius:28,background:"linear-gradient(135deg,#22d3ee 0%, #0891b2 50%, #6366f1 100%)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 20px 50px rgba(6,182,212,0.4), inset 0 2px 0 rgba(255,255,255,0.5)",border:"1px solid rgba(255,255,255,0.3)"}}>{Ico.wave(46,"white")}</div>
         <div style={{textAlign:"center"}}>
@@ -327,27 +333,33 @@ export default function App() {
     return () => document.removeEventListener('visibilitychange', onVis);
   }, []);
 
+  const applyLocalData = useCallback(() => {
+    const clientsData   = readLS("bb_clients_v2",   CLIENTS_INIT);
+    const passagesData  = readLS("bb_passages_v2",  PASSAGES_INIT);
+    const livraisonsData = readLS("bb_livraisons_v1", []);
+    const rdvsData      = readLS("bb_rdvs_v1",      []);
+    const stockData     = readLS("bb_stock_v1",     {});
+    const contratsData  = readLS("bb_contrats_v1",  {});
+    const sWithDefaults = {...Object.fromEntries(PRODUITS_DEFAUT.map(nom=>[nom,0])), ...stockData};
+    const cMigrated = clientsData.map(cl => ({...cl, moisParMois: migrateMois(cl.moisParMois||cl.saisons), photoPiscine: cl.photoPiscine||"", prixPassageE: cl.prixPassageE||0, prixPassageC: cl.prixPassageC||0}));
+    setClients(cMigrated); setPassages(passagesData); setLivraisons(livraisonsData);
+    setRdvs(rdvsData); setStock(sWithDefaults); setContrats(contratsData);
+  }, []);
+
   useEffect(()=>{
     if(!loggedIn || initialLoaded || _BB_BOOT_DONE) return;
     _BB_BOOT_DONE = true;
-    (async()=>{
-      const c = await load("bb_clients_v2", null);
-      const passages_data = await load("bb_passages_v2", null);
-      const l = await load("bb_livraisons_v1", null);
-      const r = await load("bb_rdvs_v1", null);
-      const s = await load("bb_stock_v1", null);
-      const ct = await load("bb_contrats_v1", null);
-      const clientsData = c !== null ? c : CLIENTS_INIT;
-      const passagesData = passages_data !== null ? passages_data : PASSAGES_INIT;
-      const livraisonsData = l !== null ? l : [];
-      const rdvsData = r !== null ? r : [];
-      const stockData = s !== null ? s : {};
-      const contratsData = ct !== null ? ct : {};
-      const sWithDefaults = {...Object.fromEntries(PRODUITS_DEFAUT.map(nom=>[nom,0])), ...stockData};
-      const cMigrated = clientsData.map(cl => ({...cl, moisParMois: migrateMois(cl.moisParMois||cl.saisons), photoPiscine: cl.photoPiscine||"", prixPassageE: cl.prixPassageE||0, prixPassageC: cl.prixPassageC||0}));
-      setClients(cMigrated); setPassages(passagesData); setLivraisons(livraisonsData); setRdvs(rdvsData); setStock(sWithDefaults); setContrats(contratsData); setReady(true); setInitialLoaded(true); try { sessionStorage.setItem('bb_initial_loaded', '1'); } catch { /* noop */ }
-    })();
-  },[loggedIn, initialLoaded]);
+
+    // ── 1. Affichage immédiat depuis localStorage (0 ms réseau) ──
+    applyLocalData();
+    setReady(true); setInitialLoaded(true);
+    try { sessionStorage.setItem('bb_initial_loaded', '1'); } catch { /* noop */ }
+
+    // ── 2. Réconciliation Firebase en arrière-plan ──
+    // reconcileOnBoot() compare les timestamps et écrit dans localStorage
+    // seulement si Firebase est plus récent. Ensuite on relit le localStorage.
+    reconcileOnBoot().then(() => applyLocalData()).catch(() => {});
+  },[loggedIn, initialLoaded, applyLocalData]);
 
   const saveClients   = useCallback((data) => save("bb_clients_v2",    data), []);
   const savePassages  = useCallback((data) => save("bb_passages_v2",   data), []);
@@ -495,7 +507,7 @@ export default function App() {
 
   if(!ready) return (
     <><GlobalStyles/>
-    <div style={{height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"rgba(255,255,255,0.45)",gap:16,fontFamily:"'Inter', -apple-system, system-ui, sans-serif"}}>
+    <div style={{height:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"rgba(255,255,255,0.45)",gap:16,fontFamily:"'Inter', -apple-system, system-ui, sans-serif"}}>
       <div className="scale-in" style={{width:80,height:80,borderRadius:24,background:"#0891b2",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 12px 40px rgba(12,18,34,0.35)"}}>{Ico.wave(42,"white")}</div>
       <div style={{fontWeight:900,fontSize:24,color:DS.blue,letterSpacing:-0.5}}>BRIBLUE</div>
       <div style={{color:DS.mid,fontSize:13}}>Chargement…</div>
@@ -517,9 +529,9 @@ export default function App() {
     <GlobalStyles/>
     <ToastContainer/>
     <ConfirmModal/>
-    <div style={{minHeight:"100vh",background:"rgba(255,255,255,0.45)",fontFamily:"'Inter', -apple-system, system-ui, sans-serif",maxWidth:isMobile?640:1280,margin:"0 auto",position:"relative",display:"flex",flexDirection:"column",overflowX:"hidden",width:"100%"}}>
-      {/* HEADER */}
-      <div style={{background:"rgba(255,255,255,0.45)",padding:isMobile?"10px 14px":"10px 28px",display:"flex",alignItems:"center",gap:isMobile?8:14,position:"sticky",top:0,zIndex:50,boxShadow:"0 4px 16px rgba(6,182,212,0.15)",width:"100%",boxSizing:"border-box"}}>
+    <div style={{minHeight:"100dvh",background:"rgba(255,255,255,0.45)",fontFamily:"'Inter', -apple-system, system-ui, sans-serif",maxWidth:isMobile?640:1280,margin:"0 auto",position:"relative",display:"flex",flexDirection:"column",overflowX:"hidden",width:"100%"}}>
+      {/* HEADER — paddingTop englobe la safe area (Dynamic Island / encoche iPhone) */}
+      <div style={{background:"rgba(255,255,255,0.45)",paddingTop:isMobile?"max(10px, env(safe-area-inset-top, 0px))":"10px",paddingBottom:"10px",paddingLeft:isMobile?"14px":"28px",paddingRight:isMobile?"14px":"28px",display:"flex",alignItems:"center",gap:isMobile?8:14,position:"sticky",top:0,zIndex:50,boxShadow:"0 4px 16px rgba(6,182,212,0.15)",width:"100%",boxSizing:"border-box"}}>
         <button onClick={()=>setPage("dashboard")} style={{background:"rgba(255,255,255,0.45)",border:"none",padding:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",width:isMobile?44:42,height:isMobile?44:42,borderRadius:14,flexShrink:0,boxShadow:DS.nmShadow}}>
           {Ico.wave(isMobile?22:20,"#0891b2")}
         </button>
