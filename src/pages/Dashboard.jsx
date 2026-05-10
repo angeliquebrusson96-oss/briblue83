@@ -117,10 +117,10 @@ export function DashboardHero({ clients, passages, rdvs, saisonNow, isMobile, on
           {/* Salutation */}
           <div style={{marginBottom:16}}>
             <div style={{fontSize:22,fontWeight:800,color:"#fff",lineHeight:1.2,letterSpacing:"-0.5px"}}>
-              {salut} Dorian, que cette journée se passe comme tu le souhaite ! ☀️
+              {salut} Dorian ☀️
             </div>
             <div style={{fontSize:12,color:"rgba(255,255,255,0.65)",marginTop:3,fontWeight:400}}>
-              {rdvsToday.length > 0 ? `${rdvsToday.length} rendez-vous aujourd'hui` : "Bonne journée sur le terrain"}
+              {rdvsToday.length > 0 ? `${rdvsToday.length} rendez-vous aujourd'hui` : " Que cette journée se passe comme tu le souhaite !"}
             </div>
           </div>
 
