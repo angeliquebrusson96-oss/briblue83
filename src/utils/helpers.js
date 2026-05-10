@@ -346,10 +346,12 @@ export function calculerPassagesPrevusContrat(client = {}) {
 export function isPassageEffectue(p = {}) {
   const status = String(p.statut ?? p.status ?? p.etat ?? p.état ?? "").toLowerCase();
   const type = String(p.type ?? p.categorie ?? "").toLowerCase();
+  // Passages explicitement annulés, planifiés ou RDV ne comptent pas
   if (/annul|prévu|prevu|planif|rdv|rendez|a venir|à venir/.test(status)) return false;
   if (/rdv|rendez|prévu|prevu|planif/.test(type)) return false;
   if (p.annule || p.annulé || p.cancelled || p.planifie || p.planifié || p.rdvSeulement || p.isRdvOnly) return false;
-  if (p.ok === false || p.valide === false || p.validé === false) return false;
+  // ok=false ne signifie que "rapport non finalisé", pas que la visite n'a pas eu lieu
+  // On ne filtre plus sur ok ici — seul le statut annulé/planifié exclut une visite
   return true;
 }
 export function isPassageDansContrat(p = {}, client = {}) {
