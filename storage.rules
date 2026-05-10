@@ -1,11 +1,18 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Photos de passages — accessible uniquement aux utilisateurs connectés
+    // Photos de passages — lecture publique, écriture authentifiée
+    match /photos/{fileName} {
+      allow read:  if true;
+      allow write: if request.auth != null
+                   && request.resource.size < 3 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+    // Ancien chemin (rétrocompatibilité)
     match /passages/{sessionId}/{fileName} {
       allow read:  if request.auth != null;
       allow write: if request.auth != null
-                   && request.resource.size < 2 * 1024 * 1024   // max 2 Mo par fichier
+                   && request.resource.size < 2 * 1024 * 1024
                    && request.resource.contentType.matches('image/jpeg');
     }
   }

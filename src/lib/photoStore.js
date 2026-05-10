@@ -1,14 +1,24 @@
-// ─── STOCKAGE PHOTOS DANS INDEXEDDB + FALLBACK LOCALSTORAGE ─────────────────
-// Flux normal : IDB (qualité maximale, accès instantané).
-// Fallback    : si IDB vidé par iOS/Safari, repli sur une vignette localStorage (~15 Ko).
-// Cela garantit que les photos survivent aux purges de stockage et aux redémarrages.
+// ─── STOCKAGE PHOTOS ─────────────────────────────────────────────────────────
+// Priorité : Firebase Storage (cloud, multi-appareil) → IDB (local) → localStorage fallback
+//
+// Flux d'écriture (extractPassagePhotos) :
+//   data:base64 → upload Firebase Storage → URL https://...
+//   Si upload échoue : IDB local → idb:key
+//   Si IDB échoue aussi : garde le base64 (mieux que rien)
+//
+// Flux de lecture (resolvePhoto) :
+//   https://...   → URL directe (fonctionne sur tous les appareils)
+//   idb:key       → IDB, puis fallback localStorage
+//   data:...      → base64 direct (ancien format)
 
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from "./firebase";
+
+// ─── INDEXEDDB ───────────────────────────────────────────────────────────────
 const DB_NAME    = "briblue_photos";
 const STORE_NAME = "photos";
 const DB_VERSION = 1;
-
-// Cache mémoire pour éviter des allers-retours IDB répétés
-const _cache = new Map();
+const _cache     = new Map();
 
 let _dbPromise = null;
 function openDB() {
@@ -23,8 +33,7 @@ function openDB() {
   return _dbPromise;
 }
 
-// ─── VIGNETTE FALLBACK (localStorage) ────────────────────────────────────────
-// Réduit à max 400 px JPEG 0.6 → ~15-20 Ko — survit à la purge IDB d'iOS.
+// ─── FALLBACK LOCALSTORAGE ───────────────────────────────────────────────────
 const LS_PREFIX = "bb_ph_";
 
 function compressFallback(dataUrl) {
@@ -42,8 +51,7 @@ function compressFallback(dataUrl) {
       const c = document.createElement("canvas");
       c.width = width; c.height = height;
       c.getContext("2d").drawImage(img, 0, 0, width, height);
-      try { resolve(c.toDataURL("image/jpeg", 0.6)); }
-      catch { resolve(dataUrl); }
+      try { resolve(c.toDataURL("image/jpeg", 0.6)); } catch { resolve(dataUrl); }
     };
     img.src = dataUrl;
   });
@@ -51,7 +59,7 @@ function compressFallback(dataUrl) {
 
 function saveFallback(key, dataUrl) {
   compressFallback(dataUrl).then(thumb => {
-    try { localStorage.setItem(LS_PREFIX + key, thumb); } catch { /* quota — pas critique */ }
+    try { localStorage.setItem(LS_PREFIX + key, thumb); } catch { /* quota */ }
   });
 }
 
@@ -59,31 +67,51 @@ function loadFallback(key) {
   try { return localStorage.getItem(LS_PREFIX + key) || ""; } catch { return ""; }
 }
 
-// ─── ÉCRITURE ────────────────────────────────────────────────────────────────
-// Retourne true si l'écriture IDB a réussi, false sinon.
+// ─── UPLOAD FIREBASE STORAGE ─────────────────────────────────────────────────
+// Convertit un data:base64 en Blob et l'upload dans Storage.
+// Retourne l'URL de téléchargement publique (https://...) ou null si échec.
+async function uploadToStorage(key, dataUrl) {
+  try {
+    // data:image/jpeg;base64,/9j/... → Blob
+    const [header, b64] = dataUrl.split(",");
+    const mime = header.match(/:(.*?);/)?.[1] || "image/jpeg";
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const blob = new Blob([bytes], { type: mime });
+
+    const storageRef = ref(storage, `photos/${key}.jpg`);
+    await uploadBytes(storageRef, blob, { contentType: "image/jpeg" });
+    const url = await getDownloadURL(storageRef);
+    return url;
+  } catch (e) {
+    console.warn("[briblue] uploadToStorage échoué:", e?.message);
+    return null;
+  }
+}
+
+// ─── ÉCRITURE IDB (fallback si Storage indisponible) ─────────────────────────
 export async function savePhoto(key, dataUrl) {
   _cache.set(key, dataUrl);
-  // Sauvegarder une vignette dans localStorage en parallèle (fallback si IDB vidé)
   saveFallback(key, dataUrl);
   try {
     const db = await openDB();
     await new Promise((res, rej) => {
-      const tx  = db.transaction(STORE_NAME, "readwrite");
+      const tx = db.transaction(STORE_NAME, "readwrite");
       tx.objectStore(STORE_NAME).put(dataUrl, key);
       tx.oncomplete = res;
-      tx.onerror    = e => rej(e.target.error);
+      tx.onerror = e => rej(e.target.error);
     });
     return true;
   } catch (e) {
-    console.warn("[briblue] photoStore.savePhoto IDB échoué:", e?.message);
+    console.warn("[briblue] savePhoto IDB échoué:", e?.message);
     return false;
   }
 }
 
-// ─── LECTURE ─────────────────────────────────────────────────────────────────
+// ─── LECTURE IDB ─────────────────────────────────────────────────────────────
 export async function loadPhoto(key) {
   if (_cache.has(key)) return _cache.get(key);
-  // 1. Essayer IDB (qualité maximale)
   try {
     const db = await openDB();
     const val = await new Promise((res, rej) => {
@@ -94,36 +122,30 @@ export async function loadPhoto(key) {
     });
     if (val) {
       _cache.set(key, val);
-      // Créer le fallback localStorage si pas encore présent (rétrocompatibilité)
       if (!loadFallback(key)) saveFallback(key, val);
       return val;
     }
-  } catch { /* IDB indisponible → fallback */ }
-  // 2. Fallback localStorage (vignette 400 px — IDB vidé par iOS)
+  } catch { /* IDB indisponible */ }
+  // Fallback localStorage (vignette 400 px)
   const fb = loadFallback(key);
   if (fb) { _cache.set(key, fb); return fb; }
   return "";
 }
 
 // ─── RÉSOLUTION D'UNE VALEUR PHOTO ───────────────────────────────────────────
-// Accepte indifféremment :
-//   "idb:{key}"         → charge depuis IDB ou fallback localStorage
-//   "data:image/..."    → base64 direct (déjà résolu)
-//   "https://..."       → URL distante
 export async function resolvePhoto(value) {
   if (!value) return "";
   if (value.startsWith("idb:")) return loadPhoto(value.slice(4));
+  // https:// ou data: → retourné directement
   return value;
 }
 
-// Version synchrone (depuis le cache mémoire uniquement)
 export function resolvePhotoSync(value) {
   if (!value) return "";
   if (value.startsWith("idb:")) return _cache.get(value.slice(4)) || "";
   return value;
 }
 
-// Précharge une liste de valeurs photo dans le cache
 export async function preloadPhotos(values) {
   await Promise.all(
     values.filter(v => v?.startsWith("idb:")).map(v => loadPhoto(v.slice(4)))
@@ -131,30 +153,57 @@ export async function preloadPhotos(values) {
 }
 
 // ─── MIGRATION PHOTOS D'UN PASSAGE ──────────────────────────────────────────
-// Déplace les base64 vers IDB. Si IDB échoue, garde le base64 dans le passage
-// (meilleur qu'une clé idb: dangling qui disparaît au rechargement).
+// Ordre de priorité pour chaque photo base64 :
+//   1. Upload Firebase Storage → URL https:// (cloud, multi-appareil)
+//   2. IDB local → idb:key (même appareil, si hors-ligne)
+//   3. Garde le base64 (dernier recours)
 const _SINGLE = ["photoArrivee", "photoDepart"];
 const _ARRAYS = ["photos", "photosDepart"];
+
+async function migrateOnePhoto(dataUrl, key) {
+  // 1. Essayer Firebase Storage (cloud)
+  const storageUrl = await uploadToStorage(key, dataUrl);
+  if (storageUrl) return storageUrl;
+  // 2. Fallback IDB local
+  const ok = await savePhoto(key, dataUrl);
+  if (ok) return `idb:${key}`;
+  // 3. Garder le base64
+  return dataUrl;
+}
+
+// Migre une clé idb: existante vers Firebase Storage si possible
+async function migrateIdbToStorage(idbKey) {
+  const key = idbKey.slice(4); // retirer "idb:"
+  const dataUrl = await loadPhoto(key);
+  if (!dataUrl) return idbKey; // IDB vide, impossible de migrer
+  const storageUrl = await uploadToStorage(key, dataUrl);
+  return storageUrl || idbKey; // Si upload échoue, garder idb:
+}
 
 export async function extractPassagePhotos(passage) {
   if (!passage?.id) return passage;
   const p = { ...passage };
   for (const field of _SINGLE) {
     if (p[field]?.startsWith("data:")) {
+      // base64 → Storage (ou IDB si hors-ligne)
       const key = `${p.id}_${field}`;
-      const ok = await savePhoto(key, p[field]);
-      if (ok) p[field] = `idb:${key}`;
-      // Si IDB échoue : garde le base64 — mieux que perdre la photo
+      p[field] = await migrateOnePhoto(p[field], key);
+    } else if (p[field]?.startsWith("idb:")) {
+      // idb: existant → tenter migration vers Storage
+      p[field] = await migrateIdbToStorage(p[field]);
     }
   }
   for (const field of _ARRAYS) {
     if (!Array.isArray(p[field])) continue;
     p[field] = await Promise.all(
       p[field].map(async (v, i) => {
-        if (!v?.startsWith("data:")) return v;
-        const key = `${p.id}_${field}_${i}`;
-        const ok = await savePhoto(key, v);
-        return ok ? `idb:${key}` : v;
+        if (v?.startsWith("data:")) {
+          const key = `${p.id}_${field}_${i}`;
+          return migrateOnePhoto(v, key);
+        } else if (v?.startsWith("idb:")) {
+          return migrateIdbToStorage(v);
+        }
+        return v;
       })
     );
   }

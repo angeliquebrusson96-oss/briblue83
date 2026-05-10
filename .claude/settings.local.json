@@ -5,7 +5,9 @@
       "Bash(git push *)",
       "Bash(git add *)",
       "Bash(npm run *)",
-      "Bash(git mv *)"
+      "Bash(git mv *)",
+      "Bash(node -e \"require\\('firebase/storage'\\); console.log\\('ok'\\)\")",
+      "Bash(node -e \"require\\('firebase/auth'\\); console.log\\('firebase/auth ok'\\)\")"
     ]
   }
 }

@@ -2,6 +2,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { save, load, flushPendingNow, IS_IOS, reconcileOnBoot } from "./lib/storage";
 import { extractPassagePhotos } from "./lib/photoStore";
+import { signInAnonymously } from "firebase/auth";
+import { auth } from "./lib/firebase";
 
 import { DS, Ico, IconFiche, CLIENTS_INIT, PASSAGES_INIT, PRODUITS_DEFAUT, MOIS, AC } from "./utils/constants";
 import { migrateMois, alerteClient, getEntretienMois, getControleMois, isEntretienType, isControleType, TODAY, MOIS_NOW, YEAR_NOW, totalAnnuel, getMoisVal, daysUntil } from "./utils/helpers";
@@ -327,7 +329,12 @@ export default function App() {
   const prevTaskCount = useRef(0);
   const isMobile = useIsMobile();
 
-  useEffect(()=>{ setupPWA(); try { if(sessionStorage.getItem("bb_auth")==="1") setLoggedIn(true); } catch { /* noop */ } },[]);
+  useEffect(()=>{
+    setupPWA();
+    try { if(sessionStorage.getItem("bb_auth")==="1") setLoggedIn(true); } catch { /* noop */ }
+    // S'assurer d'avoir un utilisateur Firebase pour les uploads Storage
+    if (!auth.currentUser) signInAnonymously(auth).catch(()=>{});
+  },[]);
 
   useEffect(()=>{
     const onVis = () => { if (document.visibilityState === 'hidden') { try { flushPendingNow(); } catch { /* noop */ } } };
@@ -416,7 +423,12 @@ export default function App() {
     prevTaskCount.current=currentTasks;
   },[clients,passages,ready]);
 
-  const handleLogin = useCallback(()=>{ try{sessionStorage.setItem("bb_auth","1");}catch{ /* noop */ } setLoggedIn(true); },[]);
+  const handleLogin = useCallback(()=>{
+    try{sessionStorage.setItem("bb_auth","1");}catch{ /* noop */ }
+    // Connexion anonyme Firebase pour autoriser les uploads Firebase Storage
+    if (!auth.currentUser) signInAnonymously(auth).catch(()=>{});
+    setLoggedIn(true);
+  },[]);
   const handleLogout = useCallback(()=>{ try{sessionStorage.removeItem("bb_auth");}catch{ /* noop */ } setLoggedIn(false);setReady(false);setClients([]);setPassages([]);setLivraisons([]);setRdvs([]); },[]);
 
   const saveClient = useCallback(c=>{
