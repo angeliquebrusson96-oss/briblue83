@@ -1,4 +1,5 @@
-// @ts-nocheck
+﻿// @ts-nocheck
+/* eslint-disable react-hooks/static-components */
 import React, { useState, useEffect, useCallback } from "react";
 import { getDoc } from "firebase/firestore";
 import { APP_DOC } from "../lib/firebase";
@@ -292,16 +293,17 @@ const PASSAGES_INIT = [
 // ─────────────────────────────────────────────────────────────────────────────
 // CARNET PUBLIC INLINE (aperçu interne, données déjà chargées)
 // ─────────────────────────────────────────────────────────────────────────────
-export function CarnetPublicInline({ client, passages }) {
-  return <CarnetView client={client} passages={passages} onRefresh={null} refreshing={false}/>;
+export function CarnetPublicInline({ client, passages, livraisons=[] }) {
+  return <CarnetView client={client} passages={passages} livraisons={livraisons} onRefresh={null} refreshing={false}/>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CARNET PUBLIC (URL ?carnet=CODE)
 // ─────────────────────────────────────────────────────────────────────────────
-export function CarnetPublic({ code, allClients, allPassages }) {
+export function CarnetPublic({ code }) {
   const [loadedClients, setLoadedClients] = useState(null);
   const [loadedPassages, setLoadedPassages] = useState(null);
+  const [loadedLivraisons, setLoadedLivraisons] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -312,8 +314,10 @@ export function CarnetPublic({ code, allClients, allPassages }) {
         const d = snap.data();
         const c = d["bb_clients_v2"];
         const p = d["bb_passages_v2"];
+        const l = d["bb_livraisons_v1"];
         setLoadedClients(c && c.length ? c : CLIENTS_INIT);
         setLoadedPassages(p && p.length ? p : PASSAGES_INIT);
+        setLoadedLivraisons(Array.isArray(l) ? l : []);
       } else {
         setLoadedClients(CLIENTS_INIT);
         setLoadedPassages(PASSAGES_INIT);
@@ -345,19 +349,17 @@ export function CarnetPublic({ code, allClients, allPassages }) {
     </div>
   );
 
-  return <CarnetView client={client} passages={loadedPassages||[]} onRefresh={loadData} refreshing={refreshing}/>;
+  const clientLivraisons = loadedLivraisons.filter(l=>l.clientId===client.id);
+  return <CarnetView client={client} passages={loadedPassages||[]} livraisons={clientLivraisons} onRefresh={loadData} refreshing={refreshing}/>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VUE CARNET COMMUNE (partagée entre CarnetPublicInline et CarnetPublic)
 // ─────────────────────────────────────────────────────────────────────────────
-export function CarnetView({ client, passages, onRefresh, refreshing }) {
+export function CarnetView({ client, passages, livraisons=[], onRefresh, refreshing }) {
   const [selectedPassage, setSelectedPassage] = useState(null);
   const [activeTab, setActiveTab] = useState("accueil");
   const [showSOS, setShowSOS] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => { setTimeout(() => setMounted(true), 50); }, []);
 
   const passClient = (passages||[])
     .filter(p => p.clientId === client.id)
@@ -695,14 +697,23 @@ export function CarnetView({ client, passages, onRefresh, refreshing }) {
 
   // ─── PRODUITS TAB ──────────────────────────────────────────────────────────
   const ProduitsTab = () => {
-    const livs = passClient.filter(p=>getProduitsLivres(p).length>0);
+    // Produits livrés lors des passages (détection robuste multi-champs)
+    const livsPassage = passClient
+      .filter(p => getProduitsLivres(p).length > 0)
+      .map(p => ({ id:p.id, date:p.date, produits:getProduitsLivres(p), source:"passage" }));
+    // Livraisons séparées (bb_livraisons_v1)
+    const livsDirectes = (livraisons||[])
+      .filter(l => (l.produits||[]).length > 0 || l.description)
+      .map(l => ({ id:l.id, date:l.date, produits:l.produits||[], description:l.description, source:"livraison" }));
+    const all = [...livsPassage, ...livsDirectes].sort((a,b)=>b.date.localeCompare(a.date));
+
     return (
       <div style={{padding:"0 12px"}}>
         <SectionHead
           icon={<><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></>}
           title="Produits livrés"
         />
-        {livs.length===0
+        {all.length===0
           ? <div style={{background:"#fff",borderRadius:14,border:"1px solid #e2e8f0",padding:"40px 24px",textAlign:"center"}}>
               <div style={{width:48,height:48,background:"#f1f5f9",borderRadius:14,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px"}}>
                 <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.8" strokeLinecap="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
@@ -711,21 +722,24 @@ export function CarnetView({ client, passages, onRefresh, refreshing }) {
               <div style={{fontSize:12,color:"#94a3b8"}}>Les livraisons de produits apparaîtront ici</div>
             </div>
           : <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {livs.map((p,i)=>(
-                <div key={p.id||i} style={{background:"#fff",borderRadius:14,border:"1px solid #e2e8f0",padding:"12px 14px",display:"flex",alignItems:"center",gap:12,boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
-                  <div style={{width:40,height:40,background:"linear-gradient(135deg,#f0fdf4,#dcfce7)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,border:"1px solid #bbf7d0"}}>
-                    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+              {all.map((item,i)=>{
+                const label = item.produits.length > 0 ? item.produits.join(", ") : (item.description||"Livraison");
+                return (
+                  <div key={item.id||i} style={{background:"#fff",borderRadius:14,border:"1px solid #e2e8f0",padding:"12px 14px",display:"flex",alignItems:"center",gap:12,boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
+                    <div style={{width:40,height:40,background:"linear-gradient(135deg,#f0fdf4,#dcfce7)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,border:"1px solid #bbf7d0"}}>
+                      <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:600,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{label}</div>
+                      <div style={{fontSize:11,color:"#64748b",marginTop:1}}>{fmtDate(item.date,{day:"2-digit",month:"short",year:"numeric"})}</div>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:4,background:"#f0fdf4",color:"#15803d",borderRadius:8,padding:"4px 9px",fontSize:11,fontWeight:600,flexShrink:0,border:"1px solid #bbf7d0"}}>
+                      <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                      Livré
+                    </div>
                   </div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:13,fontWeight:600,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{getProduitsLivres(p).join(", ")}</div>
-                    <div style={{fontSize:11,color:"#64748b",marginTop:1}}>{fmtDate(p.date,{day:"2-digit",month:"short",year:"numeric"})}</div>
-                  </div>
-                  <div style={{display:"flex",alignItems:"center",gap:4,background:"#f0fdf4",color:"#15803d",borderRadius:8,padding:"4px 9px",fontSize:11,fontWeight:600,flexShrink:0,border:"1px solid #bbf7d0"}}>
-                    <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                    Livré
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
         }
       </div>

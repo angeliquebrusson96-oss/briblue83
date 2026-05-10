@@ -948,7 +948,7 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
           </button>
         </div>
         <div style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
-          <CarnetPublicInline client={client} passages={passages}/>
+          <CarnetPublicInline client={client} passages={passages} livraisons={(livraisons||[]).filter(l=>l.clientId===client.id)}/>
         </div>
       </div>
     )}
