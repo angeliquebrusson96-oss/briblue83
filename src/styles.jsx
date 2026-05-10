@@ -249,6 +249,10 @@ export const GlobalStyles = () => (
     }
     #root, .root-wrap { position: relative; z-index: 1; }
 
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
     @keyframes gradientShift {
       0%,100% { background-position: 0% 50%; }
       50%     { background-position: 100% 50%; }

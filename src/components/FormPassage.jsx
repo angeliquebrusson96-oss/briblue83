@@ -4,13 +4,11 @@ import { DS, Ico, MOIS, MOIS_L, RAPPORT_STATUS } from "../utils/constants";
 import { TODAY, getRapportStatus, isEntretienType, isControleType, getPH, getCL, getTemp, getResumePassage, normalizeRapportStatus, migrateMois, totalAnnuel, calcMensualites, uid } from "../utils/helpers";
 import { useIsMobile, Modal, BtnPrimary, Card, Section, FmField, FmSectionTitle, FmHeader, FmSteps, DraftBanner, PhotoPicker, SunBurstActions, SunBurstFormNav, RapportStatusPicker, Tag, Avatar } from "./ui";
 import { toastWarn, toastSuccess, toastInfo, showConfirm } from "../styles";
-import { savePhoto } from "../lib/photoStore";
+import { extractPassagePhotos } from "../lib/photoStore";
 
 // ─── COMPRESSION PHOTO ───────────────────────────────────────────────────────
-// Réduit à max 1 000 px JPEG 0.65 → ~80-150 Ko (prévisualisation en form state)
-// Les photos ne sont JAMAIS envoyées en base64 vers Firestore :
-// à la sauvegarde, extractPhotosToIDB() les déplace dans IndexedDB
-// et ne stocke que des clés "idb:{id}_{field}" dans le document Firestore.
+// Réduit à max 1 000 px JPEG 0.65 → ~80-150 Ko pour la prévisualisation.
+// À la sauvegarde, extractPassagePhotos() déplace les base64 vers IndexedDB.
 function compressToBase64(file) {
   return new Promise(resolve => {
     const objectUrl = URL.createObjectURL(file);
@@ -34,33 +32,6 @@ function compressToBase64(file) {
   });
 }
 
-// ─── EXTRACTION PHOTOS → INDEXEDDB ───────────────────────────────────────────
-// Appelé juste avant onSave(). Remplace chaque base64 par une clé "idb:..."
-// Les photos restent dans IndexedDB sur l'appareil ; Firestore ne stocke que la clé.
-async function extractPhotosToIDB(passage) {
-  const p = { ...passage };
-  const SINGLE = ["photoArrivee", "photoDepart"];
-  const ARRAYS = ["photos", "photosDepart"];
-
-  for (const field of SINGLE) {
-    if (p[field]?.startsWith("data:")) {
-      const key = `${p.id}_${field}`;
-      await savePhoto(key, p[field]);
-      p[field] = `idb:${key}`;
-    }
-  }
-  for (const field of ARRAYS) {
-    p[field] = await Promise.all(
-      (p[field] || []).map(async (v, i) => {
-        if (!v?.startsWith("data:")) return v;
-        const key = `${p.id}_${field}_${i}`;
-        await savePhoto(key, v);
-        return `idb:${key}`;
-      })
-    );
-  }
-  return p;
-}
 
 // ─── PRODUITS PAR DÉFAUT ────────────────────────────────────────────────────
 const PRODUITS_DEFAUT = ["Chlore lent Galet","PH minus","Flocculant","Anti-calcaire","Anti-Algues","Anti-Phosphate","Éponge Magique","Filtre à cartouche","Tac+","Chlore granule","Hypochlorite","Anti-Algues moutarde","Sac de sel"];
@@ -669,6 +640,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
 
   const [step,setStep]=useState(1);
   const [showConfirmSave, setShowConfirmSave] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
 
   // Sauvegarde manuelle brouillon
@@ -752,6 +724,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
 
   const doSave = async () => {
     if(!f.clientId||!f.date){ toastWarn("Client et date requis"); return; }
+    if(isSaving) return;
     const isSAVsave = f.type==="SAV";
     const isDevissave = f.type==="Demande de devis";
     const isSansDonneesSave = f.type==="Passage sans données";
@@ -780,10 +753,18 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
           ].filter(Boolean).join(", ") || "",
       obs: isSimplifiedSave ? (f.descriptionSAV || f.commentaires || "") : f.commentaires,
     };
-    const passage = await extractPhotosToIDB(rawPassage);
-    onSave(passage);
-    clearDraftAfterSave();
-    setShowConfirmSave(false);
+    setIsSaving(true);
+    try {
+      const passage = await extractPassagePhotos(rawPassage);
+      onSave(passage);
+      clearDraftAfterSave();
+      setShowConfirmSave(false);
+    } catch (e) {
+      console.error("[briblue] doSave échoué:", e);
+      toastWarn("Erreur lors de la sauvegarde — réessaie");
+    } finally {
+      setIsSaving(false);
+    }
     // Auto-créer une livraison si produits livrés
     if (f.livraisonProduits && (f.produitsLivres?.length > 0 || f.livraisonAutre) && onSaveLivraison) {
       onSaveLivraison({
@@ -1544,9 +1525,12 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
                 <button onClick={()=>setShowConfirmSave(false)} style={{flex:1,padding:"14px",borderRadius:12,background:"rgba(255,255,255,0.4)",border:"none",cursor:"pointer",fontWeight:700,fontSize:14,color:"#64748b",fontFamily:"inherit"}}>
                   Annuler
                 </button>
-                <button onClick={doSave} style={{flex:2,padding:"14px",borderRadius:12,background:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit",boxShadow:"0 4px 16px #05996944",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  {isEdit ? "Modifier" : "Enregistrer"}
+                <button onClick={doSave} disabled={isSaving} style={{flex:2,padding:"14px",borderRadius:12,background:isSaving?"#94a3b8":"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:isSaving?"not-allowed":"pointer",fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit",boxShadow:isSaving?"none":"0 4px 16px #05996944",display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"background .2s"}}>
+                  {isSaving
+                    ? <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" style={{animation:"spin 1s linear infinite"}}><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                    : <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  }
+                  {isSaving ? "Enregistrement…" : isEdit ? "Modifier" : "Enregistrer"}
                 </button>
               </div>
             </div>

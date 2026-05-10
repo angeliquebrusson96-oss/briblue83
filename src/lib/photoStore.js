@@ -23,6 +23,7 @@ function openDB() {
 }
 
 // ─── ÉCRITURE ────────────────────────────────────────────────────────────────
+// Retourne true si l'écriture IDB a réussi, false sinon.
 export async function savePhoto(key, dataUrl) {
   _cache.set(key, dataUrl);
   try {
@@ -33,8 +34,10 @@ export async function savePhoto(key, dataUrl) {
       tx.oncomplete = res;
       tx.onerror    = e => rej(e.target.error);
     });
+    return true;
   } catch (e) {
     console.warn("[briblue] photoStore.savePhoto échoué:", e?.message);
+    return false;
   }
 }
 
@@ -79,4 +82,35 @@ export async function preloadPhotos(values) {
   await Promise.all(
     values.filter(v => v?.startsWith("idb:")).map(v => loadPhoto(v.slice(4)))
   );
+}
+
+// ─── MIGRATION PHOTOS D'UN PASSAGE ──────────────────────────────────────────
+// Déplace les base64 vers IDB. Si IDB échoue, garde le base64 dans le passage
+// (meilleur qu'une clé idb: dangling qui disparaît au rechargement).
+const _SINGLE = ["photoArrivee", "photoDepart"];
+const _ARRAYS = ["photos", "photosDepart"];
+
+export async function extractPassagePhotos(passage) {
+  if (!passage?.id) return passage;
+  const p = { ...passage };
+  for (const field of _SINGLE) {
+    if (p[field]?.startsWith("data:")) {
+      const key = `${p.id}_${field}`;
+      const ok = await savePhoto(key, p[field]);
+      if (ok) p[field] = `idb:${key}`;
+      // Si IDB échoue : garde le base64 — mieux que perdre la photo
+    }
+  }
+  for (const field of _ARRAYS) {
+    if (!Array.isArray(p[field])) continue;
+    p[field] = await Promise.all(
+      p[field].map(async (v, i) => {
+        if (!v?.startsWith("data:")) return v;
+        const key = `${p.id}_${field}_${i}`;
+        const ok = await savePhoto(key, v);
+        return ok ? `idb:${key}` : v;
+      })
+    );
+  }
+  return p;
 }

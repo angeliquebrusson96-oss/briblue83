@@ -8,7 +8,7 @@ import {
   TODAY, MOIS_NOW, YEAR_NOW,
   calculerPassagesPrevusContrat, isPassageDansContrat, isPassageEffectue
 } from "../utils/helpers";
-import { useIsMobile, Modal, RapportStatusPicker, Avatar } from "./ui";
+import { useIsMobile, Modal, RapportStatusPicker, Avatar, PhotoImg } from "./ui";
 import { showConfirm, toastSuccess } from "../styles";
 import { FormLivraison, envoyerEmailLivraison } from "./FormLivraison";
 
@@ -156,7 +156,7 @@ export function PassageDetailModal({ passage, client, onClose }) {
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(3,1fr)",gap:8}}>
             {photos.map((ph,i)=>(
               <div key={i} style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid "+DS.border}}>
-                <img src={ph.src} alt={ph.label} style={{width:"100%",height:isMobile?90:110,objectFit:"cover",display:"block"}}/>
+                <PhotoImg src={ph.src} alt={ph.label} style={{width:"100%",height:isMobile?90:110,objectFit:"cover",display:"block"}}/>
                 <span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>{ph.label}</span>
               </div>
             ))}
@@ -271,7 +271,7 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
             </div>
           )}
 
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:0,paddingBottom:18,position:"relative"}}>
+          <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(3,1fr)":"repeat(5,1fr)",gap:isMobile?6:8,marginBottom:0,paddingBottom:18,position:"relative"}}>
             {[
               {label:"Entretiens",val:`${effE}/${totalE}`,ok:effE>=totalE,sub:"effectués"},
               {label:"Contrôles", val:`${effC}/${totalC}`,ok:effC>=totalC,sub:"effectués"},
@@ -279,9 +279,9 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
               {label:"Ce mois",   val:restantsCeMois,ok:restantsCeMois===0,sub:"à planifier",highlight:restantsCeMois>0},
               {label:"Mensualité",val:mensualite+"€",ok:true,sub:"/mois"},
             ].map(({label,val,ok,sub,highlight},i)=>(
-              <div key={i} style={{background:"rgba(255,255,255,0.6)",borderRadius:14,padding:"11px 6px",textAlign:"center",border:"1px solid rgba(255,255,255,0.5)",backdropFilter:"blur(14px) saturate(180%)",WebkitBackdropFilter:"blur(14px) saturate(180%)",boxShadow:"0 4px 14px rgba(6,182,212,0.10)"}}>
+              <div key={i} style={{background:"rgba(255,255,255,0.6)",borderRadius:14,padding:isMobile?"8px 4px":"11px 6px",textAlign:"center",border:"1px solid rgba(255,255,255,0.5)",backdropFilter:"blur(14px) saturate(180%)",WebkitBackdropFilter:"blur(14px) saturate(180%)",boxShadow:"0 4px 14px rgba(6,182,212,0.10)"}}>
                 <div style={{fontSize:9,color:"#475569",fontWeight:800,textTransform:"uppercase",letterSpacing:.4,marginBottom:4}}>{label}</div>
-                <div style={{fontSize:i===2?22:17,fontWeight:900,color:highlight?"#d97706":(ok?"#059669":"#0891b2"),lineHeight:1,letterSpacing:-0.5}}>{val}</div>
+                <div style={{fontSize:isMobile?16:i===2?22:17,fontWeight:900,color:highlight?"#d97706":(ok?"#059669":"#0891b2"),lineHeight:1,letterSpacing:-0.5}}>{val}</div>
                 <div style={{fontSize:9,color:"#64748b",marginTop:3,fontWeight:600}}>{sub}</div>
               </div>
             ))}
@@ -295,7 +295,7 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
         <div style={{background:"rgba(255,255,255,0.6)",backdropFilter:"blur(20px) saturate(180%)",WebkitBackdropFilter:"blur(20px) saturate(180%)",display:"flex",borderBottom:"1px solid rgba(255,255,255,0.4)",overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none",padding:"0 4px"}}>
           {TABS.map(({id,label})=>(
             <button key={id} onClick={()=>setTab(id)}
-              style={{flexShrink:0,padding:"12px 14px",border:"none",cursor:"pointer",fontWeight:tab===id?800:600,fontSize:12.5,fontFamily:"inherit",background:"transparent",color:tab===id?"#0891b2":"#64748b",borderBottom:tab===id?"2.5px solid #06b6d4":"2.5px solid transparent",transition:"all .18s",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:6,WebkitTapHighlightColor:"transparent",letterSpacing:"0.01em"}}>
+              style={{flexShrink:0,padding:isMobile?"10px 10px":"12px 14px",border:"none",cursor:"pointer",fontWeight:tab===id?800:600,fontSize:isMobile?11.5:12.5,fontFamily:"inherit",background:"transparent",color:tab===id?"#0891b2":"#64748b",borderBottom:tab===id?"2.5px solid #06b6d4":"2.5px solid transparent",transition:"all .18s",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:6,WebkitTapHighlightColor:"transparent",letterSpacing:"0.01em"}}>
               <TabIcon name={id} size={15} color={tab===id?"#0891b2":"#64748b"}/>
               {label}
             </button>
@@ -433,7 +433,7 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
                             <div style={{borderTop:"1px solid "+cfg.color+"22",padding:"12px 14px",background:cfg.bg+"44"}}>
                               {ev.photo&&(
                                 <div style={{marginBottom:10}}>
-                                  <img src={ev.photo} alt="" style={{width:"100%",maxHeight:120,objectFit:"cover",borderRadius:10,border:"1px solid "+DS.border}}/>
+                                  <PhotoImg src={ev.photo} alt="" style={{width:"100%",maxHeight:120,objectFit:"cover",borderRadius:10,border:"1px solid "+DS.border}}/>
                                 </div>
                               )}
                               {ev.resume&&(
@@ -536,8 +536,8 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
 
                   {(p.photoArrivee||p.photoDepart)&&(
                     <div style={{display:"flex",gap:4,padding:"0 14px 8px"}}>
-                      {p.photoArrivee&&<div style={{flex:1,position:"relative"}}><img src={p.photoArrivee} alt="" style={{width:"100%",height:52,objectFit:"cover",borderRadius:8}}/><span style={{position:"absolute",bottom:2,left:4,fontSize:8,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.5)",borderRadius:3,padding:"1px 4px"}}>Arrivée</span></div>}
-                      {p.photoDepart&&<div style={{flex:1,position:"relative"}}><img src={p.photoDepart} alt="" style={{width:"100%",height:52,objectFit:"cover",borderRadius:8}}/><span style={{position:"absolute",bottom:2,left:4,fontSize:8,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.5)",borderRadius:3,padding:"1px 4px"}}>Départ</span></div>}
+                      {p.photoArrivee&&<div style={{flex:1,position:"relative"}}><PhotoImg src={p.photoArrivee} alt="" style={{width:"100%",height:52,objectFit:"cover",borderRadius:8}}/><span style={{position:"absolute",bottom:2,left:4,fontSize:8,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.5)",borderRadius:3,padding:"1px 4px"}}>Arrivée</span></div>}
+                      {p.photoDepart&&<div style={{flex:1,position:"relative"}}><PhotoImg src={p.photoDepart} alt="" style={{width:"100%",height:52,objectFit:"cover",borderRadius:8}}/><span style={{position:"absolute",bottom:2,left:4,fontSize:8,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.5)",borderRadius:3,padding:"1px 4px"}}>Départ</span></div>}
                     </div>
                   )}
 

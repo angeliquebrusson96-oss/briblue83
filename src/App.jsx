@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { save, load, flushPendingNow, IS_IOS, reconcileOnBoot } from "./lib/storage";
+import { extractPassagePhotos } from "./lib/photoStore";
 
 import { DS, Ico, IconFiche, CLIENTS_INIT, PASSAGES_INIT, PRODUITS_DEFAUT, MOIS, AC } from "./utils/constants";
 import { migrateMois, alerteClient, getEntretienMois, getControleMois, isEntretienType, isControleType, TODAY, MOIS_NOW, YEAR_NOW, totalAnnuel, getMoisVal, daysUntil } from "./utils/helpers";
@@ -441,7 +442,10 @@ export default function App() {
   const savePassage = useCallback(async p=>{
     const existing = passages.find(x=>x.id===p.id);
     if(existing?.statut==="validee" && p.statut!=="validee"){ toastError("Cette intervention est validée et ne peut plus être modifiée."); return; }
-    const next = passages.find(x=>x.id===p.id) ? passages.map(x=>x.id===p.id?p:x) : [...passages, p];
+    const raw = passages.find(x=>x.id===p.id) ? passages.map(x=>x.id===p.id?p:x) : [...passages, p];
+    // Migrer TOUTES les photos base64 restantes vers IDB avant la sauvegarde.
+    // Cela protège aussi les anciens passages qui n'avaient pas encore été migrés.
+    const next = await Promise.all(raw.map(extractPassagePhotos));
     setPassages(next);
     await savePassages(next);
     setShowFormPassage(false);setEditPassage(null);
