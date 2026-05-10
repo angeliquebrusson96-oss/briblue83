@@ -116,18 +116,29 @@ const getPlanForMonth = (client = {}, monthNumber) => {
   };
 };
 const getPassagesAnnuelsSaisis = (client = {}) => {
+  // Le total annuel doit venir de ta saisie manuelle dans la fiche client / contrat.
+  // On accepte plusieurs noms de champs pour rester compatible avec tes anciennes versions.
   const value = client.passagesAnnuels
     ?? client.nbPassagesAnnuels
     ?? client.nombrePassagesAnnuels
     ?? client.nombrePassagesAnnuel
     ?? client.totalPassagesAnnuels
     ?? client.totalPassagesAnnuel
+    ?? client.passagesContrat
+    ?? client.nbPassagesContrat
+    ?? client.nombrePassagesContrat
     ?? client.passagesPrevusContrat
     ?? client.passagesPrévusContrat
     ?? client.passagesPrevus
     ?? client.nbPassagesPrevus
     ?? client.nbPassages
-    ?? client.nombrePassages;
+    ?? client.nombrePassages
+    ?? client.contrat?.passagesAnnuels
+    ?? client.contrat?.nbPassagesAnnuels
+    ?? client.contrat?.nombrePassagesAnnuels
+    ?? client.contrat?.passagesPrevus
+    ?? client.contrat?.nbPassages
+    ?? client.contrat?.nombrePassages;
   return toNumber(value, 0);
 };
 const calculerPassagesPrevusContrat = (client = {}) => {
@@ -145,11 +156,23 @@ const calculerPassagesPrevusContrat = (client = {}) => {
   }).reduce((a, b) => a + b, 0);
 };
 const isPassageEffectue = (p = {}) => {
+  // Un passage se déduit seulement quand un vrai rapport/intervention est créé.
+  // Les rendez-vous prévus/planifiés ne doivent PAS être comptés comme effectués.
   const status = String(p.statut ?? p.status ?? p.etat ?? p.état ?? "").toLowerCase();
+  const type = String(p.type ?? p.categorie ?? "").toLowerCase();
   if (/annul|prévu|prevu|planif|rdv|rendez|a venir|à venir/.test(status)) return false;
-  if (p.annule || p.annulé || p.cancelled || p.planifie || p.planifié || p.rdvSeulement) return false;
+  if (/rdv|rendez|prévu|prevu|planif/.test(type)) return false;
+  if (p.annule || p.annulé || p.cancelled || p.planifie || p.planifié || p.rdvSeulement || p.isRdvOnly) return false;
   if (p.ok === false || p.valide === false || p.validé === false) return false;
-  // Si un rapport est créé/sauvegardé, il se déduit automatiquement car il est présent dans passClient.
+  return true;
+};
+const isPassageDansContrat = (p = {}, client = {}) => {
+  if (!p.date) return true;
+  const d = String(p.date).slice(0, 10);
+  const debut = client.dateDebut ? String(client.dateDebut).slice(0, 10) : null;
+  const fin = client.dateFin ? String(client.dateFin).slice(0, 10) : null;
+  if (debut && d < debut) return false;
+  if (fin && d > fin) return false;
   return true;
 };
 
@@ -249,7 +272,7 @@ export function CarnetView({ client, passages, onRefresh, refreshing }) {
   const getResume = getResumePassage;
 
   const totalVisitesPrevues = calculerPassagesPrevusContrat(client);
-  const passagesDeduits = passClient.filter(isPassageEffectue);
+  const passagesDeduits = passClient.filter(p => isPassageDansContrat(p, client) && isPassageEffectue(p));
   const visitesEffectuees = passagesDeduits.length;
   const visitesRestantes = Math.max(0, totalVisitesPrevues - visitesEffectuees);
   const progressPct = totalVisitesPrevues > 0 ? Math.min(100, (visitesEffectuees / totalVisitesPrevues) * 100) : 0;
