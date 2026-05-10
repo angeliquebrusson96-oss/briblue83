@@ -306,7 +306,6 @@ export default function App() {
   const [showStock, setShowStock] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [contrats, setContrats] = useState({});
-  const [initialLoaded, setInitialLoaded] = useState(() => { try { return sessionStorage.getItem('bb_initial_loaded') === '1'; } catch { return false; } });
   const [ready, setReady] = useState(false);
   const [ficheClient, setFicheClient] = useState(null);
   const [showFormClient, setShowFormClient] = useState(false);
@@ -347,19 +346,16 @@ export default function App() {
   }, []);
 
   useEffect(()=>{
-    if(!loggedIn || initialLoaded || _BB_BOOT_DONE) return;
+    if(!loggedIn || _BB_BOOT_DONE) return;
     _BB_BOOT_DONE = true;
 
-    // ── 1. Affichage immédiat depuis localStorage (0 ms réseau) ──
+    // Affichage immédiat depuis localStorage (0 ms réseau)
     applyLocalData();
-    setReady(true); setInitialLoaded(true);
-    try { sessionStorage.setItem('bb_initial_loaded', '1'); } catch { /* noop */ }
+    setReady(true);
 
-    // ── 2. Réconciliation Firebase en arrière-plan ──
-    // reconcileOnBoot() compare les timestamps et écrit dans localStorage
-    // seulement si Firebase est plus récent. Ensuite on relit le localStorage.
+    // Réconciliation Firebase en arrière-plan
     reconcileOnBoot().then(() => applyLocalData()).catch(() => {});
-  },[loggedIn, initialLoaded, applyLocalData]);
+  },[loggedIn, applyLocalData]);
 
   const saveClients   = useCallback((data) => save("bb_clients_v2",    data), []);
   const savePassages  = useCallback((data) => save("bb_passages_v2",   data), []);
