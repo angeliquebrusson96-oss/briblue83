@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { DS } from "../utils/constants";
 import { useIsMobile, Avatar } from "../components/ui";
 
@@ -17,6 +17,7 @@ const Toggle = ({ value, onChange, colorOn = "#dc2626", colorOff = "#e2e8f0" }) 
 
 // ─── Mensualités d'un client ──────────────────────────────────────────────────
 const VersementsClient = ({ client, versements, onToggleVersement, retardVisible, onToggleRetardCarnet }) => {
+  const [open, setOpen] = useState(false);
   if (!client.prix || !client.dateDebut) return null;
 
   const montantMensuel = Math.round(client.prix / 12);
@@ -49,84 +50,120 @@ const VersementsClient = ({ client, versements, onToggleVersement, retardVisible
 
   return (
     <div>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+      {/* ─ En-tête cliquable ─ */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",background:"none",border:"none",cursor:"pointer",padding:0,marginBottom: open ? 8 : 0}}
+      >
         <span style={{fontSize:11,color:"#64748b"}}>{montantMensuel}€/mois · {mensualites.length} mois</span>
-        {totalDue > 0
-          ? <span style={{fontSize:13,fontWeight:800,color:overdueCount>0?"#dc2626":"#0369a1"}}>{totalDue}€ dû</span>
-          : <span style={{fontSize:11,fontWeight:700,color:"#16a34a"}}>✓ À jour</span>
-        }
-      </div>
-
-      {hasRetard && (
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",borderRadius:8,background:retardVisible?"#fef2f2":"#f8fafc",border:`1px solid ${retardVisible?"#fecaca":"#e2e8f0"}`,marginBottom:8}}>
-          <div>
-            <div style={{fontSize:11,fontWeight:700,color:retardVisible?"#dc2626":"#475569"}}>
-              {retardVisible ? "Retard visible dans le carnet client" : "Retard masqué au client"}
-            </div>
-            <div style={{fontSize:10,color:"#94a3b8",marginTop:1}}>Le client verra ce qu'il vous doit</div>
-          </div>
-          <Toggle value={retardVisible} onChange={v => onToggleRetardCarnet(client.id, v)} />
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          {totalDue > 0
+            ? <span style={{fontSize:13,fontWeight:800,color:overdueCount>0?"#dc2626":"#0369a1"}}>{totalDue}€ dû</span>
+            : <span style={{fontSize:11,fontWeight:700,color:"#16a34a"}}>✓ À jour</span>
+          }
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round"
+            style={{transform:open?"rotate(180deg)":"rotate(0deg)",transition:"transform .2s",flexShrink:0}}>
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
         </div>
-      )}
+      </button>
 
-      <div style={{display:"flex",flexDirection:"column",gap:4}}>
-        {mensualites.slice(-6).map((m) => (
-          <div key={m.key} style={{
-            display:"flex",alignItems:"center",justifyContent:"space-between",
-            padding:"6px 10px",borderRadius:7,
-            background:m.isPaid?"#f0fdf4":m.isOverdue?"#fef2f2":m.isCurrentMonth?"#fefce8":"#f8fafc",
-            border:`1px solid ${m.isPaid?"#bbf7d0":m.isOverdue?"#fecaca":m.isCurrentMonth?"#fde047":"#e2e8f0"}`
-          }}>
-            <div style={{display:"flex",alignItems:"center",gap:7}}>
-              <span style={{fontSize:10,fontWeight:700,color:"#475569",minWidth:28,textTransform:"uppercase"}}>{MOIS_LONG[m.month].slice(0,3)}</span>
-              <span style={{fontSize:10,color:"#94a3b8"}}>{m.year}</span>
-              <span style={{fontSize:10,fontWeight:600,color:m.isPaid?"#15803d":m.isOverdue?"#dc2626":m.isCurrentMonth?"#a16207":"#94a3b8"}}>
-                {m.isPaid ? "Payé" : m.isOverdue ? "Retard" : m.isCurrentMonth ? "En cours" : "À venir"}
-              </span>
+      {open && (
+        <>
+          {hasRetard && (
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",borderRadius:8,background:retardVisible?"#fef2f2":"#f8fafc",border:`1px solid ${retardVisible?"#fecaca":"#e2e8f0"}`,marginBottom:8}}>
+              <div>
+                <div style={{fontSize:11,fontWeight:700,color:retardVisible?"#dc2626":"#475569"}}>
+                  {retardVisible ? "Retard visible dans le carnet client" : "Retard masqué au client"}
+                </div>
+                <div style={{fontSize:10,color:"#94a3b8",marginTop:1}}>Le client verra ce qu'il vous doit</div>
+              </div>
+              <Toggle value={retardVisible} onChange={v => onToggleRetardCarnet(client.id, v)} />
             </div>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <span style={{fontSize:12,fontWeight:700,color:m.isPaid?"#15803d":m.isOverdue?"#dc2626":"#0f172a"}}>{montantMensuel}€</span>
-              <button
-                onClick={() => onToggleVersement(m.key, !m.isPaid)}
-                style={{width:24,height:24,borderRadius:6,border:`1.5px solid ${m.isPaid?"#16a34a":"#cbd5e1"}`,cursor:"pointer",background:m.isPaid?"#16a34a":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"}}>
-                {m.isPaid
-                  ? <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  : <div style={{width:7,height:7,borderRadius:4,border:"2px solid #cbd5e1"}}/>
-                }
-              </button>
-            </div>
+          )}
+
+          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+            {mensualites.map((m) => (
+              <div key={m.key} style={{
+                display:"flex",alignItems:"center",justifyContent:"space-between",
+                padding:"6px 10px",borderRadius:7,
+                background:m.isPaid?"#f0fdf4":m.isOverdue?"#fef2f2":m.isCurrentMonth?"#fefce8":"#f8fafc",
+                border:`1px solid ${m.isPaid?"#bbf7d0":m.isOverdue?"#fecaca":m.isCurrentMonth?"#fde047":"#e2e8f0"}`
+              }}>
+                <div style={{display:"flex",alignItems:"center",gap:7}}>
+                  <span style={{fontSize:10,fontWeight:700,color:"#475569",minWidth:28,textTransform:"uppercase"}}>{MOIS_LONG[m.month].slice(0,3)}</span>
+                  <span style={{fontSize:10,color:"#94a3b8"}}>{m.year}</span>
+                  <span style={{fontSize:10,fontWeight:600,color:m.isPaid?"#15803d":m.isOverdue?"#dc2626":m.isCurrentMonth?"#a16207":"#94a3b8"}}>
+                    {m.isPaid ? "Payé" : m.isOverdue ? "Retard" : m.isCurrentMonth ? "En cours" : "À venir"}
+                  </span>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:12,fontWeight:700,color:m.isPaid?"#15803d":m.isOverdue?"#dc2626":"#0f172a"}}>{montantMensuel}€</span>
+                  <button
+                    onClick={() => onToggleVersement(m.key, !m.isPaid)}
+                    style={{width:24,height:24,borderRadius:6,border:`1.5px solid ${m.isPaid?"#16a34a":"#cbd5e1"}`,cursor:"pointer",background:m.isPaid?"#16a34a":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"}}>
+                    {m.isPaid
+                      ? <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      : <div style={{width:7,height:7,borderRadius:4,border:"2px solid #cbd5e1"}}/>
+                    }
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
     </div>
   );
 };
 
 // ─── Livraisons d'un client ───────────────────────────────────────────────────
 const LivraisonsClient = ({ client, livraisons, onUpdateStatut, retardVisible, onToggleRetardCarnet }) => {
+  const [open, setOpen] = useState(false);
   const clientLivraisons = livraisons
     .filter(l => l.clientId === client.id)
     .sort((a, b) => new Date(b.date) - new Date(a.date));
   if (clientLivraisons.length === 0) return null;
 
   const impayees = clientLivraisons.filter(l => l.statut !== "payee" && l.statut !== "annulee");
+  const totalImpaye = impayees.reduce((s, l) => s + (l.montant || l.prixTotal || l.total || 0), 0);
 
   return (
     <div>
-      {impayees.length > 0 && (
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",borderRadius:8,background:retardVisible?"#fff7ed":"#f8fafc",border:`1px solid ${retardVisible?"#fed7aa":"#e2e8f0"}`,marginBottom:8}}>
-          <div>
-            <div style={{fontSize:11,fontWeight:700,color:retardVisible?"#ea580c":"#475569"}}>
-              {retardVisible ? "Livraisons visibles dans le carnet" : "Livraisons masquées au client"}
-            </div>
-            <div style={{fontSize:10,color:"#94a3b8",marginTop:1}}>{impayees.length} livraison{impayees.length > 1 ? "s" : ""} non réglée{impayees.length > 1 ? "s" : ""}</div>
-          </div>
-          <Toggle value={retardVisible} onChange={v => onToggleRetardCarnet(`liv_${client.id}`, v)} colorOn="#ea580c" />
+      {/* ─ En-tête cliquable ─ */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",background:"none",border:"none",cursor:"pointer",padding:0,marginBottom: open ? 8 : 0}}
+      >
+        <span style={{fontSize:11,color:"#64748b"}}>{clientLivraisons.length} livraison{clientLivraisons.length > 1 ? "s" : ""}</span>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          {impayees.length > 0
+            ? <span style={{fontSize:13,fontWeight:800,color:"#b45309"}}>{totalImpaye > 0 ? totalImpaye + "€ dû" : impayees.length + " impayée" + (impayees.length > 1 ? "s" : "")}</span>
+            : <span style={{fontSize:11,fontWeight:700,color:"#16a34a"}}>✓ À jour</span>
+          }
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round"
+            style={{transform:open?"rotate(180deg)":"rotate(0deg)",transition:"transform .2s",flexShrink:0}}>
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
         </div>
-      )}
+      </button>
 
-      <div style={{display:"flex",flexDirection:"column",gap:4}}>
-        {clientLivraisons.slice(0, 8).map(l => {
+      {open && (
+        <>
+          {impayees.length > 0 && (
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",borderRadius:8,background:retardVisible?"#fff7ed":"#f8fafc",border:`1px solid ${retardVisible?"#fed7aa":"#e2e8f0"}`,marginBottom:8}}>
+              <div>
+                <div style={{fontSize:11,fontWeight:700,color:retardVisible?"#ea580c":"#475569"}}>
+                  {retardVisible ? "Livraisons visibles dans le carnet" : "Livraisons masquées au client"}
+                </div>
+                <div style={{fontSize:10,color:"#94a3b8",marginTop:1}}>{impayees.length} livraison{impayees.length > 1 ? "s" : ""} non réglée{impayees.length > 1 ? "s" : ""}</div>
+              </div>
+              <Toggle value={retardVisible} onChange={v => onToggleRetardCarnet(`liv_${client.id}`, v)} colorOn="#ea580c" />
+            </div>
+          )}
+
+          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+            {clientLivraisons.map(l => {
           const isPaid = l.statut === "payee";
           const isCancelled = l.statut === "annulee";
           const montant = l.montant || l.prixTotal || l.total || 0;
@@ -167,7 +204,9 @@ const LivraisonsClient = ({ client, livraisons, onUpdateStatut, retardVisible, o
             </div>
           );
         })}
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
