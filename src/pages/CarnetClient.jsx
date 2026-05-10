@@ -114,27 +114,47 @@ const dateOnly = (value) => {
 };
 const firstDayOfMonth = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
 const addMonths = (d, n) => new Date(d.getFullYear(), d.getMonth() + n, 1);
-// Lecture UNIQUE du planning mensuel.
-// Si tu modifies le planning dans la fiche client, le carnet lit ces nouvelles valeurs.
-// Compatible avec plusieurs noms de champs pour éviter les décalages entre pages.
+// Lecture UNIQUE du planning mensuel, avec fusion des sources.
+// IMPORTANT : si le planning est modifié dans une autre page/fenêtre,
+// on ne garde pas l'ancien objet en priorité : on fusionne les valeurs et
+// les données du contrat/planning passent en dernier pour écraser les anciennes valeurs.
+const mergePlanObjects = (...plans) => {
+  const merged = {};
+  plans.filter(Boolean).forEach((plan) => {
+    if (typeof plan !== "object" || Array.isArray(plan)) return;
+    Object.entries(plan).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === "") return;
+      if (typeof value === "object" && !Array.isArray(value) && typeof merged[key] === "object" && !Array.isArray(merged[key])) {
+        merged[key] = { ...merged[key], ...value };
+      } else {
+        merged[key] = value;
+      }
+    });
+  });
+  return merged;
+};
+
 const getMonthlyPlanObject = (client = {}) => {
-  return client.moisParMois
-    || client.passagesParMois
-    || client.planningMensuel
-    || client.planningPassages
-    || client.planMensuel
-    || client.planning?.moisParMois
-    || client.planning?.passagesParMois
-    || client.planning?.planningMensuel
-    || client.contrat?.moisParMois
-    || client.contrat?.passagesParMois
-    || client.contrat?.planningMensuel
-    || client.contrat?.planningPassages
-    || client.contrat?.planMensuel
-    || client.contrat?.planning?.moisParMois
-    || client.contrat?.planning?.passagesParMois
-    || client.contrat?.planning?.planningMensuel
-    || {};
+  return mergePlanObjects(
+    client.moisParMois,
+    client.passagesParMois,
+    client.planningMensuel,
+    client.planningPassages,
+    client.planMensuel,
+    client.saisons,
+    client.planning?.moisParMois,
+    client.planning?.passagesParMois,
+    client.planning?.planningMensuel,
+    client.contrat?.moisParMois,
+    client.contrat?.passagesParMois,
+    client.contrat?.planningMensuel,
+    client.contrat?.planningPassages,
+    client.contrat?.planMensuel,
+    client.contrat?.saisons,
+    client.contrat?.planning?.moisParMois,
+    client.contrat?.planning?.passagesParMois,
+    client.contrat?.planning?.planningMensuel
+  );
 };
 const getMonthPlanEntry = (plan = {}, monthNumber) => {
   const monthNames = {
