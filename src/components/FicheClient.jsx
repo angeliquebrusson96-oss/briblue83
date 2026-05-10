@@ -1,8 +1,8 @@
 // @ts-nocheck
 import React, { useState } from "react";
-import { DS, Ico, RAPPORT_STATUS, SAISONS_META, STATUT_LIV, MOIS, MOIS_L } from "../utils/constants";
+import { DS, Ico, RAPPORT_STATUS, SAISONS_META, STATUT_LIV, MOIS, MOIS_L, AC } from "../utils/constants";
 import {
-  alerteClient, AC, totalAnnuel, isEntretienType, isControleType, daysUntil,
+  alerteClient, totalAnnuel, isEntretienType, isControleType, daysUntil,
   getMoisVal, getPlanningMois, getSaison, calcMensualites, getPH, getCL, getTemp,
   getResumePassage, getRapportStatus, generateCarnetCode, exportRdvToICS,
   TODAY, MOIS_NOW, YEAR_NOW
@@ -605,7 +605,7 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
                       </button>}
                       {doneManuel>0&&<span style={{fontSize:11,fontWeight:800,color:"#7c3aed",minWidth:14,textAlign:"center"}}>{doneManuel}</span>}
                       <button onClick={e=>{e.stopPropagation();onUpdateClient({...client,passagesManuel:{...manuelMap,[mKey]:(doneManuel||0)+1}});}} style={{width:24,height:24,borderRadius:6,border:"1.5px solid "+(doneManuel>0?"#c4b5fd":DS.border),background:doneManuel>0?"#f5f3ff":"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                        <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke={doneManuel>0?"#7c3aed":DS.mid} strokeWidth="3" strokeLinecap:"round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke={doneManuel>0?"#7c3aed":DS.mid} strokeWidth="3" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                       </button>
                     </div>
                   )}
