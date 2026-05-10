@@ -106,18 +106,69 @@ const toNumber = (v, fallback = 0) => {
   const n = Number(String(v).replace(",", "."));
   return Number.isFinite(n) ? n : fallback;
 };
+const dateOnly = (value) => {
+  if (!value) return null;
+  const [y, m, d] = String(value).slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+};
+const firstDayOfMonth = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
+const addMonths = (d, n) => new Date(d.getFullYear(), d.getMonth() + n, 1);
+// Lecture UNIQUE du planning mensuel.
+// Si tu modifies le planning dans la fiche client, le carnet lit ces nouvelles valeurs.
+// Compatible avec plusieurs noms de champs pour éviter les décalages entre pages.
+const getMonthlyPlanObject = (client = {}) => {
+  return client.moisParMois
+    || client.passagesParMois
+    || client.planningMensuel
+    || client.planningPassages
+    || client.planMensuel
+    || client.planning?.moisParMois
+    || client.planning?.passagesParMois
+    || client.planning?.planningMensuel
+    || client.contrat?.moisParMois
+    || client.contrat?.passagesParMois
+    || client.contrat?.planningMensuel
+    || client.contrat?.planningPassages
+    || client.contrat?.planMensuel
+    || client.contrat?.planning?.moisParMois
+    || client.contrat?.planning?.passagesParMois
+    || client.contrat?.planning?.planningMensuel
+    || {};
+};
+const getMonthPlanEntry = (plan = {}, monthNumber) => {
+  const monthNames = {
+    1: ["janvier"],
+    2: ["fevrier", "février"],
+    3: ["mars"],
+    4: ["avril"],
+    5: ["mai"],
+    6: ["juin"],
+    7: ["juillet"],
+    8: ["aout", "août"],
+    9: ["septembre"],
+    10: ["octobre"],
+    11: ["novembre"],
+    12: ["decembre", "décembre"],
+  };
+  const names = monthNames[monthNumber] || [];
+  return plan[monthNumber]
+    ?? plan[String(monthNumber)]
+    ?? plan[String(monthNumber).padStart(2, "0")]
+    ?? names.map(n => plan[n] ?? plan[n.toUpperCase()] ?? plan[n.charAt(0).toUpperCase() + n.slice(1)]).find(v => v !== undefined)
+    ?? {};
+};
 const getPlanForMonth = (client = {}, monthNumber) => {
-  const plan = client.moisParMois || client.passagesParMois || client.planningMensuel || {};
-  const m = plan[monthNumber] || plan[String(monthNumber)] || {};
+  const plan = getMonthlyPlanObject(client);
+  const m = getMonthPlanEntry(plan, monthNumber);
   if (typeof m === "number" || typeof m === "string") return { entretien: toNumber(m), controle: 0 };
   return {
-    entretien: toNumber(m.entretien ?? m.passages ?? m.prevus ?? m.prévus ?? m.nb ?? m.nombre ?? 0),
+    entretien: toNumber(m.entretien ?? m.passages ?? m.prevus ?? m.prévus ?? m.nb ?? m.nombre ?? m.total ?? 0),
     controle: toNumber(m.controle ?? m.contrôle ?? m.controles ?? m.contrôles ?? 0),
   };
 };
+const hasMonthlyPlan = (client = {}) => Object.keys(getMonthlyPlanObject(client) || {}).length > 0;
 const getPassagesAnnuelsSaisis = (client = {}) => {
-  // Le total annuel doit venir de ta saisie manuelle dans la fiche client / contrat.
-  // On accepte plusieurs noms de champs pour rester compatible avec tes anciennes versions.
   const value = client.passagesAnnuels
     ?? client.nbPassagesAnnuels
     ?? client.nombrePassagesAnnuels
@@ -142,18 +193,45 @@ const getPassagesAnnuelsSaisis = (client = {}) => {
   return toNumber(value, 0);
 };
 const calculerPassagesPrevusContrat = (client = {}) => {
-  // IMPORTANT : le total du contrat doit rester celui saisi manuellement
-  // Exemple : 26 passages annuels. Les champs mois par mois servent au planning, pas à remplacer le contrat.
+  // Le comptage se base sur les dates du contrat.
+  // Exemple : contrat de septembre à août => on additionne uniquement ces mois-là.
+  // Le total annuel saisi sert de secours seulement si aucun détail mensuel n'existe.
+  const debut = dateOnly(client.dateDebut || client.contrat?.dateDebut || client.contrat?.debut);
+  const fin = dateOnly(client.dateFin || client.contrat?.dateFin || client.contrat?.fin);
+
+  if (debut && fin && hasMonthlyPlan(client)) {
+    let cursor = firstDayOfMonth(debut);
+    let endMonth = firstDayOfMonth(fin);
+
+    // Si la fin tombe le même jour ou avant le jour de début, on considère que le mois de fin
+    // est la bascule du nouveau contrat et on ne le recompte pas.
+    // Ex : 29/09/2025 → 29/09/2026 = sept. 2025 à août 2026.
+    // Ex : 01/01/2026 → 31/12/2026 = janv. à déc. 2026.
+    const includeEndMonth = fin.getDate() > debut.getDate();
+    const stop = includeEndMonth ? addMonths(endMonth, 1) : endMonth;
+
+    let total = 0;
+    let guard = 0;
+    while (cursor < stop && guard < 60) {
+      const monthNumber = cursor.getMonth() + 1;
+      const m = getPlanForMonth(client, monthNumber);
+      total += m.entretien + m.controle;
+      cursor = addMonths(cursor, 1);
+      guard += 1;
+    }
+    return total;
+  }
+
   const totalSaisi = getPassagesAnnuelsSaisis(client);
   if (totalSaisi > 0) return totalSaisi;
 
-  // Fallback uniquement pour les anciens clients qui n'ont pas encore de total annuel saisi.
-  const plan = client.moisParMois || client.passagesParMois || client.planningMensuel;
-  if (!plan) return 0;
-  return Array.from({ length: 12 }, (_, i) => {
-    const m = getPlanForMonth(client, i + 1);
-    return m.entretien + m.controle;
-  }).reduce((a, b) => a + b, 0);
+  if (hasMonthlyPlan(client)) {
+    return Array.from({ length: 12 }, (_, i) => {
+      const m = getPlanForMonth(client, i + 1);
+      return m.entretien + m.controle;
+    }).reduce((a, b) => a + b, 0);
+  }
+  return 0;
 };
 const isPassageEffectue = (p = {}) => {
   // Un passage se déduit seulement quand un vrai rapport/intervention est créé.
