@@ -69,10 +69,26 @@ function loadFallback(key) {
 
 // ─── UPLOAD FIREBASE STORAGE ─────────────────────────────────────────────────
 // Convertit un data:base64 en Blob et l'upload dans Storage.
-// Retourne l'URL de téléchargement publique (https://...) ou null si échec.
+// Retourne l'URL de téléchargement publique (https://...) ou null si échec/timeout.
+const UPLOAD_TIMEOUT_MS = 8000; // 8 s max — ne pas bloquer l'enregistrement
+
 async function uploadToStorage(key, dataUrl) {
+  // Ne pas tenter si pas de connexion ou pas d'utilisateur Firebase (auth anonyme)
+  if (!navigator.onLine) return null;
+  if (!auth.currentUser) {
+    // Attendre max 3 s que l'auth anonyme soit prête
+    try {
+      await Promise.race([
+        new Promise(res => {
+          const unsub = auth.onAuthStateChanged(u => { if (u) { unsub(); res(); } });
+        }),
+        new Promise((_, rej) => setTimeout(() => rej(new Error("auth timeout")), 3000)),
+      ]);
+    } catch { return null; }
+  }
+  if (!auth.currentUser) return null;
+
   try {
-    // data:image/jpeg;base64,/9j/... → Blob
     const [header, b64] = dataUrl.split(",");
     const mime = header.match(/:(.*?);/)?.[1] || "image/jpeg";
     const binary = atob(b64);
@@ -81,8 +97,12 @@ async function uploadToStorage(key, dataUrl) {
     const blob = new Blob([bytes], { type: mime });
 
     const storageRef = ref(storage, `photos/${key}.jpg`);
-    await uploadBytes(storageRef, blob, { contentType: "image/jpeg" });
-    const url = await getDownloadURL(storageRef);
+    const uploadPromise = uploadBytes(storageRef, blob, { contentType: "image/jpeg" })
+      .then(() => getDownloadURL(storageRef));
+    const timeout = new Promise((_, rej) =>
+      setTimeout(() => rej(new Error("upload timeout")), UPLOAD_TIMEOUT_MS)
+    );
+    const url = await Promise.race([uploadPromise, timeout]);
     return url;
   } catch (e) {
     console.warn("[briblue] uploadToStorage échoué:", e?.message);
