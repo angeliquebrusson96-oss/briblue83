@@ -192,6 +192,106 @@ export function PassageDetailModal({ passage, client, onClose }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 
+// ─── VERSEMENTS SECTION ──────────────────────────────────────────────────────
+const VersementsSection = ({ client, versements, onToggleVersement }) => {
+  if (!client.prix || !client.dateDebut) return null;
+
+  const montantMensuel = Math.round(client.prix / 12);
+  const today = new Date();
+  const debut = new Date(client.dateDebut);
+  const fin = client.dateFin ? new Date(client.dateFin) : new Date(debut.getFullYear() + 1, debut.getMonth(), debut.getDate());
+
+  const mensualites = [];
+  let current = new Date(debut.getFullYear(), debut.getMonth(), 1);
+  const finMois = new Date(fin.getFullYear(), fin.getMonth(), 1);
+  const currentMois = new Date(today.getFullYear(), today.getMonth(), 1);
+
+  while (current <= finMois && current <= currentMois) {
+    const year = current.getFullYear();
+    const month = current.getMonth() + 1;
+    const key = `${client.id}_${year}_${String(month).padStart(2, '0')}`;
+    const isPaid = versements?.[key] === true;
+    const isCurrentMonth = year === today.getFullYear() && month === today.getMonth() + 1;
+    const isOverdue = !isCurrentMonth && !isPaid;
+    mensualites.push({ key, year, month, isPaid, isCurrentMonth, isOverdue });
+    current = new Date(current.getFullYear(), current.getMonth() + 1, 1);
+  }
+
+  const overdueCount = mensualites.filter(m => m.isOverdue).length;
+  const totalDue = mensualites.filter(m => !m.isPaid).length * montantMensuel;
+  const MOIS_LONG = ["","Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+
+  return (
+    <div style={{marginTop:12}} onClick={e=>e.stopPropagation()}>
+      {/* En-tête */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          <div style={{width:22,height:22,borderRadius:6,background:"#e0f2fe",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.2" strokeLinecap="round">
+              <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
+            </svg>
+          </div>
+          <span style={{fontSize:12,fontWeight:700,color:"#0f172a"}}>Versements</span>
+        </div>
+        <span style={{fontSize:11,color:"#64748b"}}>{montantMensuel}€/mois</span>
+      </div>
+
+      {/* Résumé solde */}
+      {totalDue > 0 && (
+        <div style={{background:overdueCount>0?"#fef2f2":"#f0f9ff",border:`1px solid ${overdueCount>0?"#fecaca":"#bae6fd"}`,borderRadius:8,padding:"6px 10px",marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{fontSize:11,fontWeight:600,color:overdueCount>0?"#dc2626":"#0369a1"}}>
+            {overdueCount>0 ? `${overdueCount} mensualité${overdueCount>1?"s":""} en retard` : "Mois en cours non réglé"}
+          </span>
+          <span style={{fontSize:13,fontWeight:800,color:overdueCount>0?"#dc2626":"#0369a1"}}>{totalDue}€</span>
+        </div>
+      )}
+      {totalDue === 0 && mensualites.length > 0 && (
+        <div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:8,padding:"5px 10px",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>
+          <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+          <span style={{fontSize:11,fontWeight:700,color:"#16a34a"}}>Paiements à jour</span>
+        </div>
+      )}
+
+      {/* Liste des 6 derniers mois */}
+      <div style={{display:"flex",flexDirection:"column",gap:5}}>
+        {mensualites.slice(-6).map((m) => (
+          <div key={m.key} style={{
+            display:"flex",alignItems:"center",justifyContent:"space-between",
+            padding:"7px 10px",borderRadius:8,
+            background:m.isPaid?"#f0fdf4":m.isOverdue?"#fef2f2":m.isCurrentMonth?"#fefce8":"#f8fafc",
+            border:`1px solid ${m.isPaid?"#bbf7d0":m.isOverdue?"#fecaca":m.isCurrentMonth?"#fde047":"#e2e8f0"}`
+          }}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <div style={{width:30,height:30,borderRadius:7,background:m.isPaid?"#dcfce7":m.isOverdue?"#fee2e2":m.isCurrentMonth?"#fef3c7":"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                <span style={{fontSize:9,fontWeight:800,color:m.isPaid?"#15803d":m.isOverdue?"#dc2626":m.isCurrentMonth?"#a16207":"#475569"}}>
+                  {MOIS_LONG[m.month].slice(0,3).toUpperCase()}
+                </span>
+              </div>
+              <div>
+                <div style={{fontSize:11,fontWeight:600,color:"#0f172a"}}>{MOIS_LONG[m.month]} {m.year}</div>
+                <div style={{fontSize:9,color:"#64748b"}}>{m.isCurrentMonth?"Mois en cours":m.isOverdue?"En retard":m.isPaid?"Payé ✓":"À payer"}</div>
+              </div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:12,fontWeight:700,color:m.isPaid?"#15803d":m.isOverdue?"#dc2626":m.isCurrentMonth?"#a16207":"#0f172a"}}>
+                {montantMensuel}€
+              </span>
+              <button
+                onClick={()=>onToggleVersement && onToggleVersement(m.key, !m.isPaid)}
+                style={{width:26,height:26,borderRadius:7,border:`1.5px solid ${m.isPaid?"#16a34a":"#cbd5e1"}`,cursor:"pointer",background:m.isPaid?"#16a34a":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.15s"}}>
+                {m.isPaid
+                  ? <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  : <div style={{width:8,height:8,borderRadius:4,border:"2px solid #cbd5e1"}}/>
+                }
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export function PageClients({ clients, passages, contrats={}, versements={}, onUpdateContrat, onToggleVersement, onClientClick, onAdd }) {
   const [search, setSearch] = useState("");
   const [openPicker, setOpenPicker] = useState(null); // clientId du picker ouvert
@@ -422,141 +522,4 @@ export function PageClients({ clients, passages, contrats={}, versements={}, onU
   );
 }
 
-// ─── VERSEMENTS SECTION ──────────────────────────────────────────────────────
-const VersementsSection = ({ client, versements, onToggleVersement }) => {
-  if (!client.prix || !client.dateDebut) return null;
-
-  const mensualite = Math.round(client.prix / 12);
-  const today = new Date();
-  const debut = new Date(client.dateDebut);
-  const fin = client.dateFin ? new Date(client.dateFin) : new Date(debut.getFullYear() + 1, debut.getMonth(), debut.getDate());
-
-  // Générer la liste des mensualités dues
-  const mensualites = [];
-  let current = new Date(debut.getFullYear(), debut.getMonth(), 1);
-  const finMois = new Date(fin.getFullYear(), fin.getMonth(), 1);
-  const currentMois = new Date(today.getFullYear(), today.getMonth(), 1);
-
-  while (current <= finMois && current <= currentMois) {
-    const year = current.getFullYear();
-    const month = current.getMonth() + 1;
-    const key = `${client.id}_${year}_${String(month).padStart(2, '0')}`;
-    const isPaid = versements[key] === true;
-    const isCurrentMonth = year === today.getFullYear() && month === today.getMonth() + 1;
-    const isOverdue = !isCurrentMonth && !isPaid && current < currentMois;
-
-    mensualites.push({
-      key,
-      year,
-      month,
-      isPaid,
-      isCurrentMonth,
-      isOverdue,
-      date: new Date(year, month - 1, 1)
-    });
-
-    current = new Date(current.getFullYear(), current.getMonth() + 1, 1);
-  }
-
-  const totalDue = mensualites.filter(m => !m.isPaid).length * mensualite;
-  const overdueCount = mensualites.filter(m => m.isOverdue).length;
-
-  const MOIS_LONG = ["", "Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
-
-  return (
-    <div style={{ marginTop: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 24, height: 24, borderRadius: 6, background: "#e0f2fe", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round">
-              <rect x="2" y="5" width="20" height="14" rx="2" />
-              <line x1="2" y1="10" x2="22" y2="10" />
-            </svg>
-          </div>
-          <span style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>Versements</span>
-        </div>
-        <div style={{ fontSize: 12, color: "#64748b" }}>
-          {mensualite}€ / mois
-        </div>
-      </div>
-
-      {totalDue > 0 && (
-        <div style={{ background: overdueCount > 0 ? "#fef2f2" : "#f0f9ff", border: `1px solid ${overdueCount > 0 ? "#fecaca" : "#bae6fd"}`, borderRadius: 8, padding: "8px 12px", marginBottom: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: overdueCount > 0 ? "#dc2626" : "#0369a1" }}>
-              {overdueCount > 0 ? `${overdueCount} mensualité${overdueCount > 1 ? 's' : ''} en retard` : `${totalDue / mensualite} mensualité${totalDue / mensualite > 1 ? 's' : ''} à régler`}
-            </span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: overdueCount > 0 ? "#dc2626" : "#0369a1" }}>
-              {totalDue}€
-            </span>
-          </div>
-        </div>
-      )}
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {mensualites.slice(-6).map((mensualite) => (
-          <div key={mensualite.key} style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "8px 12px",
-            borderRadius: 8,
-            background: mensualite.isPaid ? "#f0fdf4" : mensualite.isOverdue ? "#fef2f2" : mensualite.isCurrentMonth ? "#fef9c3" : "#f8fafc",
-            border: `1px solid ${mensualite.isPaid ? "#bbf7d0" : mensualite.isOverdue ? "#fecaca" : mensualite.isCurrentMonth ? "#fde047" : "#e2e8f0"}`
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{
-                width: 32,
-                height: 32,
-                borderRadius: 8,
-                background: mensualite.isPaid ? "#dcfce7" : mensualite.isOverdue ? "#fee2e2" : mensualite.isCurrentMonth ? "#fef3c7" : "#f1f5f9",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center"
-              }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: mensualite.isPaid ? "#15803d" : mensualite.isOverdue ? "#dc2626" : mensualite.isCurrentMonth ? "#a16207" : "#475569" }}>
-                  {MOIS_LONG[mensualite.month].slice(0, 3).toUpperCase()}
-                </span>
-              </div>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "#0f172a" }}>
-                  {MOIS_LONG[mensualite.month]} {mensualite.year}
-                </div>
-                <div style={{ fontSize: 10, color: "#64748b" }}>
-                  {mensualite.isCurrentMonth ? "Mois en cours" : mensualite.isOverdue ? "En retard" : mensualite.isPaid ? "Payé" : "À payer"}
-                </div>
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: mensualite.isPaid ? "#15803d" : mensualite.isOverdue ? "#dc2626" : mensualite.isCurrentMonth ? "#a16207" : "#0f172a" }}>
-                {mensualite}€
-              </span>
-              <button
-                onClick={() => onToggleVersement && onToggleVersement(mensualite.key, !mensualite.isPaid)}
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 6,
-                  border: "none",
-                  cursor: "pointer",
-                  background: mensualite.isPaid ? "#15803d" : "transparent",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center"
-                }}
-              >
-                {mensualite.isPaid ? (
-                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                ) : (
-                  <div style={{ width: 8, height: 8, borderRadius: 4, border: "2px solid #cbd5e1" }} />
-                )}
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
+// ─────────────────────────────────────────────────────────────────────────────
