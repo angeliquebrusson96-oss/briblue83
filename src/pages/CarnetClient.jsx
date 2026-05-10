@@ -60,7 +60,7 @@ const getProduitsApportes = (p = {}) => [
   ["Chlore choc", p.corrChloreChoc], ["Peroxyde", p.corrPeroxyde], ["Phosphate", p.corrPhosphate],
   ["Alcafix", p.corrAlcafix], ["Autre", p.corrAutre],
 ].filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== "");
-function ouvrirRapport(passage, client) {
+function buildRapportHTML(passage, client) {
   const p = passage || {};
   const fmt = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day:"2-digit", month:"long", year:"numeric" }) : "—";
   const produitsLivres = getProduitsLivres(p);
@@ -74,10 +74,10 @@ function ouvrirRapport(passage, client) {
     ["Stabilisant", p.stabilisant ?? p.tauxStabilisant],
     ["TAC", p.alcalinite ?? p.tac],
   ].filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== "");
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Rapport ${esc(client?.nom)}</title>
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Rapport ${esc(client?.nom)}</title>
     <style>
-      @page{size:A4;margin:14mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#0f172a;margin:0;background:#eef6fb}.page{max-width:820px;margin:0 auto;background:#fff;min-height:100vh;padding:30px}.head{background:linear-gradient(135deg,#0891b2,#0e7490);color:white;border-radius:18px;padding:24px;margin-bottom:18px}.brand{font-size:13px;letter-spacing:2px;font-weight:700;opacity:.9}.title{font-size:28px;font-weight:800;margin:8px 0 4px}.sub{font-size:14px;opacity:.9}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}.card{border:1px solid #e2e8f0;border-radius:14px;padding:14px;background:#f8fafc}.label{font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;letter-spacing:.5px;margin-bottom:5px}.val{font-size:15px;font-weight:700}.section{margin-top:18px;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden}.section h2{font-size:15px;margin:0;padding:12px 14px;background:#f0f9ff;color:#075985}.section .content{padding:14px;line-height:1.55}.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{background:#e0f2fe;color:#075985;border-radius:999px;padding:7px 11px;font-size:13px;font-weight:700}.green{background:#f0fdf4;color:#166534}.muted{color:#64748b}.print{position:fixed;right:18px;bottom:18px;border:0;border-radius:999px;background:#0891b2;color:white;padding:13px 18px;font-weight:800;cursor:pointer;box-shadow:0 10px 25px rgba(8,145,178,.35)}@media print{body{background:white}.page{padding:0}.print{display:none}}
-    </style></head><body><button class="print" onclick="window.print()">Enregistrer en PDF</button><main class="page">
+      @page{size:A4;margin:14mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#0f172a;margin:0;background:#eef6fb}.page{max-width:820px;margin:0 auto;background:#fff;min-height:100vh;padding:30px}.head{background:linear-gradient(135deg,#0891b2,#0e7490);color:white;border-radius:18px;padding:24px;margin-bottom:18px}.brand{font-size:13px;letter-spacing:2px;font-weight:700;opacity:.9}.title{font-size:28px;font-weight:800;margin:8px 0 4px}.sub{font-size:14px;opacity:.9}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}.card{border:1px solid #e2e8f0;border-radius:14px;padding:14px;background:#f8fafc}.label{font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;letter-spacing:.5px;margin-bottom:5px}.val{font-size:15px;font-weight:700}.section{margin-top:18px;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden}.section h2{font-size:15px;margin:0;padding:12px 14px;background:#f0f9ff;color:#075985}.section .content{padding:14px;line-height:1.55}.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{background:#e0f2fe;color:#075985;border-radius:999px;padding:7px 11px;font-size:13px;font-weight:700}.green{background:#f0fdf4;color:#166534}.muted{color:#64748b}.print-btn{display:block;margin:28px auto 0;border:0;border-radius:999px;background:#0891b2;color:white;padding:14px 28px;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 10px 25px rgba(8,145,178,.35)}@media print{body{background:white}.page{padding:0}.print-btn{display:none}}
+    </style></head><body><main class="page">
       <div class="head"><div class="brand">BRIBLUE</div><div class="title">Rapport d'intervention</div><div class="sub">Carnet d'entretien piscine</div></div>
       <div class="grid"><div class="card"><div class="label">Client</div><div class="val">${esc(client?.nom)}</div></div><div class="card"><div class="label">Date</div><div class="val">${esc(fmt(p.date))}${p.heure ? ` · ${esc(p.heure)}` : ""}</div></div><div class="card"><div class="label">Type</div><div class="val">${esc(p.type || "Entretien")}</div></div><div class="card"><div class="label">Technicien</div><div class="val">${esc(p.tech || "BRIBLUE")}</div></div></div>
       ${mesures.length ? `<div class="section"><h2>Mesures de l'eau</h2><div class="content chips">${mesures.map(([k,v])=>`<span class="chip">${esc(k)} : ${esc(v)}</span>`).join("")}</div></div>` : ""}
@@ -86,18 +86,34 @@ function ouvrirRapport(passage, client) {
       ${produitsApportes.length ? `<div class="section"><h2>Produits apportés</h2><div class="content chips">${produitsApportes.map(([k,v])=>`<span class="chip">${esc(k)} : ${esc(v)}</span>`).join("")}</div></div>` : ""}
       ${produitsLivres.length ? `<div class="section"><h2>Produits livrés au client</h2><div class="content chips">${produitsLivres.map(x=>`<span class="chip green">${esc(x)}</span>`).join("")}</div></div>` : ""}
       <p class="muted" style="margin-top:28px;font-size:12px">BRIBLUE · La Seyne-sur-Mer · SIRET 84345436400053</p>
-    </main><script>setTimeout(()=>window.print(),350)</script></body></html>`;
-  const w = window.open("", "_blank", "noopener,noreferrer");
-  if (w) {
-    w.document.open(); w.document.write(html); w.document.close();
-  } else {
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${cleanFileName(client?.nom)}-${cleanFileName(p.date)}-rapport.html`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      <button class="print-btn" onclick="window.print()">🖨️ Enregistrer en PDF</button>
+    </main></body></html>`;
+}
+function ouvrirRapport(passage, client) {
+  const html = buildRapportHTML(passage, client);
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const w = window.open(url, "_blank");
+  if (!w) {
+    // popup bloqué → téléchargement direct
+    telechargerRapport(passage, client, url);
+    return;
   }
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+function telechargerRapport(passage, client, existingUrl) {
+  const p = passage || {};
+  const url = existingUrl || (() => {
+    const html = buildRapportHTML(p, client);
+    return URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
+  })();
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${cleanFileName(client?.nom)}-${cleanFileName(p.date)}-rapport.html`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
 // Fallback init data (mirrors App.jsx)
@@ -632,7 +648,7 @@ export function CarnetView({ client, passages, livraisons=[], onRefresh, refresh
                 {last.tech}
               </div>}
             </div>
-            <button className="cv-btn-press" style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:"#0891b2",background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:10,padding:"7px 11px",cursor:"pointer",flexShrink:0,fontFamily:"inherit",fontWeight:500}} onClick={()=>ouvrirRapport(last,client)}>
+            <button className="cv-btn-press" style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:"#0891b2",background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:10,padding:"7px 11px",cursor:"pointer",flexShrink:0,fontFamily:"inherit",fontWeight:500}} onClick={()=>telechargerRapport(last,client)}>
               <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Télécharger
             </button>
@@ -933,12 +949,19 @@ export function CarnetView({ client, passages, livraisons=[], onRefresh, refresh
               </div>
             )}
 
-            {/* Bouton télécharger */}
-            <button className="cv-btn-press" style={{width:"100%",marginTop:8,padding:"14px",background:"linear-gradient(135deg,#0891b2,#0e7490)",border:"none",borderRadius:14,fontSize:14,color:"#fff",fontWeight:600,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 14px rgba(8,145,178,0.4)"}}
-              onClick={()=>ouvrirRapport(p,client)}>
-              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Télécharger le rapport PDF
-            </button>
+            {/* Boutons aperçu / télécharger */}
+            <div style={{display:"flex",gap:8,marginTop:8}}>
+              <button className="cv-btn-press" style={{flex:1,padding:"13px",background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:14,fontSize:13,color:"#0891b2",fontWeight:600,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}
+                onClick={()=>ouvrirRapport(p,client)}>
+                <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                Aperçu PDF
+              </button>
+              <button className="cv-btn-press" style={{flex:1,padding:"13px",background:"linear-gradient(135deg,#0891b2,#0e7490)",border:"none",borderRadius:14,fontSize:13,color:"#fff",fontWeight:600,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:7,boxShadow:"0 4px 14px rgba(8,145,178,0.4)"}}
+                onClick={()=>telechargerRapport(p,client)}>
+                <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Télécharger
+              </button>
+            </div>
           </div>
         </div>
       </div>
