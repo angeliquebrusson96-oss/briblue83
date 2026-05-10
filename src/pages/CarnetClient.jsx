@@ -330,21 +330,6 @@ export function CarnetView({ client, passages, livraisons=[], onRefresh, refresh
               {client.dateFin ? fmtDate(client.dateFin,{day:"2-digit",month:"short",year:"numeric"}) : "—"}
             </div>
           </div>
-          <div className="cv-glass" style={{borderRadius:12,padding:"11px 13px"}}>
-            <div style={{fontSize:10,color:"rgba(255,255,255,0.65)",marginBottom:3,display:"flex",alignItems:"center",gap:4}}>
-              <svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.65)" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-              Visites restantes
-            </div>
-            <div style={{fontSize:14,fontWeight:600,color:"#fff",display:"flex",alignItems:"baseline",gap:4}}>
-              {visitesRestantes}
-              <span style={{fontSize:11,fontWeight:400,color:"rgba(255,255,255,0.55)"}}>/ {totalVisitesPrevues}</span>
-            </div>
-            <div style={{fontSize:9,color:"rgba(255,255,255,0.55)",marginTop:2}}>1 rapport créé = 1 passage déduit</div>
-            {/* Progress bar */}
-            <div style={{marginTop:6,height:3,background:"rgba(255,255,255,0.2)",borderRadius:2,overflow:"hidden"}}>
-              <div style={{width:`${progressPct}%`,height:"100%",background:"rgba(255,255,255,0.8)",borderRadius:2,animation:"cv-progress 1s ease both 0.4s"}}/>
-            </div>
-          </div>
         </div>
       </div>
     </div>
