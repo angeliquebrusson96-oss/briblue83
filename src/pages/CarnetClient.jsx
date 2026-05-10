@@ -998,7 +998,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, ret
 
         {/* FOOTER */}
         <div style={{textAlign:"center",padding:"20px 0 8px"}}>
-          <div style={{fontSize:10,color:"#cbd5e1",fontWeight:500,letterSpacing:"0.3px"}}>BRIBLUE · La Seyne-sur-Mer · SIRET 84345436400053</div>
+          <div style={{fontSize:10,color:"#cbd5e1",fontWeight:500,letterSpacing:"0.3px"}}>  ·BRIBLUE· </div>
         </div>
       </div>
 

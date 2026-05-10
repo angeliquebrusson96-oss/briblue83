@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { DS, Ico, MOIS, MOIS_L, RAPPORT_STATUS } from "../utils/constants";
 import { TODAY, getRapportStatus, isEntretienType, isControleType, getPH, getCL, getTemp, getResumePassage, normalizeRapportStatus, migrateMois, totalAnnuel, calcMensualites, uid } from "../utils/helpers";
-import { useIsMobile, Modal, BtnPrimary, Card, Section, FmField, FmSectionTitle, FmHeader, FmSteps, DraftBanner, PhotoPicker, SunBurstActions, SunBurstFormNav, RapportStatusPicker, Tag, Avatar } from "./ui";
+import { useIsMobile, Modal, BtnPrimary, Card, Section, FmField, FmSectionTitle, FmHeader, FmSteps, DraftBanner, PhotoPicker, SunBurstActions, SunBurstFormNav, RapportStatusPicker, Tag, Avatar, PhotoImg } from "./ui";
 import { toastWarn, toastSuccess, toastInfo, showConfirm } from "../styles";
 import { extractPassagePhotos, resolvePhoto } from "../lib/photoStore";
 
@@ -269,12 +269,13 @@ function genererHTMLRapport(passage, client) {
   const etoiles = (n) => n>0 ? `<span class="stars">${"★".repeat(n)}${"☆".repeat(5-n)}</span> <span class="star-num">${n}/5</span>` : "—";
   const sigTech = passage.signatureTech ? `<img src="${passage.signatureTech}" class="sig-img"/>` : `<div class="sig-empty">Non signée</div>`;
   const sigClient = passage.signatureClient ? `<img src="${passage.signatureClient}" class="sig-img"/>` : `<div class="sig-empty">Non signée</div>`;
-  const hasPhotos = passage.photoArrivee || passage.photoDepart || (passage.photos||[]).some(Boolean);
+  const isValidSrc = (v) => v && (v.startsWith("data:") || v.startsWith("http"));
   const allPhotos = [
-    passage.photoArrivee ? {src:passage.photoArrivee, label:"À l'arrivée"} : null,
-    ...((passage.photos||[]).map((p,i)=>p?{src:p,label:`Photo ${i+2}`}:null)),
-    passage.photoDepart ? {src:passage.photoDepart, label:"Au départ"} : null,
+    isValidSrc(passage.photoArrivee) ? {src:passage.photoArrivee, label:"À l'arrivée"} : null,
+    ...((passage.photos||[]).map((p,i)=>isValidSrc(p)?{src:p,label:`Photo ${i+2}`}:null)),
+    isValidSrc(passage.photoDepart) ? {src:passage.photoDepart, label:"Au départ"} : null,
   ].filter(Boolean);
+  const hasPhotos = allPhotos.length > 0;
   const sectionPhotos = hasPhotos ? `
 <div class="section">
   <div class="section-title"><span class="sec-icon">📸</span> Photos d'intervention</div>
@@ -660,6 +661,32 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
   const [showConfirmSave, setShowConfirmSave] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
+
+  // Résout les clés idb: dans le formulaire quand on édite un passage existant
+  useEffect(() => {
+    if (!isEdit) return;
+    const fields = ["photoArrivee","photoDepart","photos","photosDepart","signatureTech","signatureClient"];
+    const hasIdb = fields.some(k => {
+      const v = initial[k];
+      return Array.isArray(v) ? v.some(x=>x?.startsWith("idb:")) : v?.startsWith("idb:");
+    });
+    if (!hasIdb) return;
+    let alive = true;
+    (async () => {
+      const upd = {};
+      for (const k of ["photoArrivee","photoDepart","signatureTech","signatureClient"]) {
+        if (initial[k]?.startsWith("idb:")) { const r = await resolvePhoto(initial[k]); if(r) upd[k]=r; }
+      }
+      for (const k of ["photos","photosDepart"]) {
+        if (Array.isArray(initial[k]) && initial[k].some(v=>v?.startsWith("idb:"))) {
+          upd[k] = await Promise.all(initial[k].map(v=>v?.startsWith("idb:")?resolvePhoto(v):Promise.resolve(v)));
+        }
+      }
+      if (alive && Object.keys(upd).length) setF(prev=>({...prev,...upd}));
+    })();
+    return () => { alive = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEdit, initial?.id]);
 
   // Sauvegarde manuelle brouillon
   const saveDraftManual = () => {
@@ -1088,7 +1115,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
                     : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:8}}>
                         {filledPhotos.map(p=>(
                           <div key={p.key} style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid "+DS.border}}>
-                            <img src={p.val} alt={p.label} style={{width:"100%",height:90,objectFit:"cover",display:"block"}}/>
+                            <PhotoImg src={p.val} alt={p.label} style={{width:"100%",height:90,objectFit:"cover",display:"block"}}/>
                             <span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:4,padding:"1px 6px"}}>{p.label}</span>
                             <button onClick={()=>removePhoto(p.key,p.idx)} style={{position:"absolute",top:4,right:4,width:24,height:24,borderRadius:12,background:"rgba(0,0,0,0.65)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
                               {Ico.close(10,"#fff")}
@@ -1423,7 +1450,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
                         : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:8}}>
                             {filledDepart.map(p=>(
                               <div key={p.key} style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid "+DS.border}}>
-                                <img src={p.val} alt={p.label} style={{width:"100%",height:90,objectFit:"cover",display:"block"}}/>
+                                <PhotoImg src={p.val} alt={p.label} style={{width:"100%",height:90,objectFit:"cover",display:"block"}}/>
                                 <span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:4,padding:"1px 6px"}}>{p.label}</span>
                                 <button onClick={()=>removeDepart(p.key,p.idx)} style={{position:"absolute",top:5,right:5,width:24,height:24,borderRadius:12,background:"rgba(0,0,0,0.65)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
                                   {Ico.close(10,"#fff")}
@@ -1459,9 +1486,9 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
                 Photos jointes ({[f.photoArrivee,f.photoDepart,...(f.photos||[])].filter(Boolean).length}/5)
               </div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:8}}>
-                {f.photoArrivee && (<div style={{position:"relative"}}><img src={f.photoArrivee} alt="Arrivée" style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Arrivée</span></div>)}
-                {(f.photos||[]).map((ph,i)=>ph?(<div key={i} style={{position:"relative"}}><img src={ph} alt={`Photo ${i+2}`} style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Photo {i+2}</span></div>):null)}
-                {f.photoDepart && (<div style={{position:"relative"}}><img src={f.photoDepart} alt="Départ" style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Départ</span></div>)}
+                {f.photoArrivee && (<div style={{position:"relative"}}><PhotoImg src={f.photoArrivee} alt="Arrivée" style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Arrivée</span></div>)}
+                {(f.photos||[]).map((ph,i)=>ph?(<div key={i} style={{position:"relative"}}><PhotoImg src={ph} alt={`Photo ${i+2}`} style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Photo {i+2}</span></div>):null)}
+                {f.photoDepart && (<div style={{position:"relative"}}><PhotoImg src={f.photoDepart} alt="Départ" style={{width:"100%",height:80,objectFit:"cover",borderRadius:8,border:"1px solid "+DS.border,display:"block"}}/><span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>Départ</span></div>)}
               </div>
             </div>
           )}
