@@ -322,7 +322,7 @@ export function PhotoPicker({ label, value, onChange, compact }) {
       )}
       {value ? (
         <div style={{position:"relative",borderRadius:DS.radius,overflow:"hidden",border:"2px solid "+DS.blue,background:"#000"}}>
-          <img src={value} alt="photo" style={{width:"100%",maxHeight:compact?120:220,objectFit:"cover",display:"block"}}/>
+          <PhotoImg src={value} alt="photo" style={{width:"100%",maxHeight:compact?120:220,objectFit:"cover",display:"block"}}/>
           <button onClick={() => onChange("")} style={{position:"absolute",top:8,right:8,width:32,height:32,borderRadius:16,background:"rgba(0,0,0,0.6)",border:"2px solid rgba(255,255,255,0.4)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2}}>{Ico.close(14,"#fff")}</button>
           <button onClick={() => cameraRef.current?.click()} style={{position:"absolute",bottom:8,right:8,padding:"6px 12px",borderRadius:10,background:"rgba(0,0,0,0.55)",border:"1px solid rgba(255,255,255,0.3)",cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontSize:15,fontWeight:600,color:"#fff",fontFamily:"inherit"}}>{Ico.camera(13,"#fff")} Reprendre</button>
         </div>

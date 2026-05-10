@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from "react";
 import { DS, Ico, RAPPORT_STATUS } from "../utils/constants";
 import { isControleType, getRapportStatus, getPH, getCL } from "../utils/helpers";
-import { useIsMobile, Card, Avatar, Tag, IcoBubble } from "../components/ui";
+import { useIsMobile, Card, Avatar, Tag, IcoBubble, PhotoImg } from "../components/ui";
 import { showConfirm } from "../styles";
 import { PassageDetailModal } from "./PageClients";
 
@@ -177,8 +177,8 @@ export function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpd
                     </div>
                     {(p.photoArrivee||p.photoDepart) && (
                       <div style={{display:"flex",gap:6,marginBottom:6}}>
-                        {p.photoArrivee && (<div style={{position:"relative"}}><img src={p.photoArrivee} alt="Arrivée" style={{height:48,width:72,objectFit:"cover",borderRadius:7,border:"1px solid "+DS.border}}/><span style={{position:"absolute",bottom:2,left:3,fontSize:8,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:3,padding:"1px 4px"}}>Arr.</span></div>)}
-                        {p.photoDepart && (<div style={{position:"relative"}}><img src={p.photoDepart} alt="Départ" style={{height:48,width:72,objectFit:"cover",borderRadius:7,border:"1px solid "+DS.border}}/><span style={{position:"absolute",bottom:2,left:3,fontSize:8,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:3,padding:"1px 4px"}}>Dép.</span></div>)}
+                        {p.photoArrivee && (<div style={{position:"relative"}}><PhotoImg src={p.photoArrivee} alt="Arrivée" style={{height:48,width:72,objectFit:"cover",borderRadius:7,border:"1px solid "+DS.border}}/><span style={{position:"absolute",bottom:2,left:3,fontSize:8,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:3,padding:"1px 4px"}}>Arr.</span></div>)}
+                        {p.photoDepart && (<div style={{position:"relative"}}><PhotoImg src={p.photoDepart} alt="Départ" style={{height:48,width:72,objectFit:"cover",borderRadius:7,border:"1px solid "+DS.border}}/><span style={{position:"absolute",bottom:2,left:3,fontSize:8,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:3,padding:"1px 4px"}}>Dép.</span></div>)}
                       </div>
                     )}
 
