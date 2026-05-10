@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { save, load, flushPendingNow, IS_IOS, reconcileOnBoot } from "./lib/storage";
-import { extractPassagePhotos } from "./lib/photoStore";
+import { extractPassagePhotos, migratePassagePhotosToStorage } from "./lib/photoStore";
 import { signInAnonymously } from "firebase/auth";
 import { auth } from "./lib/firebase";
 
@@ -463,6 +463,18 @@ export default function App() {
     setPassages(next);
     await savePassages(next);
     setShowFormPassage(false);setEditPassage(null);
+    // Arrière-plan : migrer les photos idb: vers Firebase Storage (non-bloquant)
+    const saved = next.find(x => x.id === p.id);
+    if (saved) {
+      migratePassagePhotosToStorage(saved).then(migrated => {
+        if (!migrated) return;
+        setPassages(prev => {
+          const updated = prev.map(x => x.id === migrated.id ? migrated : x);
+          savePassages(updated);
+          return updated;
+        });
+      }).catch(() => {});
+    }
   },[savePassages, passages]);
 
   const updatePassageRapportStatus = useCallback(async (passageMaj) => {

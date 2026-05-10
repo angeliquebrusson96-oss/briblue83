@@ -1,18 +1,15 @@
 // ─── STOCKAGE PHOTOS ─────────────────────────────────────────────────────────
-// Priorité : Firebase Storage (cloud, multi-appareil) → IDB (local) → localStorage fallback
-//
-// Flux d'écriture (extractPassagePhotos) :
-//   data:base64 → upload Firebase Storage → URL https://...
-//   Si upload échoue : IDB local → idb:key
-//   Si IDB échoue aussi : garde le base64 (mieux que rien)
-//
-// Flux de lecture (resolvePhoto) :
-//   https://...   → URL directe (fonctionne sur tous les appareils)
-//   idb:key       → IDB, puis fallback localStorage
-//   data:...      → base64 direct (ancien format)
+// Flux de SAUVEGARDE (extractPassagePhotos) : IDB local uniquement → instantané.
+// Flux de MIGRATION (migratePassagePhotosToStorage) : Firebase Storage en arrière-plan.
+//   → appelé après la sauvegarde, sans bloquer l'interface.
+//   → remplace les idb:keys par des URL https:// accessibles sur tous les appareils.
+// Flux de LECTURE (resolvePhoto / PhotoImg) :
+//   https:// → URL directe (multi-appareil)
+//   idb:key  → IDB, puis fallback localStorage (400 px — survit à la purge iOS)
+//   data:    → base64 direct
 
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "./firebase";
+import { storage, auth } from "./firebase";
 
 // ─── INDEXEDDB ───────────────────────────────────────────────────────────────
 const DB_NAME    = "briblue_photos";
@@ -33,7 +30,7 @@ function openDB() {
   return _dbPromise;
 }
 
-// ─── FALLBACK LOCALSTORAGE ───────────────────────────────────────────────────
+// ─── FALLBACK LOCALSTORAGE (vignette 400 px) ─────────────────────────────────
 const LS_PREFIX = "bb_ph_";
 
 function compressFallback(dataUrl) {
@@ -67,50 +64,7 @@ function loadFallback(key) {
   try { return localStorage.getItem(LS_PREFIX + key) || ""; } catch { return ""; }
 }
 
-// ─── UPLOAD FIREBASE STORAGE ─────────────────────────────────────────────────
-// Convertit un data:base64 en Blob et l'upload dans Storage.
-// Retourne l'URL de téléchargement publique (https://...) ou null si échec/timeout.
-const UPLOAD_TIMEOUT_MS = 8000; // 8 s max — ne pas bloquer l'enregistrement
-
-async function uploadToStorage(key, dataUrl) {
-  // Ne pas tenter si pas de connexion ou pas d'utilisateur Firebase (auth anonyme)
-  if (!navigator.onLine) return null;
-  if (!auth.currentUser) {
-    // Attendre max 3 s que l'auth anonyme soit prête
-    try {
-      await Promise.race([
-        new Promise(res => {
-          const unsub = auth.onAuthStateChanged(u => { if (u) { unsub(); res(); } });
-        }),
-        new Promise((_, rej) => setTimeout(() => rej(new Error("auth timeout")), 3000)),
-      ]);
-    } catch { return null; }
-  }
-  if (!auth.currentUser) return null;
-
-  try {
-    const [header, b64] = dataUrl.split(",");
-    const mime = header.match(/:(.*?);/)?.[1] || "image/jpeg";
-    const binary = atob(b64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const blob = new Blob([bytes], { type: mime });
-
-    const storageRef = ref(storage, `photos/${key}.jpg`);
-    const uploadPromise = uploadBytes(storageRef, blob, { contentType: "image/jpeg" })
-      .then(() => getDownloadURL(storageRef));
-    const timeout = new Promise((_, rej) =>
-      setTimeout(() => rej(new Error("upload timeout")), UPLOAD_TIMEOUT_MS)
-    );
-    const url = await Promise.race([uploadPromise, timeout]);
-    return url;
-  } catch (e) {
-    console.warn("[briblue] uploadToStorage échoué:", e?.message);
-    return null;
-  }
-}
-
-// ─── ÉCRITURE IDB (fallback si Storage indisponible) ─────────────────────────
+// ─── ÉCRITURE IDB ────────────────────────────────────────────────────────────
 export async function savePhoto(key, dataUrl) {
   _cache.set(key, dataUrl);
   saveFallback(key, dataUrl);
@@ -142,21 +96,19 @@ export async function loadPhoto(key) {
     });
     if (val) {
       _cache.set(key, val);
-      if (!loadFallback(key)) saveFallback(key, val);
+      if (!loadFallback(key)) saveFallback(key, val); // rétrocompatibilité
       return val;
     }
   } catch { /* IDB indisponible */ }
-  // Fallback localStorage (vignette 400 px)
   const fb = loadFallback(key);
   if (fb) { _cache.set(key, fb); return fb; }
   return "";
 }
 
-// ─── RÉSOLUTION D'UNE VALEUR PHOTO ───────────────────────────────────────────
+// ─── RÉSOLUTION ──────────────────────────────────────────────────────────────
 export async function resolvePhoto(value) {
   if (!value) return "";
   if (value.startsWith("idb:")) return loadPhoto(value.slice(4));
-  // https:// ou data: → retourné directement
   return value;
 }
 
@@ -172,60 +124,92 @@ export async function preloadPhotos(values) {
   );
 }
 
-// ─── MIGRATION PHOTOS D'UN PASSAGE ──────────────────────────────────────────
-// Ordre de priorité pour chaque photo base64 :
-//   1. Upload Firebase Storage → URL https:// (cloud, multi-appareil)
-//   2. IDB local → idb:key (même appareil, si hors-ligne)
-//   3. Garde le base64 (dernier recours)
+// ─── MIGRATION VERS IDB (sauvegarde principale — instantanée) ────────────────
 const _SINGLE = ["photoArrivee", "photoDepart"];
 const _ARRAYS = ["photos", "photosDepart"];
-
-async function migrateOnePhoto(dataUrl, key) {
-  // 1. Essayer Firebase Storage (cloud)
-  const storageUrl = await uploadToStorage(key, dataUrl);
-  if (storageUrl) return storageUrl;
-  // 2. Fallback IDB local
-  const ok = await savePhoto(key, dataUrl);
-  if (ok) return `idb:${key}`;
-  // 3. Garder le base64
-  return dataUrl;
-}
-
-// Migre une clé idb: existante vers Firebase Storage si possible
-async function migrateIdbToStorage(idbKey) {
-  const key = idbKey.slice(4); // retirer "idb:"
-  const dataUrl = await loadPhoto(key);
-  if (!dataUrl) return idbKey; // IDB vide, impossible de migrer
-  const storageUrl = await uploadToStorage(key, dataUrl);
-  return storageUrl || idbKey; // Si upload échoue, garder idb:
-}
 
 export async function extractPassagePhotos(passage) {
   if (!passage?.id) return passage;
   const p = { ...passage };
   for (const field of _SINGLE) {
     if (p[field]?.startsWith("data:")) {
-      // base64 → Storage (ou IDB si hors-ligne)
       const key = `${p.id}_${field}`;
-      p[field] = await migrateOnePhoto(p[field], key);
-    } else if (p[field]?.startsWith("idb:")) {
-      // idb: existant → tenter migration vers Storage
-      p[field] = await migrateIdbToStorage(p[field]);
+      const ok = await savePhoto(key, p[field]);
+      if (ok) p[field] = `idb:${key}`;
     }
   }
   for (const field of _ARRAYS) {
     if (!Array.isArray(p[field])) continue;
     p[field] = await Promise.all(
       p[field].map(async (v, i) => {
-        if (v?.startsWith("data:")) {
-          const key = `${p.id}_${field}_${i}`;
-          return migrateOnePhoto(v, key);
-        } else if (v?.startsWith("idb:")) {
-          return migrateIdbToStorage(v);
-        }
-        return v;
+        if (!v?.startsWith("data:")) return v;
+        const key = `${p.id}_${field}_${i}`;
+        const ok = await savePhoto(key, v);
+        return ok ? `idb:${key}` : v;
       })
     );
   }
   return p;
+}
+
+// ─── UPLOAD UN FICHIER VERS FIREBASE STORAGE ─────────────────────────────────
+const UPLOAD_TIMEOUT_MS = 15000;
+
+async function uploadOne(key, dataUrl) {
+  if (!dataUrl || !navigator.onLine) return null;
+  if (!auth.currentUser) return null;
+  try {
+    const [header, b64] = dataUrl.split(",");
+    if (!b64) return null;
+    const mime = header.match(/:(.*?);/)?.[1] || "image/jpeg";
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const blob = new Blob([bytes], { type: mime });
+    const storageRef = ref(storage, `photos/${key}.jpg`);
+    const upload = uploadBytes(storageRef, blob, { contentType: "image/jpeg" })
+      .then(() => getDownloadURL(storageRef));
+    const timeout = new Promise((_, rej) =>
+      setTimeout(() => rej(new Error("timeout")), UPLOAD_TIMEOUT_MS)
+    );
+    return await Promise.race([upload, timeout]);
+  } catch (e) {
+    console.warn("[briblue] uploadOne échoué:", key, e?.message);
+    return null;
+  }
+}
+
+// ─── MIGRATION ARRIÈRE-PLAN vers Firebase Storage ────────────────────────────
+// Appelée APRÈS la sauvegarde (non bloquante).
+// Retourne le passage avec les clés idb: remplacées par des URL https://.
+// Retourne null si rien n'a changé (pas besoin de re-sauvegarder).
+export async function migratePassagePhotosToStorage(passage) {
+  if (!passage?.id || !navigator.onLine || !auth.currentUser) return null;
+  const p = { ...passage };
+  let changed = false;
+
+  for (const field of _SINGLE) {
+    const val = p[field];
+    if (!val?.startsWith("idb:")) continue;
+    const key = val.slice(4);
+    const dataUrl = await loadPhoto(key);
+    if (!dataUrl) continue;
+    const url = await uploadOne(key, dataUrl);
+    if (url) { p[field] = url; changed = true; }
+  }
+  for (const field of _ARRAYS) {
+    if (!Array.isArray(p[field])) continue;
+    const arr = [...p[field]];
+    for (let i = 0; i < arr.length; i++) {
+      const val = arr[i];
+      if (!val?.startsWith("idb:")) continue;
+      const key = val.slice(4);
+      const dataUrl = await loadPhoto(key);
+      if (!dataUrl) continue;
+      const url = await uploadOne(key, dataUrl);
+      if (url) { arr[i] = url; changed = true; }
+    }
+    if (changed) p[field] = arr;
+  }
+  return changed ? p : null;
 }
