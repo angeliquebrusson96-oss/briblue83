@@ -151,7 +151,7 @@ export async function reconcileOnBoot() {
     const snap    = await getDoc(APP_DOC);
     const remote  = snap.exists() ? snap.data() : {};
     const remoteTime = remote["_lastSavedAt"] ? new Date(remote["_lastSavedAt"]).getTime() : 0;
-    const KEYS = ["bb_clients_v2","bb_passages_v2","bb_livraisons_v1","bb_rdvs_v1","bb_stock_v1","bb_contrats_v1","bb_versements_v1"];
+    const KEYS = ["bb_clients_v2","bb_passages_v2","bb_livraisons_v1","bb_rdvs_v1","bb_stock_v1","bb_contrats_v1","bb_versements_v1","bb_retards_carnet_v1"];
     const toPush = {};
     let needsPush = false;
 
@@ -200,11 +200,21 @@ export async function reconcileOnBoot() {
 
 // ─── SAVE ────────────────────────────────────────────────────────────────────
 export async function save(key, val) {
+  const serialized = JSON.stringify(val);
+
+  // Avertir si les données dépassent 900 Ko (limite Firestore ~1 Mo)
+  if (serialized.length > 900_000) {
+    console.warn(`[briblue] save("${key}"): données volumineuses (${Math.round(serialized.length/1024)} Ko) — photos non compressées ?`);
+  }
+
   // 1. Sauvegarder localement en priorité absolue
   try {
-    localStorage.setItem("briblue_" + key, JSON.stringify(val));
+    localStorage.setItem("briblue_" + key, serialized);
     localStorage.setItem("briblue_meta_" + key, JSON.stringify({ savedAt: Date.now() }));
-  } catch {} // eslint-disable-line no-empty
+  } catch (e) {
+    // QuotaExceededError : localStorage plein, on continue quand même vers Firebase
+    console.warn(`[briblue] localStorage plein pour "${key}" (${Math.round(serialized.length/1024)} Ko):`, e?.name);
+  }
 
   // 2. Mettre dans la queue (protection si le réseau échoue)
   offlineQueue.pending[key] = val;
@@ -224,7 +234,8 @@ export async function save(key, val) {
       try {
         await saveViaREST({ [key]: latest }, false);
         if (offlineQueue.pending[key] === latest) delete offlineQueue.pending[key];
-      } catch {
+      } catch (e) {
+        console.warn(`[briblue] saveViaREST("${key}") échoué:`, e?.message);
         // Garde dans la queue → sera envoyé au prochain flush
       }
     }, 400);
@@ -239,12 +250,15 @@ export async function save(key, val) {
       try {
         await saveToFirebaseSDK(key, latest);
         if (offlineQueue.pending[key] === latest) delete offlineQueue.pending[key];
-      } catch {
+      } catch (e) {
+        console.warn(`[briblue] saveToFirebaseSDK("${key}") échoué:`, e?.message);
         // Fallback REST si le SDK échoue
         try {
           await saveViaREST({ [key]: latest }, false);
           if (offlineQueue.pending[key] === latest) delete offlineQueue.pending[key];
-        } catch {} // eslint-disable-line no-empty
+        } catch (e2) {
+          console.warn(`[briblue] saveViaREST fallback("${key}") échoué:`, e2?.message);
+        }
       }
     }, FIREBASE_DEBOUNCE_MS);
   }

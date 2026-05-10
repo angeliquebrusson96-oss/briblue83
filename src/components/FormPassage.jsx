@@ -4,6 +4,63 @@ import { DS, Ico, MOIS, MOIS_L, RAPPORT_STATUS } from "../utils/constants";
 import { TODAY, getRapportStatus, isEntretienType, isControleType, getPH, getCL, getTemp, getResumePassage, normalizeRapportStatus, migrateMois, totalAnnuel, calcMensualites, uid } from "../utils/helpers";
 import { useIsMobile, Modal, BtnPrimary, Card, Section, FmField, FmSectionTitle, FmHeader, FmSteps, DraftBanner, PhotoPicker, SunBurstActions, SunBurstFormNav, RapportStatusPicker, Tag, Avatar } from "./ui";
 import { toastWarn, toastSuccess, toastInfo, showConfirm } from "../styles";
+import { savePhoto } from "../lib/photoStore";
+
+// ─── COMPRESSION PHOTO ───────────────────────────────────────────────────────
+// Réduit à max 1 000 px JPEG 0.65 → ~80-150 Ko (prévisualisation en form state)
+// Les photos ne sont JAMAIS envoyées en base64 vers Firestore :
+// à la sauvegarde, extractPhotosToIDB() les déplace dans IndexedDB
+// et ne stocke que des clés "idb:{id}_{field}" dans le document Firestore.
+function compressToBase64(file) {
+  return new Promise(resolve => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); resolve(""); };
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      let { width, height } = img;
+      const MAX = 1000;
+      if (width > MAX || height > MAX) {
+        if (width >= height) { height = Math.round(height * MAX / width); width = MAX; }
+        else { width = Math.round(width * MAX / height); height = MAX; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width; canvas.height = height;
+      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      try { resolve(canvas.toDataURL("image/jpeg", 0.65)); }
+      catch { resolve(""); }
+    };
+    img.src = objectUrl;
+  });
+}
+
+// ─── EXTRACTION PHOTOS → INDEXEDDB ───────────────────────────────────────────
+// Appelé juste avant onSave(). Remplace chaque base64 par une clé "idb:..."
+// Les photos restent dans IndexedDB sur l'appareil ; Firestore ne stocke que la clé.
+async function extractPhotosToIDB(passage) {
+  const p = { ...passage };
+  const SINGLE = ["photoArrivee", "photoDepart"];
+  const ARRAYS = ["photos", "photosDepart"];
+
+  for (const field of SINGLE) {
+    if (p[field]?.startsWith("data:")) {
+      const key = `${p.id}_${field}`;
+      await savePhoto(key, p[field]);
+      p[field] = `idb:${key}`;
+    }
+  }
+  for (const field of ARRAYS) {
+    p[field] = await Promise.all(
+      (p[field] || []).map(async (v, i) => {
+        if (!v?.startsWith("data:")) return v;
+        const key = `${p.id}_${field}_${i}`;
+        await savePhoto(key, v);
+        return `idb:${key}`;
+      })
+    );
+  }
+  return p;
+}
 
 // ─── PRODUITS PAR DÉFAUT ────────────────────────────────────────────────────
 const PRODUITS_DEFAUT = ["Chlore lent Galet","PH minus","Flocculant","Anti-calcaire","Anti-Algues","Anti-Phosphate","Éponge Magique","Filtre à cartouche","Tac+","Chlore granule","Hypochlorite","Anti-Algues moutarde","Sac de sel"];
@@ -609,6 +666,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
     if (isEdit) return {...EMPTY, ...initial, rapportStatut:getRapportStatus(initial)};
     return EMPTY;
   });
+
   const [step,setStep]=useState(1);
   const [showConfirmSave, setShowConfirmSave] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
@@ -692,13 +750,13 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
   const ph=Number(f.tPH)||Number(f.ph);
   const cl=Number(f.tChlore)||Number(f.chloreLibre);
 
-  const doSave = () => {
+  const doSave = async () => {
     if(!f.clientId||!f.date){ toastWarn("Client et date requis"); return; }
     const isSAVsave = f.type==="SAV";
     const isDevissave = f.type==="Demande de devis";
     const isSansDonneesSave = f.type==="Passage sans données";
     const isSimplifiedSave = isSAVsave || isDevissave || isSansDonneesSave;
-    const passage = {
+    const rawPassage = {
       ...f,
       id: isEdit ? f.id : uid(),
       ph: isSimplifiedSave ? "" : (ph||f.tPH||f.ph||""),
@@ -722,6 +780,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
           ].filter(Boolean).join(", ") || "",
       obs: isSimplifiedSave ? (f.descriptionSAV || f.commentaires || "") : f.commentaires,
     };
+    const passage = await extractPhotosToIDB(rawPassage);
     onSave(passage);
     clearDraftAfterSave();
     setShowConfirmSave(false);
@@ -987,25 +1046,20 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
               ].filter(Boolean);
               const canAdd = filledPhotos.length < 10;
 
-              const addPhotos = (e) => {
+              const addPhotos = async (e) => {
                 const files = Array.from(e.target.files||[]).slice(0, 10 - filledPhotos.length);
+                if (!files.length) return;
+                e.target.value = "";
                 let newArrivee = f.photoArrivee||"";
                 let newPhotos = [...(f.photos||[])];
-                let readers = 0;
-                files.forEach(file => {
-                  const reader = new FileReader();
-                  reader.onload = () => {
-                    if (!newArrivee) { newArrivee = reader.result; }
-                    else { newPhotos = [...newPhotos, reader.result]; }
-                    readers++;
-                    if (readers === files.length) {
-                      set("photoArrivee", newArrivee);
-                      set("photos", newPhotos.slice(0,9));
-                    }
-                  };
-                  reader.readAsDataURL(file);
-                });
-                e.target.value="";
+                for (const file of files) {
+                  const b64 = await compressToBase64(file);
+                  if (!b64) continue;
+                  if (!newArrivee) newArrivee = b64;
+                  else newPhotos = [...newPhotos, b64];
+                }
+                set("photoArrivee", newArrivee);
+                set("photos", newPhotos.slice(0, 9));
               };
 
               const removePhoto = (key, idx) => {
@@ -1321,26 +1375,20 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
                   ].filter(Boolean);
                   const canAdd = filledDepart.length < 10;
 
-                  const addDepart = (e) => {
+                  const addDepart = async (e) => {
                     const files = Array.from(e.target.files||[]).slice(0, 10 - filledDepart.length);
-                    if(!files.length) return;
+                    if (!files.length) return;
+                    e.target.value = "";
                     let newDepart = f.photoDepart||"";
                     let newExtras = [...(f.photosDepart||[])];
-                    let done = 0;
-                    files.forEach(file => {
-                      const r = new FileReader();
-                      r.onload = () => {
-                        if (!newDepart) newDepart = r.result;
-                        else newExtras = [...newExtras, r.result];
-                        done++;
-                        if (done === files.length) {
-                          set("photoDepart", newDepart);
-                          set("photosDepart", newExtras.slice(0,9));
-                        }
-                      };
-                      r.readAsDataURL(file);
-                    });
-                    e.target.value="";
+                    for (const file of files) {
+                      const b64 = await compressToBase64(file);
+                      if (!b64) continue;
+                      if (!newDepart) newDepart = b64;
+                      else newExtras = [...newExtras, b64];
+                    }
+                    set("photoDepart", newDepart);
+                    set("photosDepart", newExtras.slice(0, 9));
                   };
 
                   const removeDepart = (key, idx) => {

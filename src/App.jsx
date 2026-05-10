@@ -17,6 +17,7 @@ import { PagePassages } from "./pages/PagePassages";
 import { PageRdv } from "./pages/PageRdv";
 import { CarnetPublic } from "./pages/CarnetClient";
 import { PageDocuments } from "./pages/PageDocuments";
+import { PageGestion } from "./pages/PageGestion";
 
 // Protection module-level contre double-load iOS
 let _BB_BOOT_DONE = false;
@@ -66,7 +67,7 @@ function LoginScreen({ onLogin }) {
             <label style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.8,display:"block",marginBottom:8}}>Adresse email</label>
             <div style={{position:"relative"}}>
               <div style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",zIndex:2}}>{Ico.mail(16,"#64748b")}</div>
-              <input type="email" value={email} onChange={e=>{setEmail(e.target.value);setErr("");}} placeholder="tapetonemail@example.com" onKeyDown={e=>e.key==="Enter"&&handleLogin()} style={{width:"100%",padding:"14px 14px 14px 42px",borderRadius:14,fontSize:14,outline:"none",boxSizing:"border-box",color:DS.dark,fontFamily:"inherit"}}/>
+              <input type="email" value={email} onChange={e=>{setEmail(e.target.value);setErr("");}} placeholder="Email" autoComplete="off" onKeyDown={e=>e.key==="Enter"&&handleLogin()} style={{width:"100%",padding:"14px 14px 14px 42px",borderRadius:14,fontSize:14,outline:"none",boxSizing:"border-box",color:DS.dark,fontFamily:"inherit"}}/>
             </div>
           </div>
           <div>
@@ -307,6 +308,7 @@ export default function App() {
   const [showImport, setShowImport] = useState(false);
   const [contrats, setContrats] = useState({});
   const [versements, setVersements] = useState({});
+  const [retardsCarnet, setRetardsCarnet] = useState({});
   const [ready, setReady] = useState(false);
   const [ficheClient, setFicheClient] = useState(null);
   const [showFormClient, setShowFormClient] = useState(false);
@@ -341,10 +343,11 @@ export default function App() {
     const stockData     = readLS("bb_stock_v1",     {});
     const contratsData  = readLS("bb_contrats_v1",  {});
     const versementsData = readLS("bb_versements_v1", {});
+    const retardsCarnetData = readLS("bb_retards_carnet_v1", {});
     const sWithDefaults = {...Object.fromEntries(PRODUITS_DEFAUT.map(nom=>[nom,0])), ...stockData};
     const cMigrated = clientsData.map(cl => ({...cl, moisParMois: migrateMois(cl.moisParMois||cl.saisons), photoPiscine: cl.photoPiscine||"", prixPassageE: cl.prixPassageE||0, prixPassageC: cl.prixPassageC||0}));
     setClients(cMigrated); setPassages(passagesData); setLivraisons(livraisonsData);
-    setRdvs(rdvsData); setStock(sWithDefaults); setContrats(contratsData); setVersements(versementsData);
+    setRdvs(rdvsData); setStock(sWithDefaults); setContrats(contratsData); setVersements(versementsData); setRetardsCarnet(retardsCarnetData);
   }, []);
 
   useEffect(()=>{
@@ -366,6 +369,7 @@ export default function App() {
   const saveStock     = useCallback((data) => save("bb_stock_v1",      data), []);
   const saveContrats  = useCallback((data) => save("bb_contrats_v1",   data), []);
   const saveVersements = useCallback((data) => save("bb_versements_v1", data), []);
+  const saveRetardsCarnet = useCallback((data) => save("bb_retards_carnet_v1", data), []);
 
   useEffect(()=>{
     if(!ready) return;
@@ -494,6 +498,15 @@ export default function App() {
   const deleteRdv = useCallback(id=>{ setRdvs(prev=>{ const next=prev.filter(x=>x.id!==id); saveRdvsList(next); return next; }); },[saveRdvsList]);
   const openAddClient = useCallback(()=>{ setEditClient(null); setShowFormClient(true); },[]);
 
+  const handleToggleRetardCarnet = useCallback((key, visible) => {
+    setRetardsCarnet(prev => {
+      const next = { ...prev };
+      if (visible) next[key] = true; else delete next[key];
+      saveRetardsCarnet(next);
+      return next;
+    });
+  }, [saveRetardsCarnet]);
+
   const handleToggleVersement = useCallback((key, paid) => {
     setVersements(prev => {
       const next = { ...prev };
@@ -528,9 +541,10 @@ export default function App() {
     { id:"interventions", l:"Rapports",     icon:(a)=><IconFiche size={22} color={a?DS.blue:"#94a3b8"}/> },
     { id:"rdv",           l:"Rendez-vous",  icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#818cf8":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="12" cy="15" r="2.5" fill={a?"#818cf8":"none"}/></svg> },
     { id:"documents",     l:"Documents",    icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#059669":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/></svg> },
+    { id:"gestion",       l:"Gestion",      icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#7c3aed":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/><line x1="14" y1="15" x2="18" y2="15"/></svg> },
   ];
 
-  const PAGE_LABELS = { dashboard:`Bonjour Dorian 👋`, clients:"Clients", passages:"Rapports", interventions:"Rapports", rdv:"Rendez-vous", documents:"Documents" };
+  const PAGE_LABELS = { dashboard:`Bonjour Dorian 👋`, clients:"Clients", passages:"Rapports", interventions:"Rapports", rdv:"Rendez-vous", documents:"Documents", gestion:"Gestion" };
 
   return (
     <>
@@ -586,6 +600,7 @@ export default function App() {
             {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddClient={openAddClient} onValider={validerPassage} onChangeStatut={updateStatutPassage}/>}
             {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
             {page==="documents"&&<PageDocuments clients={clients} contrats={contrats} onOpenContrat={(client,contrat)=>ouvrirContrat(client,contrat?.signaturePrestataire||"",contrat?.signatureClient||"")}/>}
+            {page==="gestion"&&<PageGestion clients={clients} versements={versements} onToggleVersement={handleToggleVersement} livraisons={livraisons} onUpdateStatutLivraison={updateStatutLivraison} retardsCarnet={retardsCarnet} onToggleRetardCarnet={handleToggleRetardCarnet}/>}
           </div>
         </>
       ) : (
@@ -623,6 +638,7 @@ export default function App() {
               {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddClient={openAddClient} onValider={validerPassage} onChangeStatut={updateStatutPassage}/>}
               {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
               {page==="documents"&&<PageDocuments clients={clients} contrats={contrats} onOpenContrat={(client,contrat)=>ouvrirContrat(client,contrat?.signaturePrestataire||"",contrat?.signatureClient||"")}/>}
+              {page==="gestion"&&<PageGestion clients={clients} versements={versements} onToggleVersement={handleToggleVersement} livraisons={livraisons} onUpdateStatutLivraison={updateStatutLivraison} retardsCarnet={retardsCarnet} onToggleRetardCarnet={handleToggleRetardCarnet}/>}
             </div>
           </div>
         </div>

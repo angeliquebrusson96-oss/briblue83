@@ -149,6 +149,7 @@ export function CarnetPublic({ code }) {
   const [loadedPassages, setLoadedPassages] = useState(null);
   const [loadedLivraisons, setLoadedLivraisons] = useState([]);
   const [loadedVersements, setLoadedVersements] = useState({});
+  const [loadedRetardsCarnet, setLoadedRetardsCarnet] = useState({});
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -161,10 +162,12 @@ export function CarnetPublic({ code }) {
         const p = d["bb_passages_v2"];
         const l = d["bb_livraisons_v1"];
         const v = d["bb_versements_v1"];
+        const rc = d["bb_retards_carnet_v1"];
         setLoadedClients(c && c.length ? c : CLIENTS_INIT);
         setLoadedPassages(p && p.length ? p : PASSAGES_INIT);
         setLoadedLivraisons(Array.isArray(l) ? l : []);
         setLoadedVersements(v && typeof v === "object" ? v : {});
+        setLoadedRetardsCarnet(rc && typeof rc === "object" ? rc : {});
       } else {
         setLoadedClients(CLIENTS_INIT);
         setLoadedPassages(PASSAGES_INIT);
@@ -210,13 +213,13 @@ export function CarnetPublic({ code }) {
   );
 
   const clientLivraisons = loadedLivraisons.filter(l=>l.clientId===client.id);
-  return <CarnetView client={client} passages={loadedPassages||[]} livraisons={clientLivraisons} versements={loadedVersements} onRefresh={loadData} refreshing={refreshing}/>;
+  return <CarnetView client={client} passages={loadedPassages||[]} livraisons={clientLivraisons} versements={loadedVersements} retardsCarnet={loadedRetardsCarnet} onRefresh={loadData} refreshing={refreshing}/>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VUE CARNET COMMUNE (partagée entre CarnetPublicInline et CarnetPublic)
 // ─────────────────────────────────────────────────────────────────────────────
-export function CarnetView({ client, passages, livraisons=[], versements={}, onRefresh, refreshing }) {
+export function CarnetView({ client, passages, livraisons=[], versements={}, retardsCarnet={}, onRefresh, refreshing }) {
   const [selectedPassage, setSelectedPassage] = useState(null);
   const [activeTab, setActiveTab] = useState("accueil");
   const [showSOS, setShowSOS] = useState(false);
@@ -957,7 +960,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, onR
         {/* ACCUEIL */}
         {activeTab==="accueil" && <>
           <div className="cv-stagger-2"><DerniereIntervention/></div>
-          <div className="cv-stagger-3"><VersementWidget/></div>
+          {retardsCarnet?.[client.id] && <div className="cv-stagger-3"><VersementWidget/></div>}
           <div className="cv-stagger-4"><RapportsList list={passClient.slice(0,3)} showAll={false}/></div>
           <div className="cv-stagger-5"><RapportDetail/></div>
         </>}

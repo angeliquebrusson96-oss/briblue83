@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { flushPendingNow } from "../lib/storage";
 import { DS, Ico, RAPPORT_STATUS } from "../utils/constants";
 import { normalizeRapportStatus } from "../utils/helpers";
+import { resolvePhoto } from "../lib/photoStore";
 
 // ─── HOOKS ────────────────────────────────────────────────────────────────────
 export function useIsMobile() {
@@ -142,6 +143,21 @@ export function Avatar({ nom, size=40, photo }) {
       <span style={{color:"#fff",fontWeight:800,fontSize:size*0.35,letterSpacing:-0.5}}>{initials}</span>
     </div>
   );
+}
+
+// ─── PHOTO IMG ────────────────────────────────────────────────────────────────
+// Résout les références "idb:..." depuis IndexedDB avant d'afficher l'image.
+export function PhotoImg({ src, alt="", style={} }) {
+  const [resolved, setResolved] = useState(() => (src?.startsWith("idb:") ? "" : src || ""));
+  useEffect(() => {
+    if (!src) { setResolved(""); return; }
+    if (!src.startsWith("idb:")) { setResolved(src); return; }
+    let cancelled = false;
+    resolvePhoto(src).then(v => { if (!cancelled) setResolved(v); });
+    return () => { cancelled = true; };
+  }, [src]);
+  if (!resolved) return null;
+  return <img src={resolved} alt={alt} style={style} />;
 }
 
 // ─── ICO BUBBLE ──────────────────────────────────────────────────────────────
