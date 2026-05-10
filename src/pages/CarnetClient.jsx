@@ -174,7 +174,20 @@ export function CarnetPublic({ code }) {
     }
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    loadData();
+    // Actualisation auto : toutes les 30s quand la page est visible
+    const interval = setInterval(() => {
+      if (document.visibilityState !== "hidden") loadData();
+    }, 30000);
+    // Actualisation immédiate au retour au premier plan (iPhone: tab switch, app switch)
+    const onVisible = () => { if (document.visibilityState === "visible") loadData(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [loadData]);
 
   if (loadedClients === null) return (
     <div style={{minHeight:"100vh",background:"#f0f6fb",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,fontFamily:"system-ui,sans-serif"}}>

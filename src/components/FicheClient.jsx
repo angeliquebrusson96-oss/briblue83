@@ -16,7 +16,6 @@ import { FormLivraison, envoyerEmailLivraison } from "./FormLivraison";
 // ouvrirRapport, envoyerEmail, ouvrirContrat, envoyerContratSignature
 // These are passed in as props or imported lazily. For now import from FormPassage.
 import { ouvrirRapport, envoyerEmail, ouvrirContrat, envoyerContratSignature } from "./FormPassage";
-import { CarnetPublicInline } from "../pages/CarnetClient";
 
 // ─── PASSAGE DETAIL MODAL ────────────────────────────────────────────────────
 export function PassageDetailModal({ passage, client, onClose }) {
@@ -185,7 +184,6 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
   const [showFormLiv, setShowFormLiv] = useState(false);
   const [editLiv, setEditLiv] = useState(null);
   const [selectedMois, setSelectedMois] = useState(null);
-  const [showCarnetPreview, setShowCarnetPreview] = useState(false);
   const [expandedEv, setExpandedEv] = useState(null);
   const isMobile = useIsMobile();
   const al = alerteClient(client, passages);
@@ -244,6 +242,13 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
     <>
     <Modal title="" onClose={onClose} wide>
       <div style={{margin:isMobile?"-18px -20px 0":"-24px -28px 0"}}>
+
+        {client.photoPiscine&&(
+          <div style={{height:140,position:"relative",overflow:"hidden",flexShrink:0}}>
+            <img src={client.photoPiscine} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+            <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,transparent 35%,rgba(8,18,38,0.55))"}}/>
+          </div>
+        )}
 
         <div style={{background:"linear-gradient(135deg, rgba(34,211,238,0.25) 0%, rgba(6,182,212,0.35) 40%, rgba(99,102,241,0.28) 100%)",backdropFilter:"blur(30px) saturate(180%)",WebkitBackdropFilter:"blur(30px) saturate(180%)",padding:"22px 20px 0",position:"relative",overflow:"hidden",borderBottom:"1px solid rgba(255,255,255,0.3)"}}>
           <div style={{position:"absolute",right:-60,top:-60,width:220,height:220,borderRadius:"50%",background:"radial-gradient(circle, rgba(34,211,238,0.35) 0%, transparent 70%)",filter:"blur(20px)",pointerEvents:"none"}}/>
@@ -824,10 +829,10 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
         return (
           <div className="fade-in" style={{display:"flex",flexDirection:"column",gap:14}}>
 
-            <button onClick={()=>setShowCarnetPreview(true)}
+            <button onClick={()=>window.open(carnetUrl,"_blank")}
               style={{width:"100%",height:52,borderRadius:16,background:"linear-gradient(135deg,#0891b2,#0e7490)",border:"none",cursor:"pointer",fontWeight:800,fontSize:14,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:10,boxShadow:"0 4px 16px rgba(8,145,178,0.35)",WebkitTapHighlightColor:"transparent"}}>
-              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              Aperçu — Vue client
+              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              Ouvrir le carnet client
             </button>
 
             <div style={{background:"linear-gradient(145deg,#0c1f3f,#0e3460,#0a5a8a)",borderRadius:20,padding:"24px 20px",position:"relative",overflow:"hidden",boxShadow:"0 8px 32px rgba(8,145,178,0.25)"}}>
@@ -933,27 +938,6 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
       </div>
     </Modal>
 
-    {showCarnetPreview&&(
-      <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(255,255,255,0.5)",display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        <div style={{position:"sticky",top:0,zIndex:10,background:"rgba(12,31,63,0.96)",backdropFilter:"blur(8px)",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",boxShadow:"0 2px 12px rgba(0,0,0,0.3)"}}>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <svg width={16} height={11} viewBox="0 0 32 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2.5" strokeLinecap="round">
-              <path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/>
-              <path d="M2 16c2.5 3 5 3 7.5 0S14 13 16.5 16s5 3 7.5 0"/>
-            </svg>
-            <span style={{fontSize:12,fontWeight:700,color:"rgba(255,255,255,0.7)"}}>Vue client · {client.nom}</span>
-          </div>
-          <button onClick={()=>setShowCarnetPreview(false)}
-            style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:10,background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.15)",cursor:"pointer",fontSize:12,fontWeight:700,color:"#fff",fontFamily:"inherit"}}>
-            <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            Fermer
-          </button>
-        </div>
-        <div style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
-          <CarnetPublicInline client={client} passages={passages} livraisons={(livraisons||[]).filter(l=>l.clientId===client.id)}/>
-        </div>
-      </div>
-    )}
     </>
   );
 }

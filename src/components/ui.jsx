@@ -274,10 +274,27 @@ export function PhotoPicker({ label, value, onChange, compact }) {
   const handleFile = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => onChange(reader.result);
-    reader.readAsDataURL(file);
     e.target.value = "";
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const MAX = 1024;
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      onChange(canvas.toDataURL("image/jpeg", 0.78));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      // fallback: raw reader si canvas échoue
+      const reader = new FileReader();
+      reader.onload = () => onChange(reader.result);
+      reader.readAsDataURL(file);
+    };
+    img.src = objectUrl;
   };
 
   return (
