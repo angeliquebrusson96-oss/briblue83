@@ -77,11 +77,15 @@ async function saveViaREST(pending, keepalive = false) {
 
   const fields = {};
   const updateMask = [];
+  const now = new Date().toISOString();
   keys.forEach(key => {
     fields[key] = toFirestoreValue(pending[key]);
     updateMask.push(`updateMask.fieldPaths=${encodeURIComponent(key)}`);
+    // Timestamp par clé → reconcile peut comparer clé par clé au lieu du timestamp global
+    fields[`_savedAt_${key}`] = { stringValue: now };
+    updateMask.push(`updateMask.fieldPaths=${encodeURIComponent(`_savedAt_${key}`)}`);
   });
-  fields["_lastSavedAt"] = { stringValue: new Date().toISOString() };
+  fields["_lastSavedAt"] = { stringValue: now };
   updateMask.push("updateMask.fieldPaths=_lastSavedAt");
 
   const url = `${FIRESTORE_REST_URL}?${updateMask.join("&")}`;
@@ -109,7 +113,8 @@ async function saveViaREST(pending, keepalive = false) {
 
 // ─── FIREBASE SDK (desktop/Android, connexion stable) ───────────────────────
 async function saveToFirebaseSDK(key, val) {
-  await setDoc(APP_DOC, { [key]: val, _lastSavedAt: new Date().toISOString() }, { merge: true });
+  const now = new Date().toISOString();
+  await setDoc(APP_DOC, { [key]: val, [`_savedAt_${key}`]: now, _lastSavedAt: now }, { merge: true });
 }
 
 // ─── FLUSH (iOS background / fermeture de page) ─────────────────────────────
@@ -172,11 +177,16 @@ export async function reconcileOnBoot() {
         toPush[key] = local; needsPush = true; continue;
       }
 
-      // Les deux existent → comparer les timestamps
+      // Les deux existent → comparer les timestamps PAR CLÉ (évite que la sauvegarde
+      // d'une autre clé n'écrase des données locales plus récentes non encore syncées)
       let localTime = 0;
       try { const m = localStorage.getItem("briblue_meta_" + key); if (m) localTime = JSON.parse(m).savedAt || 0; } catch {} // eslint-disable-line no-empty
 
-      if (localTime >= remoteTime) {
+      // Préférer le timestamp par clé Firebase plutôt que le timestamp global
+      const remoteKeyTs = remote[`_savedAt_${key}`];
+      const remoteKeyTime = remoteKeyTs ? new Date(remoteKeyTs).getTime() : remoteTime;
+
+      if (localTime >= remoteKeyTime) {
         // Local plus récent ou égal → pousser vers Firebase
         toPush[key] = local; needsPush = true;
       } else {
@@ -185,7 +195,7 @@ export async function reconcileOnBoot() {
         if (!offlineQueue.pending[key]) {
           try {
             localStorage.setItem("briblue_" + key, JSON.stringify(remote[key]));
-            localStorage.setItem("briblue_meta_" + key, JSON.stringify({ savedAt: remoteTime }));
+            localStorage.setItem("briblue_meta_" + key, JSON.stringify({ savedAt: remoteKeyTime }));
           } catch {} // eslint-disable-line no-empty
         }
       }
