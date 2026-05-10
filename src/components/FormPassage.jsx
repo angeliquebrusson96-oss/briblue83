@@ -4,7 +4,7 @@ import { DS, Ico, MOIS, MOIS_L, RAPPORT_STATUS } from "../utils/constants";
 import { TODAY, getRapportStatus, isEntretienType, isControleType, getPH, getCL, getTemp, getResumePassage, normalizeRapportStatus, migrateMois, totalAnnuel, calcMensualites, uid } from "../utils/helpers";
 import { useIsMobile, Modal, BtnPrimary, Card, Section, FmField, FmSectionTitle, FmHeader, FmSteps, DraftBanner, PhotoPicker, SunBurstActions, SunBurstFormNav, RapportStatusPicker, Tag, Avatar } from "./ui";
 import { toastWarn, toastSuccess, toastInfo, showConfirm } from "../styles";
-import { extractPassagePhotos } from "../lib/photoStore";
+import { extractPassagePhotos, resolvePhoto } from "../lib/photoStore";
 
 // ─── COMPRESSION PHOTO ───────────────────────────────────────────────────────
 // Réduit à max 1 000 px JPEG 0.65 → ~80-150 Ko pour la prévisualisation.
@@ -413,8 +413,25 @@ ${sectionPhotos}
 </body></html>`;
 }
 
-export function ouvrirRapport(passage, client) {
-  const html = genererHTMLRapport(passage, client);
+// Résout tous les champs photo idb: d'un passage en base64 avant de générer le HTML
+async function resolvePassageForHTML(passage) {
+  const SINGLE = ["photoArrivee", "photoDepart", "signatureTech", "signatureClient"];
+  const ARRAYS = ["photos", "photosDepart"];
+  const p = { ...passage };
+  for (const field of SINGLE) {
+    if (p[field]) p[field] = await resolvePhoto(p[field]);
+  }
+  for (const field of ARRAYS) {
+    if (Array.isArray(p[field])) {
+      p[field] = await Promise.all(p[field].map(v => resolvePhoto(v)));
+    }
+  }
+  return p;
+}
+
+export async function ouvrirRapport(passage, client) {
+  const resolved = await resolvePassageForHTML(passage);
+  const html = genererHTMLRapport(resolved, client);
   const blob = new Blob([html], {type:"text/html;charset=utf-8"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -426,7 +443,8 @@ export function ouvrirRapport(passage, client) {
 export async function envoyerEmail(passage, client, onSent) {
   if (!client?.email) { toastWarn("Aucun email renseigné pour ce client."); return; }
   const dateStr = new Date(passage.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"});
-  const htmlRapport = genererHTMLRapport(passage, client);
+  const resolved = await resolvePassageForHTML(passage);
+  const htmlRapport = genererHTMLRapport(resolved, client);
   const htmlEmail = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#f0f4f8;font-family:Arial,Helvetica,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;margin:0 auto;"><tr><td style="background:#0c1222;padding:20px 28px;border-radius:10px 10px 0 0;"><span style="font-size:20px;font-weight:bold;color:#ffffff;letter-spacing:2px;">BRI BLUE</span></td></tr><tr><td style="background:#ffffff;padding:28px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;"><p style="font-size:15px;color:#1e293b;margin:0 0 12px;">Bonjour <strong>${client?.nom||""}</strong>,</p><p style="font-size:14px;color:#475569;margin:0 0 20px;line-height:1.6;">Votre rapport d'entretien piscine du <strong>${dateStr}</strong> est disponible.</p></td></tr><tr><td style="background:#f8fafc;padding:16px 28px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px;"><p style="margin:0;font-size:12px;color:#64748b;"><strong>Dorian Briaire</strong><br/>Technicien de Piscine — BRI BLUE</p></td></tr></table></body></html>`;
   try {
     const res = await fetch("/api/send-email", {

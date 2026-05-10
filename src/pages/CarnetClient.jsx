@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { getDoc } from "firebase/firestore";
 import { APP_DOC } from "../lib/firebase";
 import { getPH, getCL, getTemp, getResumePassage, isControleType, generateCarnetCode, calculerPassagesPrevusContrat, isPassageEffectue, isPassageDansContrat } from "../utils/helpers";
+import { resolvePhoto } from "../lib/photoStore";
 
 // Génération autonome du rapport client : évite le bouton PDF cassé si App.jsx n'est pas chargé ici.
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
@@ -90,13 +91,28 @@ function buildRapportHTML(passage, client) {
       <button class="print-btn" onclick="window.print()">🖨️ Enregistrer en PDF</button>
     </main></body></html>`;
 }
-function ouvrirRapport(passage, client) {
-  const html = buildRapportHTML(passage, client);
+async function resolvePassagePhotosLocal(passage) {
+  const SINGLE = ["photoArrivee", "photoDepart", "signatureTech", "signatureClient"];
+  const ARRAYS = ["photos", "photosDepart"];
+  const p = { ...passage };
+  for (const field of SINGLE) {
+    if (p[field]) p[field] = await resolvePhoto(p[field]);
+  }
+  for (const field of ARRAYS) {
+    if (Array.isArray(p[field])) {
+      p[field] = await Promise.all(p[field].map(v => resolvePhoto(v)));
+    }
+  }
+  return p;
+}
+
+async function ouvrirRapport(passage, client) {
+  const resolved = await resolvePassagePhotosLocal(passage);
+  const html = buildRapportHTML(resolved, client);
   const blob = new Blob([html], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const w = window.open(url, "_blank");
   if (!w) {
-    // popup bloqué → téléchargement direct
     telechargerRapport(passage, client, url);
     return;
   }

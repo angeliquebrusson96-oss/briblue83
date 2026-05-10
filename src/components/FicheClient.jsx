@@ -690,16 +690,34 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
             const ct=contratClient;
             if(!ct) return null;
             const cfg={
-              signe_complet:{bg:"#f0fdf4",border:"#6ee7b7",color:DS.green,label:"Contrat co-signé",sub:"Signé le "+new Date(ct.signedAt||0).toLocaleDateString("fr")},
+              signe_complet:{bg:"#f0fdf4",border:"#6ee7b7",color:DS.green,label:"Contrat co-signé ✓",sub:"Signé le "+new Date(ct.signedAt||0).toLocaleDateString("fr")},
               signe_client: {bg:"#eff6ff",border:"#93c5fd",color:DS.blue,label:"Client signé",sub:"En attente de votre signature"},
               signe:        {bg:"#f0fdf4",border:"#6ee7b7",color:DS.green,label:"Contrat signé",sub:""},
             }[ct.statut]||{bg:"#fff7ed",border:"#fed7aa",color:DS.orange,label:"En attente de signature",sub:""};
-            return <div style={{background:cfg.bg,border:"1px solid "+cfg.border,borderRadius:10,padding:"8px 12px",display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-              <div style={{flex:1}}>
-                <div style={{fontSize:12,fontWeight:800,color:cfg.color}}>{cfg.label}</div>
-                {cfg.sub&&<div style={{fontSize:10,color:DS.mid,marginTop:1}}>{cfg.sub}</div>}
+            return <>
+              <div style={{background:cfg.bg,border:"1px solid "+cfg.border,borderRadius:10,padding:"8px 12px",display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:12,fontWeight:800,color:cfg.color}}>{cfg.label}</div>
+                  {cfg.sub&&<div style={{fontSize:10,color:DS.mid,marginTop:1}}>{cfg.sub}</div>}
+                </div>
               </div>
-            </div>;
+              {(ct.statut==="signe_complet"||ct.statut==="signe_client")&&(ct.signatureClient||ct.signaturePrestataire)&&(
+                <div style={{display:"grid",gridTemplateColumns:ct.signatureClient&&ct.signaturePrestataire?"1fr 1fr":"1fr",gap:8,marginBottom:12}}>
+                  {ct.signatureClient&&(
+                    <div style={{background:"#f8fafc",borderRadius:10,border:"1px solid #e2e8f0",padding:"8px 10px",textAlign:"center"}}>
+                      <div style={{fontSize:9,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Signature client</div>
+                      <img src={ct.signatureClient} style={{width:"100%",maxHeight:56,objectFit:"contain",borderRadius:6}} alt="signature client"/>
+                    </div>
+                  )}
+                  {ct.signaturePrestataire&&(
+                    <div style={{background:"#f8fafc",borderRadius:10,border:"1px solid #e2e8f0",padding:"8px 10px",textAlign:"center"}}>
+                      <div style={{fontSize:9,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Signature prestataire</div>
+                      <img src={ct.signaturePrestataire} style={{width:"100%",maxHeight:56,objectFit:"contain",borderRadius:6}} alt="signature prestataire"/>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>;
           })()}
 
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:8}}>
@@ -707,10 +725,11 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
               style={{height:44,borderRadius:12,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,boxShadow:"0 2px 8px rgba(2,132,199,0.25)",WebkitTapHighlightColor:"transparent"}}>
               {Ico.contract(12,"#fff")} Contrat
             </button>
-            <button onClick={()=>envoyerContratSignature(client)}
-              style={{height:44,borderRadius:12,background:contratClient?.statut==="signe_complet"?DS.greenSoft:contratClient?.statut==="signe_client"?DS.blueSoft:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,WebkitTapHighlightColor:"transparent"}}>
+            <button
+              onClick={contratClient?.statut==="signe_complet"?undefined:()=>envoyerContratSignature(client)}
+              style={{height:44,borderRadius:12,background:contratClient?.statut==="signe_complet"?DS.greenSoft:contratClient?.statut==="signe_client"?DS.blueSoft:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:contratClient?.statut==="signe_complet"?"default":"pointer",fontWeight:700,fontSize:12,color:contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,WebkitTapHighlightColor:"transparent",opacity:contratClient?.statut==="signe_complet"?0.85:1}}>
               {Ico.sign(12,contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff")}
-              {contratClient?.statut==="signe_complet"?"Signé":contratClient?.statut==="signe_client"?"Attente":"Envoyer"}
+              {contratClient?.statut==="signe_complet"?"Co-signé ✓":contratClient?.statut==="signe_client"?"Attente":"Envoyer"}
             </button>
             <button onClick={onEdit}
               style={{height:44,borderRadius:12,background:"rgba(255,255,255,0.4)",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,WebkitTapHighlightColor:"transparent"}}>

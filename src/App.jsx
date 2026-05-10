@@ -427,9 +427,11 @@ export default function App() {
       setContrats(prev=>{
         if (!prev[contractId]) return prev;
         const old = prev[contractId];
-        const archived = old.statut === "signe_complet" ? {...old, archivedAt: new Date().toISOString(), archivedReason: "Modification du contrat client"} : null;
-        const archives = archived ? [...(prev["__archives__"]||[]), archived] : (prev["__archives__"]||[]);
-        const next = {...prev, [contractId]: { clientId: c.id, statut: "reset", signatureClient: "", signaturePrestataire: "", signedAt: null }, "__archives__": archives};
+        // Ne jamais effacer les signatures si le contrat est déjà signé (partiellement ou totalement)
+        if (old.statut === "signe_client" || old.statut === "signe_complet") {
+          return prev;
+        }
+        const next = {...prev, [contractId]: { clientId: c.id, statut: "reset", signatureClient: "", signaturePrestataire: "", signedAt: null }, "__archives__": (prev["__archives__"]||[])};
         saveContrats(next);
         return next;
       });

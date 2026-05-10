@@ -188,7 +188,7 @@ export function PassageDetailModal({ passage, client, onClose }) {
 // PAGE CLIENTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function PageClients({ clients, passages, contrats={}, versements={}, onUpdateContrat, onToggleVersement, onClientClick, onAdd }) {
+export function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClientClick, onAdd }) {
   const [search, setSearch] = useState("");
   const [openPicker, setOpenPicker] = useState(null); // clientId du picker ouvert
   const [filterStat, setFilterStat] = useState("all"); // all | contrat | alertes | expires
