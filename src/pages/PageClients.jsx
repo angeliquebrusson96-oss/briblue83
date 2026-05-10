@@ -11,6 +11,14 @@ const toNumber = (v, fallback = 0) => {
   const n = Number(String(v).replace(",", "."));
   return Number.isFinite(n) ? n : fallback;
 };
+const dateOnly = (value) => {
+  if (!value) return null;
+  const [y, m, d] = String(value).slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+};
+const firstDayOfMonth = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
+const addMonths = (d, n) => new Date(d.getFullYear(), d.getMonth() + n, 1);
 const getPassagesAnnuelsSaisis = (client = {}) => {
   const value = client.passagesAnnuels
     ?? client.nbPassagesAnnuels
@@ -35,17 +43,87 @@ const getPassagesAnnuelsSaisis = (client = {}) => {
     ?? client.contrat?.nombrePassages;
   return toNumber(value, 0);
 };
+// Lecture UNIQUE du planning mensuel.
+// Si tu modifies le planning, les cartes client utilisent les nouvelles valeurs.
+// Compatible avec plusieurs noms de champs pour éviter les décalages entre pages.
+const getMonthlyPlanObject = (client = {}) => {
+  return client.moisParMois
+    || client.passagesParMois
+    || client.planningMensuel
+    || client.planningPassages
+    || client.planMensuel
+    || client.saisons
+    || client.planning?.moisParMois
+    || client.planning?.passagesParMois
+    || client.planning?.planningMensuel
+    || client.contrat?.moisParMois
+    || client.contrat?.passagesParMois
+    || client.contrat?.planningMensuel
+    || client.contrat?.planningPassages
+    || client.contrat?.planMensuel
+    || client.contrat?.saisons
+    || client.contrat?.planning?.moisParMois
+    || client.contrat?.planning?.passagesParMois
+    || client.contrat?.planning?.planningMensuel
+    || {};
+};
+const getMonthPlanEntry = (plan = {}, monthNumber) => {
+  const monthNames = {
+    1: ["janvier"],
+    2: ["fevrier", "février"],
+    3: ["mars"],
+    4: ["avril"],
+    5: ["mai"],
+    6: ["juin"],
+    7: ["juillet"],
+    8: ["aout", "août"],
+    9: ["septembre"],
+    10: ["octobre"],
+    11: ["novembre"],
+    12: ["decembre", "décembre"],
+  };
+  const names = monthNames[monthNumber] || [];
+  return plan[monthNumber]
+    ?? plan[String(monthNumber)]
+    ?? plan[String(monthNumber).padStart(2, "0")]
+    ?? names.map(n => plan[n] ?? plan[n.toUpperCase()] ?? plan[n.charAt(0).toUpperCase() + n.slice(1)]).find(v => v !== undefined)
+    ?? {};
+};
+const getPlanForMonth = (client = {}, monthNumber) => {
+  const plan = getMonthlyPlanObject(client);
+  const m = getMonthPlanEntry(plan, monthNumber);
+  if (typeof m === "number" || typeof m === "string") return toNumber(m, 0);
+  return toNumber(m.entretien ?? m.passages ?? m.prevus ?? m.prévus ?? m.nb ?? m.nombre ?? m.total ?? 0, 0)
+    + toNumber(m.controle ?? m.contrôle ?? m.controles ?? m.contrôles ?? 0, 0);
+};
+const hasMonthlyPlan = (client = {}) => Object.keys(getMonthlyPlanObject(client) || {}).length > 0;
 const totalPlanningMensuel = (client = {}) => {
-  const plan = client.moisParMois || client.passagesParMois || client.planningMensuel || client.saisons || {};
-  return Array.from({ length: 12 }, (_, i) => {
-    const key = String(i + 1);
-    const m = plan[key] ?? plan[i + 1] ?? {};
-    if (typeof m === "number" || typeof m === "string") return toNumber(m, 0);
-    return toNumber(m.entretien ?? m.passages ?? m.prevus ?? m.prévus ?? m.nb ?? m.nombre ?? 0, 0)
-      + toNumber(m.controle ?? m.contrôle ?? m.controles ?? m.contrôles ?? 0, 0);
-  }).reduce((a, b) => a + b, 0);
+  return Array.from({ length: 12 }, (_, i) => getPlanForMonth(client, i + 1)).reduce((a, b) => a + b, 0);
+};
+const totalPlanningContrat = (client = {}) => {
+  const debut = dateOnly(client.dateDebut || client.contrat?.dateDebut || client.contrat?.debut);
+  const fin = dateOnly(client.dateFin || client.contrat?.dateFin || client.contrat?.fin);
+  if (!debut || !fin || !hasMonthlyPlan(client)) return 0;
+
+  let cursor = firstDayOfMonth(debut);
+  const endMonth = firstDayOfMonth(fin);
+  const includeEndMonth = fin.getDate() > debut.getDate();
+  const stop = includeEndMonth ? addMonths(endMonth, 1) : endMonth;
+
+  let total = 0;
+  let guard = 0;
+  while (cursor < stop && guard < 60) {
+    total += getPlanForMonth(client, cursor.getMonth() + 1);
+    cursor = addMonths(cursor, 1);
+    guard += 1;
+  }
+  return total;
 };
 const getTotalContratClient = (client = {}) => {
+  // Priorité au comptage selon dates de contrat + planning mensuel.
+  // Le total annuel saisi sert seulement de secours si le planning mensuel n'existe pas.
+  const parDates = totalPlanningContrat(client);
+  if (parDates > 0) return parDates;
   const saisi = getPassagesAnnuelsSaisis(client);
   return saisi > 0 ? saisi : totalPlanningMensuel(client);
 };
@@ -382,9 +460,13 @@ export function PageClients({ clients, passages, contrats={}, onUpdateContrat, o
       <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:10}}>
         {filtered.map((c,idx)=>{
           const al=alerteClient(c,passages); const col=AC[al];
-          const planningTotal = totalPlanningMensuel(c);
-          const tot = getTotalContratClient(c); // priorité au total annuel saisi manuellement
-          const cs=c.dateDebut?c.dateDebut.slice(0,10):null; const ce=c.dateFin?c.dateFin.slice(0,10):null;
+          const contratClient = getContrat(c.id);
+          // Important : si le planning est modifié depuis la partie contrat/planning,
+          // on fusionne ces données avec la fiche client avant de recalculer.
+          const clientAvecContrat = contratClient ? { ...c, contrat: { ...(c.contrat || {}), ...contratClient } } : c;
+          const tot = getTotalContratClient(clientAvecContrat); // calculé selon les dates du contrat + planning mensuel modifié
+          const planningTotal = tot;
+          const cs=(clientAvecContrat.dateDebut || clientAvecContrat.contrat?.dateDebut)?String(clientAvecContrat.dateDebut || clientAvecContrat.contrat?.dateDebut).slice(0,10):null; const ce=(clientAvecContrat.dateFin || clientAvecContrat.contrat?.dateFin)?String(clientAvecContrat.dateFin || clientAvecContrat.contrat?.dateFin).slice(0,10):null;
           const inC=(p)=>{const ds=String(p.date).slice(0,10);return cs&&ce?ds>=cs&&ds<=ce:new Date(p.date).getFullYear()===YEAR_NOW;};
           const passagesDeduits = passages.filter(p=>p.clientId===c.id&&inC(p)&&isPassageDeductible(p));
           const eff=passagesDeduits.length;
@@ -425,7 +507,7 @@ export function PageClients({ clients, passages, contrats={}, onUpdateContrat, o
                   </div>
                   <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"rgba(255,255,255,0.45)",border:"1px solid "+DS.border}}>
                     <div style={{fontSize:13,fontWeight:800,color:DS.teal}}>{planningTotal}</div>
-                    <div style={{fontSize:9,color:DS.mid}}>Plan/mois</div>
+                    <div style={{fontSize:9,color:DS.mid}}>Plan contrat</div>
                   </div>
                 </div>
                 {tot>0&&<div style={{height:3,background:DS.light,borderRadius:99,overflow:"hidden"}}>
