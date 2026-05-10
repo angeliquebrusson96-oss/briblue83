@@ -28,7 +28,7 @@ function readLS(key, fallback) {
 }
 
 // ─── AUTH ────────────────────────────────────────────────────────────────────
-const AUTH = { email: "briblue83@hotmail.com", code: "2004" };
+const AUTH = { email: "tapetonemail@briblue.com", code: "2004" };
 
 function LoginScreen({ onLogin }) {
   const [email, setEmail] = useState("");
