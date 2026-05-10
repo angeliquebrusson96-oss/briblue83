@@ -1,10 +1,105 @@
 // @ts-nocheck
-import React, { useState, useMemo } from "react";
-import { DS, Ico, RAPPORT_STATUS } from "../utils/constants";
-import { alerteClient, daysUntil, isEntretienType, isControleType, totalAnnuel, getRapportStatus, YEAR_NOW } from "../utils/helpers";
-import { useIsMobile, Avatar, Modal, Tag, BtnPrimary } from "../components/ui";
+import React, { useState, useEffect, useCallback } from "react";
+import { getDoc } from "firebase/firestore";
+import { APP_DOC } from "../lib/firebase";
+import { getPH, getCL, getTemp, getResumePassage, isControleType, generateCarnetCode } from "../utils/helpers";
 
-// ─── Alert color map (mirrors App.jsx AC) ────────────────────────────────────
+// Génération autonome du rapport client : évite le bouton PDF cassé si App.jsx n'est pas chargé ici.
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+const cleanFileName = (v) => String(v || "rapport").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase();
+const hasProductShape = (v) => v && typeof v === "object" && !Array.isArray(v) && (
+  "nom" in v || "produit" in v || "label" in v || "name" in v || "designation" in v ||
+  "titre" in v || "qte" in v || "quantite" in v || "quantité" in v || "qty" in v
+);
+const toArray = (v) => {
+  if (!v) return [];
+  if (Array.isArray(v)) return v.flatMap(toArray);
+  if (typeof v === "string") return v.split(/[\n,;]+/).map(x => x.trim()).filter(Boolean);
+  if (typeof v === "object") {
+    if (hasProductShape(v)) return [v];
+    return Object.values(v).flatMap(toArray);
+  }
+  return [String(v)];
+};
+const formatProduitLivre = (item) => {
+  if (typeof item === "string") return item.trim();
+  if (!item || typeof item !== "object") return "";
+  const nom = item.nom || item.produit || item.label || item.name || item.designation || item.titre || "Produit";
+  const qte = item.qte || item.quantite || item.quantité || item.qty || item.dose || item.volume || item.quantiteLivree || item.quantitéLivrée || "";
+  const unite = item.unite || item.unité || item.unit || "";
+  return `${nom}${qte ? ` — ${qte}${unite ? ` ${unite}` : ""}` : ""}`.trim();
+};
+const getProduitsLivres = (p = {}) => {
+  const raw = [
+    p.produitsLivres,
+    p.produitsLivresTexte,
+    p.produitsLivrés,
+    p.produitsLivresClient,
+    p.produitsLivresAuClient,
+    p.produitsLivresClientTexte,
+    p.livraisonProduitsListe,
+    p.livraisonProduitsTexte,
+    p.livraison,
+    p.livraisons,
+    p.produits,
+    p.produitsLivre,
+    p.produitsLivree,
+  ].flatMap(toArray);
+
+  // Compatibilité avec les anciens rapports : parfois seule la case livraisonProduits était cochée
+  // et les produits étaient saisis dans un champ texte générique.
+  if ((p.livraisonProduits || p.produitLivre || p.produitsLivresCheck) && raw.length === 0) {
+    raw.push(p.produitLivreTexte || p.produitLivre || p.nomProduit || p.produit || p.designationProduit || "Produits livrés");
+  }
+
+  return raw.map(formatProduitLivre).filter(Boolean);
+};
+const getProduitsApportes = (p = {}) => [
+  ["Chlore", p.corrChlore], ["pH", p.corrPH], ["Sel", p.corrSel], ["Algicide", p.corrAlgicide],
+  ["Chlore choc", p.corrChloreChoc], ["Peroxyde", p.corrPeroxyde], ["Phosphate", p.corrPhosphate],
+  ["Alcafix", p.corrAlcafix], ["Autre", p.corrAutre],
+].filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== "");
+function ouvrirRapport(passage, client) {
+  const p = passage || {};
+  const fmt = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day:"2-digit", month:"long", year:"numeric" }) : "—";
+  const produitsLivres = getProduitsLivres(p);
+  const produitsApportes = getProduitsApportes(p);
+  const mesures = [
+    ["pH", p.ph ?? p.pH ?? p.tauxPH ?? p.tauxPh],
+    ["Chlore", p.chlore ?? p.cl ?? p.tauxChlore],
+    ["Température", p.temp ?? p.temperature ?? p.temperatureEau],
+    ["Sel", p.sel ?? p.tauxSel],
+    ["Phosphate", p.phosphate ?? p.tauxPhosphate],
+    ["Stabilisant", p.stabilisant ?? p.tauxStabilisant],
+    ["TAC", p.alcalinite ?? p.tac],
+  ].filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== "");
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Rapport ${esc(client?.nom)}</title>
+    <style>
+      @page{size:A4;margin:14mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#0f172a;margin:0;background:#eef6fb}.page{max-width:820px;margin:0 auto;background:#fff;min-height:100vh;padding:30px}.head{background:linear-gradient(135deg,#0891b2,#0e7490);color:white;border-radius:18px;padding:24px;margin-bottom:18px}.brand{font-size:13px;letter-spacing:2px;font-weight:700;opacity:.9}.title{font-size:28px;font-weight:800;margin:8px 0 4px}.sub{font-size:14px;opacity:.9}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}.card{border:1px solid #e2e8f0;border-radius:14px;padding:14px;background:#f8fafc}.label{font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;letter-spacing:.5px;margin-bottom:5px}.val{font-size:15px;font-weight:700}.section{margin-top:18px;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden}.section h2{font-size:15px;margin:0;padding:12px 14px;background:#f0f9ff;color:#075985}.section .content{padding:14px;line-height:1.55}.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{background:#e0f2fe;color:#075985;border-radius:999px;padding:7px 11px;font-size:13px;font-weight:700}.green{background:#f0fdf4;color:#166534}.muted{color:#64748b}.print{position:fixed;right:18px;bottom:18px;border:0;border-radius:999px;background:#0891b2;color:white;padding:13px 18px;font-weight:800;cursor:pointer;box-shadow:0 10px 25px rgba(8,145,178,.35)}@media print{body{background:white}.page{padding:0}.print{display:none}}
+    </style></head><body><button class="print" onclick="window.print()">Enregistrer en PDF</button><main class="page">
+      <div class="head"><div class="brand">BRIBLUE</div><div class="title">Rapport d'intervention</div><div class="sub">Carnet d'entretien piscine</div></div>
+      <div class="grid"><div class="card"><div class="label">Client</div><div class="val">${esc(client?.nom)}</div></div><div class="card"><div class="label">Date</div><div class="val">${esc(fmt(p.date))}${p.heure ? ` · ${esc(p.heure)}` : ""}</div></div><div class="card"><div class="label">Type</div><div class="val">${esc(p.type || "Entretien")}</div></div><div class="card"><div class="label">Technicien</div><div class="val">${esc(p.tech || "BRIBLUE")}</div></div></div>
+      ${mesures.length ? `<div class="section"><h2>Mesures de l'eau</h2><div class="content chips">${mesures.map(([k,v])=>`<span class="chip">${esc(k)} : ${esc(v)}</span>`).join("")}</div></div>` : ""}
+      ${(p.actions || p.travaux || p.resume || p.compteRendu) ? `<div class="section"><h2>Compte-rendu</h2><div class="content">${esc(p.actions || p.travaux || p.resume || p.compteRendu)}</div></div>` : ""}
+      ${(p.obs || p.commentaires) ? `<div class="section"><h2>Observations</h2><div class="content">${esc(p.obs || p.commentaires)}</div></div>` : ""}
+      ${produitsApportes.length ? `<div class="section"><h2>Produits apportés</h2><div class="content chips">${produitsApportes.map(([k,v])=>`<span class="chip">${esc(k)} : ${esc(v)}</span>`).join("")}</div></div>` : ""}
+      ${produitsLivres.length ? `<div class="section"><h2>Produits livrés au client</h2><div class="content chips">${produitsLivres.map(x=>`<span class="chip green">${esc(x)}</span>`).join("")}</div></div>` : ""}
+      <p class="muted" style="margin-top:28px;font-size:12px">BRIBLUE · La Seyne-sur-Mer · SIRET 84345436400053</p>
+    </main><script>setTimeout(()=>window.print(),350)</script></body></html>`;
+  const w = window.open("", "_blank", "noopener,noreferrer");
+  if (w) {
+    w.document.open(); w.document.write(html); w.document.close();
+  } else {
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${cleanFileName(client?.nom)}-${cleanFileName(p.date)}-rapport.html`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+}
+
+// Fallback init data (mirrors App.jsx)
 
 const toNumber = (v, fallback = 0) => {
   if (v === undefined || v === null || v === "") return fallback;
@@ -19,53 +114,47 @@ const dateOnly = (value) => {
 };
 const firstDayOfMonth = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
 const addMonths = (d, n) => new Date(d.getFullYear(), d.getMonth() + n, 1);
-const getPassagesAnnuelsSaisis = (client = {}) => {
-  const value = client.passagesAnnuels
-    ?? client.nbPassagesAnnuels
-    ?? client.nombrePassagesAnnuels
-    ?? client.nombrePassagesAnnuel
-    ?? client.totalPassagesAnnuels
-    ?? client.totalPassagesAnnuel
-    ?? client.passagesContrat
-    ?? client.nbPassagesContrat
-    ?? client.nombrePassagesContrat
-    ?? client.passagesPrevusContrat
-    ?? client.passagesPrévusContrat
-    ?? client.passagesPrevus
-    ?? client.nbPassagesPrevus
-    ?? client.nbPassages
-    ?? client.nombrePassages
-    ?? client.contrat?.passagesAnnuels
-    ?? client.contrat?.nbPassagesAnnuels
-    ?? client.contrat?.nombrePassagesAnnuels
-    ?? client.contrat?.passagesPrevus
-    ?? client.contrat?.nbPassages
-    ?? client.contrat?.nombrePassages;
-  return toNumber(value, 0);
+// Lecture UNIQUE du planning mensuel, avec fusion des sources.
+// IMPORTANT : si le planning est modifié dans une autre page/fenêtre,
+// on ne garde pas l'ancien objet en priorité : on fusionne les valeurs et
+// les données du contrat/planning passent en dernier pour écraser les anciennes valeurs.
+const mergePlanObjects = (...plans) => {
+  const merged = {};
+  plans.filter(Boolean).forEach((plan) => {
+    if (typeof plan !== "object" || Array.isArray(plan)) return;
+    Object.entries(plan).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === "") return;
+      if (typeof value === "object" && !Array.isArray(value) && typeof merged[key] === "object" && !Array.isArray(merged[key])) {
+        merged[key] = { ...merged[key], ...value };
+      } else {
+        merged[key] = value;
+      }
+    });
+  });
+  return merged;
 };
-// Lecture UNIQUE du planning mensuel.
-// Si tu modifies le planning, les cartes client utilisent les nouvelles valeurs.
-// Compatible avec plusieurs noms de champs pour éviter les décalages entre pages.
+
 const getMonthlyPlanObject = (client = {}) => {
-  return client.moisParMois
-    || client.passagesParMois
-    || client.planningMensuel
-    || client.planningPassages
-    || client.planMensuel
-    || client.saisons
-    || client.planning?.moisParMois
-    || client.planning?.passagesParMois
-    || client.planning?.planningMensuel
-    || client.contrat?.moisParMois
-    || client.contrat?.passagesParMois
-    || client.contrat?.planningMensuel
-    || client.contrat?.planningPassages
-    || client.contrat?.planMensuel
-    || client.contrat?.saisons
-    || client.contrat?.planning?.moisParMois
-    || client.contrat?.planning?.passagesParMois
-    || client.contrat?.planning?.planningMensuel
-    || {};
+  return mergePlanObjects(
+    client.moisParMois,
+    client.passagesParMois,
+    client.planningMensuel,
+    client.planningPassages,
+    client.planMensuel,
+    client.saisons,
+    client.planning?.moisParMois,
+    client.planning?.passagesParMois,
+    client.planning?.planningMensuel,
+    client.contrat?.moisParMois,
+    client.contrat?.passagesParMois,
+    client.contrat?.planningMensuel,
+    client.contrat?.planningPassages,
+    client.contrat?.planMensuel,
+    client.contrat?.saisons,
+    client.contrat?.planning?.moisParMois,
+    client.contrat?.planning?.passagesParMois,
+    client.contrat?.planning?.planningMensuel
+  );
 };
 const getMonthPlanEntry = (plan = {}, monthNumber) => {
   const monthNames = {
@@ -92,42 +181,81 @@ const getMonthPlanEntry = (plan = {}, monthNumber) => {
 const getPlanForMonth = (client = {}, monthNumber) => {
   const plan = getMonthlyPlanObject(client);
   const m = getMonthPlanEntry(plan, monthNumber);
-  if (typeof m === "number" || typeof m === "string") return toNumber(m, 0);
-  return toNumber(m.entretien ?? m.passages ?? m.prevus ?? m.prévus ?? m.nb ?? m.nombre ?? m.total ?? 0, 0)
-    + toNumber(m.controle ?? m.contrôle ?? m.controles ?? m.contrôles ?? 0, 0);
+  if (typeof m === "number" || typeof m === "string") return { entretien: toNumber(m), controle: 0 };
+  return {
+    entretien: toNumber(m.entretien ?? m.passages ?? m.prevus ?? m.prévus ?? m.nb ?? m.nombre ?? m.total ?? 0),
+    controle: toNumber(m.controle ?? m.contrôle ?? m.controles ?? m.contrôles ?? 0),
+  };
 };
 const hasMonthlyPlan = (client = {}) => Object.keys(getMonthlyPlanObject(client) || {}).length > 0;
-const totalPlanningMensuel = (client = {}) => {
-  return Array.from({ length: 12 }, (_, i) => getPlanForMonth(client, i + 1)).reduce((a, b) => a + b, 0);
+const getPassagesAnnuelsSaisis = (client = {}) => {
+  const value = client.passagesAnnuels
+    ?? client.nbPassagesAnnuels
+    ?? client.nombrePassagesAnnuels
+    ?? client.nombrePassagesAnnuel
+    ?? client.totalPassagesAnnuels
+    ?? client.totalPassagesAnnuel
+    ?? client.passagesContrat
+    ?? client.nbPassagesContrat
+    ?? client.nombrePassagesContrat
+    ?? client.passagesPrevusContrat
+    ?? client.passagesPrévusContrat
+    ?? client.passagesPrevus
+    ?? client.nbPassagesPrevus
+    ?? client.nbPassages
+    ?? client.nombrePassages
+    ?? client.contrat?.passagesAnnuels
+    ?? client.contrat?.nbPassagesAnnuels
+    ?? client.contrat?.nombrePassagesAnnuels
+    ?? client.contrat?.passagesPrevus
+    ?? client.contrat?.nbPassages
+    ?? client.contrat?.nombrePassages;
+  return toNumber(value, 0);
 };
-const totalPlanningContrat = (client = {}) => {
+const calculerPassagesPrevusContrat = (client = {}) => {
+  // Le comptage se base sur les dates du contrat.
+  // Exemple : contrat de septembre à août => on additionne uniquement ces mois-là.
+  // Le total annuel saisi sert de secours seulement si aucun détail mensuel n'existe.
   const debut = dateOnly(client.dateDebut || client.contrat?.dateDebut || client.contrat?.debut);
   const fin = dateOnly(client.dateFin || client.contrat?.dateFin || client.contrat?.fin);
-  if (!debut || !fin || !hasMonthlyPlan(client)) return 0;
 
-  let cursor = firstDayOfMonth(debut);
-  const endMonth = firstDayOfMonth(fin);
-  const includeEndMonth = fin.getDate() > debut.getDate();
-  const stop = includeEndMonth ? addMonths(endMonth, 1) : endMonth;
+  if (debut && fin && hasMonthlyPlan(client)) {
+    let cursor = firstDayOfMonth(debut);
+    let endMonth = firstDayOfMonth(fin);
 
-  let total = 0;
-  let guard = 0;
-  while (cursor < stop && guard < 60) {
-    total += getPlanForMonth(client, cursor.getMonth() + 1);
-    cursor = addMonths(cursor, 1);
-    guard += 1;
+    // Si la fin tombe le même jour ou avant le jour de début, on considère que le mois de fin
+    // est la bascule du nouveau contrat et on ne le recompte pas.
+    // Ex : 29/09/2025 → 29/09/2026 = sept. 2025 à août 2026.
+    // Ex : 01/01/2026 → 31/12/2026 = janv. à déc. 2026.
+    const includeEndMonth = fin.getDate() > debut.getDate();
+    const stop = includeEndMonth ? addMonths(endMonth, 1) : endMonth;
+
+    let total = 0;
+    let guard = 0;
+    while (cursor < stop && guard < 60) {
+      const monthNumber = cursor.getMonth() + 1;
+      const m = getPlanForMonth(client, monthNumber);
+      total += m.entretien + m.controle;
+      cursor = addMonths(cursor, 1);
+      guard += 1;
+    }
+    return total;
   }
-  return total;
+
+  const totalSaisi = getPassagesAnnuelsSaisis(client);
+  if (totalSaisi > 0) return totalSaisi;
+
+  if (hasMonthlyPlan(client)) {
+    return Array.from({ length: 12 }, (_, i) => {
+      const m = getPlanForMonth(client, i + 1);
+      return m.entretien + m.controle;
+    }).reduce((a, b) => a + b, 0);
+  }
+  return 0;
 };
-const getTotalContratClient = (client = {}) => {
-  // Priorité au comptage selon dates de contrat + planning mensuel.
-  // Le total annuel saisi sert seulement de secours si le planning mensuel n'existe pas.
-  const parDates = totalPlanningContrat(client);
-  if (parDates > 0) return parDates;
-  const saisi = getPassagesAnnuelsSaisis(client);
-  return saisi > 0 ? saisi : totalPlanningMensuel(client);
-};
-const isPassageDeductible = (p = {}) => {
+const isPassageEffectue = (p = {}) => {
+  // Un passage se déduit seulement quand un vrai rapport/intervention est créé.
+  // Les rendez-vous prévus/planifiés ne doivent PAS être comptés comme effectués.
   const status = String(p.statut ?? p.status ?? p.etat ?? p.état ?? "").toLowerCase();
   const type = String(p.type ?? p.categorie ?? "").toLowerCase();
   if (/annul|prévu|prevu|planif|rdv|rendez|a venir|à venir/.test(status)) return false;
@@ -136,413 +264,752 @@ const isPassageDeductible = (p = {}) => {
   if (p.ok === false || p.valide === false || p.validé === false) return false;
   return true;
 };
-
-const AC = {
-  rouge:  { bg:"#fee2e2", bd:"#fda4af", tx:"#dc2626", lbl:"URGENT"    },
-  jaune:  { bg:"#fef9c3", bd:"#fcd34d", tx:"#ca8a04", lbl:"Attention" },
-  orange: { bg:"#ffedd5", bd:"#fcd34d", tx:"#ea580c", lbl:"Retard"    },
-  aFaire: { bg:"#eff6ff", bd:"#bfdbfe", tx:"#2563eb", lbl:"À faire"   },
-  ok:     { bg:"#f0fdf4", bd:"#bbf7d0", tx:"#16a34a", lbl:"OK"        },
+const isPassageDansContrat = (p = {}, client = {}) => {
+  if (!p.date) return true;
+  const d = String(p.date).slice(0, 10);
+  const debut = client.dateDebut ? String(client.dateDebut).slice(0, 10) : null;
+  const fin = client.dateFin ? String(client.dateFin).slice(0, 10) : null;
+  if (debut && d < debut) return false;
+  if (fin && d > fin) return false;
+  return true;
 };
 
+const CLIENTS_INIT = [
+  { id:"C001", nom:"GAMBIN IMMO - COPRO O GARDEN", tel:"", email:"", adresse:"", bassin:"Liner", volume:0, formule:"Confort+", prix:2418, prixPassageE:78, prixPassageC:0, dateDebut:"2025-09-29", dateFin:"2026-09-29", photoPiscine:"", moisParMois:{1:{entretien:1,controle:0},2:{entretien:2,controle:0},3:{entretien:2,controle:0},4:{entretien:2,controle:0},5:{entretien:2,controle:0},6:{entretien:4,controle:0},7:{entretien:4,controle:0},8:{entretien:4,controle:0},9:{entretien:4,controle:0},10:{entretien:2,controle:0},11:{entretien:2,controle:0},12:{entretien:2,controle:0}} },
+  { id:"C002", nom:"Mme HAMMER", tel:"", email:"", adresse:"", bassin:"Liner", volume:0, formule:"Confort", prix:2210, prixPassageE:85, prixPassageC:0, dateDebut:"2026-03-01", dateFin:"2027-03-01", photoPiscine:"", moisParMois:{1:{entretien:1,controle:0},2:{entretien:1,controle:0},3:{entretien:2,controle:0},4:{entretien:2,controle:0},5:{entretien:2,controle:0},6:{entretien:4,controle:0},7:{entretien:4,controle:0},8:{entretien:4,controle:0},9:{entretien:4,controle:0},10:{entretien:1,controle:0},11:{entretien:1,controle:0},12:{entretien:1,controle:0}} },
+  { id:"C003", nom:"Mme LOPEZ", tel:"", email:"", adresse:"", bassin:"Liner", volume:0, formule:"VAC+", prix:1690, prixPassageE:65, prixPassageC:0, dateDebut:"2025-06-01", dateFin:"2026-06-01", photoPiscine:"", moisParMois:{1:{entretien:1,controle:0},2:{entretien:1,controle:0},3:{entretien:2,controle:0},4:{entretien:2,controle:0},5:{entretien:2,controle:0},6:{entretien:4,controle:0},7:{entretien:4,controle:0},8:{entretien:4,controle:0},9:{entretien:4,controle:0},10:{entretien:1,controle:0},11:{entretien:1,controle:0},12:{entretien:1,controle:0}} },
+  { id:"C004", nom:"Mme MARCELLOT", tel:"", email:"", adresse:"", bassin:"Liner", volume:0, formule:"VAC+", prix:1690, prixPassageE:65, prixPassageC:0, dateDebut:"2025-11-20", dateFin:"2026-11-20", photoPiscine:"", moisParMois:{1:{entretien:1,controle:0},2:{entretien:1,controle:0},3:{entretien:1,controle:0},4:{entretien:2,controle:0},5:{entretien:2,controle:0},6:{entretien:4,controle:0},7:{entretien:4,controle:0},8:{entretien:4,controle:0},9:{entretien:4,controle:0},10:{entretien:1,controle:0},11:{entretien:1,controle:0},12:{entretien:1,controle:0}} },
+  { id:"C005", nom:"Mr MOREL", tel:"", email:"", adresse:"", bassin:"Liner", volume:0, formule:"VAC+", prix:1690, prixPassageE:65, prixPassageC:0, dateDebut:"2026-03-01", dateFin:"2027-03-01", photoPiscine:"", moisParMois:{1:{entretien:1,controle:0},2:{entretien:1,controle:0},3:{entretien:2,controle:0},4:{entretien:2,controle:0},5:{entretien:2,controle:0},6:{entretien:4,controle:0},7:{entretien:4,controle:0},8:{entretien:4,controle:0},9:{entretien:4,controle:0},10:{entretien:1,controle:0},11:{entretien:1,controle:0},12:{entretien:1,controle:0}} },
+  { id:"C006", nom:"Mr NEGRE Claude", tel:"", email:"", adresse:"", bassin:"Liner", volume:0, formule:"Confort", prix:1740, prixPassageE:65, prixPassageC:35, dateDebut:"2026-04-01", dateFin:"2027-04-01", photoPiscine:"", moisParMois:{1:{entretien:0,controle:1},2:{entretien:0,controle:1},3:{entretien:0,controle:1},4:{entretien:2,controle:1},5:{entretien:4,controle:0},6:{entretien:4,controle:0},7:{entretien:4,controle:0},8:{entretien:4,controle:0},9:{entretien:4,controle:0},10:{entretien:1,controle:1},11:{entretien:0,controle:1},12:{entretien:0,controle:1}} },
+  { id:"C007", nom:"Mme RITTER", tel:"", email:"", adresse:"", bassin:"Liner", volume:0, formule:"VAC+", prix:1690, prixPassageE:65, prixPassageC:0, dateDebut:"2025-07-28", dateFin:"2026-07-28", photoPiscine:"", moisParMois:{1:{entretien:1,controle:0},2:{entretien:1,controle:0},3:{entretien:2,controle:0},4:{entretien:2,controle:0},5:{entretien:2,controle:0},6:{entretien:4,controle:0},7:{entretien:4,controle:0},8:{entretien:4,controle:0},9:{entretien:4,controle:0},10:{entretien:1,controle:0},11:{entretien:1,controle:0},12:{entretien:1,controle:0}} },
+];
+const PASSAGES_INIT = [
+  { id:1, clientId:"C001", date:"2026-04-06", type:"Entretien complet", ph:7.2, chlore:1.5, actions:"Nettoyage, vérif. pompe", obs:"RAS", tech:"Dorian", ok:true },
+  { id:2, clientId:"C002", date:"2026-04-06", type:"Entretien complet", ph:7.4, chlore:1.2, actions:"Nettoyage, ajust. pH", obs:"Filtre à changer bientôt", tech:"Dorian", ok:true },
+  { id:3, clientId:"C001", date:"2026-04-07", type:"Contrôle d'eau", ph:7.1, chlore:1.8, actions:"Contrôle mesures", obs:"RAS", tech:"Dorian", ok:true },
+];
+
 // ─────────────────────────────────────────────────────────────────────────────
-// MODAL APERÇU PASSAGE (used internally by PagePassages too)
+// CARNET PUBLIC INLINE (aperçu interne, données déjà chargées)
 // ─────────────────────────────────────────────────────────────────────────────
-export function PassageDetailModal({ passage, client, onClose }) {
-  const isMobile = useIsMobile();
-  if (!passage) return null;
-
-  const val = (v, u="") => (v!==""&&v!==null&&v!==undefined) ? `${v}${u?" "+u:""}` : "—";
-  const ouiNon = (v) => v===true ? "Oui" : v===false ? "Non" : "—";
-  const liste = (arr) => Array.isArray(arr)&&arr.length ? arr.join(", ") : (arr||"—");
-  const etoiles = (n) => n>0 ? "★".repeat(n)+"☆".repeat(5-n)+" "+n+"/5" : "—";
-
-  const isControleType_ = (type) => {
-    const t = (type||"").toLowerCase();
-    return t.includes("contrôle") || t.includes("controle");
-  };
-
-  const photos = [
-    passage.photoArrivee ? {src:passage.photoArrivee, label:"Arrivée"} : null,
-    ...((passage.photos||[]).filter(Boolean).map((src,i)=>({src, label:`Arrivée ${i+2}`}))),
-    passage.photoDepart ? {src:passage.photoDepart, label:"Départ"} : null,
-    ...((passage.photosDepart||[]).filter(Boolean).map((src,i)=>({src, label:`Départ ${i+2}`}))),
-  ].filter(Boolean);
-
-  const rapportStatus = getRapportStatus(passage);
-  const rapportMeta = RAPPORT_STATUS[rapportStatus];
-  const isCtrl = isControleType_(passage.type);
-
-  // Icônes SVG modernes
-  const BlockIcon = ({name, size=14, color="currentColor"}) => {
-    const s = {width:size,height:size,viewBox:"0 0 24 24",fill:"none",stroke:color,strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round"};
-    switch(name) {
-      case "wrench":    return <svg {...s}><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>;
-      case "water":     return <svg {...s}><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>;
-      case "pool":      return <svg {...s}><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 14c2.5 2.5 5 2.5 7.5 0s5-2.5 7.5 0 5 2.5 7.5 0"/></svg>;
-      case "flask":     return <svg {...s}><path d="M9 3h6v5l3 9a3 3 0 01-3 3H9a3 3 0 01-3-3l3-9V3z"/><path d="M9 3h6"/><path d="M6.5 15h11"/></svg>;
-      case "check":     return <svg {...s}><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
-      case "camera":    return <svg {...s}><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>;
-      case "pen":       return <svg {...s}><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>;
-      default: return null;
-    }
-  };
-  const Block = ({title, iconName, color=DS.blue, children}) => (
-    <div style={{borderRadius:16,overflow:"hidden",border:"1px solid rgba(255,255,255,0.5)",marginBottom:12,background:"rgba(255,255,255,0.45)",backdropFilter:"blur(16px) saturate(180%)",WebkitBackdropFilter:"blur(16px) saturate(180%)"}}>
-      <div style={{background:`linear-gradient(135deg, ${color}18, ${color}08)`,borderBottom:"1px solid "+color+"22",padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
-        <div style={{width:24,height:24,borderRadius:8,background:color+"22",display:"flex",alignItems:"center",justifyContent:"center",color}}>
-          <BlockIcon name={iconName} size={13} color={color}/>
-        </div>
-        <span style={{fontSize:12,fontWeight:800,color,textTransform:"uppercase",letterSpacing:.7}}>{title}</span>
-      </div>
-      <div style={{padding:"12px 14px"}}>{children}</div>
-    </div>
-  );
-
-  const Row = ({label, value, color}) => (
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"6px 0",borderBottom:"1px solid "+DS.light,gap:12}}>
-      <span style={{fontSize:13,color:DS.mid,fontWeight:500,flexShrink:0}}>{label}</span>
-      <span style={{fontSize:13,fontWeight:600,color:color||DS.dark,textAlign:"right",wordBreak:"break-word",whiteSpace:"pre-wrap",lineHeight:1.5}}>{value}</span>
-    </div>
-  );
-
-  return (
-    <Modal title="Aperçu du passage" onClose={onClose} wide>
-      {/* Header */}
-      <div style={{background:"linear-gradient(135deg,#0e7490,#06b6d4)",borderRadius:DS.radiusSm,padding:"14px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:12}}>
-        <div style={{width:44,height:44,borderRadius:12,background:isCtrl?"rgba(6,182,212,0.25)":"rgba(14,165,233,0.25)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-          {isCtrl ? Ico.drop(22,"#67e8f9") : Ico.wrench(22,"#7dd3fc")}
-        </div>
-        <div style={{flex:1}}>
-          <div style={{fontWeight:900,fontSize:16,color:"#fff",letterSpacing:-0.3}}>{client?.nom||passage.clientId}</div>
-          <div style={{display:"flex",gap:8,marginTop:5,flexWrap:"wrap"}}>
-            <span style={{background:"rgba(255,255,255,0.15)",color:"rgba(255,255,255,0.9)",fontSize:12,fontWeight:600,padding:"2px 10px",borderRadius:20}}>{new Date(passage.date).toLocaleDateString("fr",{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}</span>
-            <span style={{background:rapportMeta.bg,color:rapportMeta.color,fontSize:12,fontWeight:700,padding:"2px 10px",borderRadius:20}}>{rapportMeta.label}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Intervention */}
-      <Block title="Intervention" iconName="wrench" color={DS.blue}>
-        <Row label="Type" value={passage.type||"—"}/>
-        <Row label="Technicien" value={passage.tech||"—"}/>
-        {passage.actions&&<Row label="Actions" value={passage.actions}/>}
-        {passage.obs&&<Row label="Observations" value={passage.obs} color={DS.orange}/>}
-      </Block>
-
-      {/* Analyses */}
-      {(passage.chloreLibre||passage.ph||passage.alcalinite||passage.stabilisant||passage.tChlore||passage.tPH||passage.tSel||passage.tPhosphate||passage.tStabilisant) && (
-        <Block title="Analyses eau" iconName="water" color={DS.teal}>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:0}}>
-            {passage.tChlore!==""&&passage.tChlore!==null&&passage.tChlore!==undefined&&<Row label="Chlore (appareil)" value={val(passage.tChlore,"ppm")} color={+passage.tChlore>=0.5&&+passage.tChlore<=3?DS.green:DS.red}/>}
-            {passage.tPH!==""&&passage.tPH!==null&&passage.tPH!==undefined&&<Row label="pH (appareil)" value={val(passage.tPH)} color={+passage.tPH>=7.0&&+passage.tPH<=7.6?DS.green:DS.red}/>}
-            {passage.tSel!==""&&passage.tSel!==null&&passage.tSel!==undefined&&<Row label="Sel" value={val(passage.tSel,"g/L")}/>}
-            {passage.tPhosphate!==""&&passage.tPhosphate!==null&&passage.tPhosphate!==undefined&&<Row label="Phosphate" value={val(passage.tPhosphate,"ppm")}/>}
-            {passage.tStabilisant!==""&&passage.tStabilisant!==null&&passage.tStabilisant!==undefined&&<Row label="Stabilisant" value={val(passage.tStabilisant,"ppm")}/>}
-            {passage.chloreLibre!==""&&passage.chloreLibre!==null&&passage.chloreLibre!==undefined&&<Row label="Chlore libre" value={val(passage.chloreLibre,"ppm")}/>}
-            {passage.ph!==""&&passage.ph!==null&&passage.ph!==undefined&&<Row label="pH bandelette" value={val(passage.ph)}/>}
-            {passage.alcalinite!==""&&passage.alcalinite!==null&&passage.alcalinite!==undefined&&<Row label="Alcalinité" value={val(passage.alcalinite,"ppm")}/>}
-            {passage.stabilisant!==""&&passage.stabilisant!==null&&passage.stabilisant!==undefined&&<Row label="Stabilisant (band.)" value={val(passage.stabilisant,"ppm")}/>}
-          </div>
-          {passage.stabilisantHaut&&<div style={{marginTop:8,background:DS.orangeSoft,borderRadius:8,padding:"6px 10px",fontSize:12,fontWeight:700,color:DS.orange}}>⚠️ Stabilisant HAUT signalé</div>}
-        </Block>
-      )}
-
-      {/* État bassin */}
-      {(passage.qualiteEau||(passage.etatFond||[]).length||(passage.etatParois||[]).length) && (
-        <Block title="État bassin" iconName="pool" color={DS.green}>
-          {passage.qualiteEau&&<Row label="Qualité eau" value={passage.qualiteEau}/>}
-          {(passage.etatFond||[]).length>0&&<Row label="Fond" value={liste(passage.etatFond)}/>}
-          {(passage.etatParois||[]).length>0&&<Row label="Parois" value={liste(passage.etatParois)}/>}
-          {(passage.etatLocal||[]).length>0&&<Row label="Local" value={liste(passage.etatLocal)}/>}
-        </Block>
-      )}
-
-      {/* Correctifs */}
-      {(passage.corrChlore||passage.corrPH||passage.corrSel||passage.corrAlgicide||passage.corrAlcafix||passage.corrAutre) && (
-        <Block title="Correctifs apportés" iconName="flask" color={DS.purple}>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:0}}>
-            {passage.corrChlore&&<Row label="Chlore" value={passage.corrChlore}/>}
-            {passage.corrPH&&<Row label="pH" value={passage.corrPH}/>}
-            {passage.corrSel&&<Row label="Sel" value={passage.corrSel}/>}
-            {passage.corrAlgicide&&<Row label="Algicide" value={passage.corrAlgicide}/>}
-            {passage.corrPeroxyde&&<Row label="Peroxyde" value={passage.corrPeroxyde}/>}
-            {passage.corrChloreChoc&&<Row label="Chlore choc" value={passage.corrChloreChoc}/>}
-            {passage.corrPhosphate&&<Row label="Phosphate" value={passage.corrPhosphate}/>}
-            {passage.corrAlcafix&&<Row label="Alcafix" value={passage.corrAlcafix}/>}
-            {passage.corrAutre&&<Row label="Autre" value={passage.corrAutre}/>}
-          </div>
-        </Block>
-      )}
-
-      {/* Clôture */}
-      <Block title="Clôture" iconName="check" color={DS.orange}>
-        <Row label="Devis à faire" value={ouiNon(passage.devis)}/>
-        <Row label="Prise d'échantillon" value={ouiNon(passage.priseEchantillon)}/>
-        <Row label="Présence client" value={ouiNon(passage.presenceClient)}/>
-        <Row label="Ressenti" value={etoiles(passage.ressenti)}/>
-        {passage.livraisonProduits&&<Row label="Livraison produits" value={ouiNon(passage.livraisonProduits)}/>}
-        {(passage.produitsLivres||[]).length>0&&<Row label="Produits livrés" value={liste(passage.produitsLivres)}/>}
-        {passage.commentaires&&<div style={{marginTop:8,padding:"10px 12px",background:DS.light,borderRadius:8,fontSize:13,color:DS.dark,lineHeight:1.6,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{passage.commentaires}</div>}
-      </Block>
-
-      {/* Photos */}
-      {photos.length>0&&(
-        <Block title={`Photos (${photos.length})`} iconName="camera" color={DS.mid}>
-          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(3,1fr)",gap:8}}>
-            {photos.map((ph,i)=>(
-              <div key={i} style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid "+DS.border}}>
-                <img src={ph.src} alt={ph.label} style={{width:"100%",height:isMobile?90:110,objectFit:"cover",display:"block"}}/>
-                <span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>{ph.label}</span>
-              </div>
-            ))}
-          </div>
-        </Block>
-      )}
-
-      {/* Signatures */}
-      {(passage.signatureTech||passage.signatureClient)&&(
-        <Block title="Signatures" iconName="pen" color={DS.mid}>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12}}>
-            {passage.signatureTech&&<div><div style={{fontSize:10,fontWeight:700,color:DS.mid,marginBottom:6}}>TECHNICIEN</div><img src={passage.signatureTech} style={{width:"100%",maxHeight:60,objectFit:"contain",borderRadius:8,border:"1px solid "+DS.border,background:"#fafafa"}}/></div>}
-            {passage.signatureClient&&<div><div style={{fontSize:10,fontWeight:700,color:DS.mid,marginBottom:6}}>CLIENT</div><img src={passage.signatureClient} style={{width:"100%",maxHeight:60,objectFit:"contain",borderRadius:8,border:"1px solid "+DS.border,background:"#fafafa"}}/></div>}
-          </div>
-        </Block>
-      )}
-    </Modal>
-  );
+export function CarnetPublicInline({ client, passages }) {
+  return <CarnetView client={client} passages={passages} onRefresh={null} refreshing={false}/>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PAGE CLIENTS
+// CARNET PUBLIC (URL ?carnet=CODE)
 // ─────────────────────────────────────────────────────────────────────────────
-export function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClientClick, onAdd }) {
-  const [search, setSearch] = useState("");
-  const [openPicker, setOpenPicker] = useState(null); // clientId du picker ouvert
-  const [filterStat, setFilterStat] = useState("all"); // all | contrat | alertes | expires
-  const isMobile = useIsMobile();
+export function CarnetPublic({ code, allClients, allPassages }) {
+  const [loadedClients, setLoadedClients] = useState(null);
+  const [loadedPassages, setLoadedPassages] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const filtered = useMemo(()=>{
-    let list = clients.filter(c=>c.nom.toLowerCase().includes(search.toLowerCase())||c.adresse?.toLowerCase().includes(search.toLowerCase()));
-    if (filterStat === "contrat") list = list.filter(c=>{ const j=daysUntil(c.dateFin); return j!==null && j>=0; });
-    if (filterStat === "alertes") list = list.filter(c=>alerteClient(c,passages)!=="ok");
-    if (filterStat === "expires") list = list.filter(c=>{ const j=daysUntil(c.dateFin); return j!==null && j<30; });
-    return list;
-  },[clients,search,filterStat,passages]);
-  const totalAll = clients.length;
-  const alertCount = clients.filter(c=>alerteClient(c,passages)!=="ok").length;
+  const loadData = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const snap = await getDoc(APP_DOC);
+      if (snap.exists()) {
+        const d = snap.data();
+        const c = d["bb_clients_v2"];
+        const p = d["bb_passages_v2"];
+        setLoadedClients(c && c.length ? c : CLIENTS_INIT);
+        setLoadedPassages(p && p.length ? p : PASSAGES_INIT);
+      } else {
+        setLoadedClients(CLIENTS_INIT);
+        setLoadedPassages(PASSAGES_INIT);
+      }
+    } catch {
+      setLoadedClients(CLIENTS_INIT);
+      setLoadedPassages(PASSAGES_INIT);
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
-  const CONTRAT_STATUTS = [
-    { key:"aucun",          label:"Aucun contrat",       color:"#9ca3af", bg:"#f9fafb", border:"#e5e7eb" },
-    { key:"cree",           label:"📄 Contrat créé",     color:"#0891b2", bg:"#e0f2fe", border:"#7dd3fc" },
-    { key:"demande_envoyee",label:"Contrat envoyé",      color:"#0891b2", bg:"#f0f9ff", border:"#bae6fd" },
-    { key:"signe_client",   label:"En attente co-sign.", color:"#4f46e5", bg:"#eef2ff", border:"#a5b4fc" },
-    { key:"signe_complet",  label:"Contrat signé",       color:"#059669", bg:"#f0fdf4", border:"#86efac" },
-    { key:"renouveler",     label:"À renouveler",        color:"#b45309", bg:"#fef3c7", border:"#fcd34d" },
-    { key:"suspendu",       label:"⏸ Suspendu",          color:"#dc2626", bg:"#fff1f2", border:"#fda4af" },
-  ];
+  useEffect(() => { loadData(); }, [loadData]);
 
-  const getContrat = (clientId) =>
-    contrats["CT-"+clientId]
-    || Object.values(contrats).find(c=>c.clientId===clientId)
-    || null;
+  if (loadedClients === null) return (
+    <div style={{minHeight:"100vh",background:"#f0f6fb",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,fontFamily:"system-ui,sans-serif"}}>
+      <div style={{width:48,height:48,border:"4px solid #e0f2fe",borderTop:"4px solid #0891b2",borderRadius:"50%",animation:"spin 0.8s linear infinite",marginBottom:20}}/>
+      <div style={{fontSize:15,color:"#0891b2",fontWeight:600}}>Chargement de votre carnet…</div>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
 
-  const getStatutMeta = (clientId) => {
-    const ct = getContrat(clientId);
-    const key = ct?.statut || "aucun";
-    return CONTRAT_STATUTS.find(s=>s.key===key) || CONTRAT_STATUTS[0];
-  };
+  const client = loadedClients.find(c=>generateCarnetCode(c.id)===code.toUpperCase());
+  if (!client) return (
+    <div style={{minHeight:"100vh",background:"#f0f6fb",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,fontFamily:"system-ui,sans-serif"}}>
+      <div style={{fontSize:48,marginBottom:16}}>🔒</div>
+      <div style={{fontSize:18,fontWeight:700,color:"#0f172a",marginBottom:8}}>Code invalide</div>
+      <div style={{fontSize:14,color:"#64748b"}}>Vérifiez le code fourni par votre technicien.</div>
+    </div>
+  );
 
-  const setStatut = (clientId, key) => {
-    const contractId = "CT-"+clientId;
-    if (onUpdateContrat) onUpdateContrat(contractId, { clientId, statut: key === "prepare" ? "cree" : key });
-    setOpenPicker(null);
-  };
+  return <CarnetView client={client} passages={loadedPassages||[]} onRefresh={loadData} refreshing={refreshing}/>;
+}
 
-  // Calcul des statistiques
-  const statsClients = useMemo(()=>{
-    const sousContrat = clients.filter(c=>{
-      const j = daysUntil(c.dateFin);
-      return j !== null && j >= 0;
-    }).length;
-    const expires = clients.filter(c=>{
-      const j = daysUntil(c.dateFin);
-      return j !== null && j < 30;
-    }).length;
-    return { total: clients.length, sousContrat, alertes: alertCount, expires };
-  }, [clients, alertCount]);
+// ─────────────────────────────────────────────────────────────────────────────
+// VUE CARNET COMMUNE (partagée entre CarnetPublicInline et CarnetPublic)
+// ─────────────────────────────────────────────────────────────────────────────
+export function CarnetView({ client, passages, onRefresh, refreshing }) {
+  const [selectedPassage, setSelectedPassage] = useState(null);
+  const [activeTab, setActiveTab] = useState("accueil");
+  const [showSOS, setShowSOS] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  return (
-    <div>
-      {/* ═══ STATS HEADER — design soleil moderne ═══ */}
-      <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(2,1fr)":"repeat(4,1fr)",gap:10,marginBottom:16}}>
-        {/* Total clients */}
-        <div onClick={()=>setFilterStat("all")} style={{cursor:"pointer",transform:filterStat==="all"?"scale(1.04)":"scale(1)",transition:"transform .2s",background:"linear-gradient(135deg,#0c1f3f 0%,#0369a1 100%)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:"0 8px 24px rgba(12,31,63,0.25)"}}>
-          <div style={{position:"absolute",top:-15,right:-15,width:80,height:80,borderRadius:"50%",background:"rgba(56,189,248,0.15)",pointerEvents:"none"}}/>
-          <div style={{display:"flex",alignItems:"center",gap:10,position:"relative"}}>
-            <div style={{width:42,height:42,borderRadius:12,background:"rgba(56,189,248,0.25)",border:"1.5px solid rgba(56,189,248,0.4)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              {Ico.clients(18,"#7dd3fc")}
-            </div>
-            <div>
-              <div style={{fontSize:22,fontWeight:900,color:"#fff",lineHeight:1}}>{statsClients.total}</div>
-              <div style={{fontSize:10,color:"rgba(255,255,255,0.6)",fontWeight:700,textTransform:"uppercase",letterSpacing:0.5,marginTop:2}}>Clients</div>
-            </div>
-          </div>
-        </div>
+  useEffect(() => { setTimeout(() => setMounted(true), 50); }, []);
 
-        {/* Sous contrat */}
-        <div onClick={()=>setFilterStat(filterStat==="contrat"?"all":"contrat")} style={{cursor:"pointer",transform:filterStat==="contrat"?"scale(1.04)":"scale(1)",transition:"transform .2s",background:"linear-gradient(135deg,#059669,#10b981)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:"0 8px 24px rgba(5,150,105,0.25)"}}>
-          <div style={{position:"absolute",top:-15,right:-15,width:80,height:80,borderRadius:"50%",background:"rgba(255,255,255,0.12)",pointerEvents:"none"}}/>
-          <div style={{display:"flex",alignItems:"center",gap:10,position:"relative"}}>
-            <div style={{width:42,height:42,borderRadius:12,background:"rgba(255,255,255,0.2)",border:"1.5px solid rgba(255,255,255,0.3)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              {Ico.contract(18,"#fff")}
-            </div>
-            <div>
-              <div style={{fontSize:22,fontWeight:900,color:"#fff",lineHeight:1}}>{statsClients.sousContrat}</div>
-              <div style={{fontSize:10,color:"rgba(255,255,255,0.85)",fontWeight:700,textTransform:"uppercase",letterSpacing:0.5,marginTop:2}}>Sous contrat</div>
-            </div>
-          </div>
-        </div>
+  const passClient = (passages||[])
+    .filter(p => p.clientId === client.id)
+    .sort((a,b) => new Date(b.date) - new Date(a.date));
 
-        {/* Alertes */}
-        <div onClick={()=>setFilterStat(filterStat==="alertes"?"all":"alertes")} style={{cursor:"pointer",transform:filterStat==="alertes"?"scale(1.04)":"scale(1)",transition:"transform .2s",background:statsClients.alertes>0?"linear-gradient(135deg,#dc2626,#ef4444)":"linear-gradient(135deg,#94a3b8,#64748b)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:`0 8px 24px ${statsClients.alertes>0?"rgba(220,38,38,0.25)":"rgba(100,116,139,0.18)"}`}}>
-          <div style={{position:"absolute",top:-15,right:-15,width:80,height:80,borderRadius:"50%",background:"rgba(255,255,255,0.12)",pointerEvents:"none"}}/>
-          <div style={{display:"flex",alignItems:"center",gap:10,position:"relative"}}>
-            <div style={{width:42,height:42,borderRadius:12,background:"rgba(255,255,255,0.2)",border:"1.5px solid rgba(255,255,255,0.3)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              {Ico.alert(18,"#fff")}
-            </div>
-            <div>
-              <div style={{fontSize:22,fontWeight:900,color:"#fff",lineHeight:1}}>{statsClients.alertes}</div>
-              <div style={{fontSize:10,color:"rgba(255,255,255,0.85)",fontWeight:700,textTransform:"uppercase",letterSpacing:0.5,marginTop:2}}>{statsClients.alertes>1?"Alertes":"Alerte"}</div>
-            </div>
-          </div>
-        </div>
+  const last = passClient[0] || null;
+  const phOk  = v => v >= 7 && v <= 7.6;
+  const clOk  = v => v >= 0.5 && v <= 3;
+  const fmtDate = (d, opts) => new Date(d).toLocaleDateString("fr", opts);
+  const getResume = getResumePassage;
 
-        {/* Expirent < 30j */}
-        <div onClick={()=>setFilterStat(filterStat==="expires"?"all":"expires")} style={{cursor:"pointer",transform:filterStat==="expires"?"scale(1.04)":"scale(1)",transition:"transform .2s",background:statsClients.expires>0?"linear-gradient(135deg,#d97706,#f59e0b)":"linear-gradient(135deg,#94a3b8,#64748b)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:`0 8px 24px ${statsClients.expires>0?"rgba(217,119,6,0.25)":"rgba(100,116,139,0.18)"}`}}>
-          <div style={{position:"absolute",top:-15,right:-15,width:80,height:80,borderRadius:"50%",background:"rgba(255,255,255,0.12)",pointerEvents:"none"}}/>
-          <div style={{display:"flex",alignItems:"center",gap:10,position:"relative"}}>
-            <div style={{width:42,height:42,borderRadius:12,background:"rgba(255,255,255,0.2)",border:"1.5px solid rgba(255,255,255,0.3)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              {Ico.clock(18,"#fff")}
-            </div>
-            <div>
-              <div style={{fontSize:22,fontWeight:900,color:"#fff",lineHeight:1}}>{statsClients.expires}</div>
-              <div style={{fontSize:10,color:"rgba(255,255,255,0.85)",fontWeight:700,textTransform:"uppercase",letterSpacing:0.5,marginTop:2}}>Bientôt fin</div>
-            </div>
-          </div>
-        </div>
-      </div>
-      {/* Badge filtre actif */}
-      {filterStat !== "all" && (
-        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,padding:"8px 12px",borderRadius:12,background:"linear-gradient(135deg, rgba(8,145,178,0.1), rgba(8,145,178,0.05))",border:"1px solid rgba(8,145,178,0.2)"}}>
-          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.4" strokeLinecap="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-          <span style={{fontSize:12,fontWeight:700,color:"#0891b2",flex:1}}>
-            Filtre actif : {filterStat === "contrat" ? "Sous contrat" : filterStat === "alertes" ? "Avec alertes" : "Bientôt fin"} — {filtered.length} client{filtered.length>1?"s":""}
-          </span>
-          <button onClick={()=>setFilterStat("all")} style={{padding:"4px 10px",borderRadius:8,background:"rgba(255,255,255,0.7)",border:"1px solid rgba(8,145,178,0.25)",cursor:"pointer",fontSize:11,fontWeight:700,color:"#0891b2",fontFamily:"inherit",display:"flex",alignItems:"center",gap:4}}>
-            <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            Effacer
+  const totalVisitesPrevues = calculerPassagesPrevusContrat(client);
+  const passagesDeduits = passClient.filter(p => isPassageDansContrat(p, client) && isPassageEffectue(p));
+  const visitesEffectuees = passagesDeduits.length;
+  const visitesRestantes = Math.max(0, totalVisitesPrevues - visitesEffectuees);
+  const progressPct = totalVisitesPrevues > 0 ? Math.min(100, (visitesEffectuees / totalVisitesPrevues) * 100) : 0;
+
+  const daysUntilFin = client.dateFin ? Math.ceil((new Date(client.dateFin) - new Date()) / (1000*60*60*24)) : null;
+  const contratActif = daysUntilFin === null || daysUntilFin > 0;
+
+  const WAVES_SVG = (
+    <svg viewBox="0 0 400 60" preserveAspectRatio="none" style={{position:"absolute",bottom:0,left:0,right:0,width:"100%",height:60,opacity:0.15}} aria-hidden="true">
+      <path d="M0 40 C80 20 160 55 240 35 C320 15 360 45 400 30 L400 60 L0 60 Z" fill="white" className="cv-wave" style={{animationDelay:"0s"}}/>
+      <path d="M0 50 C60 30 140 60 220 40 C300 20 360 50 400 38 L400 60 L0 60 Z" fill="white" opacity="0.6"/>
+    </svg>
+  );
+
+  // ─── BOTTOM NAV ────────────────────────────────────────────────────────────
+  const BottomNav = () => (
+    <div style={{
+      position:"sticky",bottom:0,zIndex:200,
+      background:"rgba(255,255,255,0.92)",
+      backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",
+      borderTop:"1px solid rgba(226,232,240,0.8)",
+      display:"flex",padding:"6px 0 max(10px,env(safe-area-inset-bottom,10px))",
+    }}>
+      {[
+        {id:"accueil",label:"Accueil",path:<><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9"/></>},
+        {id:"historique",label:"Rapports",path:<><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></>},
+        {id:"sos",label:"SOS",path:<><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,isSos:true},
+        {id:"produits",label:"Produits",path:<><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></>},
+        {id:"profil",label:"Profil",path:<><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></>},
+      ].map(({id,label,path,isSos})=>{
+        const isActive = !isSos && activeTab===id;
+        return (
+          <button key={id} className="cv-btn-press"
+            onClick={()=>isSos ? setShowSOS(true) : setActiveTab(id)}
+            style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,border:"none",background:"none",cursor:"pointer",padding:"4px 0",transition:"opacity 0.15s"}}>
+            {isSos ? (
+              <div style={{width:44,height:44,borderRadius:"50%",background:"linear-gradient(135deg,#0891b2,#0e4f6f)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 14px rgba(8,145,178,0.5)",marginBottom:1,marginTop:-8}}>
+                <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round">{path}</svg>
+              </div>
+            ) : (
+              <div style={{width:36,height:28,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:8,background:isActive?"#e0f2fe":"transparent",transition:"background 0.2s"}}>
+                <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={isActive?"#0891b2":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{path}</svg>
+              </div>
+            )}
+            <span style={{fontSize:10,fontWeight:isActive?600:400,color:isSos?"#0891b2":isActive?"#0891b2":"#94a3b8",letterSpacing:isSos?"-0.1px":"0"}}>{label}</span>
           </button>
-        </div>
-      )}
+        );
+      })}
+    </div>
+  );
 
-      <div style={{display:"flex",gap:10,marginBottom:14}}>
-        <div style={{flex:1,position:"relative"}}>
-          <div style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}>{Ico.search(16,"#94a3b8")}</div>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher…"
-            style={{width:"100%",padding:"11px 14px 11px 40px",borderRadius:DS.radius,border:"none",fontSize:13,outline:"none",boxSizing:"border-box",background:"rgba(255,255,255,0.45)",boxShadow:"inset 3px 3px 6px rgba(6,182,212,0.15), inset -2px -2px 5px rgba(255,255,255,0.8)",color:DS.dark,fontFamily:"inherit"}}/>
+  // ─── HERO ──────────────────────────────────────────────────────────────────
+  const Hero = () => (
+    <div className="cv-stagger-1" style={{margin:"12px 12px 0",borderRadius:20,overflow:"hidden",position:"relative",
+      background:"linear-gradient(145deg,#0c6a8c 0%,#0891b2 40%,#0e7490 75%,#134e6b 100%)",
+      boxShadow:"0 8px 32px rgba(8,145,178,0.35)",
+    }}>
+      {/* Orbs décoratifs */}
+      <div style={{position:"absolute",right:-40,top:-40,width:180,height:180,borderRadius:"50%",background:"radial-gradient(circle,rgba(56,189,248,0.3) 0%,transparent 70%)",pointerEvents:"none"}}/>
+      <div style={{position:"absolute",left:-20,bottom:-30,width:130,height:130,borderRadius:"50%",background:"radial-gradient(circle,rgba(14,116,144,0.5) 0%,transparent 70%)",pointerEvents:"none"}}/>
+      <div style={{position:"absolute",right:60,bottom:10,width:60,height:60,borderRadius:"50%",background:"rgba(255,255,255,0.05)",pointerEvents:"none"}}/>
+      {WAVES_SVG}
+
+      <div style={{position:"relative",padding:"18px 16px 22px"}}>
+        {/* Row: logo + refresh */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <div className="cv-glass" style={{width:34,height:34,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <svg width={18} height={13} viewBox="0 0 32 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/>
+                <path d="M2 16c2.5 3 5 3 7.5 0S14 13 16.5 16s5 3 7.5 0"/>
+              </svg>
+            </div>
+            <span style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.9)",letterSpacing:1}}>BRIBLUE</span>
+          </div>
+          {onRefresh && (
+            <button onClick={onRefresh} disabled={refreshing} className="cv-glass cv-btn-press" style={{border:"none",cursor:"pointer",width:32,height:32,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",color:"white",padding:0}}>
+              <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={refreshing?{animation:"cv-spin .7s linear infinite"}:{}}><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+            </button>
+          )}
         </div>
-        <BtnPrimary onClick={onAdd} bg={DS.blueGrad} icon={Ico.userPlus(14,"#fff")} style={{flexShrink:0,padding:"10px 16px",fontSize:13,borderRadius:14,boxShadow:"4px 4px 12px rgba(8,145,178,0.3)"}}>
-          {!isMobile && "Nouveau"}
-        </BtnPrimary>
+
+        {/* Nom + badge */}
+        <div style={{fontSize:22,fontWeight:700,color:"#fff",lineHeight:1.2,letterSpacing:"-0.3px",marginBottom:6}}>{client.nom}</div>
+        <div style={{display:"inline-flex",alignItems:"center",gap:5,marginBottom:16,background:"rgba(255,255,255,0.15)",borderRadius:20,padding:"4px 11px",border:"1px solid rgba(255,255,255,0.2)"}}>
+          <span style={{width:7,height:7,borderRadius:"50%",background:contratActif?"#4ade80":"#f87171",display:"inline-block",boxShadow:contratActif?"0 0 6px #4ade80":"0 0 6px #f87171"}}/>
+          <span style={{fontSize:12,color:"#fff",fontWeight:500}}>Contrat {contratActif?"actif":"expiré"}</span>
+        </div>
+
+        {/* Stats row */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          <div className="cv-glass" style={{borderRadius:12,padding:"11px 13px"}}>
+            <div style={{fontSize:10,color:"rgba(255,255,255,0.65)",marginBottom:3,display:"flex",alignItems:"center",gap:4}}>
+              <svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.65)" strokeWidth="2.5" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              Fin de contrat
+            </div>
+            <div style={{fontSize:14,fontWeight:600,color:"#fff"}}>
+              {client.dateFin ? fmtDate(client.dateFin,{day:"2-digit",month:"short",year:"numeric"}) : "—"}
+            </div>
+          </div>
+          <div className="cv-glass" style={{borderRadius:12,padding:"11px 13px"}}>
+            <div style={{fontSize:10,color:"rgba(255,255,255,0.65)",marginBottom:3,display:"flex",alignItems:"center",gap:4}}>
+              <svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.65)" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+              Visites restantes
+            </div>
+            <div style={{fontSize:14,fontWeight:600,color:"#fff",display:"flex",alignItems:"baseline",gap:4}}>
+              {visitesRestantes}
+              <span style={{fontSize:11,fontWeight:400,color:"rgba(255,255,255,0.55)"}}>/ {totalVisitesPrevues}</span>
+            </div>
+            <div style={{fontSize:9,color:"rgba(255,255,255,0.55)",marginTop:2}}>1 rapport créé = 1 passage déduit</div>
+            {/* Progress bar */}
+            <div style={{marginTop:6,height:3,background:"rgba(255,255,255,0.2)",borderRadius:2,overflow:"hidden"}}>
+              <div style={{width:`${progressPct}%`,height:"100%",background:"rgba(255,255,255,0.8)",borderRadius:2,animation:"cv-progress 1s ease both 0.4s"}}/>
+            </div>
+          </div>
+        </div>
       </div>
-      {filtered.length===0&&<div style={{textAlign:"center",color:DS.mid,padding:40,fontSize:13}}>Aucun client trouvé</div>}
-      <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:10}}>
-        {filtered.map((c,idx)=>{
-          const al=alerteClient(c,passages); const col=AC[al];
-          const contratClient = getContrat(c.id);
-          // Important : si le planning est modifié depuis la partie contrat/planning,
-          // on fusionne ces données avec la fiche client avant de recalculer.
-          const clientAvecContrat = contratClient ? { ...c, contrat: { ...(c.contrat || {}), ...contratClient } } : c;
-          const tot = getTotalContratClient(clientAvecContrat); // calculé selon les dates du contrat + planning mensuel modifié
-          const planningTotal = tot;
-          const cs=(clientAvecContrat.dateDebut || clientAvecContrat.contrat?.dateDebut)?String(clientAvecContrat.dateDebut || clientAvecContrat.contrat?.dateDebut).slice(0,10):null; const ce=(clientAvecContrat.dateFin || clientAvecContrat.contrat?.dateFin)?String(clientAvecContrat.dateFin || clientAvecContrat.contrat?.dateFin).slice(0,10):null;
-          const inC=(p)=>{const ds=String(p.date).slice(0,10);return cs&&ce?ds>=cs&&ds<=ce:new Date(p.date).getFullYear()===YEAR_NOW;};
-          const passagesDeduits = passages.filter(p=>p.clientId===c.id&&inC(p)&&isPassageDeductible(p));
-          const eff=passagesDeduits.length;
-          const pct=tot>0?Math.round(eff/tot*100):0;
-          const rest=Math.max(0,tot-eff);
-          const accentColor=al==="rouge"?DS.red:al==="jaune"?"#d97706":al==="orange"?"#d97706":DS.green;
+    </div>
+  );
+
+  // ─── SECTION HEADER ────────────────────────────────────────────────────────
+  const SectionHead = ({icon, title, action, onAction}) => (
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 0 8px"}}>
+      <div style={{display:"flex",alignItems:"center",gap:7}}>
+        <div style={{width:28,height:28,borderRadius:8,background:"#e0f2fe",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.2" strokeLinecap="round">{icon}</svg>
+        </div>
+        <span style={{fontSize:14,fontWeight:600,color:"#0f172a"}}>{title}</span>
+      </div>
+      {action && <button onClick={onAction} style={{fontSize:12,color:"#0891b2",border:"none",cursor:"pointer",fontFamily:"inherit",fontWeight:500,padding:"4px 8px",borderRadius:6,background:"#f0f9ff"}}>{action} →</button>}
+    </div>
+  );
+
+  // ─── DERNIÈRE INTERVENTION ─────────────────────────────────────────────────
+  const DerniereIntervention = () => last ? (
+    <div style={{padding:"0 12px"}}>
+      <SectionHead
+        icon={<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>}
+        title="Dernière intervention"
+      />
+      <div className="cv-card-hover" onClick={()=>setSelectedPassage(last)} style={{
+        background:"#fff",borderRadius:16,border:"1px solid #e2e8f0",overflow:"hidden",
+        boxShadow:"0 2px 12px rgba(0,0,0,0.06)",cursor:"pointer",
+      }}>
+        {/* Bande colorée en haut */}
+        <div style={{height:3,background:"linear-gradient(90deg,#0891b2,#38bdf8,#7dd3fc)"}}/>
+        <div style={{padding:"14px 16px",display:"flex",alignItems:"center",gap:14}}>
+          {/* Date bloc */}
+          <div style={{textAlign:"center",minWidth:52,background:"#f0f9ff",borderRadius:10,padding:"8px 4px"}}>
+            <div style={{fontSize:9,color:"#0891b2",textTransform:"uppercase",letterSpacing:0.5,fontWeight:600}}>{fmtDate(last.date,{weekday:"short"})}</div>
+            <div style={{fontSize:26,fontWeight:700,color:"#0891b2",lineHeight:1.1}}>{fmtDate(last.date,{day:"2-digit"})}</div>
+            <div style={{fontSize:10,color:"#64748b"}}>{fmtDate(last.date,{month:"short"})}</div>
+          </div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:14,fontWeight:600,color:"#0f172a",marginBottom:3}}>{last.type||"Entretien"}</div>
+            <div style={{fontSize:12,color:"#64748b",display:"flex",alignItems:"center",gap:4}}>
+              <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              {last.heure||"09:00"}{last.tech&&<> · <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>{last.tech}</>}
+            </div>
+            {(getPH(last)||getCL(last))&&(
+              <div style={{display:"flex",gap:5,marginTop:7}}>
+                {getPH(last)&&<span style={{fontSize:11,fontWeight:600,padding:"2px 8px",borderRadius:6,background:phOk(getPH(last))?"#dcfce7":"#fef3c7",color:phOk(getPH(last))?"#15803d":"#92400e"}}>pH {getPH(last)}</span>}
+                {getCL(last)&&<span style={{fontSize:11,fontWeight:600,padding:"2px 8px",borderRadius:6,background:clOk(getCL(last))?"#dcfce7":"#fef3c7",color:clOk(getCL(last))?"#15803d":"#92400e"}}>Cl {getCL(last)}</span>}
+                {getTemp(last)&&<span style={{fontSize:11,fontWeight:600,padding:"2px 8px",borderRadius:6,background:"#e0f2fe",color:"#0369a1"}}>{getTemp(last)}°C</span>}
+              </div>
+            )}
+          </div>
+          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  // ─── RAPPORTS LIST ─────────────────────────────────────────────────────────
+  const RapportsList = ({list, showAll}) => (
+    <div style={{padding:"0 12px"}}>
+      <SectionHead
+        icon={<><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></>}
+        title={showAll?"Tous les rapports":"Rapports d'intervention"}
+        action={!showAll&&passClient.length>3?"Voir tout":null}
+        onAction={()=>setActiveTab("historique")}
+      />
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {list.length===0&&(
+          <div style={{background:"#fff",borderRadius:14,border:"1px solid #e2e8f0",padding:"32px",textAlign:"center",color:"#94a3b8",fontSize:13}}>
+            <div style={{fontSize:32,marginBottom:8}}>📋</div>
+            Aucune intervention enregistrée
+          </div>
+        )}
+        {list.map((p,i)=>{
+          const ph=getPH(p); const cl=getCL(p); const tmp=getTemp(p);
+          const isNew = i===0;
           return (
-            <div key={c.id} onClick={()=>onClientClick(c)} className="fade-in card-hover"
-              style={{animationDelay:`${idx*0.03}s`,background:"rgba(255,255,255,0.45)",borderRadius:DS.radius,
-                overflow:openPicker===c.id?"visible":"hidden",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",
-                border:"1px solid "+DS.border,borderTop:"2px solid "+accentColor,
-                cursor:"pointer",display:"flex",flexDirection:"column",position:"relative",zIndex:openPicker===c.id?999:1}}>
-              {c.photoPiscine&&(
-                <div style={{height:72,background:`url(${c.photoPiscine}) center/cover`,position:"relative",flexShrink:0}}>
-                  <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,transparent 40%,rgba(0,0,0,0.35))"}}/>
+            <div key={p.id||i} className="cv-rapport-row" onClick={()=>setSelectedPassage(p)} style={{
+              background:"#fff",borderRadius:14,
+              border:`1px solid ${isNew?"#bae6fd":"#e2e8f0"}`,
+              boxShadow:isNew?"0 2px 12px rgba(8,145,178,0.1)":"0 1px 4px rgba(0,0,0,0.04)",
+              overflow:"hidden",
+            }}>
+              {isNew&&<div style={{height:2,background:"linear-gradient(90deg,#0891b2,#7dd3fc)"}}/>}
+              <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:38,height:38,borderRadius:10,background:isControleType(p.type)?"#e0f2fe":"#eff6ff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  {isControleType(p.type)
+                    ? <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.2" strokeLinecap="round"><path d="M12 2C6 2 2 12 2 12s4 10 10 10 10-10 10-10S18 2 12 2z"/></svg>
+                    : <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2.2" strokeLinecap="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+                  }
                 </div>
-              )}
-              <div style={{padding:"12px",flex:1,display:"flex",flexDirection:"column",gap:7}}>
-                <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
-                  <Avatar nom={c.nom} size={34}/>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontWeight:700,fontSize:13,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
-                    <div style={{display:"flex",gap:4,marginTop:3,flexWrap:"wrap"}}>
-                      <span style={{background:"rgba(255,255,255,0.4)",color:DS.mid,padding:"1px 7px",borderRadius:20,fontWeight:600,fontSize:10,border:"1px solid "+DS.border}}>{c.formule}</span>
-                      {c.bassin&&<span style={{background:DS.light,color:DS.mid,padding:"1px 6px",borderRadius:20,fontWeight:500,fontSize:10}}>{c.bassin}</span>}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:"#0f172a"}}>{p.type||"Contrôle de l'eau"}</div>
+                  <div style={{fontSize:11,color:"#64748b",marginTop:1}}>{fmtDate(p.date,{weekday:"long",day:"2-digit",month:"short",year:"numeric"})}</div>
+                  {(ph||cl||tmp)&&(
+                    <div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap"}}>
+                      {ph&&<span style={{fontSize:11,fontWeight:600,padding:"2px 7px",borderRadius:5,background:phOk(ph)?"#dcfce7":"#fef3c7",color:phOk(ph)?"#15803d":"#92400e"}}>pH {ph}</span>}
+                      {cl&&<span style={{fontSize:11,fontWeight:600,padding:"2px 7px",borderRadius:5,background:clOk(cl)?"#dcfce7":"#fef3c7",color:clOk(cl)?"#15803d":"#92400e"}}>Cl {cl}</span>}
+                      {tmp&&<span style={{fontSize:11,fontWeight:600,padding:"2px 7px",borderRadius:5,background:"#e0f2fe",color:"#0369a1"}}>{tmp}°C</span>}
                     </div>
-                  </div>
-                  <Tag color={col.tx} bg={col.bg} style={{fontSize:9,fontWeight:700,flexShrink:0,padding:"2px 6px"}}>{col.lbl}</Tag>
+                  )}
                 </div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:3}}>
-                  <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"rgba(255,255,255,0.45)",border:"1px solid "+DS.border}}>
-                    <div style={{fontSize:13,fontWeight:800,color:DS.blue}}>{eff}<span style={{fontSize:9,color:DS.mid}}>/{tot}</span></div>
-                    <div style={{fontSize:9,color:DS.mid}}>Rapports</div>
-                  </div>
-                  <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"rgba(255,255,255,0.45)",border:"1px solid "+DS.border}}>
-                    <div style={{fontSize:13,fontWeight:800,color:rest>0?"#b45309":DS.green}}>{rest}</div>
-                    <div style={{fontSize:9,color:DS.mid}}>Restants</div>
-                  </div>
-                  <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"rgba(255,255,255,0.45)",border:"1px solid "+DS.border}}>
-                    <div style={{fontSize:13,fontWeight:800,color:DS.teal}}>{planningTotal}</div>
-                    <div style={{fontSize:9,color:DS.mid}}>Plan contrat</div>
-                  </div>
-                </div>
-                {tot>0&&<div style={{height:3,background:DS.light,borderRadius:99,overflow:"hidden"}}>
-                  <div style={{height:"100%",width:`${pct}%`,background:pct>=100?"#059669":pct>=50?"#0891b2":"#f59e0b",borderRadius:99}}/>
-                </div>}
-                {/* Badge statut contrat — cliquable */}
-                {(()=>{
-                  const meta = getStatutMeta(c.id);
-                  const isOpen = openPicker===c.id;
-                  return (
-                    <div style={{position:"relative"}}>
-                      <button onClick={e=>{e.stopPropagation();setOpenPicker(isOpen?null:c.id);}}
-                        style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"4px 8px",borderRadius:6,background:meta.bg,border:"1px solid "+meta.border,cursor:"pointer",fontFamily:"inherit"}}>
-                        <span style={{fontSize:10,fontWeight:700,color:meta.color}}>{meta.label}</span>
-                        <svg width={8} height={8} viewBox="0 0 24 24" fill="none" stroke={meta.color} strokeWidth="3" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-                      </button>
-                      {isOpen&&(
-                        <div onClick={e=>e.stopPropagation()} style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,background:"rgba(255,255,255,0.45)",borderRadius:8,boxShadow:"0 4px 20px rgba(0,0,0,0.15)",border:"1px solid "+DS.border,zIndex:100,overflow:"auto",maxHeight:220}}>
-                          {CONTRAT_STATUTS.map(s=>(
-                            <button key={s.key} onClick={()=>setStatut(c.id,s.key)}
-                              style={{width:"100%",display:"flex",alignItems:"center",gap:6,padding:"7px 10px",background:meta.key===s.key?s.bg:DS.white,border:"none",cursor:"pointer",fontFamily:"inherit",borderBottom:"1px solid "+DS.light}}>
-                              <span style={{fontSize:11,fontWeight:meta.key===s.key?700:500,color:meta.key===s.key?s.color:DS.dark}}>{s.label}</span>
-                              {meta.key===s.key&&<svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke={s.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft:"auto"}}><polyline points="20 6 9 17 4 12"/></svg>}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
+                <button className="cv-btn-press" style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:"#0891b2",background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:8,padding:"6px 9px",cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit",flexShrink:0}}
+                  onClick={e=>{e.stopPropagation(); ouvrirRapport(p, client);}}>
+                  <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  PDF
+                </button>
               </div>
             </div>
           );
         })}
       </div>
+    </div>
+  );
+
+  // ─── RAPPORT DÉTAILLÉ ──────────────────────────────────────────────────────
+  const RapportDetail = () => {
+    if (!last) return null;
+    const params = [
+      {label:"pH", val:getPH(last), unit:"", color:phOk(getPH(last))?"#ea580c":"#dc2626", ok:phOk(getPH(last)), okLabel:"Idéal", koLabel:"Revoir"},
+      {label:"Chlore libre", val:getCL(last), unit:"mg/L", color:clOk(getCL(last))?"#16a34a":"#dc2626", ok:clOk(getCL(last)), okLabel:"Idéal", koLabel:"Revoir"},
+      {label:"Alcalinité", val:last.alcalinite, unit:"mg/L", color:"#0891b2", ok:last.alcalinite>=80&&last.alcalinite<=120, okLabel:"Correct", koLabel:"Revoir"},
+      {label:"Stabilisant", val:last.stabilisant, unit:"mg/L", color:"#0891b2", ok:last.stabilisant>=20&&last.stabilisant<=50, okLabel:"Correct", koLabel:"Revoir"},
+      {label:"Température", val:getTemp(last), unit:"°C", color:"#0284c7", ok:true, okLabel:"Eau idéale", koLabel:""},
+    ].filter(p=>p.val!==null&&p.val!==undefined&&p.val!=="");
+    if (params.length===0) return null;
+    return (
+      <div style={{padding:"0 12px"}}>
+        <SectionHead
+          icon={<><path d="M12 2C6 2 2 12 2 12s4 10 10 10 10-10 10-10S18 2 12 2z"/></>}
+          title="Dernier rapport détaillé"
+        />
+        <div style={{background:"#fff",borderRadius:16,border:"1px solid #e2e8f0",overflow:"hidden",boxShadow:"0 2px 12px rgba(0,0,0,0.05)"}}>
+          {/* Header */}
+          <div style={{padding:"13px 16px 11px",borderBottom:"1px solid #f1f5f9",display:"flex",alignItems:"flex-start",justifyContent:"space-between",background:"linear-gradient(135deg,#f0f9ff,#fff)"}}>
+            <div>
+              <div style={{fontSize:13,fontWeight:700,color:"#0891b2",marginBottom:2}}>{last.type||"Contrôle de l'eau"}</div>
+              <div style={{fontSize:11,color:"#64748b"}}>{fmtDate(last.date,{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}{last.heure?` · ${last.heure}`:""}</div>
+              {last.tech&&<div style={{fontSize:11,color:"#94a3b8",marginTop:2,display:"flex",alignItems:"center",gap:3}}>
+                <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                {last.tech}
+              </div>}
+            </div>
+            <button className="cv-btn-press" style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:"#0891b2",background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:10,padding:"7px 11px",cursor:"pointer",flexShrink:0,fontFamily:"inherit",fontWeight:500}} onClick={()=>ouvrirRapport(last,client)}>
+              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Télécharger
+            </button>
+          </div>
+          {/* Params grid */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)"}}>
+            {params.map((p,i)=>{
+              const col3 = (i+1)%3===0 || i===params.length-1;
+              const lastRow = i >= params.length-3;
+              const wide = i===params.length-1 && params.length%3!==0;
+              return (
+                <div key={p.label} className="cv-param-cell" style={{
+                  padding:"12px 12px",
+                  borderRight:col3?"none":"1px solid #f1f5f9",
+                  borderBottom:lastRow?"none":"1px solid #f1f5f9",
+                  gridColumn:wide?`span ${3-(params.length-1)%3}`:"span 1",
+                }}>
+                  <div style={{fontSize:10,color:"#94a3b8",marginBottom:5,letterSpacing:"0.2px"}}>{p.label}</div>
+                  <div style={{fontSize:p.label==="pH"?24:20,fontWeight:700,color:p.ok?p.color:"#dc2626",lineHeight:1,marginBottom:4}}>
+                    {p.val}
+                    {p.unit&&<span style={{fontSize:11,fontWeight:400,color:"#94a3b8",marginLeft:2}}>{p.unit}</span>}
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:4}}>
+                    <span style={{
+                      width:6,height:6,borderRadius:"50%",flexShrink:0,
+                      background:p.ok?"#22c55e":"#ef4444",
+                      boxShadow:p.ok?"0 0 5px rgba(34,197,94,0.5)":"0 0 5px rgba(239,68,68,0.5)",
+                    }}/>
+                    <span style={{fontSize:10,color:p.ok?"#16a34a":"#dc2626",fontWeight:500}}>{p.ok?p.okLabel:p.koLabel}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {/* Remarques */}
+          {getResume(last)&&(
+            <div style={{padding:"12px 16px",background:"#f8fafc",borderTop:"1px solid #f1f5f9",display:"flex",alignItems:"flex-start",gap:10}}>
+              <div style={{width:28,height:28,borderRadius:8,background:"#dcfce7",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1}}>
+                <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.2" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <div>
+                <div style={{fontSize:11,fontWeight:600,color:"#0f172a",marginBottom:3}}>Remarques</div>
+                <div style={{fontSize:12,color:"#64748b",lineHeight:1.6}}>{getResume(last)}</div>
+              </div>
+            </div>
+          )}
+          {last.obs&&(
+            <div style={{padding:"12px 16px",background:"#fffbeb",borderTop:"1px solid #fef3c7",display:"flex",alignItems:"flex-start",gap:10}}>
+              <div style={{width:28,height:28,borderRadius:8,background:"#fef9c3",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1}}>
+                <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#ca8a04" strokeWidth="2.2" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              </div>
+              <div>
+                <div style={{fontSize:11,fontWeight:600,color:"#92400e",marginBottom:3}}>Observations</div>
+                <div style={{fontSize:12,color:"#78350f",lineHeight:1.6}}>{last.obs}</div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // ─── PRODUITS TAB ──────────────────────────────────────────────────────────
+  const ProduitsTab = () => {
+    const livs = passClient.filter(p=>getProduitsLivres(p).length>0);
+    return (
+      <div style={{padding:"0 12px"}}>
+        <SectionHead
+          icon={<><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></>}
+          title="Produits livrés"
+        />
+        {livs.length===0
+          ? <div style={{background:"#fff",borderRadius:14,border:"1px solid #e2e8f0",padding:"40px 24px",textAlign:"center"}}>
+              <div style={{width:48,height:48,background:"#f1f5f9",borderRadius:14,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px"}}>
+                <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.8" strokeLinecap="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+              </div>
+              <div style={{fontSize:14,fontWeight:600,color:"#64748b",marginBottom:4}}>Aucune livraison</div>
+              <div style={{fontSize:12,color:"#94a3b8"}}>Les livraisons de produits apparaîtront ici</div>
+            </div>
+          : <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {livs.map((p,i)=>(
+                <div key={p.id||i} style={{background:"#fff",borderRadius:14,border:"1px solid #e2e8f0",padding:"12px 14px",display:"flex",alignItems:"center",gap:12,boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
+                  <div style={{width:40,height:40,background:"linear-gradient(135deg,#f0fdf4,#dcfce7)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,border:"1px solid #bbf7d0"}}>
+                    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:600,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{getProduitsLivres(p).join(", ")}</div>
+                    <div style={{fontSize:11,color:"#64748b",marginTop:1}}>{fmtDate(p.date,{day:"2-digit",month:"short",year:"numeric"})}</div>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:4,background:"#f0fdf4",color:"#15803d",borderRadius:8,padding:"4px 9px",fontSize:11,fontWeight:600,flexShrink:0,border:"1px solid #bbf7d0"}}>
+                    <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    Livré
+                  </div>
+                </div>
+              ))}
+            </div>
+        }
+      </div>
+    );
+  };
+
+  // ─── PROFIL TAB ────────────────────────────────────────────────────────────
+  const ProfilTab = () => (
+    <div style={{padding:"0 12px"}}>
+      <SectionHead
+        icon={<><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></>}
+        title="Mon profil"
+      />
+      {/* Avatar card */}
+      <div style={{background:"linear-gradient(135deg,#0891b2,#0e7490)",borderRadius:16,padding:"20px 16px",marginBottom:8,display:"flex",alignItems:"center",gap:14,position:"relative",overflow:"hidden",boxShadow:"0 4px 18px rgba(8,145,178,0.3)"}}>
+        <div style={{position:"absolute",right:-20,top:-20,width:100,height:100,borderRadius:"50%",background:"rgba(255,255,255,0.07)"}}/>
+        <div style={{width:52,height:52,background:"rgba(255,255,255,0.2)",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,border:"2px solid rgba(255,255,255,0.3)"}}>
+          <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
+        <div>
+          <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:4}}>{client.nom}</div>
+          <div style={{display:"inline-flex",alignItems:"center",gap:5,background:"rgba(255,255,255,0.18)",borderRadius:20,padding:"3px 10px",border:"1px solid rgba(255,255,255,0.2)"}}>
+            <span style={{width:6,height:6,borderRadius:"50%",background:contratActif?"#4ade80":"#f87171",display:"inline-block",boxShadow:contratActif?"0 0 5px #4ade80":"0 0 5px #f87171"}}/>
+            <span style={{fontSize:11,color:"#fff",fontWeight:500}}>Contrat {contratActif?"actif":"expiré"}</span>
+          </div>
+        </div>
+      </div>
+      {/* Infos card */}
+      <div style={{background:"#fff",borderRadius:14,border:"1px solid #e2e8f0",overflow:"hidden",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
+        {[
+          client.bassin&&{label:"Type de bassin",val:client.bassin,icon:<rect x="2" y="6" width="20" height="12" rx="2"/>},
+          client.volume&&{label:"Volume",val:client.volume+"m³",icon:<><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/></>},
+          client.formule&&{label:"Formule",val:client.formule,icon:<><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></>},
+          client.dateDebut&&{label:"Début contrat",val:fmtDate(client.dateDebut,{day:"2-digit",month:"long",year:"numeric"}),icon:<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>},
+          client.dateFin&&{label:"Fin contrat",val:fmtDate(client.dateFin,{day:"2-digit",month:"long",year:"numeric"}),icon:<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>},
+          {label:"Passages prévus contrat",val:`${totalVisitesPrevues} passage${totalVisitesPrevues!==1?"s":""}`,icon:<><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></>},
+          {label:"Rapports déduits",val:`${visitesEffectuees} passage${visitesEffectuees!==1?"s":""}`,icon:<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>},
+          {label:"Passages restants",val:`${visitesRestantes} passage${visitesRestantes!==1?"s":""}`,icon:<><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></>},
+        ].filter(Boolean).map((row,i,arr)=>(
+          <div key={row.label} style={{padding:"12px 16px",display:"flex",alignItems:"center",gap:12,borderBottom:i<arr.length-1?"1px solid #f8fafc":"none"}}>
+            <div style={{width:30,height:30,background:"#f0f9ff",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round">{row.icon}</svg>
+            </div>
+            <span style={{fontSize:13,color:"#64748b",flex:1}}>{row.label}</span>
+            <span style={{fontSize:13,fontWeight:600,color:"#0f172a"}}>{row.val}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  // ─── BOTTOM SHEET PASSAGE ──────────────────────────────────────────────────
+  const PassageSheet = () => {
+    const p = selectedPassage;
+    if (!p) return null;
+    return (
+      <div onClick={()=>setSelectedPassage(null)} style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.6)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:10002,backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",animation:"cv-fadeIn 0.2s ease"}}>
+        <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,maxHeight:"92vh",overflowY:"auto",WebkitOverflowScrolling:"touch",boxShadow:"0 -20px 60px rgba(0,0,0,0.25)",paddingBottom:"max(32px,env(safe-area-inset-bottom,32px))",animation:"cv-fadeUp 0.3s ease"}}>
+          {/* Handle */}
+          <div style={{padding:"14px 0 4px",display:"flex",justifyContent:"center"}}>
+            <div style={{width:40,height:4,background:"#e2e8f0",borderRadius:2}}/>
+          </div>
+          {/* Bande type */}
+          <div style={{height:3,background:isControleType(p.type)?"linear-gradient(90deg,#0891b2,#38bdf8)":"linear-gradient(90deg,#3b82f6,#93c5fd)",margin:"0 22px",borderRadius:2}}/>
+          <div style={{padding:"16px 22px 0"}}>
+            {/* Header */}
+            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:18}}>
+              <div>
+                <div style={{fontSize:19,fontWeight:700,color:"#0f172a",marginBottom:4}}>{p.type||"Entretien"}</div>
+                <div style={{fontSize:12,color:"#64748b",display:"flex",alignItems:"center",gap:5}}>
+                  <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  {fmtDate(p.date,{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}
+                </div>
+                {p.tech&&<div style={{fontSize:12,color:"#64748b",marginTop:3,display:"flex",alignItems:"center",gap:5}}>
+                  <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  {p.tech}
+                </div>}
+              </div>
+              <button onClick={()=>setSelectedPassage(null)} style={{width:34,height:34,borderRadius:10,background:"#f1f5f9",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+
+            {/* Mesures */}
+            {(getPH(p)||getCL(p)||getTemp(p))&&(
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:14}}>
+                {[
+                  getPH(p)&&{label:"pH",val:getPH(p),ok:phOk(getPH(p)),color:phOk(getPH(p))?"#ea580c":"#dc2626",okLabel:"Idéal",koLabel:"Revoir",bg:phOk(getPH(p))?"#f0fdf4":"#fff7ed",border:phOk(getPH(p))?"#86efac":"#fed7aa"},
+                  getCL(p)&&{label:"Chlore",val:getCL(p),ok:clOk(getCL(p)),color:clOk(getCL(p))?"#16a34a":"#dc2626",okLabel:"Idéal",koLabel:"Revoir",bg:clOk(getCL(p))?"#f0fdf4":"#fff7ed",border:clOk(getCL(p))?"#86efac":"#fed7aa"},
+                  getTemp(p)&&{label:"Temp.",val:getTemp(p)+"°",ok:true,color:"#0284c7",okLabel:"Eau",koLabel:"",bg:"#e0f2fe",border:"#bae6fd"},
+                ].filter(Boolean).map(m=>(
+                  <div key={m.label} style={{borderRadius:14,padding:"12px 6px",textAlign:"center",background:m.bg,border:`1.5px solid ${m.border}`}}>
+                    <div style={{fontSize:10,fontWeight:600,color:m.ok?"#166534":"#92400e",textTransform:"uppercase",letterSpacing:.4,marginBottom:5}}>{m.label}</div>
+                    <div style={{fontSize:28,fontWeight:700,color:m.color,lineHeight:1}}>{m.val}</div>
+                    <div style={{fontSize:10,fontWeight:600,marginTop:5,color:m.ok?m.color:"#dc2626"}}>{m.ok?`✓ ${m.okLabel}`:`⚠ ${m.koLabel}`}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* TAC + CYA */}
+            {(p.alcalinite||p.stabilisant)&&(
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+                {p.alcalinite&&<div style={{background:"#e0f2fe",borderRadius:10,padding:"10px 12px",border:"1px solid #bae6fd"}}>
+                  <div style={{fontSize:9,fontWeight:600,color:"#0369a1",textTransform:"uppercase",marginBottom:3}}>Alcalinité (TAC)</div>
+                  <div style={{fontSize:20,fontWeight:700,color:"#0284c7"}}>{p.alcalinite} <span style={{fontSize:10,fontWeight:400,color:"#64748b"}}>mg/L</span></div>
+                </div>}
+                {p.stabilisant&&<div style={{background:"#e0f2fe",borderRadius:10,padding:"10px 12px",border:"1px solid #bae6fd"}}>
+                  <div style={{fontSize:9,fontWeight:600,color:"#0369a1",textTransform:"uppercase",marginBottom:3}}>Stabilisant (CYA)</div>
+                  <div style={{fontSize:20,fontWeight:700,color:"#0284c7"}}>{p.stabilisant} <span style={{fontSize:10,fontWeight:400,color:"#64748b"}}>mg/L</span></div>
+                </div>}
+              </div>
+            )}
+
+            {/* Qualité eau */}
+            {p.qualiteEau&&(
+              <div style={{background:"#f8fafc",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:10,border:"1px solid #e2e8f0"}}>
+                <span style={{fontSize:18}}>{p.qualiteEau==="Cristalline"?"💎":p.qualiteEau==="Verte"?"🌿":"🌫️"}</span>
+                <div>
+                  <div style={{fontSize:10,fontWeight:600,color:"#64748b",textTransform:"uppercase",marginBottom:1}}>Qualité eau</div>
+                  <div style={{fontSize:13,fontWeight:600,color:"#0f172a"}}>{p.qualiteEau}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Produits apportés */}
+            {(p.corrChlore||p.corrPH||p.corrAlgicide||p.corrAlcafix||p.corrSel||p.corrChloreChoc||p.corrPeroxyde||p.corrPhosphate||p.corrAutre)&&(
+              <div style={{background:"#f5f3ff",borderRadius:12,padding:"12px 14px",marginBottom:12,border:"1px solid #e9d5ff"}}>
+                <div style={{fontSize:10,fontWeight:700,color:"#6d28d9",textTransform:"uppercase",letterSpacing:.7,marginBottom:8,display:"flex",alignItems:"center",gap:5}}>
+                  <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 3h6v5l3 9a3 3 0 01-3 3H9a3 3 0 01-3-3l3-9V3z"/></svg>
+                  Produits apportés
+                </div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                  {[["Chlore",p.corrChlore],["pH",p.corrPH],["Sel",p.corrSel],["Algicide",p.corrAlgicide],["Chlore choc",p.corrChloreChoc],["Peroxyde",p.corrPeroxyde],["Phosphate",p.corrPhosphate],["Alcafix",p.corrAlcafix],["Autre",p.corrAutre]]
+                    .filter(([,v])=>v).map(([k,v])=>(
+                    <span key={k} style={{fontSize:12,fontWeight:500,color:"#6d28d9",background:"#ede9fe",borderRadius:7,padding:"3px 9px",border:"1px solid #ddd6fe"}}>{k}: {v}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Compte-rendu */}
+            {getResume(p)&&(
+              <div style={{background:"#f8fafc",borderRadius:12,padding:"12px 14px",marginBottom:12,border:"1px solid #e2e8f0"}}>
+                <div style={{fontSize:10,fontWeight:600,color:"#64748b",textTransform:"uppercase",letterSpacing:.7,marginBottom:6,display:"flex",alignItems:"center",gap:5}}>
+                  <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.2" strokeLinecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  Compte-rendu
+                </div>
+                <div style={{fontSize:13,color:"#334155",lineHeight:1.7}}>{getResume(p)}</div>
+              </div>
+            )}
+
+            {/* Obs */}
+            {(p.obs||p.commentaires)&&(
+              <div style={{background:"#fffbeb",borderRadius:12,padding:"12px 14px",marginBottom:12,borderLeft:"3px solid #fbbf24"}}>
+                <div style={{fontSize:10,fontWeight:600,color:"#92400e",textTransform:"uppercase",letterSpacing:.7,marginBottom:6}}>Observations</div>
+                <div style={{fontSize:13,color:"#78350f",lineHeight:1.7}}>{p.obs||p.commentaires}</div>
+              </div>
+            )}
+
+            {/* Produits livrés */}
+            {getProduitsLivres(p).length>0&&(
+              <div style={{background:"#f0fdf4",borderRadius:12,padding:"12px 14px",marginBottom:12,border:"1px solid #bbf7d0"}}>
+                <div style={{fontSize:10,fontWeight:700,color:"#15803d",textTransform:"uppercase",letterSpacing:.7,marginBottom:6,display:"flex",alignItems:"center",gap:5}}>
+                  <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                  Produits livrés
+                </div>
+                <div style={{fontSize:13,color:"#065f46",lineHeight:1.6}}>{getProduitsLivres(p).join(", ")}</div>
+              </div>
+            )}
+
+            {/* Photos */}
+            {(p.photoArrivee||p.photoDepart||(p.photos||[]).some(Boolean))&&(
+              <div style={{marginBottom:12}}>
+                <div style={{fontSize:10,fontWeight:600,color:"#64748b",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>Photos</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8}}>
+                  {[p.photoArrivee?{src:p.photoArrivee,lbl:"Arrivée"}:null,...((p.photos||[]).filter(Boolean).map((s,i)=>({src:s,lbl:`Photo ${i+2}`}))),p.photoDepart?{src:p.photoDepart,lbl:"Départ"}:null].filter(Boolean).map((ph,i)=>(
+                    <div key={i} style={{position:"relative",borderRadius:10,overflow:"hidden"}}>
+                      <img src={ph.src} alt={ph.lbl} style={{width:"100%",height:110,objectFit:"cover",display:"block"}}/>
+                      <span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>{ph.lbl}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {!getPH(p)&&!getCL(p)&&!getResume(p)&&!p.qualiteEau&&(
+              <div style={{textAlign:"center",padding:"24px 0",color:"#94a3b8",fontSize:13}}>
+                <div style={{fontSize:32,marginBottom:8}}>📝</div>
+                Aucune mesure enregistrée.
+              </div>
+            )}
+
+            {/* Bouton télécharger */}
+            <button className="cv-btn-press" style={{width:"100%",marginTop:8,padding:"14px",background:"linear-gradient(135deg,#0891b2,#0e7490)",border:"none",borderRadius:14,fontSize:14,color:"#fff",fontWeight:600,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 14px rgba(8,145,178,0.4)"}}
+              onClick={()=>ouvrirRapport(p,client)}>
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Télécharger le rapport PDF
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ─── SOS MODAL ─────────────────────────────────────────────────────────────
+  const SOSModal = () => !showSOS ? null : (
+    <div onClick={()=>setShowSOS(false)} style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.65)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:10003,backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",animation:"cv-fadeIn 0.2s ease"}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,padding:"0 22px",paddingBottom:"max(32px,env(safe-area-inset-bottom,32px))",animation:"cv-fadeUp 0.3s ease",overflow:"hidden"}}>
+        {/* Bande rouge */}
+        <div style={{height:4,background:"linear-gradient(90deg,#dc2626,#f87171)",margin:"0 -22px 20px",marginTop:0}}/>
+        <div style={{display:"flex",justifyContent:"center",marginBottom:4}}><div style={{width:40,height:4,background:"#e2e8f0",borderRadius:2}}/></div>
+        <div style={{textAlign:"center",padding:"16px 0 24px"}}>
+          <div style={{width:68,height:68,background:"linear-gradient(135deg,#fee2e2,#fecaca)",borderRadius:20,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px",border:"2px solid #fca5a5",boxShadow:"0 6px 20px rgba(220,38,38,0.2)"}}>
+            <svg width={30} height={30} viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <div style={{fontSize:20,fontWeight:700,color:"#0f172a",marginBottom:6}}>Besoin d'aide urgent ?</div>
+          <div style={{fontSize:13,color:"#64748b",lineHeight:1.5}}>Contactez directement votre technicien BRIBLUE pour toute urgence piscine</div>
+        </div>
+        <a href="tel:+33667186115" className="cv-btn-press" style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,background:"linear-gradient(135deg,#0891b2,#0e7490)",color:"#fff",borderRadius:16,padding:"17px",fontSize:16,fontWeight:700,textDecoration:"none",marginBottom:10,boxShadow:"0 6px 20px rgba(8,145,178,0.4)"}}>
+          <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.01 1.18 2 2 0 012 0h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 14.92z"/></svg>
+          06 67 18 61 15
+        </a>
+        <button onClick={()=>setShowSOS(false)} className="cv-btn-press" style={{width:"100%",padding:"14px",background:"#f1f5f9",border:"none",borderRadius:14,fontSize:14,color:"#64748b",fontWeight:500,cursor:"pointer",fontFamily:"inherit",transition:"background 0.15s"}}>
+          Fermer
+        </button>
+      </div>
+    </div>
+  );
+
+  // ─── RENDER ────────────────────────────────────────────────────────────────
+  return (
+    <div className="cv-root" style={{background:"#f0f6fb",minHeight:"100vh",maxWidth:480,margin:"0 auto"}}>
+      {/* HEADER */}
+      <div style={{background:"rgba(255,255,255,0.9)",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",padding:"13px 16px 11px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid rgba(226,232,240,0.8)",position:"sticky",top:0,zIndex:100}}>
+        <div style={{width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:8,color:"#94a3b8"}}>
+          <svg width={18} height={14} viewBox="0 0 22 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="0" y1="1" x2="22" y2="1"/><line x1="0" y1="8" x2="22" y2="8"/><line x1="0" y1="15" x2="22" y2="15"/></svg>
+        </div>
+        <div style={{textAlign:"center"}}>
+          <div style={{fontSize:15,fontWeight:700,color:"#0f172a",letterSpacing:"-0.2px"}}>Carnet d'entretien</div>
+          <div style={{fontSize:10,color:"#94a3b8",letterSpacing:"0.3px",marginTop:1}}>Votre piscine, notre expertise</div>
+        </div>
+        <button style={{width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:8,border:"none",background:"transparent",cursor:"pointer",color:"#64748b"}} onClick={onRefresh||undefined} title="Actualiser">
+          <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={refreshing?{animation:"cv-spin .7s linear infinite"}:{}}><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        </button>
+      </div>
+
+      {/* CONTENT */}
+      <div className="cv-scroll" style={{paddingBottom:72}}>
+
+        {/* HERO — toujours visible sauf profil/produits */}
+        {(activeTab==="accueil"||activeTab==="historique") && <Hero/>}
+
+        {/* ACCUEIL */}
+        {activeTab==="accueil" && <>
+          <div className="cv-stagger-2"><DerniereIntervention/></div>
+          <div className="cv-stagger-3"><RapportsList list={passClient.slice(0,3)} showAll={false}/></div>
+          <div className="cv-stagger-4"><RapportDetail/></div>
+        </>}
+
+        {/* HISTORIQUE */}
+        {activeTab==="historique" && (
+          <div className="cv-stagger-1"><RapportsList list={passClient} showAll={true}/></div>
+        )}
+
+        {/* PRODUITS */}
+        {activeTab==="produits" && (
+          <div className="cv-stagger-1" style={{paddingTop:12}}><ProduitsTab/></div>
+        )}
+
+        {/* PROFIL */}
+        {activeTab==="profil" && (
+          <div className="cv-stagger-1" style={{paddingTop:12}}><ProfilTab/></div>
+        )}
+
+        {/* FOOTER */}
+        <div style={{textAlign:"center",padding:"20px 0 8px"}}>
+          <div style={{fontSize:10,color:"#cbd5e1",fontWeight:500,letterSpacing:"0.3px"}}>BRIBLUE · La Seyne-sur-Mer · SIRET 84345436400053</div>
+        </div>
+      </div>
+
+      <BottomNav/>
+      <PassageSheet/>
+      <SOSModal/>
     </div>
   );
 }
