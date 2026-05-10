@@ -328,6 +328,8 @@ export function PageClients({ clients, passages, contrats={}, onUpdateContrat, o
       <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:10}}>
         {filtered.map((c,idx)=>{
           const al=alerteClient(c,passages); const col=AC[al];
+          const mpm=c.moisParMois||c.saisons||{};
+          const tE=totalAnnuel(mpm,"entretien"), tC=totalAnnuel(mpm,"controle");
           const tot=calculerPassagesPrevusContrat(c);
           const passEff=passages.filter(p=>p.clientId===c.id&&isPassageDansContrat(p,c)&&isPassageEffectue(p));
           const eE=passEff.filter(p=>isEntretienType(p.type)).length;

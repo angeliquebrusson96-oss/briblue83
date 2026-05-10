@@ -1,0 +1,46 @@
+{
+  "name": "BRIBLUE CRM",
+  "short_name": "BRIBLUE",
+  "description": "Gestion piscine & carnets clients BRIBLUE",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0c1a2e",
+  "theme_color": "#0891b2",
+  "orientation": "portrait-primary",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Nouveau rapport",
+      "short_name": "Rapport",
+      "url": "/?action=nouveau-rapport",
+      "description": "Créer un nouveau rapport de passage"
+    },
+    {
+      "name": "Clients",
+      "short_name": "Clients",
+      "url": "/?page=clients",
+      "description": "Voir la liste des clients"
+    }
+  ]
+}
