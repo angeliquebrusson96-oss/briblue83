@@ -28,7 +28,7 @@ function readLS(key, fallback) {
 }
 
 // ─── AUTH ────────────────────────────────────────────────────────────────────
-const AUTH = { email: "tapetonemail@briblue.com", code: "2004" };
+const AUTH = { email: "briblue83@hotmail.com", code: "2004" };
 
 function LoginScreen({ onLogin }) {
   const [email, setEmail] = useState("");
@@ -66,7 +66,7 @@ function LoginScreen({ onLogin }) {
             <label style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.8,display:"block",marginBottom:8}}>Adresse email</label>
             <div style={{position:"relative"}}>
               <div style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",zIndex:2}}>{Ico.mail(16,"#64748b")}</div>
-              <input type="email" value={email} onChange={e=>{setEmail(e.target.value);setErr("");}} placeholder="briblue83@hotmail.com" onKeyDown={e=>e.key==="Enter"&&handleLogin()} style={{width:"100%",padding:"14px 14px 14px 42px",borderRadius:14,fontSize:14,outline:"none",boxSizing:"border-box",color:DS.dark,fontFamily:"inherit"}}/>
+              <input type="email" value={email} onChange={e=>{setEmail(e.target.value);setErr("");}} placeholder="tapetonemail@example.com" onKeyDown={e=>e.key==="Enter"&&handleLogin()} style={{width:"100%",padding:"14px 14px 14px 42px",borderRadius:14,fontSize:14,outline:"none",boxSizing:"border-box",color:DS.dark,fontFamily:"inherit"}}/>
             </div>
           </div>
           <div>
