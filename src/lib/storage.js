@@ -151,18 +151,18 @@ export async function reconcileOnBoot() {
     const snap    = await getDoc(APP_DOC);
     const remote  = snap.exists() ? snap.data() : {};
     const remoteTime = remote["_lastSavedAt"] ? new Date(remote["_lastSavedAt"]).getTime() : 0;
-    const KEYS = ["bb_clients_v2","bb_passages_v2","bb_livraisons_v1","bb_rdvs_v1","bb_stock_v1","bb_contrats_v1"];
+    const KEYS = ["bb_clients_v2","bb_passages_v2","bb_livraisons_v1","bb_rdvs_v1","bb_stock_v1","bb_contrats_v1","bb_versements_v1"];
     const toPush = {};
     let needsPush = false;
 
     for (const key of KEYS) {
       let local = null;
-      try { const ls = localStorage.getItem("briblue_" + key); if (ls) local = JSON.parse(ls); } catch {}
+      try { const ls = localStorage.getItem("briblue_" + key); if (ls) local = JSON.parse(ls); } catch {} // eslint-disable-line no-empty
 
       if (local == null) {
         // Rien en local → prendre Firebase
         if (remote[key] != null) {
-          try { localStorage.setItem("briblue_" + key, JSON.stringify(remote[key])); } catch {}
+          try { localStorage.setItem("briblue_" + key, JSON.stringify(remote[key])); } catch {} // eslint-disable-line no-empty
         }
         continue;
       }
@@ -174,7 +174,7 @@ export async function reconcileOnBoot() {
 
       // Les deux existent → comparer les timestamps
       let localTime = 0;
-      try { const m = localStorage.getItem("briblue_meta_" + key); if (m) localTime = JSON.parse(m).savedAt || 0; } catch {}
+      try { const m = localStorage.getItem("briblue_meta_" + key); if (m) localTime = JSON.parse(m).savedAt || 0; } catch {} // eslint-disable-line no-empty
 
       if (localTime >= remoteTime) {
         // Local plus récent ou égal → pousser vers Firebase
@@ -186,7 +186,7 @@ export async function reconcileOnBoot() {
           try {
             localStorage.setItem("briblue_" + key, JSON.stringify(remote[key]));
             localStorage.setItem("briblue_meta_" + key, JSON.stringify({ savedAt: remoteTime }));
-          } catch {}
+          } catch {} // eslint-disable-line no-empty
         }
       }
     }
@@ -204,7 +204,7 @@ export async function save(key, val) {
   try {
     localStorage.setItem("briblue_" + key, JSON.stringify(val));
     localStorage.setItem("briblue_meta_" + key, JSON.stringify({ savedAt: Date.now() }));
-  } catch {}
+  } catch {} // eslint-disable-line no-empty
 
   // 2. Mettre dans la queue (protection si le réseau échoue)
   offlineQueue.pending[key] = val;
@@ -244,7 +244,7 @@ export async function save(key, val) {
         try {
           await saveViaREST({ [key]: latest }, false);
           if (offlineQueue.pending[key] === latest) delete offlineQueue.pending[key];
-        } catch {}
+        } catch {} // eslint-disable-line no-empty
       }
     }, FIREBASE_DEBOUNCE_MS);
   }
@@ -281,7 +281,7 @@ export async function load(key, fallback) {
     if (ls !== null) localData = JSON.parse(ls);
     const m = localStorage.getItem("briblue_meta_" + key);
     if (m) localTime = JSON.parse(m).savedAt || 0;
-  } catch {}
+  } catch {} // eslint-disable-line no-empty
 
   // 2. Ne jamais écraser une donnée en attente d'envoi
   if (offlineQueue.pending[key] !== undefined) return localData ?? fallback;
@@ -298,7 +298,7 @@ export async function load(key, fallback) {
           return localData;
         }
         // Firebase plus récent → mettre à jour le cache local
-        try { localStorage.setItem("briblue_" + key, JSON.stringify(allData[key])); } catch {}
+        try { localStorage.setItem("briblue_" + key, JSON.stringify(allData[key])); } catch {} // eslint-disable-line no-empty
         return allData[key];
       }
     }

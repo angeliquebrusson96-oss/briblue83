@@ -62,7 +62,7 @@ const SAISON_THEMES = {
 // ─────────────────────────────────────────────────────────────────────────────
 // DASHBOARD HERO
 // ─────────────────────────────────────────────────────────────────────────────
-export function DashboardHero({ clients, passages, rdvs, saisonNow, isMobile, onAddPassage, onAddLivraison, onAddClient, onAddRdv }) {
+export function DashboardHero({ clients, passages, rdvs, saisonNow, isMobile, onAddPassage, onAddLivraison, onAddClient, onAddRdv }) { // eslint-disable-line no-unused-vars
   const heure = new Date().getHours();
   const salut = heure < 12 ? "Bonjour" : heure < 18 ? "Bon après-midi" : "Bonsoir";
   const dateStr = new Date().toLocaleDateString("fr", { weekday:"long", day:"2-digit", month:"long", year:"numeric" });

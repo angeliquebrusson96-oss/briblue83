@@ -13,6 +13,40 @@ const AC = {
   ok:     { bg:"#f0fdf4", bd:"#bbf7d0", tx:"#16a34a", lbl:"OK"        },
 };
 
+// ─── Component to render block icons ────────────────────────────────────────
+const BlockIcon = ({name, size=14, color="currentColor"}) => {
+  const s = {width:size,height:size,viewBox:"0 0 24 24",fill:"none",stroke:color,strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round"};
+  switch(name) {
+    case "wrench":    return <svg {...s}><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>;
+    case "water":     return <svg {...s}><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>;
+    case "pool":      return <svg {...s}><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 14c2.5 2.5 5 2.5 7.5 0s5-2.5 7.5 0 5 2.5 7.5 0"/></svg>;
+    case "flask":     return <svg {...s}><path d="M9 3h6v5l3 9a3 3 0 01-3 3H9a3 3 0 01-3-3l3-9V3z"/><path d="M9 3h6"/><path d="M6.5 15h11"/></svg>;
+    case "check":     return <svg {...s}><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
+    case "camera":    return <svg {...s}><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>;
+    case "pen":       return <svg {...s}><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>;
+    default: return null;
+  }
+};
+
+const Block = ({title, iconName, color=DS.blue, children}) => (
+  <div style={{borderRadius:16,overflow:"hidden",border:"1px solid rgba(255,255,255,0.5)",marginBottom:12,background:"rgba(255,255,255,0.45)",backdropFilter:"blur(16px) saturate(180%)",WebkitBackdropFilter:"blur(16px) saturate(180%)"}}>
+    <div style={{background:`linear-gradient(135deg, ${color}18, ${color}08)`,borderBottom:"1px solid "+color+"22",padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
+      <div style={{width:24,height:24,borderRadius:8,background:color+"22",display:"flex",alignItems:"center",justifyContent:"center",color}}>
+        <BlockIcon name={iconName} size={13} color={color}/>
+      </div>
+      <span style={{fontSize:12,fontWeight:800,color,textTransform:"uppercase",letterSpacing:.7}}>{title}</span>
+    </div>
+    <div style={{padding:"12px 14px"}}>{children}</div>
+  </div>
+);
+
+const Row = ({label, value, color}) => (
+  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"6px 0",borderBottom:"1px solid "+DS.light,gap:12}}>
+    <span style={{fontSize:13,color:DS.mid,fontWeight:500,flexShrink:0}}>{label}</span>
+    <span style={{fontSize:13,fontWeight:600,color:color||DS.dark,textAlign:"right",wordBreak:"break-word",whiteSpace:"pre-wrap",lineHeight:1.5}}>{value}</span>
+  </div>
+);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MODAL APERÇU PASSAGE (used internally by PagePassages too)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -40,39 +74,6 @@ export function PassageDetailModal({ passage, client, onClose }) {
   const rapportStatus = getRapportStatus(passage);
   const rapportMeta = RAPPORT_STATUS[rapportStatus] || RAPPORT_STATUS.cree;
   const isCtrl = isControleType_(passage.type);
-
-  // Icônes SVG modernes
-  const BlockIcon = ({name, size=14, color="currentColor"}) => {
-    const s = {width:size,height:size,viewBox:"0 0 24 24",fill:"none",stroke:color,strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round"};
-    switch(name) {
-      case "wrench":    return <svg {...s}><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>;
-      case "water":     return <svg {...s}><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>;
-      case "pool":      return <svg {...s}><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 14c2.5 2.5 5 2.5 7.5 0s5-2.5 7.5 0 5 2.5 7.5 0"/></svg>;
-      case "flask":     return <svg {...s}><path d="M9 3h6v5l3 9a3 3 0 01-3 3H9a3 3 0 01-3-3l3-9V3z"/><path d="M9 3h6"/><path d="M6.5 15h11"/></svg>;
-      case "check":     return <svg {...s}><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
-      case "camera":    return <svg {...s}><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>;
-      case "pen":       return <svg {...s}><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>;
-      default: return null;
-    }
-  };
-  const Block = ({title, iconName, color=DS.blue, children}) => (
-    <div style={{borderRadius:16,overflow:"hidden",border:"1px solid rgba(255,255,255,0.5)",marginBottom:12,background:"rgba(255,255,255,0.45)",backdropFilter:"blur(16px) saturate(180%)",WebkitBackdropFilter:"blur(16px) saturate(180%)"}}>
-      <div style={{background:`linear-gradient(135deg, ${color}18, ${color}08)`,borderBottom:"1px solid "+color+"22",padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
-        <div style={{width:24,height:24,borderRadius:8,background:color+"22",display:"flex",alignItems:"center",justifyContent:"center",color}}>
-          <BlockIcon name={iconName} size={13} color={color}/>
-        </div>
-        <span style={{fontSize:12,fontWeight:800,color,textTransform:"uppercase",letterSpacing:.7}}>{title}</span>
-      </div>
-      <div style={{padding:"12px 14px"}}>{children}</div>
-    </div>
-  );
-
-  const Row = ({label, value, color}) => (
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"6px 0",borderBottom:"1px solid "+DS.light,gap:12}}>
-      <span style={{fontSize:13,color:DS.mid,fontWeight:500,flexShrink:0}}>{label}</span>
-      <span style={{fontSize:13,fontWeight:600,color:color||DS.dark,textAlign:"right",wordBreak:"break-word",whiteSpace:"pre-wrap",lineHeight:1.5}}>{value}</span>
-    </div>
-  );
 
   return (
     <Modal title="Aperçu du passage" onClose={onClose} wide>
@@ -184,7 +185,120 @@ export function PassageDetailModal({ passage, client, onClose }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // PAGE CLIENTS
 // ─────────────────────────────────────────────────────────────────────────────
-export function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClientClick, onAdd }) {
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION VERSEMENTS (admin) — affichée dans la card client
+// ─────────────────────────────────────────────────────────────────────────────
+export function VersementsSection({ client, versements={}, onToggleVersement }) {
+  const [open, setOpen] = useState(false);
+
+  if (!client.prix || !client.dateDebut) return null;
+
+  const mensualite = Math.round(client.prix / 12);
+  const debut = new Date(client.dateDebut);
+  const fin   = client.dateFin ? new Date(client.dateFin) : new Date(debut.getFullYear()+1, debut.getMonth(), debut.getDate());
+  const today  = new Date();
+
+  // Générer la liste des mois du contrat
+  const mois = [];
+  let cur = new Date(debut.getFullYear(), debut.getMonth(), 1);
+  const finMois = new Date(fin.getFullYear(), fin.getMonth(), 1);
+  while (cur <= finMois) {
+    mois.push({ year: cur.getFullYear(), month: cur.getMonth()+1 });
+    cur = new Date(cur.getFullYear(), cur.getMonth()+1, 1);
+  }
+
+  const key = (y,m) => `${client.id}_${y}_${String(m).padStart(2,"0")}`;
+  const isPaye = (y,m) => !!versements[key(y,m)];
+  const isFutur = (y,m) => new Date(y, m-1, 1) > today;
+  const isCourant = (y,m) => { const d=new Date(y,m-1,1); const n=new Date(today.getFullYear(),today.getMonth(),1); return d.getTime()===n.getTime(); };
+
+  const moisDus = mois.filter(({year:y,month:m}) => !isFutur(y,m) && !isPaye(y,m));
+  const totalDu = moisDus.length * mensualite;
+  const nbPayes = mois.filter(({year:y,month:m}) => isPaye(y,m)).length;
+
+  const MOIS_FR = ["","Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
+  const MOIS_LONG = ["","Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+
+  return (
+    <div style={{marginTop:8}}>
+      <button
+        onClick={e=>{e.stopPropagation(); setOpen(o=>!o);}}
+        style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
+          padding:"6px 8px",borderRadius:8,
+          background: moisDus.length>0 ? "#fff7ed" : "#f0fdf4",
+          border: `1px solid ${moisDus.length>0?"#fed7aa":"#bbf7d0"}`,
+          cursor:"pointer",fontFamily:"inherit",transition:"background 0.15s"}}>
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={moisDus.length>0?"#ea580c":"#16a34a"} strokeWidth="2.5" strokeLinecap="round">
+            <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
+          </svg>
+          <span style={{fontSize:10,fontWeight:700,color:moisDus.length>0?"#ea580c":"#16a34a"}}>
+            {moisDus.length>0 ? `${moisDus.length} mois impayé${moisDus.length>1?"s":""} — ${totalDu}€` : `Paiements à jour ✓`}
+          </span>
+        </div>
+        <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke={moisDus.length>0?"#ea580c":"#16a34a"} strokeWidth="3" strokeLinecap="round">
+          <polyline points={open?"18 15 12 9 6 15":"6 9 12 15 18 9"}/>
+        </svg>
+      </button>
+
+      {open && (
+        <div onClick={e=>e.stopPropagation()} style={{marginTop:6,background:"#fff",borderRadius:10,border:"1px solid #e2e8f0",overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,0.07)"}}>
+          {/* Header résumé */}
+          <div style={{background:"linear-gradient(135deg,#0e7490,#0891b2)",padding:"10px 12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,0.75)",fontWeight:600}}>Mensualité · {mensualite}€/mois</div>
+              <div style={{fontSize:13,fontWeight:700,color:"#fff",marginTop:1}}>{nbPayes}/{mois.length} versements reçus</div>
+            </div>
+            <div style={{textAlign:"right"}}>
+              {moisDus.length>0
+                ? <div style={{background:"rgba(239,68,68,0.2)",borderRadius:8,padding:"4px 9px"}}>
+                    <div style={{fontSize:11,color:"#fca5a5",fontWeight:700}}>Solde dû</div>
+                    <div style={{fontSize:16,fontWeight:900,color:"#fff"}}>{totalDu}€</div>
+                  </div>
+                : <div style={{background:"rgba(74,222,128,0.2)",borderRadius:8,padding:"4px 9px"}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#86efac"}}>✓ À jour</div>
+                  </div>
+              }
+            </div>
+          </div>
+          {/* Grille des mois */}
+          <div style={{padding:"10px 10px",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
+            {mois.map(({year:y,month:m})=>{
+              const paye = isPaye(y,m);
+              const futur = isFutur(y,m);
+              const courant = isCourant(y,m);
+              return (
+                <button key={key(y,m)}
+                  onClick={()=>!futur && onToggleVersement && onToggleVersement(key(y,m), !paye)}
+                  style={{
+                    display:"flex",flexDirection:"column",alignItems:"center",
+                    padding:"7px 4px",borderRadius:8,cursor:futur?"default":"pointer",
+                    border:`1.5px solid ${paye?"#86efac":futur?"#e2e8f0":courant?"#fed7aa":"#fca5a5"}`,
+                    background:paye?"#f0fdf4":futur?"#f8fafc":courant?"#fff7ed":"#fff1f2",
+                    fontFamily:"inherit",transition:"all 0.15s",
+                  }}>
+                  <span style={{fontSize:9,fontWeight:700,color:paye?"#16a34a":futur?"#94a3b8":courant?"#ea580c":"#dc2626",marginBottom:2}}>
+                    {MOIS_FR[m]}
+                  </span>
+                  <span style={{fontSize:8,color:"#94a3b8",marginBottom:4}}>{y}</span>
+                  {futur
+                    ? <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    : paye
+                      ? <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      : <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={courant?"#ea580c":"#dc2626"} strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  }
+                </button>
+              );
+            })}
+          </div>
+          <div style={{padding:"0 10px 8px",fontSize:9,color:"#94a3b8",textAlign:"center"}}>Tapez sur un mois pour basculer payé / impayé</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function PageClients({ clients, passages, contrats={}, versements={}, onUpdateContrat, onToggleVersement, onClientClick, onAdd }) {
   const [search, setSearch] = useState("");
   const [openPicker, setOpenPicker] = useState(null); // clientId du picker ouvert
   const [filterStat, setFilterStat] = useState("all"); // all | contrat | alertes | expires
@@ -197,7 +311,7 @@ export function PageClients({ clients, passages, contrats={}, onUpdateContrat, o
     if (filterStat === "expires") list = list.filter(c=>{ const j=daysUntil(c.dateFin); return j!==null && j<30; });
     return list;
   },[clients,search,filterStat,passages]);
-  const totalAll = clients.length;
+  const totalAll = clients.length; // eslint-disable-line no-unused-vars
   const alertCount = clients.filter(c=>alerteClient(c,passages)!=="ok").length;
 
   const CONTRAT_STATUTS = [
@@ -404,6 +518,7 @@ export function PageClients({ clients, passages, contrats={}, onUpdateContrat, o
                     </div>
                   );
                 })()}
+                <VersementsSection client={c} versements={versements} onToggleVersement={onToggleVersement}/>
               </div>
             </div>
           );

@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { DS, Ico, MOIS, MOIS_L, RAPPORT_STATUS } from "../utils/constants";
-import { TODAY, getRapportStatus, isEntretienType, isControleType, getPH, getCL, getTemp, getResumePassage, normalizeRapportStatus, migrateMois, totalAnnuel, calcMensualites } from "../utils/helpers";
+import { TODAY, getRapportStatus, isEntretienType, isControleType, getPH, getCL, getTemp, getResumePassage, normalizeRapportStatus, migrateMois, totalAnnuel, calcMensualites, uid } from "../utils/helpers";
 import { useIsMobile, Modal, BtnPrimary, Card, Section, FmField, FmSectionTitle, FmHeader, FmSteps, DraftBanner, PhotoPicker, SunBurstActions, SunBurstFormNav, RapportStatusPicker, Tag, Avatar } from "./ui";
 import { toastWarn, toastSuccess, toastInfo, showConfirm } from "../styles";
 
@@ -10,8 +10,7 @@ const PRODUITS_DEFAUT = ["Chlore lent Galet","PH minus","Flocculant","Anti-calca
 
 const ETAT_LOCAL_OPTIONS = ["Nettoyage du sol","Trace d'eau au sol","Trace d'eau au mur","Fuite plomberie","Fuite moteur","Sur filtre ?"];
 
-// ─── HELPERS LOCAUX ──────────────────────────────────────────────────────────
-function uid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
+// ─── HELPERS LOCAUX ────────────────────────────────────────────────────────
 
 export function genererContratHTML(client, sigPrestataire="", sigClient="") {
   const mpm = migrateMois(client.moisParMois||client.saisons);

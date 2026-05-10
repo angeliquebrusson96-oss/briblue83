@@ -137,8 +137,8 @@ const PASSAGES_INIT = [
 // ─────────────────────────────────────────────────────────────────────────────
 // CARNET PUBLIC INLINE (aperçu interne, données déjà chargées)
 // ─────────────────────────────────────────────────────────────────────────────
-export function CarnetPublicInline({ client, passages, livraisons=[] }) {
-  return <CarnetView client={client} passages={passages} livraisons={livraisons} onRefresh={null} refreshing={false}/>;
+export function CarnetPublicInline({ client, passages, livraisons=[], versements={} }) {
+  return <CarnetView client={client} passages={passages} livraisons={livraisons} versements={versements} onRefresh={null} refreshing={false}/>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -148,6 +148,7 @@ export function CarnetPublic({ code }) {
   const [loadedClients, setLoadedClients] = useState(null);
   const [loadedPassages, setLoadedPassages] = useState(null);
   const [loadedLivraisons, setLoadedLivraisons] = useState([]);
+  const [loadedVersements, setLoadedVersements] = useState({});
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -159,9 +160,11 @@ export function CarnetPublic({ code }) {
         const c = d["bb_clients_v2"];
         const p = d["bb_passages_v2"];
         const l = d["bb_livraisons_v1"];
+        const v = d["bb_versements_v1"];
         setLoadedClients(c && c.length ? c : CLIENTS_INIT);
         setLoadedPassages(p && p.length ? p : PASSAGES_INIT);
         setLoadedLivraisons(Array.isArray(l) ? l : []);
+        setLoadedVersements(v && typeof v === "object" ? v : {});
       } else {
         setLoadedClients(CLIENTS_INIT);
         setLoadedPassages(PASSAGES_INIT);
@@ -207,13 +210,13 @@ export function CarnetPublic({ code }) {
   );
 
   const clientLivraisons = loadedLivraisons.filter(l=>l.clientId===client.id);
-  return <CarnetView client={client} passages={loadedPassages||[]} livraisons={clientLivraisons} onRefresh={loadData} refreshing={refreshing}/>;
+  return <CarnetView client={client} passages={loadedPassages||[]} livraisons={clientLivraisons} versements={loadedVersements} onRefresh={loadData} refreshing={refreshing}/>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VUE CARNET COMMUNE (partagée entre CarnetPublicInline et CarnetPublic)
 // ─────────────────────────────────────────────────────────────────────────────
-export function CarnetView({ client, passages, livraisons=[], onRefresh, refreshing }) {
+export function CarnetView({ client, passages, livraisons=[], versements={}, onRefresh, refreshing }) {
   const [selectedPassage, setSelectedPassage] = useState(null);
   const [activeTab, setActiveTab] = useState("accueil");
   const [showSOS, setShowSOS] = useState(false);
@@ -232,10 +235,117 @@ export function CarnetView({ client, passages, livraisons=[], onRefresh, refresh
   const passagesDeduits = passClient.filter(p => isPassageDansContrat(p, client) && isPassageEffectue(p));
   const visitesEffectuees = passagesDeduits.length;
   const visitesRestantes = Math.max(0, totalVisitesPrevues - visitesEffectuees);
-  const progressPct = totalVisitesPrevues > 0 ? Math.min(100, (visitesEffectuees / totalVisitesPrevues) * 100) : 0;
+  const _progressPct = totalVisitesPrevues > 0 ? Math.min(100, (visitesEffectuees / totalVisitesPrevues) * 100) : 0;
 
   const daysUntilFin = client.dateFin ? Math.ceil((new Date(client.dateFin) - new Date()) / (1000*60*60*24)) : null;
   const contratActif = daysUntilFin === null || daysUntilFin > 0;
+
+  // ─── VERSEMENTS ────────────────────────────────────────────────────────────
+  const versKey = (y, m) => `${client.id}_${y}_${String(m).padStart(2,"0")}`;
+  const mensualite = client.prix ? Math.round(client.prix / 12) : 0;
+  const MOIS_LONG = ["","Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+
+  const versementMoisDus = (() => {
+    if (!client.dateDebut || !mensualite) return [];
+    const today = new Date();
+    const debut = new Date(client.dateDebut);
+    const fin   = client.dateFin ? new Date(client.dateFin) : new Date(debut.getFullYear()+1, debut.getMonth(), debut.getDate());
+    const dus = [];
+    let cur = new Date(debut.getFullYear(), debut.getMonth(), 1);
+    const finMois    = new Date(fin.getFullYear(), fin.getMonth(), 1);
+    const curMois    = new Date(today.getFullYear(), today.getMonth(), 1);
+    while (cur <= finMois && cur <= curMois) {
+      const y = cur.getFullYear(), m = cur.getMonth()+1;
+      if (!versements[versKey(y,m)]) dus.push({ year:y, month:m });
+      cur = new Date(cur.getFullYear(), cur.getMonth()+1, 1);
+    }
+    return dus;
+  })();
+
+  // ─── WIDGET VERSEMENT (vue client) ─────────────────────────────────────────
+  const VersementWidget = () => {
+    if (!mensualite || !client.dateDebut) return null;
+    const today = new Date();
+    const nbDus = versementMoisDus.length;
+    // mois en retard = tous les mois dus SAUF le mois courant
+    const retards = versementMoisDus.filter(({year:y,month:m}) =>
+      !(y === today.getFullYear() && m === today.getMonth()+1)
+    );
+    const aJour = nbDus === 0;
+    const totalDu = nbDus * mensualite;
+
+    return (
+      <div style={{padding:"0 12px",marginBottom:4}}>
+        <div style={{
+          background:"#fff",borderRadius:16,overflow:"hidden",
+          border:`1px solid ${aJour?"#bbf7d0":retards.length>=2?"#fca5a5":"#fed7aa"}`,
+          boxShadow:`0 2px 10px ${aJour?"rgba(22,163,74,0.07)":retards.length>=2?"rgba(220,38,38,0.09)":"rgba(234,88,12,0.09)"}`,
+        }}>
+          <div style={{height:3,background:aJour
+            ?"linear-gradient(90deg,#22c55e,#86efac)"
+            :retards.length>=2?"linear-gradient(90deg,#ef4444,#f87171)"
+            :"linear-gradient(90deg,#f97316,#fb923c)"
+          }}/>
+          <div style={{padding:"13px 14px"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:aJour?0:10}}>
+              <div style={{width:40,height:40,borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
+                background:aJour?"#f0fdf4":retards.length>=2?"#fee2e2":"#fff7ed"}}>
+                {aJour
+                  ? <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  : <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={retards.length>=2?"#dc2626":"#ea580c"} strokeWidth="2.5" strokeLinecap="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                }
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>
+                  {aJour ? "Paiements à jour" : retards.length>=2 ? `${retards.length} mensualité${retards.length>1?"s":""} en retard` : "Mensualité en attente"}
+                </div>
+                <div style={{fontSize:11,color:"#64748b",marginTop:2}}>
+                  {aJour ? `${mensualite}€ / mois · contrat ${client.formule||""}` : `${totalDu}€ restant${totalDu>mensualite?"s":""} à régler`}
+                </div>
+              </div>
+              {!aJour && (
+                <div style={{flexShrink:0,textAlign:"right"}}>
+                  <div style={{fontSize:18,fontWeight:900,color:retards.length>=2?"#dc2626":"#ea580c"}}>{totalDu}€</div>
+                </div>
+              )}
+            </div>
+
+            {!aJour && (
+              <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                {versementMoisDus.map(({year:y,month:m})=>{
+                  const estCourant = y===today.getFullYear() && m===today.getMonth()+1;
+                  return (
+                    <div key={versKey(y,m)} style={{
+                      display:"flex",alignItems:"center",justifyContent:"space-between",
+                      padding:"8px 10px",borderRadius:10,
+                      background:estCourant?"#fff7ed":"#fff1f2",
+                      border:`1px solid ${estCourant?"#fed7aa":"#fecaca"}`,
+                    }}>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <div style={{width:30,height:30,borderRadius:8,background:estCourant?"#ffedd5":"#fee2e2",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+                          <span style={{fontSize:8,fontWeight:700,color:estCourant?"#ea580c":"#dc2626",lineHeight:1.2}}>{MOIS_LONG[m].slice(0,3).toUpperCase()}</span>
+                          <span style={{fontSize:8,color:estCourant?"#ea580c":"#dc2626",lineHeight:1.2}}>{y}</span>
+                        </div>
+                        <div>
+                          <div style={{fontSize:12,fontWeight:600,color:"#0f172a"}}>{MOIS_LONG[m]} {y}</div>
+                          <div style={{fontSize:10,color:"#64748b"}}>{estCourant?"Mois en cours":"En retard"}</div>
+                        </div>
+                      </div>
+                      <span style={{fontSize:14,fontWeight:700,color:estCourant?"#ea580c":"#dc2626"}}>{mensualite}€</span>
+                    </div>
+                  );
+                })}
+                <a href="tel:+33667186115" style={{display:"flex",alignItems:"center",justifyContent:"center",gap:7,marginTop:2,padding:"10px",borderRadius:10,background:"linear-gradient(135deg,#0891b2,#0e7490)",textDecoration:"none",boxShadow:"0 4px 14px rgba(8,145,178,0.3)"}}>
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.01 1.18 2 2 0 012 0h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 14.92z"/></svg>
+                  <span style={{fontSize:12,fontWeight:700,color:"white"}}>Contacter BRIBLUE</span>
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const WAVES_SVG = (
     <svg viewBox="0 0 400 60" preserveAspectRatio="none" style={{position:"absolute",bottom:0,left:0,right:0,width:"100%",height:60,opacity:0.15}} aria-hidden="true">
@@ -847,8 +957,9 @@ export function CarnetView({ client, passages, livraisons=[], onRefresh, refresh
         {/* ACCUEIL */}
         {activeTab==="accueil" && <>
           <div className="cv-stagger-2"><DerniereIntervention/></div>
-          <div className="cv-stagger-3"><RapportsList list={passClient.slice(0,3)} showAll={false}/></div>
-          <div className="cv-stagger-4"><RapportDetail/></div>
+          <div className="cv-stagger-3"><VersementWidget/></div>
+          <div className="cv-stagger-4"><RapportsList list={passClient.slice(0,3)} showAll={false}/></div>
+          <div className="cv-stagger-5"><RapportDetail/></div>
         </>}
 
         {/* HISTORIQUE */}
