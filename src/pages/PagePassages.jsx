@@ -107,7 +107,7 @@ export function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpd
             const phOk=_ph>=7&&_ph<=7.6, clOk=_cl>=0.5&&_cl<=3;
             const isCtrl = isControleType(p.type);
             const rapportStatus = getRapportStatus(p);
-            const rapportMeta = RAPPORT_STATUS[rapportStatus];
+            const rapportMeta = RAPPORT_STATUS[rapportStatus] || RAPPORT_STATUS.cree;
             return (
               <Card key={p.id} className="fade-in" style={{animationDelay:`${idx*0.05}s`}}>
                 <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>

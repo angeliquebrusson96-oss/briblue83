@@ -151,6 +151,8 @@ export const DS = {
 export const AC = {
   rouge:  { tx:"#be123c", bg:"#fff1f2", bd:"#fecdd3", lbl:"Urgent" },
   jaune:  { tx:"#b45309", bg:"#fffbeb", bd:"#fde68a", lbl:"À surveiller" },
+  orange: { tx:"#c2410c", bg:"#fff7ed", bd:"#fed7aa", lbl:"En retard" },
+  aFaire: { tx:"#0369a1", bg:"#e0f2fe", bd:"#bae6fd", lbl:"À planifier" },
   bleu:   { tx:"#1d4ed8", bg:"#eff6ff", bd:"#bfdbfe", lbl:"En retard" },
   ok:     { tx:"#065f46", bg:"#ecfdf5", bd:"#a7f3d0", lbl:"OK" },
 };

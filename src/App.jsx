@@ -674,7 +674,7 @@ export default function App() {
               ? <div style={{textAlign:"center",color:DS.mid,padding:32,fontSize:13}}>{dismissedAlertes.length>0?"Toutes les alertes sont masquées":"Aucune alerte en cours"}</div>
               : <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 {alertes.map(c=>{
-                  const al=alerteClient(c,passages); const col=AC[al]; const j=daysUntil(c.dateFin);
+                  const al=alerteClient(c,passages); const col=AC[al]||AC.ok; const j=daysUntil(c.dateFin);
                   const mpm=c.moisParMois||c.saisons||{};
                   const tE=totalAnnuel(mpm,"entretien"), tC=totalAnnuel(mpm,"controle"), tot=tE+tC;
                   const cs=c.dateDebut?c.dateDebut.slice(0,10):null; const ce=c.dateFin?c.dateFin.slice(0,10):null;

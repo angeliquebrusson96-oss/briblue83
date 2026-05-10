@@ -188,7 +188,7 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
   const [expandedEv, setExpandedEv] = useState(null);
   const isMobile = useIsMobile();
   const al = alerteClient(client, passages);
-  const col = AC[al];
+  const col = AC[al] || AC.ok;
   const rdvClient = rdvs.filter(r=>r.clientId===client.id).sort((a,b)=>a.date.localeCompare(b.date));
   const contractStart = client.dateDebut ? client.dateDebut.slice(0,10) : null;
   const contractEnd = client.dateFin ? client.dateFin.slice(0,10) : null;
