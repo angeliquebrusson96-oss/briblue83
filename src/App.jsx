@@ -59,7 +59,7 @@ function LoginScreen({ onLogin }) {
       <div className="fade-in glass-strong" style={{width:"100%",maxWidth:420,borderRadius:DS.radiusLg,padding:32,boxShadow:"0 30px 80px rgba(6,182,212,0.22), 0 10px 30px rgba(15,23,42,0.12), inset 0 1px 0 rgba(255,255,255,0.8)",position:"relative"}}>
         <div style={{marginBottom:26}}>
           <div style={{fontWeight:800,fontSize:20,color:DS.dark,letterSpacing:"-0.02em"}}>Connexion Technicien</div>
-          <div style={{color:DS.mid,fontSize:13,marginTop:4,fontWeight:500}}>Accès réservé à l'équipe BRIBLUE</div>
+          <div style={{color:DS.mid,fontSize:13,marginTop:4,fontWeight:500}}>Accès réservé </div>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:16}}>
           <div>
@@ -86,7 +86,7 @@ function LoginScreen({ onLogin }) {
           </button>
         </div>
       </div>
-      <div style={{marginTop:22,color:"#64748b",fontSize:11,textAlign:"center",fontWeight:600,letterSpacing:0.3}}>BRIBLUE · SIRET 84345436400053 · La Seyne-sur-Mer</div>
+      <div style={{marginTop:22,color:"#64748b",fontSize:11,textAlign:"center",fontWeight:600,letterSpacing:0.3}}>BRIBLUE </div>
     </div>
   );
 }
