@@ -5,6 +5,60 @@ import { alerteClient, daysUntil, isEntretienType, isControleType, totalAnnuel, 
 import { useIsMobile, Avatar, Modal, Tag, BtnPrimary } from "../components/ui";
 
 // ─── Alert color map (mirrors App.jsx AC) ────────────────────────────────────
+
+const toNumber = (v, fallback = 0) => {
+  if (v === undefined || v === null || v === "") return fallback;
+  const n = Number(String(v).replace(",", "."));
+  return Number.isFinite(n) ? n : fallback;
+};
+const getPassagesAnnuelsSaisis = (client = {}) => {
+  const value = client.passagesAnnuels
+    ?? client.nbPassagesAnnuels
+    ?? client.nombrePassagesAnnuels
+    ?? client.nombrePassagesAnnuel
+    ?? client.totalPassagesAnnuels
+    ?? client.totalPassagesAnnuel
+    ?? client.passagesContrat
+    ?? client.nbPassagesContrat
+    ?? client.nombrePassagesContrat
+    ?? client.passagesPrevusContrat
+    ?? client.passagesPrévusContrat
+    ?? client.passagesPrevus
+    ?? client.nbPassagesPrevus
+    ?? client.nbPassages
+    ?? client.nombrePassages
+    ?? client.contrat?.passagesAnnuels
+    ?? client.contrat?.nbPassagesAnnuels
+    ?? client.contrat?.nombrePassagesAnnuels
+    ?? client.contrat?.passagesPrevus
+    ?? client.contrat?.nbPassages
+    ?? client.contrat?.nombrePassages;
+  return toNumber(value, 0);
+};
+const totalPlanningMensuel = (client = {}) => {
+  const plan = client.moisParMois || client.passagesParMois || client.planningMensuel || client.saisons || {};
+  return Array.from({ length: 12 }, (_, i) => {
+    const key = String(i + 1);
+    const m = plan[key] ?? plan[i + 1] ?? {};
+    if (typeof m === "number" || typeof m === "string") return toNumber(m, 0);
+    return toNumber(m.entretien ?? m.passages ?? m.prevus ?? m.prévus ?? m.nb ?? m.nombre ?? 0, 0)
+      + toNumber(m.controle ?? m.contrôle ?? m.controles ?? m.contrôles ?? 0, 0);
+  }).reduce((a, b) => a + b, 0);
+};
+const getTotalContratClient = (client = {}) => {
+  const saisi = getPassagesAnnuelsSaisis(client);
+  return saisi > 0 ? saisi : totalPlanningMensuel(client);
+};
+const isPassageDeductible = (p = {}) => {
+  const status = String(p.statut ?? p.status ?? p.etat ?? p.état ?? "").toLowerCase();
+  const type = String(p.type ?? p.categorie ?? "").toLowerCase();
+  if (/annul|prévu|prevu|planif|rdv|rendez|a venir|à venir/.test(status)) return false;
+  if (/rdv|rendez|prévu|prevu|planif/.test(type)) return false;
+  if (p.annule || p.annulé || p.cancelled || p.planifie || p.planifié || p.rdvSeulement || p.isRdvOnly) return false;
+  if (p.ok === false || p.valide === false || p.validé === false) return false;
+  return true;
+};
+
 const AC = {
   rouge:  { bg:"#fee2e2", bd:"#fda4af", tx:"#dc2626", lbl:"URGENT"    },
   jaune:  { bg:"#fef9c3", bd:"#fcd34d", tx:"#ca8a04", lbl:"Attention" },
@@ -328,13 +382,12 @@ export function PageClients({ clients, passages, contrats={}, onUpdateContrat, o
       <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:10}}>
         {filtered.map((c,idx)=>{
           const al=alerteClient(c,passages); const col=AC[al];
-          const mpm=c.moisParMois||c.saisons||{};
-          const tE=totalAnnuel(mpm,"entretien"), tC=totalAnnuel(mpm,"controle"), tot=tE+tC;
+          const planningTotal = totalPlanningMensuel(c);
+          const tot = getTotalContratClient(c); // priorité au total annuel saisi manuellement
           const cs=c.dateDebut?c.dateDebut.slice(0,10):null; const ce=c.dateFin?c.dateFin.slice(0,10):null;
           const inC=(p)=>{const ds=String(p.date).slice(0,10);return cs&&ce?ds>=cs&&ds<=ce:new Date(p.date).getFullYear()===YEAR_NOW;};
-          const eE=passages.filter(p=>p.clientId===c.id&&inC(p)&&isEntretienType(p.type)).length;
-          const eC=passages.filter(p=>p.clientId===c.id&&inC(p)&&isControleType(p.type)).length;
-          const eff=eE+eC;
+          const passagesDeduits = passages.filter(p=>p.clientId===c.id&&inC(p)&&isPassageDeductible(p));
+          const eff=passagesDeduits.length;
           const pct=tot>0?Math.round(eff/tot*100):0;
           const rest=Math.max(0,tot-eff);
           const accentColor=al==="rouge"?DS.red:al==="jaune"?"#d97706":al==="orange"?"#d97706":DS.green;
@@ -363,16 +416,16 @@ export function PageClients({ clients, passages, contrats={}, onUpdateContrat, o
                 </div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:3}}>
                   <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"rgba(255,255,255,0.45)",border:"1px solid "+DS.border}}>
-                    <div style={{fontSize:13,fontWeight:800,color:DS.blue}}>{eE}<span style={{fontSize:9,color:DS.mid}}>/{tE}</span></div>
-                    <div style={{fontSize:9,color:DS.mid}}>Entret.</div>
+                    <div style={{fontSize:13,fontWeight:800,color:DS.blue}}>{eff}<span style={{fontSize:9,color:DS.mid}}>/{tot}</span></div>
+                    <div style={{fontSize:9,color:DS.mid}}>Rapports</div>
                   </div>
                   <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"rgba(255,255,255,0.45)",border:"1px solid "+DS.border}}>
-                    <div style={{fontSize:13,fontWeight:800,color:DS.teal}}>{eC}<span style={{fontSize:9,color:DS.mid}}>/{tC}</span></div>
-                    <div style={{fontSize:9,color:DS.mid}}>Contrôl.</div>
+                    <div style={{fontSize:13,fontWeight:800,color:rest>0?"#b45309":DS.green}}>{rest}</div>
+                    <div style={{fontSize:9,color:DS.mid}}>Restants</div>
                   </div>
                   <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"rgba(255,255,255,0.45)",border:"1px solid "+DS.border}}>
-                    <div style={{fontSize:13,fontWeight:800,color:rest>0?"#b45309":DS.green}}>{pct}<span style={{fontSize:9,color:DS.mid}}>%</span></div>
-                    <div style={{fontSize:9,color:DS.mid}}>{rest>0?rest+" rest.":"À jour"}</div>
+                    <div style={{fontSize:13,fontWeight:800,color:DS.teal}}>{planningTotal}</div>
+                    <div style={{fontSize:9,color:DS.mid}}>Plan/mois</div>
                   </div>
                 </div>
                 {tot>0&&<div style={{height:3,background:DS.light,borderRadius:99,overflow:"hidden"}}>
