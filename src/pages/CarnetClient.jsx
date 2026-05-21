@@ -521,62 +521,122 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, ret
   ) : null;
 
   // ─── RAPPORTS LIST ─────────────────────────────────────────────────────────
-  const RapportsList = ({list, showAll}) => (
-    <div style={{padding:"0 12px"}}>
-      <SectionHead
-        icon={<><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></>}
-        title={showAll?"Tous les rapports":"Rapports d'intervention"}
-        action={!showAll&&passClient.length>3?"Voir tout":null}
-        onAction={()=>setActiveTab("historique")}
-      />
-      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+  const RapportsList = ({list, showAll}) => {
+    const currentYear = new Date().getFullYear();
+    const [openYears, setOpenYears] = React.useState({});
+    const toggleYear = (y) => setOpenYears(prev => ({...prev, [y]: !prev[y]}));
+
+    // Grouper par année si showAll, sinon afficher tel quel
+    if (!showAll) {
+      return (
+        <div style={{padding:"0 12px"}}>
+          <SectionHead
+            icon={<><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></>}
+            title="Rapports d'intervention"
+            action={passClient.length>3?"Voir tout":null}
+            onAction={()=>setActiveTab("historique")}
+          />
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {list.length===0&&(
+              <div style={{background:"#fff",borderRadius:14,border:"1px solid #e2e8f0",padding:"32px",textAlign:"center",color:"#94a3b8",fontSize:13}}>
+                <div style={{fontSize:32,marginBottom:8}}>📋</div>
+                Aucune intervention enregistrée
+              </div>
+            )}
+            {list.map((p,i)=><RapportCard key={p.id||i} p={p} isNew={i===0}/>)}
+          </div>
+        </div>
+      );
+    }
+
+    // Mode historique complet : grouper par année
+    const byYear = {};
+    list.forEach(p => {
+      const y = new Date(p.date).getFullYear();
+      if (!byYear[y]) byYear[y] = [];
+      byYear[y].push(p);
+    });
+    const years = Object.keys(byYear).map(Number).sort((a,b)=>b-a);
+
+    return (
+      <div style={{padding:"0 12px"}}>
+        <SectionHead
+          icon={<><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></>}
+          title="Tous les rapports"
+        />
         {list.length===0&&(
           <div style={{background:"#fff",borderRadius:14,border:"1px solid #e2e8f0",padding:"32px",textAlign:"center",color:"#94a3b8",fontSize:13}}>
             <div style={{fontSize:32,marginBottom:8}}>📋</div>
             Aucune intervention enregistrée
           </div>
         )}
-        {list.map((p,i)=>{
-          const ph=getPH(p); const cl=getCL(p); const tmp=getTemp(p);
-          const isNew = i===0;
+        {years.map(year => {
+          const isPast = year < currentYear;
+          const isOpen = openYears[year] !== undefined ? openYears[year] : !isPast;
+          const rapports = byYear[year];
           return (
-            <div key={p.id||i} className="cv-rapport-row" onClick={()=>setSelectedPassage(p)} style={{
-              background:"#fff",borderRadius:14,
-              border:`1px solid ${isNew?"#bae6fd":"#e2e8f0"}`,
-              boxShadow:isNew?"0 2px 12px rgba(8,145,178,0.1)":"0 1px 4px rgba(0,0,0,0.04)",
-              overflow:"hidden",
-            }}>
-              {isNew&&<div style={{height:2,background:"linear-gradient(90deg,#0891b2,#7dd3fc)"}}/>}
-              <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:12}}>
-                <div style={{width:38,height:38,borderRadius:10,background:isControleType(p.type)?"#e0f2fe":"#eff6ff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                  {isControleType(p.type)
-                    ? <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.2" strokeLinecap="round"><path d="M12 2C6 2 2 12 2 12s4 10 10 10 10-10 10-10S18 2 12 2z"/></svg>
-                    : <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2.2" strokeLinecap="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
-                  }
+            <div key={year} style={{marginBottom:12}}>
+              {/* En-tête année cliquable si passée */}
+              <button
+                onClick={()=>toggleYear(year)}
+                style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",background:isPast?"#f1f5f9":"#e0f2fe",border:isPast?"1px solid #e2e8f0":"1px solid #bae6fd",borderRadius:10,padding:"9px 14px",cursor:"pointer",fontFamily:"inherit",marginBottom:isOpen?8:0,transition:"all 0.2s"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={isPast?"#64748b":"#0891b2"} strokeWidth="2.2" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <span style={{fontSize:13,fontWeight:700,color:isPast?"#475569":"#0891b2"}}>{year}</span>
+                  <span style={{fontSize:11,color:isPast?"#94a3b8":"#38bdf8",background:isPast?"#e2e8f0":"#f0f9ff",borderRadius:20,padding:"1px 8px",fontWeight:600}}>{rapports.length} rapport{rapports.length>1?"s":""}</span>
                 </div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:600,color:"#0f172a"}}>{p.type||"Contrôle de l'eau"}</div>
-                  <div style={{fontSize:11,color:"#64748b",marginTop:1}}>{fmtDate(p.date,{weekday:"long",day:"2-digit",month:"short",year:"numeric"})}</div>
-                  {(ph||cl||tmp)&&(
-                    <div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap"}}>
-                      {ph&&<span style={{fontSize:11,fontWeight:600,padding:"2px 7px",borderRadius:5,background:phOk(ph)?"#dcfce7":"#fef3c7",color:phOk(ph)?"#15803d":"#92400e"}}>pH {ph}</span>}
-                      {cl&&<span style={{fontSize:11,fontWeight:600,padding:"2px 7px",borderRadius:5,background:clOk(cl)?"#dcfce7":"#fef3c7",color:clOk(cl)?"#15803d":"#92400e"}}>Cl {cl}</span>}
-                      {tmp&&<span style={{fontSize:11,fontWeight:600,padding:"2px 7px",borderRadius:5,background:"#e0f2fe",color:"#0369a1"}}>{tmp}°C</span>}
-                    </div>
-                  )}
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={isPast?"#94a3b8":"#0891b2"} strokeWidth="2.5" strokeLinecap="round" style={{transform:isOpen?"rotate(180deg)":"rotate(0deg)",transition:"transform 0.2s"}}><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              {isOpen&&(
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {rapports.map((p,i)=><RapportCard key={p.id||i} p={p} isNew={year===currentYear&&i===0}/>)}
                 </div>
-                <button className="cv-btn-press" style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:"#0891b2",background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:8,padding:"6px 9px",cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit",flexShrink:0}}
-                  onClick={e=>{e.stopPropagation(); ouvrirRapport(p, client);}}>
-                  <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                  PDF
-                </button>
-              </div>
+              )}
             </div>
           );
         })}
       </div>
-    </div>
-  );
+    );
+  };
+
+  // ─── RAPPORT CARD ──────────────────────────────────────────────────────────
+  const RapportCard = ({p, isNew}) => {
+    const ph=getPH(p); const cl=getCL(p); const tmp=getTemp(p);
+    return (
+      <div className="cv-rapport-row" onClick={()=>setSelectedPassage(p)} style={{
+        background:"#fff",borderRadius:14,
+        border:`1px solid ${isNew?"#bae6fd":"#e2e8f0"}`,
+        boxShadow:isNew?"0 2px 12px rgba(8,145,178,0.1)":"0 1px 4px rgba(0,0,0,0.04)",
+        overflow:"hidden",
+      }}>
+        {isNew&&<div style={{height:2,background:"linear-gradient(90deg,#0891b2,#7dd3fc)"}}/>}
+        <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:38,height:38,borderRadius:10,background:isControleType(p.type)?"#e0f2fe":"#eff6ff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            {isControleType(p.type)
+              ? <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.2" strokeLinecap="round"><path d="M12 2C6 2 2 12 2 12s4 10 10 10 10-10 10-10S18 2 12 2z"/></svg>
+              : <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2.2" strokeLinecap="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+            }
+          </div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,fontWeight:600,color:"#0f172a"}}>{p.type||"Contrôle de l'eau"}</div>
+            <div style={{fontSize:11,color:"#64748b",marginTop:1}}>{fmtDate(p.date,{weekday:"long",day:"2-digit",month:"short",year:"numeric"})}</div>
+            {(ph||cl||tmp)&&(
+              <div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap"}}>
+                {ph&&<span style={{fontSize:11,fontWeight:600,padding:"2px 7px",borderRadius:5,background:phOk(ph)?"#dcfce7":"#fef3c7",color:phOk(ph)?"#15803d":"#92400e"}}>pH {ph}</span>}
+                {cl&&<span style={{fontSize:11,fontWeight:600,padding:"2px 7px",borderRadius:5,background:clOk(cl)?"#dcfce7":"#fef3c7",color:clOk(cl)?"#15803d":"#92400e"}}>Cl {cl}</span>}
+                {tmp&&<span style={{fontSize:11,fontWeight:600,padding:"2px 7px",borderRadius:5,background:"#e0f2fe",color:"#0369a1"}}>{tmp}°C</span>}
+              </div>
+            )}
+          </div>
+          <button className="cv-btn-press" style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:"#0891b2",background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:8,padding:"6px 9px",cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit",flexShrink:0}}
+            onClick={e=>{e.stopPropagation(); ouvrirRapport(p, client);}}>
+            <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            PDF
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   // ─── RAPPORT DÉTAILLÉ ──────────────────────────────────────────────────────
   const RapportDetail = () => {
@@ -854,19 +914,19 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, ret
               </div>
             )}
 
-            {/* Compte-rendu */}
-            {getResume(p)&&(
+            {/* Compte-rendu — texte pur sans les produits déjà affichés */}
+            {(p.actions||p.travaux||p.compteRendu)&&(
               <div style={{background:"#f8fafc",borderRadius:12,padding:"12px 14px",marginBottom:12,border:"1px solid #e2e8f0"}}>
                 <div style={{fontSize:10,fontWeight:600,color:"#64748b",textTransform:"uppercase",letterSpacing:.7,marginBottom:6,display:"flex",alignItems:"center",gap:5}}>
                   <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.2" strokeLinecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                   Compte-rendu
                 </div>
-                <div style={{fontSize:13,color:"#334155",lineHeight:1.7}}>{getResume(p)}</div>
+                <div style={{fontSize:13,color:"#334155",lineHeight:1.7}}>{p.actions||p.travaux||p.compteRendu}</div>
               </div>
             )}
 
-            {/* Obs */}
-            {(p.obs||p.commentaires)&&(
+            {/* Obs — uniquement si différent du compte-rendu */}
+            {(p.obs||p.commentaires)&&(p.obs||p.commentaires)!==(p.actions||p.travaux||p.compteRendu)&&(
               <div style={{background:"#fffbeb",borderRadius:12,padding:"12px 14px",marginBottom:12,borderLeft:"3px solid #fbbf24"}}>
                 <div style={{fontSize:10,fontWeight:600,color:"#92400e",textTransform:"uppercase",letterSpacing:.7,marginBottom:6}}>Observations</div>
                 <div style={{fontSize:13,color:"#78350f",lineHeight:1.7}}>{p.obs||p.commentaires}</div>
