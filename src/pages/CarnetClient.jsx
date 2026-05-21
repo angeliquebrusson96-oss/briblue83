@@ -93,8 +93,8 @@ function buildRapportHTML(passage, client) {
       <button class="print-btn" onclick="window.print()">🖨️ Enregistrer en PDF</button>
     </main></body></html>`;
 }
-function ouvrirContrat(client) {
-  const html = genererContratHTML(client, "", "");
+function ouvrirContrat(client, sigPrestataire="", sigClient="") {
+  const html = genererContratHTML(client, sigPrestataire, sigClient);
   const blob = new Blob([html], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -179,6 +179,7 @@ export function CarnetPublic({ code }) {
   const [loadedLivraisons, setLoadedLivraisons] = useState([]);
   const [loadedVersements, setLoadedVersements] = useState({});
   const [loadedRetardsCarnet, setLoadedRetardsCarnet] = useState({});
+  const [loadedContrats, setLoadedContrats] = useState({});
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -192,11 +193,13 @@ export function CarnetPublic({ code }) {
         const l = d["bb_livraisons_v1"];
         const v = d["bb_versements_v1"];
         const rc = d["bb_retards_carnet_v1"];
+        const ct = d["bb_contrats_v1"];
         setLoadedClients(c && c.length ? c : CLIENTS_INIT);
         setLoadedPassages(p && p.length ? p : PASSAGES_INIT);
         setLoadedLivraisons(Array.isArray(l) ? l : []);
         setLoadedVersements(v && typeof v === "object" ? v : {});
         setLoadedRetardsCarnet(rc && typeof rc === "object" ? rc : {});
+        setLoadedContrats(ct && typeof ct === "object" ? ct : {});
       } else {
         setLoadedClients(CLIENTS_INIT);
         setLoadedPassages(PASSAGES_INIT);
@@ -242,7 +245,10 @@ export function CarnetPublic({ code }) {
   );
 
   const clientLivraisons = loadedLivraisons.filter(l=>l.clientId===client.id);
-  return <CarnetView client={client} passages={loadedPassages||[]} livraisons={clientLivraisons} versements={loadedVersements} retardsCarnet={loadedRetardsCarnet} onRefresh={loadData} refreshing={refreshing}/>;
+  const clientContrat = loadedContrats["CT-"+client.id]
+    || Object.values(loadedContrats).find(ct=>ct?.clientId===client.id)
+    || {};
+  return <CarnetView client={client} passages={loadedPassages||[]} livraisons={clientLivraisons} versements={loadedVersements} retardsCarnet={loadedRetardsCarnet} contrat={clientContrat} onRefresh={loadData} refreshing={refreshing}/>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -455,7 +461,7 @@ function SOSModal({ show, onClose, clientNom }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // VUE CARNET COMMUNE (partagée entre CarnetPublicInline et CarnetPublic)
 // ─────────────────────────────────────────────────────────────────────────────
-export function CarnetView({ client, passages, livraisons=[], versements={}, retardsCarnet={}, onRefresh, refreshing }) {
+export function CarnetView({ client, passages, livraisons=[], versements={}, retardsCarnet={}, contrat={}, onRefresh, refreshing }) {
   const [selectedPassage, setSelectedPassage] = useState(null);
   const [activeTab, setActiveTab] = useState("accueil");
   const [showSOS, setShowSOS] = useState(false);
@@ -1055,7 +1061,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, ret
 
       {/* Bouton Voir mon contrat */}
       <button
-        onClick={()=>ouvrirContrat(client)}
+        onClick={()=>ouvrirContrat(client, contrat.signaturePrestataire||"", contrat.signatureClient||"")}
         className="cv-btn-press"
         style={{display:"flex",alignItems:"center",gap:12,background:"#fff",borderRadius:14,border:"1px solid #e2e8f0",padding:"14px 16px",marginTop:8,width:"100%",cursor:"pointer",fontFamily:"inherit",textAlign:"left",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
         <div style={{width:36,height:36,background:"linear-gradient(135deg,#f0f9ff,#e0f2fe)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,border:"1px solid #bae6fd"}}>
