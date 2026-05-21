@@ -44,7 +44,12 @@ export default defineConfig({
           if (normalId.includes('node_modules/react') || normalId.includes('node_modules/react-dom')) {
             return 'react-vendor';
           }
-          if (normalId.includes('node_modules/firebase')) {
+          // Firebase v12 scoped packages : firebase/ ET @firebase/ ET @grpc/
+          if (
+            normalId.includes('node_modules/firebase') ||
+            normalId.includes('node_modules/@firebase') ||
+            normalId.includes('node_modules/@grpc')
+          ) {
             return 'firebase-vendor';
           }
           if (normalId.includes('/src/utils/helpers')) return 'utils-helpers';
