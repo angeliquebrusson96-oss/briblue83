@@ -1,25 +1,10 @@
 // @ts-nocheck
 import React, { useState, useMemo } from "react";
-import { DS, Ico, RAPPORT_STATUS } from "../utils/constants";
+import { DS, Ico, RAPPORT_STATUS, IconFiche } from "../utils/constants";
 import { isControleType, getRapportStatus, getPH, getCL } from "../utils/helpers";
 import { useIsMobile, Card, Avatar, Tag, IcoBubble, PhotoImg } from "../components/ui";
 import { showConfirm } from "../styles";
 import { PassageDetailModal } from "./PageClients";
-
-// Local IconFiche (duplicated from App.jsx)
-function IconFiche({ size=18, color="currentColor" }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="4" y="3" width="16" height="18" rx="2"/>
-      <polyline points="16 3 16 7 20 7" fill="none"/>
-      <path d="M7 10l1.5 1.5L11 9"/>
-      <line x1="13" y1="10.5" x2="17" y2="10.5"/>
-      <path d="M7 15l1.5 1.5L11 14"/>
-      <line x1="13" y1="15.5" x2="17" y2="15.5"/>
-    </svg>
-  );
-}
-
 import { ouvrirRapport, envoyerEmail } from "../components/FormPassage";
 
 // ─────────────────────────────────────────────────────────────────────────────

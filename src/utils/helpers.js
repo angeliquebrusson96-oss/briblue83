@@ -240,7 +240,7 @@ export function exportRdvToICS(rdv, client) {
     "END:VALARM",
     "END:VEVENT",
     "END:VCALENDAR",
-  ].filter(Boolean).join("\\n");
+  ].filter(Boolean).join("\r\n") + "\r\n";
 
   const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -347,7 +347,7 @@ export function isPassageEffectue(p = {}) {
   const status = String(p.statut ?? p.status ?? p.etat ?? p.état ?? "").toLowerCase();
   const type = String(p.type ?? p.categorie ?? "").toLowerCase();
   // Passages explicitement annulés, planifiés ou RDV ne comptent pas
-  if (/annul|prévu|prevu|planif|rdv|rendez|a venir|à venir/.test(status)) return false;
+  if (/annul|pr[eé]vu|planif|rdv|rendez|[aà] venir/.test(status)) return false;
   if (/rdv|rendez|prévu|prevu|planif/.test(type)) return false;
   if (p.annule || p.annulé || p.cancelled || p.planifie || p.planifié || p.rdvSeulement || p.isRdvOnly) return false;
   // ok=false ne signifie que "rapport non finalisé", pas que la visite n'a pas eu lieu

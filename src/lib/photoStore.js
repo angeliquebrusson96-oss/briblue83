@@ -205,11 +205,16 @@ async function uploadOne(key, dataUrl) {
 // ─── MIGRATION GLOBALE : tous les passages avec des clés idb: ────────────────
 // Appelée au démarrage (après auth), non bloquante.
 // Retourne la liste mise à jour (ou la même liste si rien n'a changé).
+// Traite les passages séquentiellement pour ne pas saturer le réseau mobile
 export async function migrateAllPassagesPhotos(passages) {
   if (!Array.isArray(passages) || !navigator.onLine || !auth.currentUser) return passages;
-  const results = await Promise.all(passages.map(migratePassagePhotosToStorage));
   let changed = false;
-  const updated = passages.map((p, i) => { if (results[i]) { changed = true; return results[i]; } return p; });
+  const updated = [...passages];
+  for (let i = 0; i < passages.length; i++) {
+    if (!navigator.onLine || !auth.currentUser) break; // arrêt si hors-ligne
+    const migrated = await migratePassagePhotosToStorage(passages[i]);
+    if (migrated) { updated[i] = migrated; changed = true; }
+  }
   return changed ? updated : passages;
 }
 
@@ -234,6 +239,7 @@ export async function migratePassagePhotosToStorage(passage) {
   for (const field of _ARRAYS) {
     if (!Array.isArray(p[field])) continue;
     const arr = [...p[field]];
+    let arrChanged = false;
     for (let i = 0; i < arr.length; i++) {
       const val = arr[i];
       if (!val?.startsWith("idb:")) continue;
@@ -241,9 +247,9 @@ export async function migratePassagePhotosToStorage(passage) {
       const dataUrl = await loadPhoto(key);
       if (!dataUrl) continue;
       const url = await uploadOne(key, dataUrl);
-      if (url) { arr[i] = url; changed = true; }
+      if (url) { arr[i] = url; changed = true; arrChanged = true; }
     }
-    if (changed) p[field] = arr;
+    if (arrChanged) p[field] = arr;
   }
   return changed ? p : null;
 }

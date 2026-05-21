@@ -49,7 +49,7 @@ export async function envoyerEmailLivraison(livraison, client) {
   const dateStr = new Date(livraison.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"});
   const filename = `BonLivraison_BRIBLUE_${client?.nom?.replace(/\s/g,"_")||"client"}_${livraison.date}.html`;
   const html = genererHTMLLivraison(livraison, client);
-  const b64 = btoa(unescape(encodeURIComponent(html)));
+  const b64 = btoa(String.fromCharCode(...new TextEncoder().encode(html)));
   const corps = `Bonjour ${client?.nom||""},\n\nVotre bon de livraison du ${dateStr} est disponible.\n\nCordialement,\nDorian Briaire\nTechnicien de Piscine - BRI BLUE`;
   try {
     const res = await fetch("/api/send-email", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ from:`BRIBLUE <rapport-piscine@briblue83.com>`, to:[client.email], subject:`Bon de livraison BRIBLUE — ${dateStr}`, text:corps, attachments:[{filename,content:b64}] }) });
@@ -74,17 +74,27 @@ export function FormLivraison({ initial, clientId, clients=[], produitsStock=[],
     () => !!(f.produits?.length || f.description?.trim() || f.montant)
   );
 
-  const addPhotos = (e) => {
+  const compressPhoto = (file) => new Promise(resolve => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onerror = () => { URL.revokeObjectURL(url); const r = new FileReader(); r.onload=()=>resolve(r.result); r.readAsDataURL(file); };
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const MAX = 1024; let {width, height} = img;
+      if (width > MAX || height > MAX) { if(width>=height){height=Math.round(height*MAX/width);width=MAX;}else{width=Math.round(width*MAX/height);height=MAX;} }
+      const c = document.createElement("canvas"); c.width=width; c.height=height;
+      c.getContext("2d").drawImage(img,0,0,width,height);
+      try { resolve(c.toDataURL("image/jpeg",0.72)); } catch { const r=new FileReader(); r.onload=()=>resolve(r.result); r.readAsDataURL(file); }
+    };
+    img.src = url;
+  });
+
+  const addPhotos = async (e) => {
     const files = Array.from(e.target.files||[]).slice(0, 10-(f.photos||[]).length);
+    e.target.value = "";
     if(!files.length) return;
-    let loaded = 0;
-    const newPhotos = [...(f.photos||[])];
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = () => { newPhotos.push(reader.result); loaded++; if(loaded===files.length) set("photos",newPhotos.slice(0,10)); };
-      reader.readAsDataURL(file);
-    });
-    e.target.value="";
+    const compressed = await Promise.all(files.map(compressPhoto));
+    set("photos", [...(f.photos||[]), ...compressed].slice(0, 10));
   };
 
   const STEPS = ["Client", "Produits", "Résumé"];

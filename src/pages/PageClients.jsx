@@ -1,17 +1,8 @@
 // @ts-nocheck
 import React, { useState, useMemo } from "react";
-import { DS, Ico, RAPPORT_STATUS } from "../utils/constants";
+import { DS, Ico, RAPPORT_STATUS, AC } from "../utils/constants";
 import { alerteClient, daysUntil, isEntretienType, isControleType, totalAnnuel, getRapportStatus, YEAR_NOW, calculerPassagesPrevusContrat, isPassageDansContrat, isPassageEffectue } from "../utils/helpers";
 import { useIsMobile, Avatar, Modal, Tag, BtnPrimary, PhotoImg } from "../components/ui";
-
-// ─── Alert color map (mirrors App.jsx AC) ────────────────────────────────────
-const AC = {
-  rouge:  { bg:"#fee2e2", bd:"#fda4af", tx:"#dc2626", lbl:"URGENT"    },
-  jaune:  { bg:"#fef9c3", bd:"#fcd34d", tx:"#ca8a04", lbl:"Attention" },
-  orange: { bg:"#ffedd5", bd:"#fcd34d", tx:"#ea580c", lbl:"Retard"    },
-  aFaire: { bg:"#eff6ff", bd:"#bfdbfe", tx:"#2563eb", lbl:"À faire"   },
-  ok:     { bg:"#f0fdf4", bd:"#bbf7d0", tx:"#16a34a", lbl:"OK"        },
-};
 
 // ─── Component to render block icons ────────────────────────────────────────
 const BlockIcon = ({name, size=14, color="currentColor"}) => {
