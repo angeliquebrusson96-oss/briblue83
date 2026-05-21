@@ -234,78 +234,207 @@ export function CarnetPublic({ code }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SOS MODAL — composant externe pour éviter re-render du parent à chaque frappe
+// SOS MODAL — questionnaire interactif + résumé envoyé par SMS
 // ─────────────────────────────────────────────────────────────────────────────
 function SOSModal({ show, onClose, clientNom }) {
-  const [message, setMessage] = useState("");
+  const [step, setStep] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [comment, setComment] = useState("");
   const [sent, setSent] = useState(false);
 
-  // Réinitialiser quand on ferme
   const handleClose = () => {
     onClose();
-    setTimeout(() => { setMessage(""); setSent(false); }, 300);
+    setTimeout(() => { setStep(0); setAnswers({}); setComment(""); setSent(false); }, 300);
   };
 
   if (!show) return null;
 
+  // ── Définition du questionnaire ──────────────────────────────────────────
+  const QUESTIONS = [
+    {
+      id: "urgence",
+      question: "Quel est le problème principal ?",
+      emoji: "🔍",
+      choices: [
+        { value: "eau_verte", label: "Eau verte / trouble", emoji: "🟢" },
+        { value: "fuite",     label: "Fuite d'eau",         emoji: "💧" },
+        { value: "pompe",     label: "Pompe / filtration",  emoji: "⚙️" },
+        { value: "autre",     label: "Autre problème",      emoji: "❓" },
+      ],
+    },
+    {
+      id: "depuis",
+      question: "Depuis combien de temps ?",
+      emoji: "⏱️",
+      choices: [
+        { value: "24h",       label: "Moins de 24h",    emoji: "🕐" },
+        { value: "quelques",  label: "Quelques jours",  emoji: "📅" },
+        { value: "semaine",   label: "Plus d'une semaine", emoji: "📆" },
+      ],
+    },
+    {
+      id: "gravite",
+      question: "C'est urgent ?",
+      emoji: "🚨",
+      choices: [
+        { value: "tres_urgent", label: "Oui, très urgent",     emoji: "🔴" },
+        { value: "urgent",      label: "Oui, assez urgent",    emoji: "🟠" },
+        { value: "pas_urgent",  label: "Non, quand possible",  emoji: "🟢" },
+      ],
+    },
+  ];
+
+  const currentQ = QUESTIONS[step];
+  const isLastQ = step === QUESTIONS.length - 1;
+  const isCommentStep = step === QUESTIONS.length;
+  const isDone = sent;
+
+  const handleChoice = (val) => {
+    const newAnswers = { ...answers, [currentQ.id]: val };
+    setAnswers(newAnswers);
+    if (!isLastQ) {
+      setStep(s => s + 1);
+    } else {
+      setStep(QUESTIONS.length); // passe au commentaire
+    }
+  };
+
+  const buildMessage = () => {
+    const labels = {
+      urgence: { eau_verte:"Eau verte/trouble", fuite:"Fuite d'eau", pompe:"Pompe/filtration", autre:"Autre problème" },
+      depuis:  { "24h":"< 24h", quelques:"Quelques jours", semaine:"> 1 semaine" },
+      gravite: { tres_urgent:"Très urgent 🔴", urgent:"Assez urgent 🟠", pas_urgent:"Non urgent 🟢" },
+    };
+    const pb    = labels.urgence[answers.urgence] || answers.urgence;
+    const dep   = labels.depuis[answers.depuis]   || answers.depuis;
+    const grav  = labels.gravite[answers.gravite] || answers.gravite;
+    let msg = `🏊 SOS PISCINE — ${clientNom}\n`;
+    msg += `Problème : ${pb}\n`;
+    msg += `Depuis : ${dep}\n`;
+    msg += `Urgence : ${grav}`;
+    if (comment.trim()) msg += `\nCommentaire : ${comment.trim()}`;
+    return msg;
+  };
+
   const handleSend = () => {
-    if (!message.trim()) return;
     const tel = "+33667186115";
-    const text = encodeURIComponent(`[${clientNom}] ${message.trim()}`);
+    const text = encodeURIComponent(buildMessage());
     window.open(`sms:${tel}?body=${text}`, "_blank");
     setSent(true);
-    setTimeout(() => { setSent(false); setMessage(""); }, 3000);
   };
+
+  const progressPct = Math.min(100, (step / QUESTIONS.length) * 100);
 
   return (
     <div onClick={handleClose} style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.65)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:10003,backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",animation:"cv-fadeIn 0.2s ease"}}>
-      <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,padding:"0 22px",paddingBottom:"max(32px,env(safe-area-inset-bottom,32px))",animation:"cv-fadeUp 0.3s ease",overflow:"hidden"}}>
-        <div style={{height:4,background:"linear-gradient(90deg,#dc2626,#f87171)",margin:"0 -22px 20px",marginTop:0}}/>
-        <div style={{display:"flex",justifyContent:"center",marginBottom:4}}><div style={{width:40,height:4,background:"#e2e8f0",borderRadius:2}}/></div>
-        <div style={{textAlign:"center",padding:"16px 0 20px"}}>
-          <div style={{width:68,height:68,background:"linear-gradient(135deg,#fee2e2,#fecaca)",borderRadius:20,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px",border:"2px solid #fca5a5",boxShadow:"0 6px 20px rgba(220,38,38,0.2)"}}>
-            <svg width={30} height={30} viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          </div>
-          <div style={{fontSize:20,fontWeight:700,color:"#0f172a",marginBottom:6}}>Besoin d'aide urgent ?</div>
-          <div style={{fontSize:13,color:"#64748b",lineHeight:1.5}}>Contactez directement votre technicien BRIBLUE pour toute urgence piscine</div>
-        </div>
-        <a href="tel:+33667186115" className="cv-btn-press" style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,background:"linear-gradient(135deg,#0891b2,#0e7490)",color:"#fff",borderRadius:16,padding:"17px",fontSize:16,fontWeight:700,textDecoration:"none",marginBottom:12,boxShadow:"0 6px 20px rgba(8,145,178,0.4)"}}>
-          <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.01 1.18 2 2 0 012 0h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 14.92z"/></svg>
-          06 67 18 61 15
-        </a>
-        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-          <div style={{flex:1,height:1,background:"#e2e8f0"}}/>
-          <span style={{fontSize:11,color:"#94a3b8",fontWeight:500}}>ou envoyer un message</span>
-          <div style={{flex:1,height:1,background:"#e2e8f0"}}/>
-        </div>
-        {sent ? (
-          <div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:14,padding:"16px",textAlign:"center",marginBottom:12}}>
-            <div style={{fontSize:24,marginBottom:6}}>✅</div>
-            <div style={{fontSize:14,fontWeight:600,color:"#15803d"}}>Message envoyé !</div>
-            <div style={{fontSize:12,color:"#64748b",marginTop:2}}>Votre technicien vous répondra rapidement.</div>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,padding:"0 20px",paddingBottom:"max(32px,env(safe-area-inset-bottom,32px))",animation:"cv-fadeUp 0.3s ease",overflow:"hidden"}}>
+        {/* Bande rouge */}
+        <div style={{height:4,background:"linear-gradient(90deg,#dc2626,#f87171)",margin:"0 -20px 0",marginTop:0}}/>
+        {/* Handle */}
+        <div style={{display:"flex",justifyContent:"center",margin:"12px 0 16px"}}><div style={{width:40,height:4,background:"#e2e8f0",borderRadius:2}}/></div>
+
+        {isDone ? (
+          /* ── Confirmation ── */
+          <div style={{textAlign:"center",padding:"16px 0 8px"}}>
+            <div style={{fontSize:52,marginBottom:12}}>✅</div>
+            <div style={{fontSize:18,fontWeight:700,color:"#0f172a",marginBottom:6}}>Message envoyé !</div>
+            <div style={{fontSize:13,color:"#64748b",lineHeight:1.6,marginBottom:24}}>Votre technicien BRIBLUE a reçu votre demande et vous contactera rapidement.</div>
+            {/* Récap */}
+            <div style={{background:"#f8fafc",borderRadius:14,padding:"14px",textAlign:"left",marginBottom:20,border:"1px solid #e2e8f0"}}>
+              <div style={{fontSize:11,fontWeight:700,color:"#64748b",textTransform:"uppercase",letterSpacing:.7,marginBottom:10}}>Récapitulatif envoyé</div>
+              <pre style={{margin:0,fontSize:12,color:"#334155",fontFamily:"inherit",whiteSpace:"pre-wrap",lineHeight:1.7}}>{buildMessage()}</pre>
+            </div>
+            <button onClick={handleClose} className="cv-btn-press" style={{width:"100%",padding:"14px",background:"#f1f5f9",border:"none",borderRadius:14,fontSize:14,color:"#64748b",fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>Fermer</button>
           </div>
         ) : (
-          <div style={{marginBottom:12}}>
-            <textarea
-              value={message}
-              onChange={e=>setMessage(e.target.value)}
-              placeholder="Décrivez votre problème (ex: fuite au niveau du filtre, eau verte…)"
-              rows={3}
-              style={{width:"100%",borderRadius:12,border:"1px solid #e2e8f0",padding:"12px 14px",fontSize:13,color:"#0f172a",fontFamily:"inherit",resize:"none",outline:"none",boxSizing:"border-box",background:"#f8fafc",lineHeight:1.5}}
-            />
-            <button
-              onClick={handleSend}
-              disabled={!message.trim()}
-              className="cv-btn-press"
-              style={{width:"100%",padding:"14px",background:message.trim()?"linear-gradient(135deg,#dc2626,#ef4444)":"#e2e8f0",border:"none",borderRadius:14,fontSize:14,color:message.trim()?"#fff":"#94a3b8",fontWeight:600,cursor:message.trim()?"pointer":"default",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:8,boxShadow:message.trim()?"0 4px 14px rgba(220,38,38,0.3)":"none",transition:"all 0.2s"}}>
-              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-              Envoyer le message
+          <>
+            {/* Header SOS */}
+            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:18}}>
+              <div style={{width:46,height:46,background:"linear-gradient(135deg,#fee2e2,#fecaca)",borderRadius:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,border:"2px solid #fca5a5"}}>
+                <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:16,fontWeight:700,color:"#0f172a"}}>Besoin d'aide ?</div>
+                <div style={{fontSize:11,color:"#64748b"}}>Répondez en quelques secondes</div>
+              </div>
+              {/* Appel direct */}
+              <a href="tel:+33667186115" style={{display:"flex",alignItems:"center",justifyContent:"center",width:40,height:40,background:"linear-gradient(135deg,#0891b2,#0e7490)",borderRadius:12,flexShrink:0,boxShadow:"0 3px 10px rgba(8,145,178,0.35)"}}>
+                <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.01 1.18 2 2 0 012 0h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 14.92z"/></svg>
+              </a>
+            </div>
+
+            {/* Barre de progression */}
+            {!isCommentStep && (
+              <div style={{marginBottom:20}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                  <span style={{fontSize:11,color:"#94a3b8"}}>Question {step+1} sur {QUESTIONS.length}</span>
+                  <span style={{fontSize:11,color:"#94a3b8"}}>{Math.round(progressPct)}%</span>
+                </div>
+                <div style={{height:4,background:"#f1f5f9",borderRadius:2,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${progressPct}%`,background:"linear-gradient(90deg,#dc2626,#f87171)",borderRadius:2,transition:"width 0.3s ease"}}/>
+                </div>
+              </div>
+            )}
+
+            {/* Question ou commentaire */}
+            {!isCommentStep ? (
+              <>
+                <div style={{textAlign:"center",marginBottom:20}}>
+                  <div style={{fontSize:32,marginBottom:8}}>{currentQ.emoji}</div>
+                  <div style={{fontSize:16,fontWeight:700,color:"#0f172a",lineHeight:1.4}}>{currentQ.question}</div>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
+                  {currentQ.choices.map(c=>(
+                    <button key={c.value} onClick={()=>handleChoice(c.value)} className="cv-btn-press"
+                      style={{width:"100%",padding:"14px 16px",background:answers[currentQ.id]===c.value?"#fff7f7":"#f8fafc",border:`1.5px solid ${answers[currentQ.id]===c.value?"#fca5a5":"#e2e8f0"}`,borderRadius:14,fontSize:14,color:"#0f172a",fontWeight:500,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:12,textAlign:"left",transition:"all 0.15s"}}>
+                      <span style={{fontSize:20,flexShrink:0}}>{c.emoji}</span>
+                      <span style={{flex:1}}>{c.label}</span>
+                      <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Récap des réponses */}
+                <div style={{background:"#f0f9ff",borderRadius:12,padding:"12px 14px",marginBottom:16,border:"1px solid #bae6fd"}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#0891b2",textTransform:"uppercase",letterSpacing:.7,marginBottom:8}}>Récapitulatif</div>
+                  {QUESTIONS.map(q=>{
+                    const choice = q.choices.find(c=>c.value===answers[q.id]);
+                    return choice ? (
+                      <div key={q.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
+                        <span style={{fontSize:14}}>{choice.emoji}</span>
+                        <span style={{fontSize:12,color:"#334155"}}>{choice.label}</span>
+                      </div>
+                    ) : null;
+                  })}
+                </div>
+                {/* Commentaire libre */}
+                <div style={{marginBottom:16}}>
+                  <div style={{fontSize:13,fontWeight:600,color:"#0f172a",marginBottom:8}}>💬 Commentaire supplémentaire <span style={{fontWeight:400,color:"#94a3b8"}}>(optionnel)</span></div>
+                  <textarea
+                    value={comment}
+                    onChange={e=>setComment(e.target.value)}
+                    placeholder="Précisez si besoin (ex: eau mousseuse, bruit anormal…)"
+                    rows={3}
+                    style={{width:"100%",borderRadius:12,border:"1px solid #e2e8f0",padding:"12px 14px",fontSize:13,color:"#0f172a",fontFamily:"inherit",resize:"none",outline:"none",boxSizing:"border-box",background:"#f8fafc",lineHeight:1.5}}
+                  />
+                </div>
+                <button onClick={handleSend} className="cv-btn-press"
+                  style={{width:"100%",padding:"15px",background:"linear-gradient(135deg,#dc2626,#ef4444)",border:"none",borderRadius:14,fontSize:15,color:"#fff",fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:10,boxShadow:"0 4px 14px rgba(220,38,38,0.35)"}}>
+                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                  Envoyer le message
+                </button>
+              </>
+            )}
+
+            {/* Bouton retour ou fermer */}
+            <button onClick={step > 0 ? ()=>setStep(s=>s-1) : handleClose} className="cv-btn-press"
+              style={{width:"100%",padding:"13px",background:"#f1f5f9",border:"none",borderRadius:14,fontSize:13,color:"#64748b",fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>
+              {step > 0 ? "← Revenir" : "Fermer"}
             </button>
-          </div>
+          </>
         )}
-        <button onClick={handleClose} className="cv-btn-press" style={{width:"100%",padding:"14px",background:"#f1f5f9",border:"none",borderRadius:14,fontSize:14,color:"#64748b",fontWeight:500,cursor:"pointer",fontFamily:"inherit",transition:"background 0.15s"}}>
-          Fermer
-        </button>
       </div>
     </div>
   );
@@ -837,12 +966,12 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, ret
               {all.map((item,i)=>{
                 const label = item.produits.length > 0 ? item.produits.join(", ") : (item.description||"Livraison");
                 return (
-                  <div key={item.id||i} style={{background:"#fff",borderRadius:14,border:"1px solid #e2e8f0",padding:"12px 14px",display:"flex",alignItems:"center",gap:12,boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
+                  <div key={item.id||i} style={{background:"#fff",borderRadius:14,border:"1px solid #e2e8f0",padding:"12px 14px",display:"flex",alignItems:"center",gap:12,boxShadow:"0 1px 4px rgba(0,0,0,0.04)",minWidth:0}}>
                     <div style={{width:40,height:40,background:"linear-gradient(135deg,#f0fdf4,#dcfce7)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,border:"1px solid #bbf7d0"}}>
                       <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
                     </div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:13,fontWeight:600,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{label}</div>
+                    <div style={{flex:1,minWidth:0,overflow:"hidden"}}>
+                      <div style={{fontSize:13,fontWeight:600,color:"#0f172a",wordBreak:"break-word",lineHeight:1.4}}>{label}</div>
                       <div style={{fontSize:11,color:"#64748b",marginTop:1}}>{fmtDate(item.date,{day:"2-digit",month:"short",year:"numeric"})}</div>
                     </div>
                     <div style={{display:"flex",alignItems:"center",gap:4,background:"#f0fdf4",color:"#15803d",borderRadius:8,padding:"4px 9px",fontSize:11,fontWeight:600,flexShrink:0,border:"1px solid #bbf7d0"}}>
@@ -860,7 +989,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, ret
 
   // ─── PROFIL TAB ────────────────────────────────────────────────────────────
   const ProfilTab = () => (
-    <div style={{padding:"0 12px"}}>
+    <div style={{padding:"0 12px 20px"}}>
       <SectionHead
         icon={<><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></>}
         title="Mon profil"
