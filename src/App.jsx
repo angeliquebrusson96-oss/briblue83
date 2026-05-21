@@ -358,6 +358,16 @@ export default function App() {
     setRdvs(rdvsData); setStock(sWithDefaults); setContrats(contratsData); setVersements(versementsData); setRetardsCarnet(retardsCarnetData);
   }, []);
 
+  // ─── SAVE CALLBACKS (déclarés avant runPhotoMigration qui en dépend) ────────────
+  const saveClients   = useCallback((data) => save("bb_clients_v2",    data), []);
+  const savePassages  = useCallback((data) => save("bb_passages_v2",   data), []);
+  const saveLivraisonsList = useCallback((data) => save("bb_livraisons_v1", data), []);
+  const saveRdvsList  = useCallback((data) => save("bb_rdvs_v1",       data), []);
+  const saveStock     = useCallback((data) => save("bb_stock_v1",      data), []);
+  const saveContrats  = useCallback((data) => save("bb_contrats_v1",   data), []);
+  const saveVersements = useCallback((data) => save("bb_versements_v1", data), []);
+  const saveRetardsCarnet = useCallback((data) => save("bb_retards_carnet_v1", data), []);
+
   // ─── MIGRATION PHOTOS : lit les passages depuis LS et pousse les idb: vers Storage ──
   const runPhotoMigration = useCallback(async () => {
     if (!navigator.onLine || !auth.currentUser) return;
@@ -409,15 +419,6 @@ export default function App() {
     });
     return () => unsub();
   }, [ready, runPhotoMigration]);
-
-  const saveClients   = useCallback((data) => save("bb_clients_v2",    data), []);
-  const savePassages  = useCallback((data) => save("bb_passages_v2",   data), []);
-  const saveLivraisonsList = useCallback((data) => save("bb_livraisons_v1", data), []);
-  const saveRdvsList  = useCallback((data) => save("bb_rdvs_v1",       data), []);
-  const saveStock     = useCallback((data) => save("bb_stock_v1",      data), []);
-  const saveContrats  = useCallback((data) => save("bb_contrats_v1",   data), []);
-  const saveVersements = useCallback((data) => save("bb_versements_v1", data), []);
-  const saveRetardsCarnet = useCallback((data) => save("bb_retards_carnet_v1", data), []);
 
   useEffect(()=>{
     if(!ready) return;
