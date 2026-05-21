@@ -19,6 +19,7 @@ export default defineConfig({
     //
     // Solution : terser avec mangle désactivé (pas de renommage = pas de collision).
     // La compression whitespace/dead-code reste active → ~même taille que OXC.
+    chunkSizeWarningLimit: 1000,
     minify: 'terser',
     terserOptions: {
       // Ne pas renommer les variables → aucun risque de collision de noms
