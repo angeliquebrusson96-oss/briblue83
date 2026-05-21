@@ -17,10 +17,23 @@ export default defineConfig({
     // à des variables dans des portées imbriquées (module scope ET scope App()),
     // causant un TDZ "Cannot access X before initialization" à l'exécution.
     //
-    // Solution définitive : désactiver la minification des variables (mangling).
-    // La compression whitespace/dead-code est conservée via rolldownOptions.
-    // Impact taille : +20-30% gzip, mais l'app fonctionne correctement.
-    minify: false,
+    // Solution : terser avec mangle désactivé (pas de renommage = pas de collision).
+    // La compression whitespace/dead-code reste active → ~même taille que OXC.
+    minify: 'terser',
+    terserOptions: {
+      // Ne pas renommer les variables → aucun risque de collision de noms
+      mangle: false,
+      compress: {
+        // Désactiver les optimisations qui réordonnent les déclarations (cause TDZ)
+        sequences: false,
+        // Conserver les noms de fonctions pour le débogage
+        keep_fnames: true,
+      },
+      format: {
+        // Supprimer les commentaires pour réduire la taille
+        comments: false,
+      },
+    },
     rollupOptions: {
       output: {
         // Séparer les vendors et utilitaires en chunks distincts

@@ -10,7 +10,12 @@
       "Bash(node -e \"require\\('firebase/auth'\\); console.log\\('firebase/auth ok'\\)\")",
       "Bash(npx tsc *)",
       "Bash(node_modules\\\\.bin\\\\eslint src/App.jsx --max-warnings=0)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(npm install *)",
+      "Read(//c/c/Users/CE PC/Downloads/briblue/node_modules/.bin/**)",
+      "Bash(node_modules/.bin/terser --version)",
+      "Bash(cd \"/c/Users/CE PC/Downloads/briblue\" && grep -c \"firestore\\\\|firebase\" dist/assets/components-BM1GB4as.js | head -1 && ls dist/assets/)",
+      "Read(//c/c/Users/CE PC/Downloads/briblue/dist/assets/**)"
     ]
   }
 }
