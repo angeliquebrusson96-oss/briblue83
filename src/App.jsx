@@ -1,8 +1,8 @@
 // @ts-nocheck
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { save, load, flushPendingNow, IS_IOS, reconcileOnBoot } from "./lib/storage";
-import { extractPassagePhotos, migratePassagePhotosToStorage } from "./lib/photoStore";
-import { signInAnonymously } from "firebase/auth";
+import { extractPassagePhotos, migratePassagePhotosToStorage, migrateAllPassagesPhotos } from "./lib/photoStore";
+import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import { auth } from "./lib/firebase";
 
 import { DS, Ico, IconFiche, CLIENTS_INIT, PASSAGES_INIT, PRODUITS_DEFAUT, MOIS, AC } from "./utils/constants";
@@ -358,6 +358,21 @@ export default function App() {
     setRdvs(rdvsData); setStock(sWithDefaults); setContrats(contratsData); setVersements(versementsData); setRetardsCarnet(retardsCarnetData);
   }, []);
 
+  // ─── MIGRATION PHOTOS : lit les passages depuis LS et pousse les idb: vers Storage ──
+  const runPhotoMigration = useCallback(async () => {
+    if (!navigator.onLine || !auth.currentUser) return;
+    const current = readLS("bb_passages_v2", PASSAGES_INIT);
+    if (!current.some(p =>
+      ["photoArrivee","photoDepart"].some(f => p[f]?.startsWith("idb:")) ||
+      ["photos","photosDepart"].some(f => Array.isArray(p[f]) && p[f].some(v => v?.startsWith("idb:")))
+    )) return; // rien à migrer
+    const updated = await migrateAllPassagesPhotos(current);
+    if (updated !== current) {
+      setPassages(updated);
+      await savePassages(updated);
+    }
+  }, [savePassages]);
+
   useEffect(()=>{
     if(!loggedIn || _BB_BOOT_DONE) return;
     _BB_BOOT_DONE = true;
@@ -366,9 +381,34 @@ export default function App() {
     applyLocalData();
     setReady(true);
 
-    // Réconciliation Firebase en arrière-plan
-    reconcileOnBoot().then(() => applyLocalData()).catch(() => {});
-  },[loggedIn, applyLocalData]);
+    // Réconciliation Firebase en arrière-plan, puis migration photos
+    reconcileOnBoot().then(() => {
+      applyLocalData();
+      runPhotoMigration().catch(() => {});
+    }).catch(() => {});
+  },[loggedIn, applyLocalData, runPhotoMigration]);
+
+  // ─── RETRY MIGRATION quand on repasse en ligne ───────────────────────────────
+  useEffect(() => {
+    if (!ready) return;
+    const onOnline = async () => {
+      if (!auth.currentUser) {
+        await signInAnonymously(auth).catch(() => {});
+      }
+      runPhotoMigration().catch(() => {});
+    };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [ready, runPhotoMigration]);
+
+  // ─── RETRY MIGRATION dès que Firebase Auth est prêt ──────────────────────────
+  useEffect(() => {
+    if (!ready) return;
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (user && navigator.onLine) runPhotoMigration().catch(() => {});
+    });
+    return () => unsub();
+  }, [ready, runPhotoMigration]);
 
   const saveClients   = useCallback((data) => save("bb_clients_v2",    data), []);
   const savePassages  = useCallback((data) => save("bb_passages_v2",   data), []);

@@ -7,7 +7,9 @@
       "Bash(npm run *)",
       "Bash(git mv *)",
       "Bash(node -e \"require\\('firebase/storage'\\); console.log\\('ok'\\)\")",
-      "Bash(node -e \"require\\('firebase/auth'\\); console.log\\('firebase/auth ok'\\)\")"
+      "Bash(node -e \"require\\('firebase/auth'\\); console.log\\('firebase/auth ok'\\)\")",
+      "Bash(npx tsc *)",
+      "Bash(node_modules\\\\.bin\\\\eslint src/App.jsx --max-warnings=0)"
     ]
   }
 }

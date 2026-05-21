@@ -147,15 +147,23 @@ export function Avatar({ nom, size=40, photo }) {
 
 // ─── PHOTO IMG ────────────────────────────────────────────────────────────────
 // Résout les références "idb:..." depuis IndexedDB avant d'afficher l'image.
+// Affiche un placeholder gris si l'image idb: ne peut pas être résolue localement.
 export function PhotoImg({ src, alt="", style={} }) {
-  const [resolved, setResolved] = useState(() => (src?.startsWith("idb:") ? "" : src || ""));
+  const isIdb = src?.startsWith("idb:");
+  const [resolved, setResolved] = useState(() => (isIdb ? null : src || ""));
   useEffect(() => {
     if (!src) { setResolved(""); return; }
     if (!src.startsWith("idb:")) { setResolved(src); return; }
+    setResolved(null);
     let cancelled = false;
-    resolvePhoto(src).then(v => { if (!cancelled) setResolved(v); });
+    resolvePhoto(src).then(v => { if (!cancelled) setResolved(v || ""); });
     return () => { cancelled = true; };
   }, [src]);
+  if (resolved === null) return (
+    <div style={{...style, background:"#e2e8f0", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0}}>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+    </div>
+  );
   if (!resolved) return null;
   return <img src={resolved} alt={alt} style={style} />;
 }

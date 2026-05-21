@@ -152,20 +152,43 @@ export async function extractPassagePhotos(passage) {
   return p;
 }
 
+// ─── COMPRESSION AVANT UPLOAD (900 px, 72 % — optimisé réseau mobile) ───────
+function compressForUpload(dataUrl) {
+  return new Promise(resolve => {
+    if (!dataUrl?.startsWith("data:image/")) { resolve(dataUrl); return; }
+    const img = new Image();
+    img.onerror = () => resolve(dataUrl);
+    img.onload = () => {
+      const MAX = 900;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        if (width >= height) { height = Math.round(height * MAX / width); width = MAX; }
+        else { width = Math.round(width * MAX / height); height = MAX; }
+      }
+      const c = document.createElement("canvas");
+      c.width = width; c.height = height;
+      c.getContext("2d").drawImage(img, 0, 0, width, height);
+      try { resolve(c.toDataURL("image/jpeg", 0.72)); } catch { resolve(dataUrl); }
+    };
+    img.src = dataUrl;
+  });
+}
+
 // ─── UPLOAD UN FICHIER VERS FIREBASE STORAGE ─────────────────────────────────
-const UPLOAD_TIMEOUT_MS = 15000;
+const UPLOAD_TIMEOUT_MS = 20000;
 
 async function uploadOne(key, dataUrl) {
   if (!dataUrl || !navigator.onLine) return null;
   if (!auth.currentUser) return null;
   try {
-    const [header, b64] = dataUrl.split(",");
+    // Compresser avant envoi pour réduire la taille sur le réseau mobile
+    const compressed = await compressForUpload(dataUrl);
+    const [header, b64] = compressed.split(",");
     if (!b64) return null;
-    const mime = header.match(/:(.*?);/)?.[1] || "image/jpeg";
     const binary = atob(b64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const blob = new Blob([bytes], { type: mime });
+    const blob = new Blob([bytes], { type: "image/jpeg" });
     const storageRef = ref(storage, `photos/${key}.jpg`);
     const upload = uploadBytes(storageRef, blob, { contentType: "image/jpeg" })
       .then(() => getDownloadURL(storageRef));
@@ -177,6 +200,17 @@ async function uploadOne(key, dataUrl) {
     console.warn("[briblue] uploadOne échoué:", key, e?.message);
     return null;
   }
+}
+
+// ─── MIGRATION GLOBALE : tous les passages avec des clés idb: ────────────────
+// Appelée au démarrage (après auth), non bloquante.
+// Retourne la liste mise à jour (ou la même liste si rien n'a changé).
+export async function migrateAllPassagesPhotos(passages) {
+  if (!Array.isArray(passages) || !navigator.onLine || !auth.currentUser) return passages;
+  const results = await Promise.all(passages.map(migratePassagePhotosToStorage));
+  let changed = false;
+  const updated = passages.map((p, i) => { if (results[i]) { changed = true; return results[i]; } return p; });
+  return changed ? updated : passages;
 }
 
 // ─── MIGRATION ARRIÈRE-PLAN vers Firebase Storage ────────────────────────────
