@@ -234,14 +234,90 @@ export function CarnetPublic({ code }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SOS MODAL — composant externe pour éviter re-render du parent à chaque frappe
+// ─────────────────────────────────────────────────────────────────────────────
+function SOSModal({ show, onClose, clientNom }) {
+  const [message, setMessage] = useState("");
+  const [sent, setSent] = useState(false);
+
+  // Réinitialiser quand on ferme
+  const handleClose = () => {
+    onClose();
+    setTimeout(() => { setMessage(""); setSent(false); }, 300);
+  };
+
+  if (!show) return null;
+
+  const handleSend = () => {
+    if (!message.trim()) return;
+    const tel = "+33667186115";
+    const text = encodeURIComponent(`[${clientNom}] ${message.trim()}`);
+    window.open(`sms:${tel}?body=${text}`, "_blank");
+    setSent(true);
+    setTimeout(() => { setSent(false); setMessage(""); }, 3000);
+  };
+
+  return (
+    <div onClick={handleClose} style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.65)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:10003,backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",animation:"cv-fadeIn 0.2s ease"}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,padding:"0 22px",paddingBottom:"max(32px,env(safe-area-inset-bottom,32px))",animation:"cv-fadeUp 0.3s ease",overflow:"hidden"}}>
+        <div style={{height:4,background:"linear-gradient(90deg,#dc2626,#f87171)",margin:"0 -22px 20px",marginTop:0}}/>
+        <div style={{display:"flex",justifyContent:"center",marginBottom:4}}><div style={{width:40,height:4,background:"#e2e8f0",borderRadius:2}}/></div>
+        <div style={{textAlign:"center",padding:"16px 0 20px"}}>
+          <div style={{width:68,height:68,background:"linear-gradient(135deg,#fee2e2,#fecaca)",borderRadius:20,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px",border:"2px solid #fca5a5",boxShadow:"0 6px 20px rgba(220,38,38,0.2)"}}>
+            <svg width={30} height={30} viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <div style={{fontSize:20,fontWeight:700,color:"#0f172a",marginBottom:6}}>Besoin d'aide urgent ?</div>
+          <div style={{fontSize:13,color:"#64748b",lineHeight:1.5}}>Contactez directement votre technicien BRIBLUE pour toute urgence piscine</div>
+        </div>
+        <a href="tel:+33667186115" className="cv-btn-press" style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,background:"linear-gradient(135deg,#0891b2,#0e7490)",color:"#fff",borderRadius:16,padding:"17px",fontSize:16,fontWeight:700,textDecoration:"none",marginBottom:12,boxShadow:"0 6px 20px rgba(8,145,178,0.4)"}}>
+          <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.01 1.18 2 2 0 012 0h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 14.92z"/></svg>
+          06 67 18 61 15
+        </a>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+          <div style={{flex:1,height:1,background:"#e2e8f0"}}/>
+          <span style={{fontSize:11,color:"#94a3b8",fontWeight:500}}>ou envoyer un message</span>
+          <div style={{flex:1,height:1,background:"#e2e8f0"}}/>
+        </div>
+        {sent ? (
+          <div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:14,padding:"16px",textAlign:"center",marginBottom:12}}>
+            <div style={{fontSize:24,marginBottom:6}}>✅</div>
+            <div style={{fontSize:14,fontWeight:600,color:"#15803d"}}>Message envoyé !</div>
+            <div style={{fontSize:12,color:"#64748b",marginTop:2}}>Votre technicien vous répondra rapidement.</div>
+          </div>
+        ) : (
+          <div style={{marginBottom:12}}>
+            <textarea
+              value={message}
+              onChange={e=>setMessage(e.target.value)}
+              placeholder="Décrivez votre problème (ex: fuite au niveau du filtre, eau verte…)"
+              rows={3}
+              style={{width:"100%",borderRadius:12,border:"1px solid #e2e8f0",padding:"12px 14px",fontSize:13,color:"#0f172a",fontFamily:"inherit",resize:"none",outline:"none",boxSizing:"border-box",background:"#f8fafc",lineHeight:1.5}}
+            />
+            <button
+              onClick={handleSend}
+              disabled={!message.trim()}
+              className="cv-btn-press"
+              style={{width:"100%",padding:"14px",background:message.trim()?"linear-gradient(135deg,#dc2626,#ef4444)":"#e2e8f0",border:"none",borderRadius:14,fontSize:14,color:message.trim()?"#fff":"#94a3b8",fontWeight:600,cursor:message.trim()?"pointer":"default",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:8,boxShadow:message.trim()?"0 4px 14px rgba(220,38,38,0.3)":"none",transition:"all 0.2s"}}>
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              Envoyer le message
+            </button>
+          </div>
+        )}
+        <button onClick={handleClose} className="cv-btn-press" style={{width:"100%",padding:"14px",background:"#f1f5f9",border:"none",borderRadius:14,fontSize:14,color:"#64748b",fontWeight:500,cursor:"pointer",fontFamily:"inherit",transition:"background 0.15s"}}>
+          Fermer
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // VUE CARNET COMMUNE (partagée entre CarnetPublicInline et CarnetPublic)
 // ─────────────────────────────────────────────────────────────────────────────
 export function CarnetView({ client, passages, livraisons=[], versements={}, retardsCarnet={}, onRefresh, refreshing }) {
   const [selectedPassage, setSelectedPassage] = useState(null);
   const [activeTab, setActiveTab] = useState("accueil");
   const [showSOS, setShowSOS] = useState(false);
-  const [sosMessage, setSosMessage] = useState("");
-  const [sosSent, setSosSent] = useState(false);
 
   const passClient = (passages||[])
     .filter(p => p.clientId === client.id)
@@ -986,73 +1062,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, ret
   };
 
   // ─── SOS MODAL ─────────────────────────────────────────────────────────────
-  const SOSModal = () => {
-    if (!showSOS) return null;
-    const handleSendMessage = () => {
-      if (!sosMessage.trim()) return;
-      const tel = "+33667186115";
-      const text = encodeURIComponent(`[${client.nom}] ${sosMessage.trim()}`);
-      window.open(`sms:${tel}?body=${text}`, "_blank");
-      setSosSent(true);
-      setTimeout(() => { setSosSent(false); setSosMessage(""); }, 3000);
-    };
-    return (
-      <div onClick={()=>{setShowSOS(false);setSosSent(false);setSosMessage("");}} style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.65)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:10003,backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",animation:"cv-fadeIn 0.2s ease"}}>
-        <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,padding:"0 22px",paddingBottom:"max(32px,env(safe-area-inset-bottom,32px))",animation:"cv-fadeUp 0.3s ease",overflow:"hidden"}}>
-          {/* Bande rouge */}
-          <div style={{height:4,background:"linear-gradient(90deg,#dc2626,#f87171)",margin:"0 -22px 20px",marginTop:0}}/>
-          <div style={{display:"flex",justifyContent:"center",marginBottom:4}}><div style={{width:40,height:4,background:"#e2e8f0",borderRadius:2}}/></div>
-          <div style={{textAlign:"center",padding:"16px 0 20px"}}>
-            <div style={{width:68,height:68,background:"linear-gradient(135deg,#fee2e2,#fecaca)",borderRadius:20,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px",border:"2px solid #fca5a5",boxShadow:"0 6px 20px rgba(220,38,38,0.2)"}}>
-              <svg width={30} height={30} viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-            </div>
-            <div style={{fontSize:20,fontWeight:700,color:"#0f172a",marginBottom:6}}>Besoin d'aide urgent ?</div>
-            <div style={{fontSize:13,color:"#64748b",lineHeight:1.5}}>Contactez directement votre technicien BRIBLUE pour toute urgence piscine</div>
-          </div>
-          {/* Appel téléphonique */}
-          <a href="tel:+33667186115" className="cv-btn-press" style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,background:"linear-gradient(135deg,#0891b2,#0e7490)",color:"#fff",borderRadius:16,padding:"17px",fontSize:16,fontWeight:700,textDecoration:"none",marginBottom:12,boxShadow:"0 6px 20px rgba(8,145,178,0.4)"}}>
-            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.01 1.18 2 2 0 012 0h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 14.92z"/></svg>
-            06 67 18 61 15
-          </a>
-          {/* Séparateur */}
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-            <div style={{flex:1,height:1,background:"#e2e8f0"}}/>
-            <span style={{fontSize:11,color:"#94a3b8",fontWeight:500}}>ou envoyer un message</span>
-            <div style={{flex:1,height:1,background:"#e2e8f0"}}/>
-          </div>
-          {/* Zone de message */}
-          {sosSent ? (
-            <div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:14,padding:"16px",textAlign:"center",marginBottom:12}}>
-              <div style={{fontSize:24,marginBottom:6}}>✅</div>
-              <div style={{fontSize:14,fontWeight:600,color:"#15803d"}}>Message envoyé !</div>
-              <div style={{fontSize:12,color:"#64748b",marginTop:2}}>Votre technicien vous répondra rapidement.</div>
-            </div>
-          ) : (
-            <div style={{marginBottom:12}}>
-              <textarea
-                value={sosMessage}
-                onChange={e=>setSosMessage(e.target.value)}
-                placeholder="Décrivez votre problème (ex: fuite au niveau du filtre, eau verte…)"
-                rows={3}
-                style={{width:"100%",borderRadius:12,border:"1px solid #e2e8f0",padding:"12px 14px",fontSize:13,color:"#0f172a",fontFamily:"inherit",resize:"none",outline:"none",boxSizing:"border-box",background:"#f8fafc",lineHeight:1.5}}
-              />
-              <button
-                onClick={handleSendMessage}
-                disabled={!sosMessage.trim()}
-                className="cv-btn-press"
-                style={{width:"100%",padding:"14px",background:sosMessage.trim()?"linear-gradient(135deg,#dc2626,#ef4444)":"#e2e8f0",border:"none",borderRadius:14,fontSize:14,color:sosMessage.trim()?"#fff":"#94a3b8",fontWeight:600,cursor:sosMessage.trim()?"pointer":"default",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:8,boxShadow:sosMessage.trim()?"0 4px 14px rgba(220,38,38,0.3)":"none",transition:"all 0.2s"}}>
-                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                Envoyer le message
-              </button>
-            </div>
-          )}
-          <button onClick={()=>{setShowSOS(false);setSosSent(false);setSosMessage("");}} className="cv-btn-press" style={{width:"100%",padding:"14px",background:"#f1f5f9",border:"none",borderRadius:14,fontSize:14,color:"#64748b",fontWeight:500,cursor:"pointer",fontFamily:"inherit",transition:"background 0.15s"}}>
-            Fermer
-          </button>
-        </div>
-      </div>
-    );
-  };
+  // Rendu via composant externe pour éviter le re-render du parent à chaque frappe
 
   // ─── RENDER ────────────────────────────────────────────────────────────────
   return (
@@ -1108,7 +1118,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, ret
 
       <BottomNav/>
       <PassageSheet/>
-      <SOSModal/>
+      <SOSModal show={showSOS} onClose={()=>setShowSOS(false)} clientNom={client.nom}/>
     </div>
   );
 }
