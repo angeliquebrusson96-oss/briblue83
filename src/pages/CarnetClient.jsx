@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { getDoc } from "firebase/firestore";
 import { APP_DOC } from "../lib/firebase";
-import { getPH, getCL, getTemp, getResumePassage, isControleType, generateCarnetCode, calculerPassagesPrevusContrat, isPassageEffectue, isPassageDansContrat } from "../utils/helpers";
+import { getPH, getCL, getTemp, getResumePassage, isControleType, generateCarnetCode, calculerPassagesPrevusContrat, isPassageEffectue, isPassageDansContrat, calcMensualites, migrateMois, totalAnnuel } from "../utils/helpers";
+import { genererContratHTML } from "../components/FormPassage";
 import { resolvePhoto } from "../lib/photoStore";
 import { PhotoImg } from "../components/ui";
 
@@ -92,165 +93,16 @@ function buildRapportHTML(passage, client) {
       <button class="print-btn" onclick="window.print()">🖨️ Enregistrer en PDF</button>
     </main></body></html>`;
 }
-function buildContratHTML(client) {
-  const fmt = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day:"2-digit", month:"long", year:"numeric" }) : "—";
-  const c = client || {};
-  const today = new Date().toLocaleDateString("fr-FR", { day:"2-digit", month:"long", year:"numeric" });
-  const daysLeft = c.dateFin ? Math.ceil((new Date(c.dateFin) - new Date()) / (1000*60*60*24)) : null;
-  const actif = daysLeft === null || daysLeft > 0;
-
-  // Calcul précis : 11 mensualités tronquées au centime + 1 mois de solde
-  const prix = c.prix || 0;
-  const mensBase = prix ? Math.floor(prix * 100 / 12) / 100 : 0;
-  const mensSolde = prix ? Math.round((prix - mensBase * 11) * 100) / 100 : 0;
-  const fmtEur = (v) => {
-    if (!v && v !== 0) return "—";
-    return v % 1 === 0 ? v + "\u00a0€" : v.toFixed(2).replace(".", ",") + "\u00a0€";
-  };
-
-  // 12ème mois calendaire depuis le début = mois de solde
-  const debutDate = c.dateDebut ? new Date(c.dateDebut) : null;
-  const moisSoldeDate = debutDate ? new Date(debutDate.getFullYear(), debutDate.getMonth() + 11, 1) : null;
-  const isSolde = (y, m) => moisSoldeDate && y === moisSoldeDate.getFullYear() && m === moisSoldeDate.getMonth() + 1;
-
-  const MOIS = ["","Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
-
-  // Tableau des 12 mensualités
-  let mensualitesRows = "";
-  if (debutDate && prix) {
-    for (let i = 0; i < 12; i++) {
-      const d = new Date(debutDate.getFullYear(), debutDate.getMonth() + i, 1);
-      const y = d.getFullYear(), m = d.getMonth() + 1;
-      const montant = isSolde(y, m) ? mensSolde : mensBase;
-      const estSolde = isSolde(y, m);
-      mensualitesRows += `<div class="row">
-        <span class="row-label">${MOIS[m]} ${y}${estSolde ? ' <span class="badge-solde">solde</span>' : ""}</span>
-        <span class="row-val${estSolde ? " solde" : ""}">${fmtEur(montant)}</span>
-      </div>`;
-    }
-  }
-
-  // Planning mensuel
-  const mpm = c.moisParMois || {};
-  const planningRows = Object.entries(mpm)
-    .sort(([a],[b]) => parseInt(a)-parseInt(b))
-    .map(([m, v]) => {
-      const total = (v.entretien||0) + (v.controle||0);
-      if (total === 0) return "";
-      const parts = [];
-      if (v.entretien) parts.push(v.entretien + " entretien" + (v.entretien>1?"s":""));
-      if (v.controle)  parts.push(v.controle + " contrôle" + (v.controle>1?"s":""));
-      return `<div class="row"><span class="row-label">${MOIS[parseInt(m)]}</span><span class="row-val">${parts.join(" + ")}</span></div>`;
-    }).join("");
-
-  const dotColor = actif ? "#4ade80" : "#f87171";
-
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Contrat ${c.nom||""} — BRIBLUE</title>
-  <style>
-    @page{size:A4;margin:14mm}
-    *{box-sizing:border-box}
-    body{font-family:Arial,sans-serif;color:#0f172a;margin:0;background:#eef6fb}
-    .page{max-width:820px;margin:0 auto;background:#fff;min-height:100vh;padding:30px}
-    .head{background:linear-gradient(135deg,#0891b2,#0e7490);color:white;border-radius:18px;padding:28px;margin-bottom:24px;position:relative;overflow:hidden}
-    .head::after{content:"";position:absolute;right:-40px;top:-40px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,0.07)}
-    .brand{font-size:13px;letter-spacing:2px;font-weight:700;opacity:.85;margin-bottom:6px}
-    .title{font-size:30px;font-weight:800;margin:0 0 4px}
-    .sub{font-size:14px;opacity:.85}
-    .badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:5px 13px;font-size:12px;margin-top:12px}
-    .dot{width:8px;height:8px;border-radius:50%;background:${dotColor};box-shadow:0 0 6px ${dotColor}}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
-    .card{border:1px solid #e2e8f0;border-radius:14px;padding:16px;background:#f8fafc}
-    .lbl{font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;letter-spacing:.5px;margin-bottom:6px}
-    .val{font-size:16px;font-weight:700;color:#0f172a}
-    .val small{font-size:11px;font-weight:400;color:#64748b;display:block;margin-top:2px}
-    .section{margin-bottom:20px;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden}
-    .section-head{background:linear-gradient(135deg,#f0f9ff,#fff);padding:13px 16px;border-bottom:1px solid #e2e8f0;font-size:14px;font-weight:700;color:#0891b2}
-    .section-body{padding:4px 16px}
-    .row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #f1f5f9}
-    .row:last-child{border-bottom:none}
-    .row-label{font-size:13px;color:#64748b}
-    .row-val{font-size:13px;font-weight:700;color:#0f172a}
-    .row-val.solde{color:#0891b2}
-    .badge-solde{background:#e0f2fe;color:#0891b2;border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700;margin-left:6px;vertical-align:middle}
-    .total-row{display:flex;justify-content:space-between;align-items:center;padding:11px 16px;background:#f0f9ff;border-top:2px solid #bae6fd}
-    .total-lbl{font-size:13px;font-weight:700;color:#0891b2}
-    .total-val{font-size:16px;font-weight:900;color:#0891b2}
-    .note{font-size:11px;color:#94a3b8;font-style:italic;padding:0 4px;margin-bottom:16px}
-    .highlight{background:#f0f9ff;border-radius:10px;padding:14px;margin-top:4px;border:1px solid #bae6fd}
-    .footer{text-align:center;margin-top:32px;padding-top:16px;border-top:1px solid #e2e8f0;color:#94a3b8;font-size:11px}
-    .print-btn{display:block;margin:24px auto 0;border:0;border-radius:999px;background:#0891b2;color:white;padding:14px 28px;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 10px 25px rgba(8,145,178,.35)}
-    @media print{body{background:white}.page{padding:0}.print-btn{display:none}}
-  </style></head><body><main class="page">
-    <div class="head">
-      <div class="brand">BRIBLUE</div>
-      <div class="title">Contrat d'entretien</div>
-      <div class="sub">Votre piscine, notre expertise</div>
-      <div class="badge"><span class="dot"></span><span>Contrat ${actif ? "actif" : "expiré"}</span></div>
-    </div>
-
-    <div class="grid">
-      <div class="card"><div class="lbl">Client</div><div class="val">${c.nom||"—"}</div></div>
-      <div class="card"><div class="lbl">Formule</div><div class="val">${c.formule||"—"}${c.bassin ? `<small>${c.bassin}${c.volume ? " · " + c.volume + " m³" : ""}</small>` : ""}</div></div>
-      <div class="card"><div class="lbl">Début de contrat</div><div class="val">${fmt(c.dateDebut)}</div></div>
-      <div class="card"><div class="lbl">Fin de contrat</div><div class="val">${fmt(c.dateFin)}${daysLeft !== null ? `<small style="color:${daysLeft < 30 ? "#dc2626" : "#64748b"}">${daysLeft > 0 ? daysLeft + " jours restants" : "Expiré"}</small>` : ""}</div></div>
-    </div>
-
-    ${prix ? `
-    <div class="section">
-      <div class="section-head">💶 Mensualités — Total annuel : ${fmtEur(prix)}</div>
-      <div class="section-body">${mensualitesRows}</div>
-      <div class="total-row"><span class="total-lbl">Total annuel</span><span class="total-val">${fmtEur(prix)}</span></div>
-    </div>
-    <p class="note">Les 11 premières mensualités sont de ${fmtEur(mensBase)}. Le mois de solde est de ${fmtEur(mensSolde)} pour atteindre exactement ${fmtEur(prix)}.</p>
-    ` : ""}
-
-    ${c.prixPassageE || c.prixPassageC ? `
-    <div class="section">
-      <div class="section-head">📋 Tarifs hors contrat</div>
-      <div class="section-body">
-        ${c.prixPassageE ? `<div class="row"><span class="row-label">Passage entretien</span><span class="row-val">${fmtEur(c.prixPassageE)}</span></div>` : ""}
-        ${c.prixPassageC ? `<div class="row"><span class="row-label">Passage contrôle</span><span class="row-val">${fmtEur(c.prixPassageC)}</span></div>` : ""}
-      </div>
-    </div>
-    ` : ""}
-
-    ${planningRows ? `
-    <div class="section">
-      <div class="section-head">📅 Planning mensuel des passages</div>
-      <div class="section-body">${planningRows}</div>
-    </div>
-    ` : ""}
-
-    <div class="highlight">
-      <div style="font-size:11px;font-weight:700;color:#0891b2;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Contact technicien</div>
-      <div style="font-size:15px;font-weight:700;color:#0f172a">BRIBLUE — Dorian</div>
-      <div style="font-size:13px;color:#64748b;margin-top:3px">📞 06 67 18 61 15</div>
-      ${c.adresse ? `<div style="font-size:12px;color:#94a3b8;margin-top:4px">📍 ${c.adresse}</div>` : ""}
-    </div>
-
-    <div class="footer">
-      <p>Document généré le ${today}</p>
-      <p>BRIBLUE · La Seyne-sur-Mer · SIRET 84345436400053</p>
-    </div>
-    <button class="print-btn" onclick="window.print()">🖨️ Enregistrer en PDF</button>
-  </main></body></html>`;
-}
 function ouvrirContrat(client) {
-  const html = buildContratHTML(client);
+  const html = genererContratHTML(client, "", "");
   const blob = new Blob([html], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
-  const w = window.open(url, "_blank");
-  if (!w) {
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${cleanFileName(client?.nom)}-contrat.html`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  }
+  const a = document.createElement("a");
+  a.href = url; a.target = "_blank"; a.rel = "noopener";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
+
 
 async function resolvePassagePhotosLocal(passage) {
   const SINGLE = ["photoArrivee", "photoDepart", "signatureTech", "signatureClient"];
@@ -630,20 +482,19 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, ret
   // ─── VERSEMENTS ────────────────────────────────────────────────────────────
   const versKey = (y, m) => `${client.id}_${y}_${String(m).padStart(2,"0")}`;
 
-  // Calcul précis : 11 mensualités tronquées au centime + 1 mois de solde
-  const mensualiteBase = client.prix ? Math.floor(client.prix * 100 / 12) / 100 : 0;
-  const mensualiteSolde = client.prix ? Math.round((client.prix - mensualiteBase * 11) * 100) / 100 : 0;
-  // Numéro du mois de solde (12ème mois = dernier mois du contrat)
-  const moisSoldeIndex = client.dateDebut ? (() => {
-    const debut = new Date(client.dateDebut);
-    const moisSolde = new Date(debut.getFullYear(), debut.getMonth() + 11, 1);
-    return { year: moisSolde.getFullYear(), month: moisSolde.getMonth() + 1 };
-  })() : null;
-  const isMoisSolde = (y, m) => moisSoldeIndex && y === moisSoldeIndex.year && m === moisSoldeIndex.month;
+  // Utilise calcMensualites de helpers.js — même logique que le vrai contrat
+  const prixAnnuel = totalAnnuel(client.moisParMois||client.saisons,"entretien") * (client.prixPassageE||0)
+                   + totalAnnuel(client.moisParMois||client.saisons,"controle")  * (client.prixPassageC||0)
+                   || client.prix || 0;
+  const { m1: mensualiteSolde, m11: mensualiteBase, estRond } = calcMensualites(prixAnnuel);
+
+  // Mois de solde = 1er mois du contrat (1er prélèvement = ajustement)
+  const debutDate = client.dateDebut ? new Date(client.dateDebut) : null;
+  const isMoisSolde = (y, m) => debutDate && y === debutDate.getFullYear() && m === debutDate.getMonth()+1;
   const getMensualite = (y, m) => isMoisSolde(y, m) ? mensualiteSolde : mensualiteBase;
   const fmtEur = (v) => v % 1 === 0 ? `${v}€` : `${v.toFixed(2).replace(".", ",")}€`;
 
-  const mensualite = mensualiteBase; // conservé pour compatibilité widget
+  const mensualite = mensualiteBase;
   const MOIS_LONG = ["","Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
 
   const versementMoisDus = (() => {
@@ -653,8 +504,8 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, ret
     const fin   = client.dateFin ? new Date(client.dateFin) : new Date(debut.getFullYear()+1, debut.getMonth(), debut.getDate());
     const dus = [];
     let cur = new Date(debut.getFullYear(), debut.getMonth(), 1);
-    const finMois    = new Date(fin.getFullYear(), fin.getMonth(), 1);
-    const curMois    = new Date(today.getFullYear(), today.getMonth(), 1);
+    const finMois = new Date(fin.getFullYear(), fin.getMonth(), 1);
+    const curMois = new Date(today.getFullYear(), today.getMonth(), 1);
     while (cur <= finMois && cur <= curMois) {
       const y = cur.getFullYear(), m = cur.getMonth()+1;
       if (!versements[versKey(y,m)]) dus.push({ year:y, month:m, montant: getMensualite(y, m) });
