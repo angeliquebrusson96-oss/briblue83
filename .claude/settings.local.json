@@ -16,7 +16,9 @@
       "Bash(node_modules/.bin/terser --version)",
       "Bash(cd \"/c/Users/CE PC/Downloads/briblue\" && grep -c \"firestore\\\\|firebase\" dist/assets/components-BM1GB4as.js | head -1 && ls dist/assets/)",
       "Read(//c/c/Users/CE PC/Downloads/briblue/dist/assets/**)",
-      "Bash(cd \"/c/Users/CE PC/Downloads/briblue\" && rm -rf dist && npm run build 2>&1 | tail -25)"
+      "Bash(cd \"/c/Users/CE PC/Downloads/briblue\" && rm -rf dist && npm run build 2>&1 | tail -25)",
+      "Bash(cd \"/c/Users/CE PC/Downloads/briblue\" && grep -n \"const save\" src/App.jsx | head -20)",
+      "Read(//c/c/Users/CE PC/Downloads/briblue/src/**)"
     ]
   }
 }
