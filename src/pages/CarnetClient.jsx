@@ -92,6 +92,110 @@ function buildRapportHTML(passage, client) {
       <button class="print-btn" onclick="window.print()">🖨️ Enregistrer en PDF</button>
     </main></body></html>`;
 }
+function buildContratHTML(client) {
+  const fmt = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day:"2-digit", month:"long", year:"numeric" }) : "—";
+  const c = client || {};
+  const today = new Date().toLocaleDateString("fr-FR", { day:"2-digit", month:"long", year:"numeric" });
+  const daysLeft = c.dateFin ? Math.ceil((new Date(c.dateFin) - new Date()) / (1000*60*60*24)) : null;
+  const actif = daysLeft === null || daysLeft > 0;
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Contrat ${esc(c.nom)} — BRIBLUE</title>
+  <style>
+    @page{size:A4;margin:14mm}
+    *{box-sizing:border-box}
+    body{font-family:Arial,sans-serif;color:#0f172a;margin:0;background:#eef6fb}
+    .page{max-width:820px;margin:0 auto;background:#fff;min-height:100vh;padding:30px}
+    .head{background:linear-gradient(135deg,#0891b2,#0e7490);color:white;border-radius:18px;padding:28px;margin-bottom:24px;position:relative;overflow:hidden}
+    .head::after{content:"";position:absolute;right:-40px;top:-40px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,0.07)}
+    .brand{font-size:13px;letter-spacing:2px;font-weight:700;opacity:.85;margin-bottom:6px}
+    .title{font-size:30px;font-weight:800;margin:0 0 4px}
+    .sub{font-size:14px;opacity:.85}
+    .badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:5px 13px;font-size:12px;margin-top:12px}
+    .dot{width:8px;height:8px;border-radius:50%;background:${actif?"#4ade80":"#f87171"};box-shadow:0 0 6px ${actif?"#4ade80":"#f87171"}}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 0 20px}
+    .card{border:1px solid #e2e8f0;border-radius:14px;padding:16px;background:#f8fafc}
+    .label{font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;letter-spacing:.5px;margin-bottom:6px}
+    .val{font-size:16px;font-weight:700;color:#0f172a}
+    .section{margin-bottom:20px;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden}
+    .section-head{background:linear-gradient(135deg,#f0f9ff,#fff);padding:13px 16px;border-bottom:1px solid #e2e8f0;font-size:14px;font-weight:700;color:#0891b2;display:flex;align-items:center;gap:8px}
+    .section-body{padding:16px}
+    .row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f1f5f9}
+    .row:last-child{border-bottom:none}
+    .row-label{font-size:13px;color:#64748b}
+    .row-val{font-size:13px;font-weight:600;color:#0f172a}
+    .highlight{background:#f0f9ff;border-radius:10px;padding:14px;margin-top:8px;border:1px solid #bae6fd}
+    .muted{color:#64748b;font-size:12px}
+    .footer{text-align:center;margin-top:32px;padding-top:16px;border-top:1px solid #e2e8f0;color:#94a3b8;font-size:11px}
+    .print-btn{display:block;margin:24px auto 0;border:0;border-radius:999px;background:#0891b2;color:white;padding:14px 28px;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 10px 25px rgba(8,145,178,.35)}
+    @media print{body{background:white}.page{padding:0}.print-btn{display:none}}
+  </style></head><body><main class="page">
+    <div class="head">
+      <div class="brand">BRIBLUE</div>
+      <div class="title">Contrat d'entretien</div>
+      <div class="sub">Votre piscine, notre expertise</div>
+      <div class="badge"><span class="dot"></span><span>Contrat ${actif?"actif":"expiré"}</span></div>
+    </div>
+
+    <div class="grid">
+      <div class="card"><div class="label">Client</div><div class="val">${esc(c.nom||"—")}</div></div>
+      <div class="card"><div class="label">Formule</div><div class="val">${esc(c.formule||"—")}</div></div>
+      <div class="card"><div class="label">Début de contrat</div><div class="val">${esc(fmt(c.dateDebut))}</div></div>
+      <div class="card"><div class="label">Fin de contrat</div><div class="val">${esc(fmt(c.dateFin))}${daysLeft!==null?`<br><span style="font-size:11px;font-weight:400;color:${daysLeft<30?"#dc2626":"#64748b"}">${daysLeft>0?`${daysLeft} jours restants`:"Expiré"}</span>`:""}</div></div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">📋 Détails du contrat</div>
+      <div class="section-body">
+        ${c.bassin?`<div class="row"><span class="row-label">Type de bassin</span><span class="row-val">${esc(c.bassin)}</span></div>`:""}
+        ${c.volume?`<div class="row"><span class="row-label">Volume</span><span class="row-val">${esc(String(c.volume))} m³</span></div>`:""}
+        ${c.prix?`<div class="row"><span class="row-label">Montant annuel</span><span class="row-val">${esc(String(c.prix))} €</span></div>`:""}
+        ${c.prix?`<div class="row"><span class="row-label">Mensualité</span><span class="row-val">${Math.round(c.prix/12)} € / mois</span></div>`:""}
+        ${c.adresse?`<div class="row"><span class="row-label">Adresse</span><span class="row-val">${esc(c.adresse)}</span></div>`:""}
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">🔧 Prestations incluses</div>
+      <div class="section-body">
+        ${c.moisParMois ? Object.entries(c.moisParMois).map(([m,v])=>{
+          const mois=["","Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"][parseInt(m)];
+          const total=(v.entretien||0)+(v.controle||0);
+          if(total===0) return "";
+          return `<div class="row"><span class="row-label">${esc(mois)}</span><span class="row-val">${v.entretien?`${v.entretien} entretien${v.entretien>1?"s":""}`:""} ${v.controle?`${v.controle} contrôle${v.controle>1?"s":""}`:""}</span></div>`;
+        }).join("") : "<p class='muted'>Planning non défini</p>"}
+      </div>
+    </div>
+
+    <div class="highlight">
+      <div style="font-size:11px;font-weight:700;color:#0891b2;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Contact technicien</div>
+      <div style="font-size:15px;font-weight:700;color:#0f172a">BRIBLUE — Dorian</div>
+      <div style="font-size:13px;color:#64748b;margin-top:3px">📞 06 67 18 61 15</div>
+    </div>
+
+    <div class="footer">
+      <p>Document généré le ${today}</p>
+      <p>BRIBLUE · La Seyne-sur-Mer · SIRET 84345436400053</p>
+    </div>
+    <button class="print-btn" onclick="window.print()">🖨️ Enregistrer en PDF</button>
+  </main></body></html>`;
+}
+
+function ouvrirContrat(client) {
+  const html = buildContratHTML(client);
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const w = window.open(url, "_blank");
+  if (!w) {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${cleanFileName(client?.nom)}-contrat.html`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+
 async function resolvePassagePhotosLocal(passage) {
   const SINGLE = ["photoArrivee", "photoDepart", "signatureTech", "signatureClient"];
   const ARRAYS = ["photos", "photosDepart"];
@@ -906,26 +1010,27 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, ret
               );
             })}
           </div>
-          {/* Remarques */}
-          {getResume(last)&&(
+          {/* Compte-rendu (texte technicien, sans obs) */}
+          {(last.actions||last.travaux||last.compteRendu)&&(
             <div style={{padding:"12px 16px",background:"#f8fafc",borderTop:"1px solid #f1f5f9",display:"flex",alignItems:"flex-start",gap:10}}>
               <div style={{width:28,height:28,borderRadius:8,background:"#dcfce7",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1}}>
                 <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.2" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
               </div>
               <div>
-                <div style={{fontSize:11,fontWeight:600,color:"#0f172a",marginBottom:3}}>Remarques</div>
-                <div style={{fontSize:12,color:"#64748b",lineHeight:1.6}}>{getResume(last)}</div>
+                <div style={{fontSize:11,fontWeight:600,color:"#0f172a",marginBottom:3}}>Compte-rendu</div>
+                <div style={{fontSize:12,color:"#64748b",lineHeight:1.6}}>{last.actions||last.travaux||last.compteRendu}</div>
               </div>
             </div>
           )}
-          {last.obs&&(
+          {/* Observations uniquement si différentes du compte-rendu */}
+          {(last.obs||last.commentaires)&&(last.obs||last.commentaires)!==(last.actions||last.travaux||last.compteRendu)&&(
             <div style={{padding:"12px 16px",background:"#fffbeb",borderTop:"1px solid #fef3c7",display:"flex",alignItems:"flex-start",gap:10}}>
               <div style={{width:28,height:28,borderRadius:8,background:"#fef9c3",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1}}>
                 <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#ca8a04" strokeWidth="2.2" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
               </div>
               <div>
                 <div style={{fontSize:11,fontWeight:600,color:"#92400e",marginBottom:3}}>Observations</div>
-                <div style={{fontSize:12,color:"#78350f",lineHeight:1.6}}>{last.obs}</div>
+                <div style={{fontSize:12,color:"#78350f",lineHeight:1.6}}>{last.obs||last.commentaires}</div>
               </div>
             </div>
           )}
@@ -1026,6 +1131,21 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, ret
           </div>
         ))}
       </div>
+
+      {/* Bouton Voir mon contrat */}
+      <button
+        onClick={()=>ouvrirContrat(client)}
+        className="cv-btn-press"
+        style={{display:"flex",alignItems:"center",gap:12,background:"#fff",borderRadius:14,border:"1px solid #e2e8f0",padding:"14px 16px",marginTop:8,width:"100%",cursor:"pointer",fontFamily:"inherit",textAlign:"left",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
+        <div style={{width:36,height:36,background:"linear-gradient(135deg,#f0f9ff,#e0f2fe)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,border:"1px solid #bae6fd"}}>
+          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </div>
+        <div style={{flex:1}}>
+          <div style={{fontSize:13,fontWeight:600,color:"#0891b2"}}>Voir mon contrat</div>
+          <div style={{fontSize:11,color:"#94a3b8",marginTop:1}}>Aperçu &amp; téléchargement PDF</div>
+        </div>
+        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
     </div>
   );
 
