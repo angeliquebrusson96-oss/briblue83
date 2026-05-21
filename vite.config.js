@@ -13,28 +13,33 @@ export default defineConfig({
     }),
   ],
   build: {
-    // Bug Rolldown : son minifieur assigne le même nom court (ex. "Re", "Ne")
-    // à des variables de portées imbriquées (module + fonction), causant un TDZ.
-    // esbuild n'a pas ce bug et est plus rapide.
-    // oxc = nouveau minifieur Vite 8 (esbuild est déprécié dans Vite 8)
-    minify: 'oxc',
+    // Bug Rolldown/OXC : le minifieur assigne le même nom court (Re, Ne, ut...)
+    // à des variables dans des portées imbriquées (module scope ET scope App()),
+    // causant un TDZ "Cannot access X before initialization" à l'exécution.
+    //
+    // Solution définitive : désactiver la minification des variables (mangling).
+    // La compression whitespace/dead-code est conservée via rolldownOptions.
+    // Impact taille : +20-30% gzip, mais l'app fonctionne correctement.
+    minify: false,
     rollupOptions: {
       output: {
-        // Rolldown scope-flattening bug : il assigne le même nom court (ex. "Re")
-        // à des variables de modules différents (helpers.js "Re" = calculerPassagesPrevusContrat,
-        // App.jsx "Re" = saveStock hook), causant un TDZ à l'exécution.
-        // La solution : forcer chaque groupe de modules dans son propre chunk → portées séparées.
+        // Séparer les vendors et utilitaires en chunks distincts
+        // (portées JS isolées + meilleure mise en cache)
         manualChunks(id) {
-          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
+          // Normaliser les séparateurs de chemin (Windows \ vs Linux /)
+          const normalId = id.replace(/\\/g, '/');
+          if (normalId.includes('node_modules/react') || normalId.includes('node_modules/react-dom')) {
             return 'react-vendor';
           }
-          if (id.includes('node_modules/firebase')) {
+          if (normalId.includes('node_modules/firebase')) {
             return 'firebase-vendor';
           }
-          // Isoler les utilitaires dans leurs propres chunks pour éviter la collision de noms
-          if (id.includes('/src/utils/helpers')) return 'utils-helpers';
-          if (id.includes('/src/utils/constants')) return 'utils-constants';
-          if (id.includes('/src/lib/')) return 'lib';
+          if (normalId.includes('/src/utils/helpers')) return 'utils-helpers';
+          if (normalId.includes('/src/utils/constants')) return 'utils-constants';
+          if (normalId.includes('/src/lib/')) return 'lib';
+          if (normalId.includes('/src/pages/')) return 'pages';
+          if (normalId.includes('/src/components/')) return 'components';
+          if (normalId.includes('/src/styles')) return 'styles';
         },
       },
     },
