@@ -113,7 +113,7 @@ export const PASSAGES_INIT = [
   { id:3, clientId:"C001", date:"2026-04-07", type:"Contrôle d'eau",    ph:7.1, chlore:1.8, actions:"Contrôle mesures",          obs:"RAS",                      tech:"Dorian", ok:true },
 ];
 
-export const PRODUITS_DEFAUT = ["Chlore lent Galet","PH minus","Flocculant","Anti-calcaire","Anti-Algues","Anti-Phosphate","Éponge Magique","Filtre à cartouche","Tac+","Chlore granule","Hypochlorite","Anti-Algues moutarde","Sac de sel"];
+export const PRODUITS_DEFAUT = ["Chlore lent Galet","PH minus","PH +","Flocculant","Anti-calcaire","Anti-Algues","Anti-Phosphate","Éponge Magique","Filtre à cartouche","Tac+","Chlore granule","Hypochlorite","Hypochlorite stick","Anti-Algues moutarde","Sac de sel","Waterlily","Oxygène actif","Détartrant cellule"];
 
 export const STATUT_LIV = {
   aFacturer: { label:"À facturer", color:"#0369a1", bg:"#f0f9ff" },

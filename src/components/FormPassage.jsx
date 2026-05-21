@@ -379,7 +379,7 @@ function genererHTMLRapport(passage, client) {
     <div class="field"><div class="field-label">Peroxyde</div><div class="field-value">${val(passage.corrPeroxyde)}</div></div>
     <div class="field"><div class="field-label">Chlore choc</div><div class="field-value">${val(passage.corrChloreChoc)}</div></div>
     <div class="field"><div class="field-label">Phosphate</div><div class="field-value">${val(passage.corrPhosphate)}</div></div>
-    <div class="field"><div class="field-label">Alcafix</div><div class="field-value">${val(passage.corrAlcafix)}</div></div>
+    <div class="field"><div class="field-label">Tac +</div><div class="field-value">${val(passage.corrAlcafix)}</div></div>
     <div class="field"><div class="field-label">Autre</div><div class="field-value">${val(passage.corrAutre)}</div></div>
   </div>
 </div>
@@ -609,7 +609,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
   const EMPTY = {
     date:TODAY, clientId:defaultClientId||"", type:"Entretien complet", tech:"Dorian",
     chloreLibre:"", ph:"", alcalinite:"", stabilisant:"",
-    tSel:"", tPhosphate:"", tStabilisant:"", tChlore:"", tPH:"",
+    tSel:"", tPhosphate:"", tStabilisant:"", tChlore:"", tPH:"", tAlcalinite:"",
     qualiteEau:"", etatFond:[], etatParois:[], etatLocal:[], etatBacTampon:[], etatVoletBac:[],
     corrChlore:"", corrPhosphate:"", corrPH:"", corrSel:"", corrAlgicide:"", corrPeroxyde:"", corrChloreChoc:"", corrAlcafix:"", corrAutre:"",
     devis:null, priseEchantillon:null, commentaires:"",
@@ -792,7 +792,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
             f.corrPH&&`pH: ${f.corrPH}`,
             f.corrAlgicide&&`Algicide: ${f.corrAlgicide}`,
             f.corrChloreChoc&&`Chlore choc: ${f.corrChloreChoc}`,
-            f.corrAlcafix&&`Alcafix: ${f.corrAlcafix}`,
+            f.corrAlcafix&&`Tac +: ${f.corrAlcafix}`,
             f.corrAutre&&f.corrAutre,
           ].filter(Boolean).join(", ") || "",
       obs: isSimplifiedSave ? (f.descriptionSAV || f.commentaires || "") : f.commentaires,
@@ -1282,6 +1282,8 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
                   icon={<span style={{fontSize:13,fontWeight:900,color:"#4f46e5",letterSpacing:-1}}>pH</span>}/>
                 <MRow label="Taux stabilisant" value={f.tStabilisant} onChange={v=>set("tStabilisant",v)} color="#4f46e5"
                   icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#4f46e5" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}/>
+                <MRow label="Alcalinité" unit="ppm" value={f.tAlcalinite} onChange={v=>set("tAlcalinite",v)} ideal="80 – 120" okFn={v=>v>=80&&v<=120} color="#0891b2"
+                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/><path d="M8 12h8M12 8v8"/></svg>}/>
               </div>
             </div>
           </div>
@@ -1344,7 +1346,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
                 {k:"corrPeroxyde",l:"Peroxyde",ico:"💧",col:"#0284c7"},
                 {k:"corrChloreChoc",l:"Chlore Choc",ico:"⚡",col:"#b45309"},
                 {k:"corrPhosphate",l:"Phosphate",ico:"🔬",col:"#be185d"},
-                {k:"corrAlcafix",l:"Alcafix",ico:"🧫",col:"#059669"},
+                {k:"corrAlcafix",l:"Tac +",ico:"🧫",col:"#059669"},
                 {k:"corrAutre",l:"Autre",ico:"📦",col:"#94a3b8"},
               ].map(({k,l,ico,col})=>(
                 <div key={k} style={{background:"rgba(255,255,255,0.55)",borderRadius:10,padding:"10px 12px",border:"1px solid "+DS.border}}>
