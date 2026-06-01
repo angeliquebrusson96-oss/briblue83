@@ -1230,84 +1230,95 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
       )}
 
       {step===2 && !isSimplified && (
-        <div className="fade-in">
-          <div style={{borderRadius:DS.radius,overflow:"hidden",border:"1px solid "+DS.border,boxShadow:DS.shadow}}>
-            {/* En-tête */}
-            <div style={{background:"linear-gradient(135deg,#0891b2,#4f46e5)",padding:"12px 16px",display:"flex",alignItems:"center",gap:10}}>
-              <div style={{width:32,height:32,borderRadius:10,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.phTest(16,"#fff")}</div>
+        <div className="fade-in" style={{display:"flex",flexDirection:"column",gap:14}}>
+          {/* Gate : prise d'échantillon */}
+          <OuiNon label="Prise d'échantillon ?" value={f.priseEchantillon} onChange={v=>set("priseEchantillon",v)}/>
+
+          {/* Si Non → confirmation sans mesure */}
+          {f.priseEchantillon===false && (
+            <div style={{display:"flex",alignItems:"center",gap:14,padding:"16px 18px",borderRadius:DS.radius,border:"2px solid #e2e8f0",background:"#f8fafc"}}>
+              <div style={{width:42,height:42,borderRadius:12,background:"#e2e8f0",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>🚫</div>
               <div>
-                <div style={{fontSize:13,fontWeight:800,color:"#fff",letterSpacing:.3}}>Analyses eau</div>
-                <div style={{fontSize:10,color:"rgba(255,255,255,0.75)",marginTop:1}}>Bandelette &amp; Électronique</div>
+                <div style={{fontSize:14,fontWeight:800,color:"#475569"}}>Pas d'analyse effectuée</div>
+                <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>Aucune mesure ne sera enregistrée pour ce passage</div>
               </div>
             </div>
-            {/* Légende colonnes */}
-            <div style={{background:"#f8fafc",borderBottom:"1px solid "+DS.border,padding:"5px 12px",display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center"}}>
-              <div style={{fontSize:10,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5}}>Paramètre</div>
-              <div style={{fontSize:10,fontWeight:700,color:"#0891b2",textTransform:"uppercase",letterSpacing:.5,textAlign:"center"}}>🧪 Bandelette</div>
-              <div style={{fontSize:10,fontWeight:700,color:"#4f46e5",textTransform:"uppercase",letterSpacing:.5,textAlign:"center"}}>📊 Électronique</div>
-            </div>
-            <div style={{background:DS.white,padding:"8px 12px",display:"flex",flexDirection:"column",gap:0}}>
-              {/* Chlore */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center",padding:"9px 0",borderBottom:"1px solid "+DS.light}}>
-                <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,color:DS.dark}}>
-                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>
-                  Chlore <span style={{fontSize:10,color:DS.mid,fontWeight:500}}>ppm</span>
-                </div>
-                <MRow value={f.chloreLibre} onChange={v=>set("chloreLibre",v)} ideal="1–3" okFn={v=>v>=1&&v<=3} color="#0891b2" compact/>
-                <MRow value={f.tChlore} onChange={v=>set("tChlore",v)} ideal="1–1.5" okFn={v=>v>=0.5&&v<=3} color="#4f46e5" compact/>
-              </div>
-              {/* pH */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center",padding:"9px 0",borderBottom:"1px solid "+DS.light}}>
-                <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,color:DS.dark}}>
-                  <span style={{fontSize:12,fontWeight:900,color:"#0891b2",letterSpacing:-1}}>pH</span>
-                </div>
-                <MRow value={f.ph} onChange={v=>set("ph",v)} ideal="7.2–7.8" okFn={v=>v>=7.2&&v<=7.8} color="#0891b2" compact/>
-                <MRow value={f.tPH} onChange={v=>set("tPH",v)} ideal="7.2–7.4" okFn={v=>v>=7.0&&v<=7.6} color="#4f46e5" compact/>
-              </div>
-              {/* Alcalinité */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center",padding:"9px 0",borderBottom:"1px solid "+DS.light}}>
-                <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,color:DS.dark}}>
-                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2" strokeLinecap="round"><path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/><path d="M2 16c2.5 3 5 3 7.5 0S14 13 16.5 16s5 3 7.5 0"/></svg>
-                  Alcalinité <span style={{fontSize:10,color:DS.mid,fontWeight:500}}>ppm</span>
-                </div>
-                <MRow value={f.alcalinite} onChange={v=>set("alcalinite",v)} ideal="80–120" okFn={v=>v>=80&&v<=120} color="#0891b2" compact/>
-                <MRow value={f.tAlcalinite} onChange={v=>set("tAlcalinite",v)} ideal="80–120" okFn={v=>v>=80&&v<=120} color="#4f46e5" compact/>
-              </div>
-              {/* Stabilisant */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center",padding:"9px 0",borderBottom:"1px solid "+DS.light}}>
-                <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,color:DS.dark}}>
-                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                  Stabilisant <span style={{fontSize:10,color:DS.mid,fontWeight:500}}>ppm</span>
-                </div>
-                <MRow value={f.stabilisant} onChange={v=>set("stabilisant",v)} ideal="30–50" okFn={v=>v>=30&&v<=50} color="#0891b2" compact/>
-                <MRow value={f.tStabilisant} onChange={v=>set("tStabilisant",v)} color="#4f46e5" compact/>
-              </div>
-              {/* Sel — électronique uniquement */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center",padding:"9px 0",borderBottom:"1px solid "+DS.light}}>
-                <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,color:DS.dark}}>
-                  <span style={{fontSize:14}}>🧂</span> Sel
-                </div>
-                <div style={{fontSize:11,color:DS.mid,textAlign:"center"}}>—</div>
-                <MRow value={f.tSel} onChange={v=>set("tSel",v)} color="#4f46e5" compact/>
-              </div>
-              {/* Phosphate — électronique uniquement */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center",padding:"9px 0"}}>
-                <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,color:DS.dark}}>
-                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#4f46e5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v5l3 9a3 3 0 01-3 3H9a3 3 0 01-3-3l3-9V3z"/><path d="M6.5 15h11"/></svg>
-                  Phosphate
-                </div>
-                <div style={{fontSize:11,color:DS.mid,textAlign:"center"}}>—</div>
-                <MRow value={f.tPhosphate} onChange={v=>set("tPhosphate",v)} color="#4f46e5" compact/>
-              </div>
-            </div>
-            {/* Checkbox stabilisant haut */}
-            <div style={{background:"#f8fafc",borderTop:"1px solid "+DS.border,padding:"8px 12px"}}>
-              <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",background:f.stabilisantHaut?"#fff7ed":"transparent",padding:"6px 10px",borderRadius:8,border:"1px solid "+(f.stabilisantHaut?"#fcd34d":"transparent"),width:"fit-content"}}>
-                <input type="checkbox" checked={!!f.stabilisantHaut} onChange={e=>set("stabilisantHaut",e.target.checked)} style={{width:16,height:16,accentColor:"#b45309"}}/>
-                <span style={{fontSize:12,fontWeight:700,color:f.stabilisantHaut?"#b45309":"#64748b"}}>⚠️ Stabilisant HAUT</span>
+          )}
+
+          {/* Si Oui → cartes mesures mobile-first */}
+          {f.priseEchantillon===true && (
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {/* Paramètres avec bandelette + électronique */}
+              {[
+                {label:"Chlore",unit:"ppm",bandField:"chloreLibre",bandIdeal:"1–3",bandOk:v=>v>=1&&v<=3,elecField:"tChlore",elecIdeal:"1–1.5",elecOk:v=>v>=0.5&&v<=3},
+                {label:"pH",unit:"",bandField:"ph",bandIdeal:"7.2–7.8",bandOk:v=>v>=7.2&&v<=7.8,elecField:"tPH",elecIdeal:"7.2–7.4",elecOk:v=>v>=7.0&&v<=7.6},
+                {label:"Alcalinité",unit:"ppm",bandField:"alcalinite",bandIdeal:"80–120",bandOk:v=>v>=80&&v<=120,elecField:"tAlcalinite",elecIdeal:"80–120",elecOk:v=>v>=80&&v<=120},
+                {label:"Stabilisant",unit:"ppm",bandField:"stabilisant",bandIdeal:"30–50",bandOk:v=>v>=30&&v<=50,elecField:"tStabilisant",elecIdeal:"",elecOk:null},
+              ].map(({label,unit,bandField,bandIdeal,bandOk,elecField,elecIdeal,elecOk})=>{
+                const bv=parseFloat(f[bandField]);
+                const ev=parseFloat(f[elecField]);
+                const bOk=f[bandField]!==undefined&&f[bandField]!==""&&bandOk?bandOk(bv):null;
+                const eOk=f[elecField]!==undefined&&f[elecField]!==""&&elecOk?elecOk(ev):null;
+                const bCol=f[bandField]!==""&&f[bandField]!==undefined?(bOk===true?"#16a34a":bOk===false?"#dc2626":"#94a3b8"):"#94a3b8";
+                const eCol=f[elecField]!==""&&f[elecField]!==undefined?(eOk===true?"#16a34a":eOk===false?"#dc2626":"#94a3b8"):"#94a3b8";
+                return (
+                  <div key={label} style={{background:DS.white,borderRadius:14,border:"1.5px solid "+DS.border,overflow:"hidden",boxShadow:"0 1px 6px rgba(0,0,0,0.06)"}}>
+                    <div style={{padding:"9px 14px",background:"#f8fafc",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontSize:14,fontWeight:800,color:DS.dark}}>{label}</span>
+                      {unit&&<span style={{fontSize:11,fontWeight:500,color:DS.mid,marginLeft:2}}>{unit}</span>}
+                      {(f[bandField]||f[elecField])&&(
+                        <div style={{marginLeft:"auto",width:8,height:8,borderRadius:4,background:(bOk===true||eOk===true)?"#16a34a":(bOk===false||eOk===false)?"#dc2626":"#94a3b8"}}/>
+                      )}
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0}}>
+                      <div style={{padding:"10px 12px",borderRight:"1px solid "+DS.border+"66"}}>
+                        <div style={{fontSize:10,fontWeight:700,color:"#0891b2",marginBottom:6,letterSpacing:.3}}>🧪 Bandelette</div>
+                        <input type="number" inputMode="decimal" step="0.1" value={f[bandField]||""} onChange={e=>set(bandField,e.target.value)}
+                          style={{width:"100%",height:54,padding:"0 8px",borderRadius:10,border:`2.5px solid ${bCol}`,fontSize:22,fontWeight:800,color:bCol,textAlign:"center",background:bCol==="#16a34a"?"#f0fdf4":bCol==="#dc2626"?"#fef2f2":"#f8fafc",boxSizing:"border-box",fontFamily:"inherit",outline:"none",transition:"all .2s"}}/>
+                        {bandIdeal&&<div style={{fontSize:10,color:"#94a3b8",marginTop:4,textAlign:"center"}}>Idéal: {bandIdeal}</div>}
+                      </div>
+                      <div style={{padding:"10px 12px"}}>
+                        <div style={{fontSize:10,fontWeight:700,color:"#4f46e5",marginBottom:6,letterSpacing:.3}}>📊 Élec.</div>
+                        <input type="number" inputMode="decimal" step="0.1" value={f[elecField]||""} onChange={e=>set(elecField,e.target.value)}
+                          style={{width:"100%",height:54,padding:"0 8px",borderRadius:10,border:`2.5px solid ${eCol}`,fontSize:22,fontWeight:800,color:eCol,textAlign:"center",background:eCol==="#16a34a"?"#f0fdf4":eCol==="#dc2626"?"#fef2f2":"#f8fafc",boxSizing:"border-box",fontFamily:"inherit",outline:"none",transition:"all .2s"}}/>
+                        {elecIdeal&&<div style={{fontSize:10,color:"#94a3b8",marginTop:4,textAlign:"center"}}>Idéal: {elecIdeal}</div>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Paramètres électronique uniquement */}
+              {[
+                {label:"Sel",unit:"g/L",field:"tSel",ideal:"3–5",ok:v=>v>=3&&v<=5},
+                {label:"Phosphate",unit:"ppb",field:"tPhosphate",ideal:"",ok:null},
+              ].map(({label,unit,field,ideal,ok})=>{
+                const pv=parseFloat(f[field]);
+                const isOk=f[field]!==""&&f[field]!==undefined&&ok?ok(pv):null;
+                const col=f[field]!==""&&f[field]!==undefined?(isOk===true?"#16a34a":isOk===false?"#dc2626":"#94a3b8"):"#94a3b8";
+                return (
+                  <div key={label} style={{background:DS.white,borderRadius:14,border:"1.5px solid "+DS.border,overflow:"hidden",boxShadow:"0 1px 6px rgba(0,0,0,0.06)"}}>
+                    <div style={{padding:"9px 14px",background:"#f8fafc",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontSize:14,fontWeight:800,color:DS.dark}}>{label}</span>
+                      {unit&&<span style={{fontSize:11,fontWeight:500,color:DS.mid,marginLeft:2}}>{unit}</span>}
+                      <span style={{marginLeft:"auto",fontSize:10,fontWeight:600,color:"#4f46e5"}}>📊 Électronique uniquement</span>
+                    </div>
+                    <div style={{padding:"12px 14px"}}>
+                      <input type="number" inputMode="decimal" step="0.1" value={f[field]||""} onChange={e=>set(field,e.target.value)}
+                        style={{width:"100%",height:54,padding:"0 10px",borderRadius:10,border:`2.5px solid ${col}`,fontSize:22,fontWeight:800,color:col,textAlign:"center",background:col==="#16a34a"?"#f0fdf4":col==="#dc2626"?"#fef2f2":"#f8fafc",boxSizing:"border-box",fontFamily:"inherit",outline:"none",transition:"all .2s"}}/>
+                      {ideal&&<div style={{fontSize:10,color:"#94a3b8",marginTop:4,textAlign:"center"}}>Idéal: {ideal}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Stabilisant HAUT */}
+              <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",padding:"13px 16px",borderRadius:12,border:`1.5px solid ${f.stabilisantHaut?"#fcd34d":"#e2e8f0"}`,background:f.stabilisantHaut?"#fffbeb":"rgba(255,255,255,0.6)"}}>
+                <input type="checkbox" checked={!!f.stabilisantHaut} onChange={e=>set("stabilisantHaut",e.target.checked)} style={{width:18,height:18,accentColor:"#b45309"}}/>
+                <span style={{fontSize:13,fontWeight:700,color:f.stabilisantHaut?"#b45309":"#64748b"}}>⚠️ Stabilisant HAUT</span>
               </label>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -1385,7 +1396,6 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
         <div className="fade-in">
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16}}>
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
-              {!isSimplified && <OuiNon label="Prise d'échantillon ?" value={f.priseEchantillon} onChange={v=>set("priseEchantillon",v)}/>}
               {!isSimplified && <div>
                 <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:4}}>Commentaires</span>
                 <textarea value={f.commentaires} onChange={e=>set("commentaires",e.target.value)} placeholder="Anomalies, recommandations..."
