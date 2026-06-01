@@ -877,79 +877,25 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
   ];
   const STEP_INFO = isSansDonnees ? STEP_INFO_SANS : isSAV ? STEP_INFO_SAV : isDevis ? STEP_INFO_DEVIS : STEP_INFO_FULL;
 
-  const Stepper = () => {
-    const pct = Math.round((step-1)/STEPS*100);
-    return (
-    <div style={{marginBottom:16}}>
-      {/* Barre de progression globale */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-        <span style={{fontSize:12,color:DS.mid,fontWeight:600}}>Progression</span>
-        <span style={{fontSize:12,fontWeight:700,color:DS.dark}}>{step-1} / {STEPS} étapes — {pct}%</span>
-      </div>
-      <div style={{height:5,background:DS.light,borderRadius:99,marginBottom:16,overflow:"hidden"}}>
-        <div style={{height:"100%",width:`${pct}%`,background:"linear-gradient(90deg,#059669,#0ea5e9)",borderRadius:99,transition:"width .4s cubic-bezier(.22,1,.36,1)"}}/>
-      </div>
-
-      {/* Ronds étapes */}
-      <div style={{display:"flex",alignItems:"center",gap:0,marginBottom:14,position:"relative"}}>
-        {/* Ligne fond */}
-        <div style={{position:"absolute",top:"50%",left:"4%",right:"4%",height:2,background:DS.light,transform:"translateY(-50%)",zIndex:0}}/>
-        {/* Ligne progression */}
-        <div style={{position:"absolute",top:"50%",left:"4%",height:2,width:`${Math.max(0,(step-1.5)/STEPS*92)}%`,background:"linear-gradient(90deg,#059669,#0ea5e9)",transform:"translateY(-50%)",transition:"width .4s",zIndex:1}}/>
+  const Stepper = () => (
+    <div style={{marginBottom:16,margin:"0 -2px 16px",padding:"0 2px"}}>
+      <div style={{display:"flex",gap:7,overflowX:"auto",paddingBottom:3,scrollbarWidth:"none",msOverflowStyle:"none",WebkitOverflowScrolling:"touch"}}>
         {STEP_INFO.map((s,i)=>{
-          const done=i+1<step, active=i+1===step;
+          const active=i+1===step, done=i+1<step;
+          const col=s.color;
           return (
-            <div key={i} style={{flex:1,display:"flex",justifyContent:"center",zIndex:2}}>
-              <button onClick={()=>setStep(i+1)} title={s.l} style={{
-                width:active?44:36, height:active?44:36,
-                borderRadius:"50%", border:"none", cursor:"pointer",
-                background:active?s.color:done?"#059669":DS.white,
-                border:done||active?"none":`2px solid ${DS.border}`,
-                display:"flex",alignItems:"center",justifyContent:"center",
-                flexShrink:0, position:"relative",
-                transition:"all .3s cubic-bezier(.22,1,.36,1)",
-                boxShadow:active?`0 4px 16px ${s.color}44`:done?"0 2px 8px rgba(5,150,105,0.25)":"none",
-              }}>
-                {done
-                  ? <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  : (typeof s.ic==="function" ? s.ic(active?"#fff":"#94a3b8", active?17:14) : <span style={{fontSize:active?14:11}}>{s.ic}</span>)
-                }
-                {active && <div style={{position:"absolute",inset:-4,borderRadius:"50%",border:`2px solid ${s.color}44`,pointerEvents:"none"}}/>}
-              </button>
-            </div>
+            <button key={i} onClick={()=>setStep(i+1)} style={{flexShrink:0,padding:"9px 15px",borderRadius:22,border:"none",cursor:"pointer",fontFamily:"inherit",background:active?col:done?col+"18":"#f1f5f9",color:active?"#fff":done?col:"#94a3b8",fontWeight:active?800:600,fontSize:12,display:"flex",alignItems:"center",gap:6,boxShadow:active?`0 4px 14px ${col}44`:"none",transition:"all .25s",WebkitTapHighlightColor:"transparent",letterSpacing:active?0.1:0}}>
+              {done
+                ? <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                : (typeof s.ic==="function" ? s.ic(active?"#fff":"#94a3b8",14) : <span style={{fontSize:14,lineHeight:1}}>{s.ic}</span>)
+              }
+              {s.l}
+            </button>
           );
         })}
-      </div>
-
-      {/* Labels sous les ronds */}
-      <div style={{display:"flex",marginBottom:14}}>
-        {STEP_INFO.map((s,i)=>{
-          const done=i+1<step, active=i+1===step;
-          const shortLabel = {Intervention:"Interv.",Analyses:"Analys.","Analyses eau":"Analyses","État bassin":"Bassin",Correctifs:"Correct.",Clôture:"Clôture",Signatures:"Signat."};
-          const label = shortLabel[s.l] || s.l;
-          return (
-            <div key={i} style={{flex:1,textAlign:"center"}}>
-              <span style={{fontSize:8,fontWeight:active?800:500,color:active?s.color:done?"#059669":DS.mid,letterSpacing:0,display:"block",lineHeight:1.2}}>{label}</span>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Bandeau étape active */}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",borderRadius:14,background:`${STEP_INFO[step-1].color}10`,border:`1.5px solid ${STEP_INFO[step-1].color}30`}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:34,height:34,borderRadius:10,background:STEP_INFO[step-1].color,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:`0 3px 10px ${STEP_INFO[step-1].color}44`}}>
-            {typeof STEP_INFO[step-1].ic==="function" ? STEP_INFO[step-1].ic("#fff",16) : <span style={{fontSize:15}}>{STEP_INFO[step-1].ic}</span>}
-          </div>
-          <div>
-            <div style={{fontSize:14,fontWeight:800,color:STEP_INFO[step-1].color,letterSpacing:-0.2}}>{STEP_INFO[step-1].l}</div>
-            <div style={{fontSize:11,color:DS.mid,marginTop:1}}>Étape {step} sur {STEPS}</div>
-          </div>
-        </div>
-        <div style={{fontSize:22,fontWeight:900,color:STEP_INFO[step-1].color,opacity:0.8}}>{pct}<span style={{fontSize:12,fontWeight:600}}>%</span></div>
       </div>
     </div>
-  );};
+  );
 
 
   const clientSel = clients.find(c=>c.id===f.clientId);
@@ -1248,6 +1194,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
           {/* Si Oui → cartes ludiques par paramètre */}
           {f.priseEchantillon===true && (
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
+
               {/* Barre de progression */}
               {(()=>{
                 const allF=["chloreLibre","tChlore","ph","tPH","alcalinite","tAlcalinite","stabilisant","tStabilisant","tSel","tPhosphate"];
@@ -1263,7 +1210,8 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
                 );
               })()}
 
-              {/* Une carte colorée par paramètre */}
+              {/* Grille 2 colonnes pour les cartes paramètres */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
               {[
                 {label:"Chlore",     emoji:"💧", color:"#0891b2", bg:"#e0f7fa",
                  rows:[{ico:"🧪",lbl:"Bandelette",   field:"chloreLibre",ideal:"1–3 ppm",  ok:v=>v>=1&&v<=3},
@@ -1314,7 +1262,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
                               {isFilled&&isOk===false&&<span style={{marginLeft:"auto",fontSize:18}}>❌</span>}
                             </div>
                             <input type="number" inputMode="decimal" step="0.1" value={val||""} onChange={e=>set(field,e.target.value)}
-                              style={{width:"100%",height:60,padding:"0 10px",borderRadius:12,border:`2.5px solid ${bCol}`,fontSize:28,fontWeight:800,color:tCol,textAlign:"center",background:iBg,boxSizing:"border-box",fontFamily:"inherit",outline:"none",transition:"all .2s"}}/>
+                              style={{width:"100%",height:52,padding:"0 6px",borderRadius:10,border:`2.5px solid ${bCol}`,fontSize:22,fontWeight:800,color:tCol,textAlign:"center",background:iBg,boxSizing:"border-box",fontFamily:"inherit",outline:"none",transition:"all .2s"}}/>
                           </div>
                         );
                       })}
@@ -1322,8 +1270,9 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
                   </div>
                 );
               })}
+              </div>{/* fin grille 2 colonnes */}
 
-              {/* Stabilisant HAUT */}
+              {/* Stabilisant HAUT — pleine largeur */}
               <label style={{display:"flex",alignItems:"center",gap:12,cursor:"pointer",padding:"14px 16px",borderRadius:14,border:`2px solid ${f.stabilisantHaut?"#f59e0b":"#e2e8f0"}`,background:f.stabilisantHaut?"#fffbeb":"rgba(255,255,255,0.6)",transition:"all .2s"}}>
                 <input type="checkbox" checked={!!f.stabilisantHaut} onChange={e=>set("stabilisantHaut",e.target.checked)} style={{width:20,height:20,accentColor:"#b45309"}}/>
                 <span style={{fontSize:13,fontWeight:700,color:f.stabilisantHaut?"#b45309":"#64748b"}}>⚠️ Stabilisant HAUT</span>
@@ -1560,18 +1509,34 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
         </div>
       )}
 
-      <SunBurstFormNav
-        step={step} totalSteps={STEPS}
-        onNext={()=>setStep(s=>s+1)}
-        onPrev={()=>setStep(s=>s-1)}
-        onSave={handleSave}
-        onCancel={onClose}
-        onSaveDraft={saveDraftManual}
-        draftSaved={draftSaved}
-        nextLabel={(STEP_INFO[step]||STEP_INFO[STEPS-1]).l}
-        nextColor={(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}
-        saveLabel="Enregistrer le rapport"
-      />
+      {/* ── NAVIGATION ── */}
+      <div style={{marginTop:24,paddingTop:16,borderTop:"1px solid "+DS.border,display:"flex",gap:8,alignItems:"center"}}>
+        {/* Retour / Annuler */}
+        <button onClick={step===1?onClose:()=>setStep(s=>s-1)} style={{flex:1,height:50,borderRadius:14,border:"1.5px solid "+DS.border,background:"rgba(255,255,255,0.7)",cursor:"pointer",fontWeight:700,fontSize:13,color:"#64748b",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6,WebkitTapHighlightColor:"transparent",transition:"all .2s"}}>
+          {step===1
+            ? <><svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Annuler</>
+            : <><svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>Retour</>
+          }
+        </button>
+        {/* Brouillon */}
+        <button onClick={saveDraftManual} title="Sauvegarder brouillon" style={{flexShrink:0,width:50,height:50,borderRadius:14,border:`1.5px solid ${draftSaved?"#a7f3d0":DS.border}`,background:draftSaved?"#f0fdf4":"rgba(255,255,255,0.7)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .3s",WebkitTapHighlightColor:"transparent"}}>
+          {draftSaved
+            ? <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            : <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          }
+        </button>
+        {/* Suivant / Enregistrer */}
+        {step<STEPS
+          ? <button onClick={()=>setStep(s=>s+1)} style={{flex:2,height:50,borderRadius:14,border:"none",background:`linear-gradient(135deg,${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color},${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}bb)`,cursor:"pointer",fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit",boxShadow:`0 6px 20px ${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}44`,display:"flex",alignItems:"center",justifyContent:"center",gap:8,WebkitTapHighlightColor:"transparent",transition:"all .2s"}}>
+              Suivant
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </button>
+          : <button onClick={handleSave} style={{flex:2,height:50,borderRadius:14,border:"none",background:"linear-gradient(135deg,#059669,#10b981)",cursor:"pointer",fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit",boxShadow:"0 6px 20px rgba(5,150,105,0.4)",display:"flex",alignItems:"center",justifyContent:"center",gap:8,WebkitTapHighlightColor:"transparent",transition:"all .2s"}}>
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Enregistrer
+            </button>
+        }
+      </div>
 
             {/* Modale confirmation enregistrement */}
       {showConfirmSave && (()=>{
