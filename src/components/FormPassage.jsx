@@ -540,38 +540,83 @@ function StarRating({ value, onChange }) {
 function SignaturePad({ value, onChange, label }) {
   const canvasRef = useRef(null);
   const drawing = useRef(false);
+  const [isOpen, setIsOpen] = useState(false);
   const [hasSign, setHasSign] = useState(!!value);
 
+  // Charger la signature existante dans le canvas quand il s'ouvre
   useEffect(()=>{
-    if(value && canvasRef.current) {
+    if(isOpen && value && canvasRef.current) {
       const img = new Image();
-      img.onload = ()=>{ const ctx=canvasRef.current?.getContext("2d"); ctx&&ctx.drawImage(img,0,0); };
+      img.onload = ()=>{ const ctx=canvasRef.current?.getContext("2d"); if(ctx){ctx.clearRect(0,0,500,220);ctx.drawImage(img,0,0,500,220);} };
       img.src = value;
     }
-  },[]);
+  },[isOpen]);
 
   const getPos = (e, canvas) => {
     const r = canvas.getBoundingClientRect();
     const src = e.touches?.[0] || e;
     return { x:(src.clientX-r.left)*(canvas.width/r.width), y:(src.clientY-r.top)*(canvas.height/r.height) };
   };
-  const start = (e) => { e.preventDefault(); drawing.current=true; const canvas=canvasRef.current; const ctx=canvas.getContext("2d"); const {x,y}=getPos(e,canvas); ctx.beginPath(); ctx.moveTo(x,y); ctx.strokeStyle="#1b3a5c"; ctx.lineWidth=2.5; ctx.lineCap="round"; ctx.lineJoin="round"; };
+  const start = (e) => { e.preventDefault(); drawing.current=true; const canvas=canvasRef.current; const ctx=canvas.getContext("2d"); const {x,y}=getPos(e,canvas); ctx.beginPath(); ctx.moveTo(x,y); ctx.strokeStyle="#1b3a5c"; ctx.lineWidth=3; ctx.lineCap="round"; ctx.lineJoin="round"; };
   const move = (e) => { e.preventDefault(); if(!drawing.current)return; const canvas=canvasRef.current; const ctx=canvas.getContext("2d"); const {x,y}=getPos(e,canvas); ctx.lineTo(x,y); ctx.stroke(); };
-  const end = (e) => { e.preventDefault(); drawing.current=false; const data=canvasRef.current.toDataURL("image/png"); setHasSign(true); onChange(data); };
-  const clear = () => { const canvas=canvasRef.current; canvas.getContext("2d").clearRect(0,0,canvas.width,canvas.height); setHasSign(false); onChange(""); };
+  const end = (e) => { e.preventDefault(); if(!drawing.current)return; drawing.current=false; const data=canvasRef.current.toDataURL("image/png"); setHasSign(true); onChange(data); };
+  const clear = () => { const canvas=canvasRef.current; if(canvas){canvas.getContext("2d").clearRect(0,0,canvas.width,canvas.height);} setHasSign(false); onChange(""); };
+  const done = () => { setIsOpen(false); };
+  const resign = () => { clear(); setIsOpen(true); };
+
+  if (isOpen) {
+    return (
+      <div>
+        {label && <span style={{fontSize:13,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:8}}>{label}</span>}
+        <div style={{border:`2px solid ${DS.blue}`,borderRadius:DS.radius,overflow:"hidden",background:"#f8faff",position:"relative",touchAction:"none"}}>
+          <canvas ref={canvasRef} width={500} height={220}
+            style={{display:"block",width:"100%",height:220,touchAction:"none",cursor:"crosshair"}}
+            onMouseDown={start} onMouseMove={move} onMouseUp={end} onMouseLeave={end}
+            onTouchStart={start} onTouchMove={move} onTouchEnd={end}/>
+          {!hasSign && (
+            <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",pointerEvents:"none",gap:6}}>
+              <span style={{fontSize:32,opacity:.25}}>✍️</span>
+              <span style={{color:"#b0bec5",fontSize:13,fontWeight:600}}>Signez dans cet espace</span>
+            </div>
+          )}
+        </div>
+        <div style={{display:"flex",gap:8,marginTop:8}}>
+          <button onClick={clear} style={{flex:1,height:44,borderRadius:12,border:"1.5px solid #fca5a5",background:"#fef2f2",cursor:"pointer",fontWeight:700,fontSize:13,color:"#dc2626",fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>
+            ✕ Effacer
+          </button>
+          <button onClick={done} style={{flex:2,height:44,borderRadius:12,border:"none",background:"linear-gradient(135deg,#059669,#34d399)",cursor:"pointer",fontWeight:800,fontSize:14,color:"#fff",fontFamily:"inherit",boxShadow:"0 4px 14px #05996933",WebkitTapHighlightColor:"transparent"}}>
+            ✓ Valider la signature
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (hasSign && value) {
+    return (
+      <div>
+        {label && <span style={{fontSize:13,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:8}}>{label}</span>}
+        <div style={{border:"2px solid #bbf7d0",borderRadius:DS.radius,overflow:"hidden",background:"#f0fdf4",position:"relative"}}>
+          <img src={value} alt="Signature" style={{display:"block",width:"100%",height:100,objectFit:"contain",padding:"4px 0"}}/>
+          <div style={{position:"absolute",top:6,right:6}}>
+            <span style={{fontSize:10,fontWeight:800,color:"#059669",background:"#dcfce7",borderRadius:6,padding:"2px 8px"}}>✓ Signé</span>
+          </div>
+        </div>
+        <button onClick={resign} style={{marginTop:8,width:"100%",height:44,borderRadius:12,border:"1.5px solid "+DS.border,background:"rgba(255,255,255,0.7)",cursor:"pointer",fontWeight:700,fontSize:13,color:DS.mid,fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>
+          ✏️ Resigner
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div>
-      {label && <span style={{fontSize:15,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>{label}</span>}
-      <div style={{border:"1.5px solid "+DS.border,borderRadius:DS.radius,overflow:"hidden",background:DS.light,position:"relative"}}>
-        <canvas ref={canvasRef} width={500} height={140} style={{display:"block",width:"100%",height:140,touchAction:"none",cursor:"crosshair"}}
-          onMouseDown={start} onMouseMove={move} onMouseUp={end} onMouseLeave={end}
-          onTouchStart={start} onTouchMove={move} onTouchEnd={end}/>
-        {!hasSign && <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none"}}>
-          <span style={{color:DS.border,fontSize:15,display:"flex",alignItems:"center",gap:6}}>{Ico.sign(14,"#cbd5e1")} Signez ici</span>
-        </div>}
-      </div>
-      {hasSign && <button onClick={clear} style={{marginTop:4,background:"none",border:"none",color:"#94a3b8",fontSize:15,cursor:"pointer",fontWeight:600}}>✕ Effacer</button>}
+      {label && <span style={{fontSize:13,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:8}}>{label}</span>}
+      <button onClick={()=>setIsOpen(true)}
+        style={{width:"100%",minHeight:90,borderRadius:DS.radius,border:`2px dashed ${DS.border}`,background:"rgba(255,255,255,0.6)",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,WebkitTapHighlightColor:"transparent",transition:"all .2s"}}>
+        <span style={{fontSize:36,lineHeight:1,opacity:.5}}>✍️</span>
+        <span style={{fontSize:14,fontWeight:700,color:"#94a3b8"}}>Appuyez pour signer</span>
+      </button>
     </div>
   );
 }
@@ -668,6 +713,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
   const [showConfirmSave, setShowConfirmSave] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
+  const [clientSearch, setClientSearch] = useState("");
 
   // Résout les clés idb: dans le formulaire quand on édite un passage existant
   useEffect(() => {
@@ -970,23 +1016,38 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
           {/* Client */}
           <div>
             <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5,display:"block",marginBottom:8}}>Client *</span>
+            {/* Barre de recherche */}
+            <div style={{position:"relative",marginBottom:8}}>
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.2" strokeLinecap="round" style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input
+                type="search" value={clientSearch} onChange={e=>setClientSearch(e.target.value)}
+                placeholder="Rechercher un client…"
+                style={{width:"100%",padding:"12px 14px 12px 40px",borderRadius:14,border:"2px solid "+DS.border,fontSize:16,fontFamily:"inherit",color:DS.dark,boxSizing:"border-box",outline:"none",background:"#fff"}}/>
+              {clientSearch && (
+                <button onClick={()=>setClientSearch("")} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",padding:4,color:"#94a3b8",fontSize:16,lineHeight:1}}>✕</button>
+              )}
+            </div>
+            {/* Liste filtrée */}
             <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:220,overflowY:"auto",WebkitOverflowScrolling:"touch",borderRadius:14,border:"2px solid "+DS.border,padding:8,background:DS.light}}>
-              {clients.map(c=>{
-                const sel=f.clientId===c.id;
-                return (
-                  <button key={c.id} onClick={()=>set("clientId",c.id)}
-                    style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,border:`2px solid ${sel?DS.blue:DS.border}`,background:sel?DS.blueSoft:"rgba(255,255,255,0.9)",cursor:"pointer",textAlign:"left",fontFamily:"inherit",transition:"all .2s",minHeight:60,WebkitTapHighlightColor:"transparent",boxShadow:sel?"0 3px 14px "+DS.blue+"22":"none"}}>
-                    <Avatar nom={c.nom} size={38}/>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontWeight:700,fontSize:15,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
-                      <div style={{fontSize:12,color:DS.mid,marginTop:2}}>{c.formule}{c.bassin?" · "+c.bassin:""}</div>
-                    </div>
-                    {sel && <div style={{width:28,height:28,borderRadius:14,background:"linear-gradient(135deg,#0891b2,#06b6d4)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                      {Ico.check(13,"#fff")}
-                    </div>}
-                  </button>
-                );
-              })}
+              {clients.filter(c=>c.nom.toLowerCase().includes(clientSearch.toLowerCase())).length===0
+                ? <div style={{padding:"20px",textAlign:"center",color:DS.mid,fontSize:14}}>Aucun client trouvé</div>
+                : clients.filter(c=>c.nom.toLowerCase().includes(clientSearch.toLowerCase())).map(c=>{
+                  const sel=f.clientId===c.id;
+                  return (
+                    <button key={c.id} onClick={()=>{set("clientId",c.id);setClientSearch("");}}
+                      style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,border:`2px solid ${sel?DS.blue:DS.border}`,background:sel?DS.blueSoft:"rgba(255,255,255,0.9)",cursor:"pointer",textAlign:"left",fontFamily:"inherit",transition:"all .2s",minHeight:60,WebkitTapHighlightColor:"transparent",boxShadow:sel?"0 3px 14px "+DS.blue+"22":"none"}}>
+                      <Avatar nom={c.nom} size={38}/>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontWeight:700,fontSize:15,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
+                        <div style={{fontSize:12,color:DS.mid,marginTop:2}}>{c.formule}{c.bassin?" · "+c.bassin:""}</div>
+                      </div>
+                      {sel && <div style={{width:28,height:28,borderRadius:14,background:"linear-gradient(135deg,#0891b2,#06b6d4)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        {Ico.check(13,"#fff")}
+                      </div>}
+                    </button>
+                  );
+                })
+              }
             </div>
           </div>
 
@@ -1197,74 +1258,62 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
           {f.priseEchantillon===true && (
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
 
-              {/* Barre de progression */}
-              {(()=>{
-                const allF=["chloreLibre","tChlore","ph","tPH","alcalinite","tAlcalinite","stabilisant","tStabilisant","tSel","tPhosphate"];
-                const n=allF.filter(k=>f[k]!==undefined&&f[k]!=="").length;
-                const pct=Math.round(n/allF.length*100);
-                return (
-                  <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:12,background:"#f8fafc",border:"1px solid "+DS.border}}>
-                    <div style={{flex:1,height:8,borderRadius:4,background:"#e2e8f0",overflow:"hidden"}}>
-                      <div style={{height:"100%",borderRadius:4,background:pct===100?"linear-gradient(90deg,#059669,#22c55e)":"linear-gradient(90deg,#0891b2,#6366f1)",width:pct+"%",transition:"width .4s"}}/>
-                    </div>
-                    <span style={{fontSize:12,fontWeight:700,color:pct===100?"#16a34a":DS.mid,minWidth:36,textAlign:"right"}}>{pct===100?"✅ OK":n+"/"+allF.length}</span>
-                  </div>
-                );
-              })()}
-
-              {/* Grille 2 colonnes pour les cartes paramètres */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              {/* Cartes analyses — colonne unique, inputs côte à côte */}
               {[
-                {label:"Chlore",     emoji:"💧", color:"#0891b2", bg:"#e0f7fa",
-                 rows:[{ico:"🧪",lbl:"Bandelette",   field:"chloreLibre",ideal:"1–3 ppm",  ok:v=>v>=1&&v<=3},
-                       {ico:"📊",lbl:"Électronique", field:"tChlore",    ideal:"1–1.5",    ok:v=>v>=0.5&&v<=3}]},
-                {label:"pH",         emoji:"⚗️",  color:"#7c3aed", bg:"#ede9fe",
-                 rows:[{ico:"🧪",lbl:"Bandelette",   field:"ph",         ideal:"7.2–7.8",  ok:v=>v>=7.2&&v<=7.8},
-                       {ico:"📊",lbl:"Électronique", field:"tPH",        ideal:"7.2–7.4",  ok:v=>v>=7.0&&v<=7.6}]},
-                {label:"Alcalinité", emoji:"🌊", color:"#0284c7", bg:"#e0f2fe",
-                 rows:[{ico:"🧪",lbl:"Bandelette",   field:"alcalinite", ideal:"80–120 ppm",ok:v=>v>=80&&v<=120},
-                       {ico:"📊",lbl:"Électronique", field:"tAlcalinite",ideal:"80–120",   ok:v=>v>=80&&v<=120}]},
-                {label:"Stabilisant",emoji:"🛡️", color:"#059669", bg:"#d1fae5",
-                 rows:[{ico:"🧪",lbl:"Bandelette",   field:"stabilisant",ideal:"30–50 ppm",ok:v=>v>=30&&v<=50},
-                       {ico:"📊",lbl:"Électronique", field:"tStabilisant",ideal:"",        ok:null}]},
-                {label:"Sel",        emoji:"🧂", color:"#b45309", bg:"#fef3c7",
-                 rows:[{ico:"📊",lbl:"Électronique", field:"tSel",       ideal:"3–5 g/L",  ok:v=>v>=3&&v<=5}]},
-                {label:"Phosphate",  emoji:"🔬", color:"#dc2626", bg:"#fee2e2",
-                 rows:[{ico:"📊",lbl:"Électronique", field:"tPhosphate", ideal:"",         ok:null}]},
-              ].map(({label,emoji,color,bg,rows})=>{
-                const filled=rows.filter(r=>f[r.field]!==undefined&&f[r.field]!=="");
-                const allOk=filled.length>0&&filled.every(r=>!r.ok||r.ok(parseFloat(f[r.field])));
-                const anyFilled=filled.length>0;
-                const cardBg=anyFilled?(allOk?"#f0fdf4":bg):"#f8fafc";
-                const cardBorder=anyFilled?(allOk?"#22c55e55":color+"44"):DS.border;
+                {label:"Chlore",     emoji:"💧", color:"#0891b2",
+                 band:{field:"chloreLibre",ideal:"1–3",ok:v=>v>=1&&v<=3},
+                 elec:{field:"tChlore",   ideal:"1–1.5",ok:v=>v>=0.5&&v<=3},
+                 unit:"ppm"},
+                {label:"pH",         emoji:"⚗️",  color:"#7c3aed",
+                 band:{field:"ph",    ideal:"7.2–7.8",ok:v=>v>=7.2&&v<=7.8},
+                 elec:{field:"tPH",   ideal:"7.2–7.4",ok:v=>v>=7.0&&v<=7.6},
+                 unit:""},
+                {label:"Alcalinité", emoji:"🌊", color:"#0284c7",
+                 band:{field:"alcalinite",  ideal:"80–120",ok:v=>v>=80&&v<=120},
+                 elec:{field:"tAlcalinite", ideal:"80–120",ok:v=>v>=80&&v<=120},
+                 unit:"ppm"},
+                {label:"Stabilisant",emoji:"🛡️", color:"#059669",
+                 band:{field:"stabilisant", ideal:"30–50",ok:v=>v>=30&&v<=50},
+                 elec:{field:"tStabilisant",ideal:"",ok:null},
+                 unit:"ppm"},
+                {label:"Sel",        emoji:"🧂", color:"#b45309",
+                 elec:{field:"tSel",ideal:"3–5 g/L",ok:v=>v>=3&&v<=5},
+                 unit:"g/L"},
+                {label:"Phosphate",  emoji:"🔬", color:"#dc2626",
+                 elec:{field:"tPhosphate",ideal:"",ok:null},
+                 unit:"ppb"},
+              ].map(({label,emoji,color,band,elec,unit})=>{
+                const cols=[band,elec].filter(Boolean);
+                const fv=cols.map(c=>({...c,val:f[c.field],filled:f[c.field]!==undefined&&f[c.field]!==""}));
+                const anyF=fv.some(c=>c.filled);
+                const allOk=anyF&&fv.filter(c=>c.filled).every(c=>!c.ok||c.ok(parseFloat(c.val)));
                 return (
-                  <div key={label} style={{borderRadius:16,border:`2px solid ${cardBorder}`,background:DS.white,overflow:"hidden",boxShadow:anyFilled?(allOk?"0 4px 18px #22c55e22":"0 4px 18px "+color+"18"):"0 1px 4px rgba(0,0,0,0.06)",transition:"all .3s"}}>
-                    {/* Header coloré */}
-                    <div style={{background:anyFilled?(allOk?"linear-gradient(135deg,#dcfce7,#bbf7d0)":bg):"#f8fafc",padding:"11px 16px",borderBottom:`1px solid ${cardBorder}`,display:"flex",alignItems:"center",gap:10}}>
-                      <span style={{fontSize:26,lineHeight:1}}>{emoji}</span>
-                      <span style={{fontSize:16,fontWeight:800,color:anyFilled?(allOk?"#16a34a":color):DS.dark,flex:1}}>{label}</span>
-                      {anyFilled&&<span style={{fontSize:24,lineHeight:1}}>{allOk?"✅":"❌"}</span>}
+                  <div key={label} style={{borderRadius:18,overflow:"hidden",border:`2px solid ${anyF?(allOk?"#22c55e55":color+"44"):DS.border}`,boxShadow:anyF?(allOk?"0 4px 20px #22c55e18":"0 4px 20px "+color+"14"):"0 1px 4px rgba(0,0,0,0.05)",transition:"all .3s"}}>
+                    {/* Header gradient vivid */}
+                    <div style={{background:anyF?(allOk?"linear-gradient(135deg,#059669,#22c55e)":`linear-gradient(135deg,${color},${color}cc)`):`linear-gradient(135deg,${color}22,${color}10)`,padding:"12px 18px",display:"flex",alignItems:"center",gap:10}}>
+                      <span style={{fontSize:28,lineHeight:1}}>{emoji}</span>
+                      <div style={{flex:1}}>
+                        <span style={{fontSize:16,fontWeight:900,color:anyF?"#fff":color,letterSpacing:-.3}}>{label}</span>
+                        {unit&&<span style={{fontSize:11,fontWeight:600,color:anyF?"rgba(255,255,255,0.7)":color+"99",marginLeft:6}}>{unit}</span>}
+                      </div>
+                      {anyF&&<span style={{fontSize:26,lineHeight:1}}>{allOk?"✅":"❌"}</span>}
                     </div>
-                    {/* Lignes de saisie */}
-                    <div style={{padding:"10px 14px",display:"flex",flexDirection:"column",gap:10}}>
-                      {rows.map(({ico,lbl,field,ideal,ok})=>{
-                        const val=f[field];
-                        const isFilled=val!==undefined&&val!=="";
-                        const isOk=isFilled&&ok?ok(parseFloat(val)):null;
-                        const bCol=isFilled?(isOk===true?"#22c55e":isOk===false?"#ef4444":"#94a3b8"):"#e2e8f0";
-                        const tCol=isFilled?(isOk===true?"#16a34a":isOk===false?"#dc2626":DS.dark):"#94a3b8";
-                        const iBg=isFilled?(isOk===true?"#f0fdf4":isOk===false?"#fef2f2":"#fafafa"):"#fafafa";
+                    {/* Inputs côte à côte */}
+                    <div style={{display:"grid",gridTemplateColumns:cols.length===2?"1fr 1fr":"1fr",background:"#fff",padding:"14px 14px 10px"}}>
+                      {fv.map((c,ci)=>{
+                        const isOk=c.filled&&c.ok?c.ok(parseFloat(c.val)):null;
+                        const bc=c.filled?(isOk===true?"#22c55e":isOk===false?"#ef4444":"#94a3b8"):"#e2e8f0";
+                        const tc=c.filled?(isOk===true?"#16a34a":isOk===false?"#dc2626":DS.dark):"#94a3b8";
+                        const ibg=c.filled?(isOk===true?"#f0fdf4":isOk===false?"#fef2f2":"#fafafa"):"#fafafa";
                         return (
-                          <div key={field}>
-                            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
-                              <span style={{fontSize:16}}>{ico}</span>
-                              <span style={{fontSize:12,fontWeight:700,color:"#64748b"}}>{lbl}</span>
-                              {ideal&&<span style={{fontSize:10,color:"#94a3b8",marginLeft:2}}>{ideal}</span>}
-                              {isFilled&&isOk===true&&<span style={{marginLeft:"auto",fontSize:18}}>✅</span>}
-                              {isFilled&&isOk===false&&<span style={{marginLeft:"auto",fontSize:18}}>❌</span>}
+                          <div key={c.field} style={{padding:ci===0&&cols.length===2?"0 8px 0 0":"0 0 0 8px",borderRight:ci===0&&cols.length===2?"1.5px solid #f1f5f9":"none"}}>
+                            <div style={{fontSize:10,fontWeight:700,color:"#94a3b8",marginBottom:5,display:"flex",alignItems:"center",gap:4}}>
+                              <span>{band&&ci===0?"🧪":"📊"}</span>
+                              <span>{band&&ci===0?"Bandelette":"Électronique"}</span>
+                              {c.ideal&&<span style={{marginLeft:"auto",fontSize:9,color:"#b0bec5"}}>✓ {c.ideal}</span>}
                             </div>
-                            <input type="number" inputMode="decimal" step="0.1" value={val||""} onChange={e=>set(field,e.target.value)}
-                              style={{width:"100%",height:52,padding:"0 6px",borderRadius:10,border:`2.5px solid ${bCol}`,fontSize:22,fontWeight:800,color:tCol,textAlign:"center",background:iBg,boxSizing:"border-box",fontFamily:"inherit",outline:"none",transition:"all .2s"}}/>
+                            <input type="number" inputMode="decimal" step="0.1" value={c.val||""} onChange={e=>set(c.field,e.target.value)}
+                              style={{width:"100%",height:58,borderRadius:12,border:`2.5px solid ${bc}`,fontSize:24,fontWeight:900,color:tc,textAlign:"center",background:ibg,boxSizing:"border-box",fontFamily:"inherit",outline:"none",transition:"all .2s",display:"block"}}/>
                           </div>
                         );
                       })}
@@ -1272,7 +1321,6 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
                   </div>
                 );
               })}
-              </div>{/* fin grille 2 colonnes */}
 
               {/* Stabilisant HAUT — pleine largeur */}
               <label style={{display:"flex",alignItems:"center",gap:12,cursor:"pointer",padding:"14px 16px",borderRadius:14,border:`2px solid ${f.stabilisantHaut?"#f59e0b":"#e2e8f0"}`,background:f.stabilisantHaut?"#fffbeb":"rgba(255,255,255,0.6)",transition:"all .2s"}}>
@@ -1325,7 +1373,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
               <div style={{width:24,height:24,borderRadius:7,background:"#4f46e5",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.chemicals(12,"#fff")}</div>
               Produits apportés
             </div>
-            <div style={{display:"flex",flexDirection:"column",gap:5}}>
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
               {[
                 {k:"corrChlore",l:"Chlore",ico:"🧪",col:"#0891b2",ph:"ex: 200g"},
                 {k:"corrPH",l:"pH",ico:"⚗️",col:"#4f46e5",ph:"ex: 500ml"},
@@ -1335,14 +1383,15 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
                 {k:"corrChloreChoc",l:"Chlore Choc",ico:"⚡",col:"#b45309",ph:"ex: 200g"},
                 {k:"corrPhosphate",l:"Phosphate",ico:"🔬",col:"#be185d",ph:"ex: 250ml"},
                 {k:"corrAlcafix",l:"Tac +",ico:"🧫",col:"#059669",ph:"ex: 500g"},
-                {k:"corrAutre",l:"Autre",ico:"📦",col:"#94a3b8",ph:"produit..."},
+                {k:"corrAutre",l:"Autre",ico:"📦",col:"#94a3b8",ph:"produit, marque..."},
               ].map(({k,l,ico,col,ph})=>(
-                <div key={k} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",borderRadius:9,border:`1.5px solid ${f[k]?col+"55":DS.border}`,background:f[k]?col+"0a":"rgba(255,255,255,0.5)",transition:"all .2s"}}>
-                  <span style={{fontSize:16,flexShrink:0,lineHeight:1}}>{ico}</span>
-                  <span style={{fontSize:12,fontWeight:600,color:f[k]?col:DS.mid,flex:1,minWidth:0}}>{l}</span>
+                <div key={k} style={{display:"flex",alignItems:"center",gap:10,minHeight:54,padding:"6px 10px 6px 10px",borderRadius:12,border:`2px solid ${f[k]?col+"66":DS.border}`,background:f[k]?col+"0d":"rgba(255,255,255,0.6)",transition:"all .2s"}}>
+                  <span style={{fontSize:20,flexShrink:0,lineHeight:1,width:28,textAlign:"center"}}>{ico}</span>
+                  <span style={{fontSize:13,fontWeight:700,color:f[k]?col:DS.mid,flex:1,minWidth:0,lineHeight:1.2}}>{l}</span>
                   <input value={f[k]||""} onChange={e=>set(k,e.target.value)}
                     placeholder={ph}
-                    style={{width:96,padding:"5px 8px",borderRadius:7,border:`1.5px solid ${f[k]?col+"88":DS.border}`,fontSize:13,outline:"none",color:f[k]?col:DS.dark,fontFamily:"inherit",background:"rgba(255,255,255,0.85)",textAlign:"right",flexShrink:0,transition:"all .2s"}}/>
+                    inputMode="text"
+                    style={{width:120,padding:"10px 10px",borderRadius:9,border:`2px solid ${f[k]?col+"99":DS.border}`,fontSize:15,outline:"none",color:f[k]?col:DS.dark,fontFamily:"inherit",background:f[k]?col+"08":"rgba(255,255,255,0.9)",textAlign:"right",flexShrink:0,transition:"all .2s",fontWeight:f[k]?700:400}}/>
                 </div>
               ))}
             </div>
