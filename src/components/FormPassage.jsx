@@ -477,19 +477,19 @@ function MultiCheck({ label, options, values, onChange }) {
   return (
     <div>
       {label && (
-        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
-          <span style={{fontSize:15,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7}}>{label}</span>
-          {values.length>0 && <span style={{background:DS.blue,color:"#fff",fontSize:15,fontWeight:800,borderRadius:10,padding:"1px 7px",minWidth:18,textAlign:"center"}}>{values.length}</span>}
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+          <span style={{fontSize:13,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5}}>{label}</span>
+          {values.length>0 && <span style={{background:DS.blue,color:"#fff",fontSize:11,fontWeight:800,borderRadius:10,padding:"2px 8px"}}>{values.length}</span>}
         </div>
       )}
-      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+      <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
         {options.map(o=>{
           const sel=values.includes(o);
           return (
-            <button key={o} onClick={()=>toggle(o)} className="btn-hover" style={{display:"inline-flex",alignItems:"center",gap:5,padding:"7px 12px",borderRadius:20,border:`1.5px solid ${sel?DS.blue:DS.border}`,background:sel?DS.blueGrad:DS.white,cursor:"pointer",fontFamily:"inherit",fontWeight:sel?700:500,fontSize:15,color:sel?"#fff":DS.mid,boxShadow:sel?"0 2px 8px "+DS.blue+"33":"none",transition:"all .2s",WebkitTapHighlightColor:"transparent"}}>
+            <button key={o} onClick={()=>toggle(o)} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"10px 16px",minHeight:46,borderRadius:22,border:`2px solid ${sel?DS.blue:DS.border}`,background:sel?"linear-gradient(135deg,#0891b2,#0ea5e9)":DS.white,cursor:"pointer",fontFamily:"inherit",fontWeight:600,fontSize:14,color:sel?"#fff":DS.mid,boxShadow:sel?"0 3px 10px "+DS.blue+"33":"none",transition:"all .2s",WebkitTapHighlightColor:"transparent"}}>
               {sel
-                ? <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                : <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke={DS.border} strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                ? <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                : <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={DS.border} strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               }
               {o}
             </button>
@@ -503,13 +503,13 @@ function MultiCheck({ label, options, values, onChange }) {
 function OuiNon({ label, value, onChange }) {
   return (
     <div>
-      {label && <span style={{fontSize:15,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:7}}>{label}</span>}
-      <div style={{display:"flex",gap:8}}>
-        <button onClick={()=>onChange(true)} className="btn-hover" style={{flex:1,padding:"10px",borderRadius:10,border:`1.5px solid ${value===true?DS.green:DS.border}`,background:value===true?DS.greenSoft:DS.white,color:value===true?DS.green:DS.mid,fontWeight:700,fontSize:15,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6,transition:"all .2s",boxShadow:value===true?"0 2px 8px "+DS.green+"33":"none"}}>
-          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Oui
+      {label && <span style={{fontSize:13,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5,display:"block",marginBottom:10}}>{label}</span>}
+      <div style={{display:"flex",gap:10}}>
+        <button onClick={()=>onChange(true)} style={{flex:1,minHeight:56,padding:"14px 12px",borderRadius:16,border:`2.5px solid ${value===true?"#22c55e":DS.border}`,background:value===true?"linear-gradient(135deg,#f0fdf4,#dcfce7)":DS.white,color:value===true?"#16a34a":DS.mid,fontWeight:700,fontSize:16,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"all .2s",WebkitTapHighlightColor:"transparent",boxShadow:value===true?"0 4px 16px #22c55e33":"none"}}>
+          <span style={{fontSize:20,lineHeight:1}}>{value===true?"✅":"☑️"}</span> Oui
         </button>
-        <button onClick={()=>onChange(false)} className="btn-hover" style={{flex:1,padding:"10px",borderRadius:10,border:`1.5px solid ${value===false?DS.red:DS.border}`,background:value===false?DS.redSoft:DS.white,color:value===false?DS.red:DS.mid,fontWeight:700,fontSize:15,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6,transition:"all .2s",boxShadow:value===false?"0 2px 8px "+DS.red+"33":"none"}}>
-          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Non
+        <button onClick={()=>onChange(false)} style={{flex:1,minHeight:56,padding:"14px 12px",borderRadius:16,border:`2.5px solid ${value===false?"#ef4444":DS.border}`,background:value===false?"linear-gradient(135deg,#fef2f2,#fee2e2)":DS.white,color:value===false?"#dc2626":DS.mid,fontWeight:700,fontSize:16,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"all .2s",WebkitTapHighlightColor:"transparent",boxShadow:value===false?"0 4px 16px #ef444433":"none"}}>
+          <span style={{fontSize:20,lineHeight:1}}>{value===false?"❌":"✖️"}</span> Non
         </button>
       </div>
     </div>
@@ -520,17 +520,17 @@ function StarRating({ value, onChange }) {
   const labels=["","Mauvais","Passable","Bien","Très bien","Excellent"];
   return (
     <div>
-      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+      <div style={{display:"flex",alignItems:"center",gap:0}}>
         {[1,2,3,4,5].map(n=>(
-          <button key={n} onClick={()=>onChange(n)} style={{background:"none",border:"none",cursor:"pointer",padding:"4px",lineHeight:1,transition:"all .2s",transform:n<=value?"scale(1.2)":"scale(1)"}}>
-            {Ico.star(32,n<=value?"#f59e0b":"#e2e8f0",n<=value?"#f59e0b":"none")}
+          <button key={n} onClick={()=>onChange(n)} style={{background:"none",border:"none",cursor:"pointer",padding:"6px 5px",lineHeight:1,transition:"transform .15s",transform:n<=value?"scale(1.18)":"scale(1)",WebkitTapHighlightColor:"transparent",minWidth:48,minHeight:48,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            {Ico.star(36,n<=value?"#f59e0b":"#e2e8f0",n<=value?"#f59e0b":"none")}
           </button>
         ))}
       </div>
       {value>0 && (
-        <div style={{display:"inline-flex",alignItems:"center",gap:5,background:"#fffbeb",borderRadius:8,padding:"4px 10px",border:"1px solid #fcd34d"}}>
-          <span style={{fontSize:15,fontWeight:800,color:"#d97706"}}>{value}/5</span>
-          <span style={{fontSize:15,color:"#92400e",fontWeight:500}}>{labels[value]}</span>
+        <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"#fffbeb",borderRadius:10,padding:"6px 14px",border:"1px solid #fcd34d",marginTop:4}}>
+          <span style={{fontSize:16,fontWeight:900,color:"#d97706"}}>{value}/5</span>
+          <span style={{fontSize:14,color:"#92400e",fontWeight:600}}>{labels[value]}</span>
         </div>
       )}
     </div>
@@ -954,71 +954,73 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
       <Stepper/>
 
       {step===1 && (
-        <div className="fade-in">
-          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12}}>
-            <input type="date" value={f.date} onChange={e=>set("date",e.target.value)} style={{padding:"12px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:14,fontFamily:"inherit",color:DS.dark}}/>
-            <input placeholder="Technicien" value={f.tech} onChange={e=>set("tech",e.target.value)} style={{padding:"12px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:14,fontFamily:"inherit",color:DS.dark}}/>
+        <div className="fade-in" style={{display:"flex",flexDirection:"column",gap:18}}>
+          {/* Date + Technicien */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <div>
+              <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5,display:"block",marginBottom:6}}>Date</span>
+              <input type="date" value={f.date} onChange={e=>set("date",e.target.value)} style={{width:"100%",padding:"14px",borderRadius:14,border:"2px solid "+DS.border,fontSize:16,fontFamily:"inherit",color:DS.dark,boxSizing:"border-box",outline:"none"}}/>
+            </div>
+            <div>
+              <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5,display:"block",marginBottom:6}}>Technicien</span>
+              <input placeholder="Nom" value={f.tech} onChange={e=>set("tech",e.target.value)} style={{width:"100%",padding:"14px",borderRadius:14,border:"2px solid "+DS.border,fontSize:16,fontFamily:"inherit",color:DS.dark,boxSizing:"border-box",outline:"none"}}/>
+            </div>
           </div>
-          <div style={{marginTop:16}}>
-            <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:8}}>Client *</span>
-            {isMobile ? (
-              <select
-                value={f.clientId}
-                onChange={e=>set("clientId", e.target.value)}
-                style={{width:"100%",padding:"14px 16px",borderRadius:DS.radiusSm,border:"none",background:"rgba(255,255,255,0.45)",boxShadow:DS.nmShadowSm,fontSize:15,color:DS.dark}}
-              >
-                <option value="">Choisir un client</option>
-                {clients.map(c=>(
-                  <option key={c.id} value={c.id}>{c.nom} — {c.formule}</option>
-                ))}
-              </select>
-            ) : (
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:8,maxHeight:220,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
-                {clients.map(c=>{
-                  const sel=f.clientId===c.id;
-                  return (
-                    <button key={c.id} onClick={()=>set("clientId",c.id)} className="card-hover" style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",borderRadius:DS.radiusSm,border:`2px solid ${sel?DS.blue:DS.border}`,background:sel?DS.blueSoft:DS.white,cursor:"pointer",textAlign:"left",fontFamily:"inherit",transition:"all .2s",boxShadow:sel?"0 2px 12px "+DS.blue+"22":"none"}}>
-                      <Avatar nom={c.nom} size={38}/>
-                      <div style={{flex:1}}>
-                        <div style={{fontWeight:700,fontSize:13,color:DS.dark}}>{c.nom}</div>
-                        <div style={{fontSize:11,color:DS.mid,marginTop:1}}>{c.formule} · {c.bassin} {c.volume}m³</div>
-                      </div>
-                      {sel && <div style={{width:22,height:22,borderRadius:11,background:DS.blueGrad,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"0 2px 6px "+DS.blue+"44"}}>{Ico.check(12,"#fff")}</div>}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-          <div style={{marginTop:16}}>
-            <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:8}}>Type d'intervention</span>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7}}>
-              {[
-                {v:"Entretien complet",l:"Entretien",ico:Ico.wrench,col:"#0284c7",bg:"#e0f2fe"},
-                {v:"Contrôle d'eau",l:"Contrôle",ico:Ico.drop,col:"#0891b2",bg:"#e0f7fa"},
-                {v:"Visite technique",l:"Visite",ico:Ico.brush,col:"#4f46e5",bg:"#eef2ff"},
-                {v:"Bassin en rattrapage",l:"Rattrapage",ico:Ico.chemicals,col:"#b45309",bg:"#fef3c7"},
-                {v:"Fin de rattrapage",l:"Fin ratt.",ico:Ico.check,col:"#059669",bg:"#d1fae5"},
-                {v:"SAV",l:"SAV",ico:(s,c)=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17" strokeWidth="2.5"/></svg>,col:"#dc2626",bg:"#fef2f2"},
-                {v:"Demande de devis",l:"Devis",ico:(s,c)=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/><path d="M9 9h1"/></svg>,col:"#7c3aed",bg:"#f5f3ff"},
-                {v:"Passage sans données",l:"Sans data",ico:(s,c)=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16" strokeWidth="2.5"/></svg>,col:"#64748b",bg:"#f1f5f9"},
-              ].map(({v,l,ico,col,bg})=>{
-                const sel=f.type===v;
+
+          {/* Client */}
+          <div>
+            <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5,display:"block",marginBottom:8}}>Client *</span>
+            <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:220,overflowY:"auto",WebkitOverflowScrolling:"touch",borderRadius:14,border:"2px solid "+DS.border,padding:8,background:DS.light}}>
+              {clients.map(c=>{
+                const sel=f.clientId===c.id;
                 return (
-                  <button key={v} onClick={()=>{set("type",v);setStep(1);}} className="btn-hover"
-                    style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,padding:"10px 4px",borderRadius:12,border:`2px solid ${sel?col:DS.border}`,background:sel?bg:DS.white,cursor:"pointer",textAlign:"center",fontFamily:"inherit",transition:"all .2s",boxShadow:sel?`0 3px 10px ${col}33`:"none",WebkitTapHighlightColor:"transparent"}}>
-                    <div style={{width:34,height:34,borderRadius:10,background:sel?col:"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .2s",boxShadow:sel?`0 2px 8px ${col}44`:"none"}}>
-                      {ico(16,sel?"#fff":DS.mid)}
+                  <button key={c.id} onClick={()=>set("clientId",c.id)}
+                    style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,border:`2px solid ${sel?DS.blue:DS.border}`,background:sel?DS.blueSoft:"rgba(255,255,255,0.9)",cursor:"pointer",textAlign:"left",fontFamily:"inherit",transition:"all .2s",minHeight:60,WebkitTapHighlightColor:"transparent",boxShadow:sel?"0 3px 14px "+DS.blue+"22":"none"}}>
+                    <Avatar nom={c.nom} size={38}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:700,fontSize:15,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
+                      <div style={{fontSize:12,color:DS.mid,marginTop:2}}>{c.formule}{c.bassin?" · "+c.bassin:""}</div>
                     </div>
-                    <span style={{fontSize:10,fontWeight:sel?800:500,color:sel?col:DS.mid,lineHeight:1.2,letterSpacing:-.1}}>{l}</span>
+                    {sel && <div style={{width:28,height:28,borderRadius:14,background:"linear-gradient(135deg,#0891b2,#06b6d4)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      {Ico.check(13,"#fff")}
+                    </div>}
                   </button>
                 );
               })}
             </div>
-            {/* Label du type sélectionné */}
-            {f.type && <div style={{marginTop:8,padding:"6px 12px",borderRadius:8,background:DS.light,fontSize:12,fontWeight:600,color:DS.mid,textAlign:"center"}}>{f.type}</div>}
           </div>
-          <div style={{borderTop:"1px solid "+DS.border,paddingTop:16,marginTop:16}}>
+
+          {/* Type d'intervention */}
+          <div>
+            <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5,display:"block",marginBottom:10}}>Type d'intervention</span>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
+              {[
+                {v:"Entretien complet",    l:"Entretien",   ico:Ico.wrench,   col:"#0284c7",bg:"#e0f2fe"},
+                {v:"Contrôle d'eau",       l:"Contrôle",    ico:Ico.drop,     col:"#0891b2",bg:"#e0f7fa"},
+                {v:"Visite technique",     l:"Visite",      ico:Ico.brush,    col:"#4f46e5",bg:"#eef2ff"},
+                {v:"Bassin en rattrapage", l:"Rattrapage",  ico:Ico.chemicals,col:"#b45309",bg:"#fef3c7"},
+                {v:"Fin de rattrapage",    l:"Fin ratt.",   ico:Ico.check,    col:"#059669",bg:"#d1fae5"},
+                {v:"SAV",                  l:"SAV",         ico:(s,c)=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17" strokeWidth="2.5"/></svg>,col:"#dc2626",bg:"#fef2f2"},
+                {v:"Demande de devis",     l:"Devis",       ico:(s,c)=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>,col:"#7c3aed",bg:"#f5f3ff"},
+                {v:"Passage sans données", l:"Sans data",   ico:(s,c)=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16" strokeWidth="2.5"/></svg>,col:"#64748b",bg:"#f1f5f9"},
+              ].map(({v,l,ico,col,bg})=>{
+                const sel=f.type===v;
+                return (
+                  <button key={v} onClick={()=>set("type",v)}
+                    style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"12px 4px",borderRadius:14,border:`2px solid ${sel?col:DS.border}`,background:sel?bg:DS.white,cursor:"pointer",textAlign:"center",fontFamily:"inherit",transition:"all .2s",boxShadow:sel?`0 4px 14px ${col}33`:"none",WebkitTapHighlightColor:"transparent",minHeight:76}}>
+                    <div style={{width:38,height:38,borderRadius:11,background:sel?col:"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .2s",boxShadow:sel?`0 3px 10px ${col}44`:"none"}}>
+                      {ico(18,sel?"#fff":DS.mid)}
+                    </div>
+                    <span style={{fontSize:11,fontWeight:sel?800:500,color:sel?col:DS.mid,lineHeight:1.2}}>{l}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {f.type && (
+              <div style={{marginTop:10,padding:"10px 14px",borderRadius:12,background:DS.light,fontSize:13,fontWeight:600,color:DS.mid,textAlign:"center",border:"1px solid "+DS.border}}>{f.type}</div>
+            )}
+          </div>
+          <div style={{borderTop:"1px solid "+DS.border,paddingTop:16}}>
             {(() => {
               const filledPhotos = [
                 f.photoArrivee ? {key:"pa", label:"Arrivée", val:f.photoArrivee} : null,
@@ -1119,7 +1121,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
           <div>
             <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>Note (optionnel)</span>
             <textarea value={f.obs||""} onChange={e=>set("obs",e.target.value)} placeholder="Ex: Passage effectué, client absent..."
-              style={{width:"100%",padding:"11px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:13,minHeight:80,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark}}/>
+              style={{width:"100%",padding:"11px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:16,minHeight:88,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark}}/>
           </div>
         </div>
       )}
@@ -1131,7 +1133,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
               <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>{isSAV?"Description de la panne":"Description des travaux demandés"}</span>
               <textarea value={f.descriptionSAV||""} onChange={e=>set("descriptionSAV",e.target.value)}
                 placeholder={isSAV?"Décrivez le problème constaté, le symptôme, l'équipement concerné..":"Décrivez les travaux souhaités, les équipements à installer ou remplacer..."}
-                style={{width:"100%",padding:"12px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:13,minHeight:120,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark}}/>
+                style={{width:"100%",padding:"12px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:16,minHeight:130,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark}}/>
             </div>
             {isSAV && (
               <div>
@@ -1149,7 +1151,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
                 <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:6}}>Pièces remplacées / utilisées</span>
                 <textarea value={f.piecesSAV||""} onChange={e=>set("piecesSAV",e.target.value)}
                   placeholder="Ex: Joint pompe x2, filtre cartouche, ..."
-                  style={{width:"100%",padding:"10px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:13,minHeight:70,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark}}/>
+                  style={{width:"100%",padding:"10px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:16,minHeight:80,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark}}/>
               </div>
             )}
             {isDevis && (
@@ -1169,7 +1171,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
             <div>
               <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:4}}>Commentaires</span>
               <textarea value={f.commentaires||""} onChange={e=>set("commentaires",e.target.value)} placeholder="Informations complémentaires..."
-                style={{width:"100%",padding:"11px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:13,minHeight:80,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark}}/>
+                style={{width:"100%",padding:"11px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:16,minHeight:88,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark}}/>
             </div>
           </div>
         </div>
@@ -1360,7 +1362,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
               {!isSimplified && <div>
                 <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:4}}>Commentaires</span>
                 <textarea value={f.commentaires} onChange={e=>set("commentaires",e.target.value)} placeholder="Anomalies, recommandations..."
-                  style={{width:"100%",padding:"11px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:13,minHeight:100,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,transition:"all .2s"}}/>
+                  style={{width:"100%",padding:"11px 14px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:16,minHeight:110,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark,transition:"all .2s"}}/>
               </div>}
               <OuiNon label="Livraison de produits ?" value={f.livraisonProduits} onChange={v=>set("livraisonProduits",v)}/>
               {f.livraisonProduits && (
@@ -1369,7 +1371,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
                   <div>
                     <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:4}}>Autre (quantités, marques…)</span>
                     <textarea value={f.livraisonAutre} onChange={e=>set("livraisonAutre",e.target.value)}
-                      style={{width:"100%",padding:"9px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:13,minHeight:56,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark}}/>
+                      style={{width:"100%",padding:"9px 12px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.border,fontSize:16,minHeight:72,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:DS.dark}}/>
                   </div>
                 </>
               )}
