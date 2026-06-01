@@ -522,8 +522,8 @@ function StarRating({ value, onChange }) {
     <div>
       <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
         {[1,2,3,4,5].map(n=>(
-          <button key={n} onClick={()=>onChange(n)} style={{background:"none",border:"none",cursor:"pointer",padding:"2px",lineHeight:1,transition:"all .2s",transform:n<=value?"scale(1.15)":"scale(1)"}}>
-            {Ico.star(28,n<=value?"#f59e0b":"#e2e8f0",n<=value?"#f59e0b":"none")}
+          <button key={n} onClick={()=>onChange(n)} style={{background:"none",border:"none",cursor:"pointer",padding:"4px",lineHeight:1,transition:"all .2s",transform:n<=value?"scale(1.2)":"scale(1)"}}>
+            {Ico.star(32,n<=value?"#f59e0b":"#e2e8f0",n<=value?"#f59e0b":"none")}
           </button>
         ))}
       </div>
@@ -580,12 +580,12 @@ function MRow({label,unit,value,onChange,ideal,okFn,icon,color="#0891b2",compact
   const hasVal = value!==""&&value!==null&&value!==undefined&&value!==false;
   const ok = hasVal&&okFn ? okFn(+value) : true;
   const statusColor = !hasVal?"#e2e8f0":ok?"#22c55e":"#ef4444";
-  // Mode compact : juste l'input + indicateur (utilisé dans la grille analyses)
+  // Mode compact : juste l'input + indicateur idéal en dessous (utilisé dans la grille analyses)
   if (compact) return (
-    <div style={{display:"flex",alignItems:"center",gap:4,justifyContent:"center"}}>
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,justifyContent:"center"}}>
       <input type="number" step="0.1" value={value===""||value===null||value===undefined?"":value} onChange={e=>onChange(e.target.value===""?"":+e.target.value)}
-        style={{width:64,padding:"7px 8px",borderRadius:8,border:`2px solid ${statusColor}`,fontSize:14,fontWeight:800,boxSizing:"border-box",color:hasVal?(ok?"#16a34a":"#be123c"):DS.dark,background:hasVal?(ok?"#f0fdf4":"#fef2f2"):"rgba(255,255,255,0.8)",textAlign:"center",outline:"none",fontFamily:"inherit",transition:"all .2s"}}/>
-      {ideal&&<div style={{fontSize:9,color:"#94a3b8",lineHeight:1.1}}>{ideal}</div>}
+        style={{width:76,padding:"8px 6px",borderRadius:8,border:`2px solid ${statusColor}`,fontSize:15,fontWeight:800,boxSizing:"border-box",color:hasVal?(ok?"#16a34a":"#be123c"):DS.dark,background:hasVal?(ok?"#f0fdf4":"#fef2f2"):"rgba(255,255,255,0.8)",textAlign:"center",outline:"none",fontFamily:"inherit",transition:"all .2s"}}/>
+      {ideal&&<div style={{fontSize:9,color:"#94a3b8",lineHeight:1.1,textAlign:"center",letterSpacing:-.2}}>{ideal}</div>}
     </div>
   );
   return (
@@ -1046,29 +1046,31 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
           </div>
           <div style={{marginTop:16}}>
             <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:8}}>Type d'intervention</span>
-            <div style={{display:"flex",flexDirection:"column",gap:5}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7}}>
               {[
-                {v:"Entretien complet",ico:Ico.wrench,col:"#0284c7",bg:"#e0f2fe"},
-                {v:"Contrôle d'eau",ico:Ico.drop,col:"#0891b2",bg:"#e0f7fa"},
-                {v:"Visite technique",ico:Ico.brush,col:"#4f46e5",bg:"#eef2ff"},
-                {v:"Bassin en rattrapage",ico:Ico.chemicals,col:"#b45309",bg:"#fef3c7"},
-                {v:"Fin de rattrapage",ico:Ico.check,col:"#059669",bg:"#d1fae5"},
-                {v:"SAV",ico:(s,c)=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17" strokeWidth="2.5"/></svg>,col:"#dc2626",bg:"#fef2f2"},
-                {v:"Demande de devis",ico:(s,c)=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/><path d="M9 9h1"/></svg>,col:"#7c3aed",bg:"#f5f3ff"},
-                {v:"Passage sans données",ico:(s,c)=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16" strokeWidth="2.5"/></svg>,col:"#64748b",bg:"#f1f5f9"},
-              ].map(({v,ico,col,bg})=>{
+                {v:"Entretien complet",l:"Entretien",ico:Ico.wrench,col:"#0284c7",bg:"#e0f2fe"},
+                {v:"Contrôle d'eau",l:"Contrôle",ico:Ico.drop,col:"#0891b2",bg:"#e0f7fa"},
+                {v:"Visite technique",l:"Visite",ico:Ico.brush,col:"#4f46e5",bg:"#eef2ff"},
+                {v:"Bassin en rattrapage",l:"Rattrapage",ico:Ico.chemicals,col:"#b45309",bg:"#fef3c7"},
+                {v:"Fin de rattrapage",l:"Fin ratt.",ico:Ico.check,col:"#059669",bg:"#d1fae5"},
+                {v:"SAV",l:"SAV",ico:(s,c)=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17" strokeWidth="2.5"/></svg>,col:"#dc2626",bg:"#fef2f2"},
+                {v:"Demande de devis",l:"Devis",ico:(s,c)=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/><path d="M9 9h1"/></svg>,col:"#7c3aed",bg:"#f5f3ff"},
+                {v:"Passage sans données",l:"Sans data",ico:(s,c)=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16" strokeWidth="2.5"/></svg>,col:"#64748b",bg:"#f1f5f9"},
+              ].map(({v,l,ico,col,bg})=>{
                 const sel=f.type===v;
                 return (
-                  <button key={v} onClick={()=>{set("type",v);setStep(1);}} className="btn-hover" style={{display:"flex",alignItems:"center",gap:11,padding:"11px 14px",borderRadius:12,border:`1.5px solid ${sel?col:DS.border}`,background:sel?bg:DS.white,cursor:"pointer",textAlign:"left",fontFamily:"inherit",transition:"all .2s",boxShadow:sel?`0 2px 10px ${col}22`:"none"}}>
-                    <div style={{width:32,height:32,borderRadius:9,background:sel?col:"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .2s"}}>
-                      {ico(15,sel?"#fff":DS.mid)}
+                  <button key={v} onClick={()=>{set("type",v);setStep(1);}} className="btn-hover"
+                    style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,padding:"10px 4px",borderRadius:12,border:`2px solid ${sel?col:DS.border}`,background:sel?bg:DS.white,cursor:"pointer",textAlign:"center",fontFamily:"inherit",transition:"all .2s",boxShadow:sel?`0 3px 10px ${col}33`:"none",WebkitTapHighlightColor:"transparent"}}>
+                    <div style={{width:34,height:34,borderRadius:10,background:sel?col:"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .2s",boxShadow:sel?`0 2px 8px ${col}44`:"none"}}>
+                      {ico(16,sel?"#fff":DS.mid)}
                     </div>
-                    <span style={{fontSize:13,fontWeight:sel?700:400,color:sel?col:DS.mid,flex:1}}>{v}</span>
-                    {sel && <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                    <span style={{fontSize:10,fontWeight:sel?800:500,color:sel?col:DS.mid,lineHeight:1.2,letterSpacing:-.1}}>{l}</span>
                   </button>
                 );
               })}
             </div>
+            {/* Label du type sélectionné */}
+            {f.type && <div style={{marginTop:8,padding:"6px 12px",borderRadius:8,background:DS.light,fontSize:12,fontWeight:600,color:DS.mid,textAlign:"center"}}>{f.type}</div>}
           </div>
           <div style={{borderTop:"1px solid "+DS.border,paddingTop:16,marginTop:16}}>
             {(() => {
@@ -1246,7 +1248,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
             </div>
             <div style={{background:DS.white,padding:"8px 12px",display:"flex",flexDirection:"column",gap:0}}>
               {/* Chlore */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center",padding:"6px 0",borderBottom:"1px solid "+DS.light}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center",padding:"9px 0",borderBottom:"1px solid "+DS.light}}>
                 <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,color:DS.dark}}>
                   <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>
                   Chlore <span style={{fontSize:10,color:DS.mid,fontWeight:500}}>ppm</span>
@@ -1255,7 +1257,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
                 <MRow value={f.tChlore} onChange={v=>set("tChlore",v)} ideal="1–1.5" okFn={v=>v>=0.5&&v<=3} color="#4f46e5" compact/>
               </div>
               {/* pH */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center",padding:"6px 0",borderBottom:"1px solid "+DS.light}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center",padding:"9px 0",borderBottom:"1px solid "+DS.light}}>
                 <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,color:DS.dark}}>
                   <span style={{fontSize:12,fontWeight:900,color:"#0891b2",letterSpacing:-1}}>pH</span>
                 </div>
@@ -1263,7 +1265,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
                 <MRow value={f.tPH} onChange={v=>set("tPH",v)} ideal="7.2–7.4" okFn={v=>v>=7.0&&v<=7.6} color="#4f46e5" compact/>
               </div>
               {/* Alcalinité */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center",padding:"6px 0",borderBottom:"1px solid "+DS.light}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center",padding:"9px 0",borderBottom:"1px solid "+DS.light}}>
                 <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,color:DS.dark}}>
                   <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2" strokeLinecap="round"><path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/><path d="M2 16c2.5 3 5 3 7.5 0S14 13 16.5 16s5 3 7.5 0"/></svg>
                   Alcalinité <span style={{fontSize:10,color:DS.mid,fontWeight:500}}>ppm</span>
@@ -1272,7 +1274,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
                 <MRow value={f.tAlcalinite} onChange={v=>set("tAlcalinite",v)} ideal="80–120" okFn={v=>v>=80&&v<=120} color="#4f46e5" compact/>
               </div>
               {/* Stabilisant */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center",padding:"6px 0",borderBottom:"1px solid "+DS.light}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center",padding:"9px 0",borderBottom:"1px solid "+DS.light}}>
                 <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,color:DS.dark}}>
                   <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                   Stabilisant <span style={{fontSize:10,color:DS.mid,fontWeight:500}}>ppm</span>
@@ -1281,7 +1283,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
                 <MRow value={f.tStabilisant} onChange={v=>set("tStabilisant",v)} color="#4f46e5" compact/>
               </div>
               {/* Sel — électronique uniquement */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center",padding:"6px 0",borderBottom:"1px solid "+DS.light}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center",padding:"9px 0",borderBottom:"1px solid "+DS.light}}>
                 <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,color:DS.dark}}>
                   <span style={{fontSize:14}}>🧂</span> Sel
                 </div>
@@ -1289,7 +1291,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
                 <MRow value={f.tSel} onChange={v=>set("tSel",v)} color="#4f46e5" compact/>
               </div>
               {/* Phosphate — électronique uniquement */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center",padding:"6px 0"}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center",padding:"9px 0"}}>
                 <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,color:DS.dark}}>
                   <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#4f46e5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v5l3 9a3 3 0 01-3 3H9a3 3 0 01-3-3l3-9V3z"/><path d="M6.5 15h11"/></svg>
                   Phosphate
@@ -1344,30 +1346,29 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
             </div>
             {/* Colonne droite : Produits apportés + Devis */}
             <div style={{display:"flex",flexDirection:"column",gap:16}}>
-          <div style={{background:`linear-gradient(135deg,#7c3aed08,#7c3aed12)`,borderRadius:DS.radius,padding:18,border:"1px solid #7c3aed18"}}>
-            <div style={{fontSize:11,fontWeight:800,color:"#4f46e5",textTransform:"uppercase",letterSpacing:.8,marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
-              <div style={{width:26,height:26,borderRadius:8,background:"#4f46e5",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.chemicals(13,"#fff")}</div>
+          <div style={{background:"linear-gradient(135deg,#7c3aed08,#7c3aed12)",borderRadius:DS.radius,padding:"12px 14px",border:"1px solid #7c3aed18"}}>
+            <div style={{fontSize:11,fontWeight:800,color:"#4f46e5",textTransform:"uppercase",letterSpacing:.8,marginBottom:10,display:"flex",alignItems:"center",gap:7}}>
+              <div style={{width:24,height:24,borderRadius:7,background:"#4f46e5",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.chemicals(12,"#fff")}</div>
               Produits apportés
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <div style={{display:"flex",flexDirection:"column",gap:5}}>
               {[
-                {k:"corrChlore",l:"Chlore",ico:"🧪",col:"#0891b2"},
-                {k:"corrPH",l:"pH",ico:"⚗️",col:"#4f46e5"},
-                {k:"corrSel",l:"Sel",ico:"🧂",col:"#64748b"},
-                {k:"corrAlgicide",l:"Algicide",ico:"🌿",col:"#16a34a"},
-                {k:"corrPeroxyde",l:"Peroxyde",ico:"💧",col:"#0284c7"},
-                {k:"corrChloreChoc",l:"Chlore Choc",ico:"⚡",col:"#b45309"},
-                {k:"corrPhosphate",l:"Phosphate",ico:"🔬",col:"#be185d"},
-                {k:"corrAlcafix",l:"Tac +",ico:"🧫",col:"#059669"},
-                {k:"corrAutre",l:"Autre",ico:"📦",col:"#94a3b8"},
-              ].map(({k,l,ico,col})=>(
-                <div key={k} style={{background:"rgba(255,255,255,0.55)",borderRadius:10,padding:"10px 12px",border:"1px solid "+DS.border}}>
-                  <div style={{fontSize:10,fontWeight:700,color:col,marginBottom:5,display:"flex",alignItems:"center",gap:4}}>
-                    <span style={{fontSize:13}}>{ico}</span> {l}
-                  </div>
+                {k:"corrChlore",l:"Chlore",ico:"🧪",col:"#0891b2",ph:"ex: 200g"},
+                {k:"corrPH",l:"pH",ico:"⚗️",col:"#4f46e5",ph:"ex: 500ml"},
+                {k:"corrSel",l:"Sel",ico:"🧂",col:"#64748b",ph:"ex: 2 sacs"},
+                {k:"corrAlgicide",l:"Algicide",ico:"🌿",col:"#16a34a",ph:"ex: 250ml"},
+                {k:"corrPeroxyde",l:"Peroxyde",ico:"💧",col:"#0284c7",ph:"ex: 500ml"},
+                {k:"corrChloreChoc",l:"Chlore Choc",ico:"⚡",col:"#b45309",ph:"ex: 200g"},
+                {k:"corrPhosphate",l:"Phosphate",ico:"🔬",col:"#be185d",ph:"ex: 250ml"},
+                {k:"corrAlcafix",l:"Tac +",ico:"🧫",col:"#059669",ph:"ex: 500g"},
+                {k:"corrAutre",l:"Autre",ico:"📦",col:"#94a3b8",ph:"produit..."},
+              ].map(({k,l,ico,col,ph})=>(
+                <div key={k} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",borderRadius:9,border:`1.5px solid ${f[k]?col+"55":DS.border}`,background:f[k]?col+"0a":"rgba(255,255,255,0.5)",transition:"all .2s"}}>
+                  <span style={{fontSize:16,flexShrink:0,lineHeight:1}}>{ico}</span>
+                  <span style={{fontSize:12,fontWeight:600,color:f[k]?col:DS.mid,flex:1,minWidth:0}}>{l}</span>
                   <input value={f[k]||""} onChange={e=>set(k,e.target.value)}
-                    placeholder={k==="corrSel"?"ex: 2 sacs":k==="corrChlore"?"ex: 200g":"ex: 500ml"}
-                    style={{width:"100%",padding:"7px 10px",borderRadius:8,border:"1.5px solid "+DS.border,fontSize:13,outline:"none",boxSizing:"border-box",color:DS.dark,fontFamily:"inherit",transition:"all .2s",background:f[k]?col+"08":DS.white}}/>
+                    placeholder={ph}
+                    style={{width:96,padding:"5px 8px",borderRadius:7,border:`1.5px solid ${f[k]?col+"88":DS.border}`,fontSize:13,outline:"none",color:f[k]?col:DS.dark,fontFamily:"inherit",background:"rgba(255,255,255,0.85)",textAlign:"right",flexShrink:0,transition:"all .2s"}}/>
                 </div>
               ))}
             </div>
@@ -1478,12 +1479,18 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
                   );
                 })()}
               </div>
-              <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",background:`linear-gradient(135deg,${DS.greenSoft},#bbf7d0)`,padding:"14px 16px",borderRadius:DS.radiusSm,border:"1.5px solid "+DS.green+"44",marginTop:4,transition:"all .2s"}}>
-                <input type="checkbox" checked={f.ok} onChange={e=>set("ok",e.target.checked)} style={{width:20,height:20,accentColor:DS.green}}/>
-                <span style={{fontWeight:800,color:"#16a34a",fontSize:14,display:"flex",alignItems:"center",gap:6}}>
-                  {Ico.check(16,"#16a34a")} Passage validé et terminé
-                </span>
-              </label>
+              <button onClick={()=>set("ok",!f.ok)} style={{display:"flex",alignItems:"center",gap:12,padding:"16px 18px",borderRadius:DS.radiusSm,border:`2px solid ${f.ok?DS.green:"#e2e8f0"}`,background:f.ok?"linear-gradient(135deg,#d1fae5,#bbf7d0)":"rgba(255,255,255,0.6)",cursor:"pointer",fontFamily:"inherit",textAlign:"left",transition:"all .3s",boxShadow:f.ok?"0 4px 16px rgba(5,150,105,0.25)":"none",width:"100%"}}>
+                <div style={{width:36,height:36,borderRadius:10,background:f.ok?"linear-gradient(135deg,#059669,#34d399)":"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .3s",boxShadow:f.ok?"0 3px 10px rgba(5,150,105,0.4)":"none"}}>
+                  {f.ok
+                    ? <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    : <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  }
+                </div>
+                <div>
+                  <div style={{fontSize:14,fontWeight:800,color:f.ok?"#16a34a":"#64748b",lineHeight:1.2}}>{f.ok ? "✅ Passage validé !" : "Marquer comme terminé"}</div>
+                  <div style={{fontSize:11,color:f.ok?"#4ade80":"#94a3b8",marginTop:2}}>{f.ok ? "Clôturé et enregistré" : "Appuyez pour valider"}</div>
+                </div>
+              </button>
             </div>
           </div>
         </div>
