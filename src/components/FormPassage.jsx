@@ -1234,88 +1234,104 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
           {/* Gate : prise d'échantillon */}
           <OuiNon label="Prise d'échantillon ?" value={f.priseEchantillon} onChange={v=>set("priseEchantillon",v)}/>
 
-          {/* Si Non → confirmation sans mesure */}
+          {/* Si Non → confirmation */}
           {f.priseEchantillon===false && (
-            <div style={{display:"flex",alignItems:"center",gap:14,padding:"16px 18px",borderRadius:DS.radius,border:"2px solid #e2e8f0",background:"#f8fafc"}}>
-              <div style={{width:42,height:42,borderRadius:12,background:"#e2e8f0",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>🚫</div>
+            <div style={{display:"flex",alignItems:"center",gap:14,padding:"18px",borderRadius:16,border:"2px solid #e2e8f0",background:"#f8fafc"}}>
+              <span style={{fontSize:32}}>🚫</span>
               <div>
                 <div style={{fontSize:14,fontWeight:800,color:"#475569"}}>Pas d'analyse effectuée</div>
-                <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>Aucune mesure ne sera enregistrée pour ce passage</div>
+                <div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>Aucune mesure enregistrée pour ce passage</div>
               </div>
             </div>
           )}
 
-          {/* Si Oui → cartes mesures mobile-first */}
+          {/* Si Oui → cartes ludiques par paramètre */}
           {f.priseEchantillon===true && (
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              {/* Paramètres avec bandelette + électronique */}
-              {[
-                {label:"Chlore",unit:"ppm",bandField:"chloreLibre",bandIdeal:"1–3",bandOk:v=>v>=1&&v<=3,elecField:"tChlore",elecIdeal:"1–1.5",elecOk:v=>v>=0.5&&v<=3},
-                {label:"pH",unit:"",bandField:"ph",bandIdeal:"7.2–7.8",bandOk:v=>v>=7.2&&v<=7.8,elecField:"tPH",elecIdeal:"7.2–7.4",elecOk:v=>v>=7.0&&v<=7.6},
-                {label:"Alcalinité",unit:"ppm",bandField:"alcalinite",bandIdeal:"80–120",bandOk:v=>v>=80&&v<=120,elecField:"tAlcalinite",elecIdeal:"80–120",elecOk:v=>v>=80&&v<=120},
-                {label:"Stabilisant",unit:"ppm",bandField:"stabilisant",bandIdeal:"30–50",bandOk:v=>v>=30&&v<=50,elecField:"tStabilisant",elecIdeal:"",elecOk:null},
-              ].map(({label,unit,bandField,bandIdeal,bandOk,elecField,elecIdeal,elecOk})=>{
-                const bv=parseFloat(f[bandField]);
-                const ev=parseFloat(f[elecField]);
-                const bOk=f[bandField]!==undefined&&f[bandField]!==""&&bandOk?bandOk(bv):null;
-                const eOk=f[elecField]!==undefined&&f[elecField]!==""&&elecOk?elecOk(ev):null;
-                const bCol=f[bandField]!==""&&f[bandField]!==undefined?(bOk===true?"#16a34a":bOk===false?"#dc2626":"#94a3b8"):"#94a3b8";
-                const eCol=f[elecField]!==""&&f[elecField]!==undefined?(eOk===true?"#16a34a":eOk===false?"#dc2626":"#94a3b8"):"#94a3b8";
+              {/* Barre de progression */}
+              {(()=>{
+                const allF=["chloreLibre","tChlore","ph","tPH","alcalinite","tAlcalinite","stabilisant","tStabilisant","tSel","tPhosphate"];
+                const n=allF.filter(k=>f[k]!==undefined&&f[k]!=="").length;
+                const pct=Math.round(n/allF.length*100);
                 return (
-                  <div key={label} style={{background:DS.white,borderRadius:14,border:"1.5px solid "+DS.border,overflow:"hidden",boxShadow:"0 1px 6px rgba(0,0,0,0.06)"}}>
-                    <div style={{padding:"9px 14px",background:"#f8fafc",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:8}}>
-                      <span style={{fontSize:14,fontWeight:800,color:DS.dark}}>{label}</span>
-                      {unit&&<span style={{fontSize:11,fontWeight:500,color:DS.mid,marginLeft:2}}>{unit}</span>}
-                      {(f[bandField]||f[elecField])&&(
-                        <div style={{marginLeft:"auto",width:8,height:8,borderRadius:4,background:(bOk===true||eOk===true)?"#16a34a":(bOk===false||eOk===false)?"#dc2626":"#94a3b8"}}/>
-                      )}
+                  <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:12,background:"#f8fafc",border:"1px solid "+DS.border}}>
+                    <div style={{flex:1,height:8,borderRadius:4,background:"#e2e8f0",overflow:"hidden"}}>
+                      <div style={{height:"100%",borderRadius:4,background:pct===100?"linear-gradient(90deg,#059669,#22c55e)":"linear-gradient(90deg,#0891b2,#6366f1)",width:pct+"%",transition:"width .4s"}}/>
                     </div>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0}}>
-                      <div style={{padding:"10px 12px",borderRight:"1px solid "+DS.border+"66"}}>
-                        <div style={{fontSize:10,fontWeight:700,color:"#0891b2",marginBottom:6,letterSpacing:.3}}>🧪 Bandelette</div>
-                        <input type="number" inputMode="decimal" step="0.1" value={f[bandField]||""} onChange={e=>set(bandField,e.target.value)}
-                          style={{width:"100%",height:54,padding:"0 8px",borderRadius:10,border:`2.5px solid ${bCol}`,fontSize:22,fontWeight:800,color:bCol,textAlign:"center",background:bCol==="#16a34a"?"#f0fdf4":bCol==="#dc2626"?"#fef2f2":"#f8fafc",boxSizing:"border-box",fontFamily:"inherit",outline:"none",transition:"all .2s"}}/>
-                        {bandIdeal&&<div style={{fontSize:10,color:"#94a3b8",marginTop:4,textAlign:"center"}}>Idéal: {bandIdeal}</div>}
-                      </div>
-                      <div style={{padding:"10px 12px"}}>
-                        <div style={{fontSize:10,fontWeight:700,color:"#4f46e5",marginBottom:6,letterSpacing:.3}}>📊 Élec.</div>
-                        <input type="number" inputMode="decimal" step="0.1" value={f[elecField]||""} onChange={e=>set(elecField,e.target.value)}
-                          style={{width:"100%",height:54,padding:"0 8px",borderRadius:10,border:`2.5px solid ${eCol}`,fontSize:22,fontWeight:800,color:eCol,textAlign:"center",background:eCol==="#16a34a"?"#f0fdf4":eCol==="#dc2626"?"#fef2f2":"#f8fafc",boxSizing:"border-box",fontFamily:"inherit",outline:"none",transition:"all .2s"}}/>
-                        {elecIdeal&&<div style={{fontSize:10,color:"#94a3b8",marginTop:4,textAlign:"center"}}>Idéal: {elecIdeal}</div>}
-                      </div>
-                    </div>
+                    <span style={{fontSize:12,fontWeight:700,color:pct===100?"#16a34a":DS.mid,minWidth:36,textAlign:"right"}}>{pct===100?"✅ OK":n+"/"+allF.length}</span>
                   </div>
                 );
-              })}
+              })()}
 
-              {/* Paramètres électronique uniquement */}
+              {/* Une carte colorée par paramètre */}
               {[
-                {label:"Sel",unit:"g/L",field:"tSel",ideal:"3–5",ok:v=>v>=3&&v<=5},
-                {label:"Phosphate",unit:"ppb",field:"tPhosphate",ideal:"",ok:null},
-              ].map(({label,unit,field,ideal,ok})=>{
-                const pv=parseFloat(f[field]);
-                const isOk=f[field]!==""&&f[field]!==undefined&&ok?ok(pv):null;
-                const col=f[field]!==""&&f[field]!==undefined?(isOk===true?"#16a34a":isOk===false?"#dc2626":"#94a3b8"):"#94a3b8";
+                {label:"Chlore",     emoji:"💧", color:"#0891b2", bg:"#e0f7fa",
+                 rows:[{ico:"🧪",lbl:"Bandelette",   field:"chloreLibre",ideal:"1–3 ppm",  ok:v=>v>=1&&v<=3},
+                       {ico:"📊",lbl:"Électronique", field:"tChlore",    ideal:"1–1.5",    ok:v=>v>=0.5&&v<=3}]},
+                {label:"pH",         emoji:"⚗️",  color:"#7c3aed", bg:"#ede9fe",
+                 rows:[{ico:"🧪",lbl:"Bandelette",   field:"ph",         ideal:"7.2–7.8",  ok:v=>v>=7.2&&v<=7.8},
+                       {ico:"📊",lbl:"Électronique", field:"tPH",        ideal:"7.2–7.4",  ok:v=>v>=7.0&&v<=7.6}]},
+                {label:"Alcalinité", emoji:"🌊", color:"#0284c7", bg:"#e0f2fe",
+                 rows:[{ico:"🧪",lbl:"Bandelette",   field:"alcalinite", ideal:"80–120 ppm",ok:v=>v>=80&&v<=120},
+                       {ico:"📊",lbl:"Électronique", field:"tAlcalinite",ideal:"80–120",   ok:v=>v>=80&&v<=120}]},
+                {label:"Stabilisant",emoji:"🛡️", color:"#059669", bg:"#d1fae5",
+                 rows:[{ico:"🧪",lbl:"Bandelette",   field:"stabilisant",ideal:"30–50 ppm",ok:v=>v>=30&&v<=50},
+                       {ico:"📊",lbl:"Électronique", field:"tStabilisant",ideal:"",        ok:null}]},
+                {label:"Sel",        emoji:"🧂", color:"#b45309", bg:"#fef3c7",
+                 rows:[{ico:"📊",lbl:"Électronique", field:"tSel",       ideal:"3–5 g/L",  ok:v=>v>=3&&v<=5}]},
+                {label:"Phosphate",  emoji:"🔬", color:"#dc2626", bg:"#fee2e2",
+                 rows:[{ico:"📊",lbl:"Électronique", field:"tPhosphate", ideal:"",         ok:null}]},
+              ].map(({label,emoji,color,bg,rows})=>{
+                const filled=rows.filter(r=>f[r.field]!==undefined&&f[r.field]!=="");
+                const allOk=filled.length>0&&filled.every(r=>!r.ok||r.ok(parseFloat(f[r.field])));
+                const anyFilled=filled.length>0;
+                const cardBg=anyFilled?(allOk?"#f0fdf4":bg):"#f8fafc";
+                const cardBorder=anyFilled?(allOk?"#22c55e55":color+"44"):DS.border;
                 return (
-                  <div key={label} style={{background:DS.white,borderRadius:14,border:"1.5px solid "+DS.border,overflow:"hidden",boxShadow:"0 1px 6px rgba(0,0,0,0.06)"}}>
-                    <div style={{padding:"9px 14px",background:"#f8fafc",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:8}}>
-                      <span style={{fontSize:14,fontWeight:800,color:DS.dark}}>{label}</span>
-                      {unit&&<span style={{fontSize:11,fontWeight:500,color:DS.mid,marginLeft:2}}>{unit}</span>}
-                      <span style={{marginLeft:"auto",fontSize:10,fontWeight:600,color:"#4f46e5"}}>📊 Électronique uniquement</span>
+                  <div key={label} style={{borderRadius:16,border:`2px solid ${cardBorder}`,background:DS.white,overflow:"hidden",boxShadow:anyFilled?(allOk?"0 4px 18px #22c55e22":"0 4px 18px "+color+"18"):"0 1px 4px rgba(0,0,0,0.06)",transition:"all .3s"}}>
+                    {/* Header coloré */}
+                    <div style={{background:anyFilled?(allOk?"linear-gradient(135deg,#dcfce7,#bbf7d0)":bg):"#f8fafc",padding:"11px 16px",borderBottom:`1px solid ${cardBorder}`,display:"flex",alignItems:"center",gap:10}}>
+                      <span style={{fontSize:26,lineHeight:1}}>{emoji}</span>
+                      <span style={{fontSize:16,fontWeight:800,color:anyFilled?(allOk?"#16a34a":color):DS.dark,flex:1}}>{label}</span>
+                      {anyFilled&&<span style={{fontSize:24,lineHeight:1}}>{allOk?"✅":"❌"}</span>}
                     </div>
-                    <div style={{padding:"12px 14px"}}>
-                      <input type="number" inputMode="decimal" step="0.1" value={f[field]||""} onChange={e=>set(field,e.target.value)}
-                        style={{width:"100%",height:54,padding:"0 10px",borderRadius:10,border:`2.5px solid ${col}`,fontSize:22,fontWeight:800,color:col,textAlign:"center",background:col==="#16a34a"?"#f0fdf4":col==="#dc2626"?"#fef2f2":"#f8fafc",boxSizing:"border-box",fontFamily:"inherit",outline:"none",transition:"all .2s"}}/>
-                      {ideal&&<div style={{fontSize:10,color:"#94a3b8",marginTop:4,textAlign:"center"}}>Idéal: {ideal}</div>}
+                    {/* Lignes de saisie */}
+                    <div style={{padding:"10px 14px",display:"flex",flexDirection:"column",gap:10}}>
+                      {rows.map(({ico,lbl,field,ideal,ok})=>{
+                        const val=f[field];
+                        const isFilled=val!==undefined&&val!=="";
+                        const isOk=isFilled&&ok?ok(parseFloat(val)):null;
+                        const bCol=isFilled?(isOk===true?"#22c55e":isOk===false?"#ef4444":"#94a3b8"):"#e2e8f0";
+                        const tCol=isFilled?(isOk===true?"#16a34a":isOk===false?"#dc2626":DS.dark):"#94a3b8";
+                        const iBg=isFilled?(isOk===true?"#f0fdf4":isOk===false?"#fef2f2":"#fafafa"):"#fafafa";
+                        return (
+                          <div key={field} style={{display:"flex",alignItems:"center",gap:10}}>
+                            <div style={{display:"flex",flexDirection:"column",gap:1,minWidth:108,flexShrink:0}}>
+                              <div style={{display:"flex",alignItems:"center",gap:5}}>
+                                <span style={{fontSize:15}}>{ico}</span>
+                                <span style={{fontSize:11,fontWeight:700,color:"#64748b"}}>{lbl}</span>
+                              </div>
+                              {ideal&&<span style={{fontSize:9,color:"#94a3b8",paddingLeft:20}}>{ideal}</span>}
+                            </div>
+                            <input type="number" inputMode="decimal" step="0.1" value={val||""} onChange={e=>set(field,e.target.value)}
+                              style={{flex:1,height:52,padding:"0 10px",borderRadius:10,border:`2.5px solid ${bCol}`,fontSize:22,fontWeight:800,color:tCol,textAlign:"center",background:iBg,boxSizing:"border-box",fontFamily:"inherit",outline:"none",transition:"all .2s"}}/>
+                            <div style={{width:26,textAlign:"center",flexShrink:0,fontSize:18,lineHeight:1}}>
+                              {isFilled&&isOk===true&&"✅"}
+                              {isFilled&&isOk===false&&"❌"}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
               })}
 
               {/* Stabilisant HAUT */}
-              <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",padding:"13px 16px",borderRadius:12,border:`1.5px solid ${f.stabilisantHaut?"#fcd34d":"#e2e8f0"}`,background:f.stabilisantHaut?"#fffbeb":"rgba(255,255,255,0.6)"}}>
-                <input type="checkbox" checked={!!f.stabilisantHaut} onChange={e=>set("stabilisantHaut",e.target.checked)} style={{width:18,height:18,accentColor:"#b45309"}}/>
+              <label style={{display:"flex",alignItems:"center",gap:12,cursor:"pointer",padding:"14px 16px",borderRadius:14,border:`2px solid ${f.stabilisantHaut?"#f59e0b":"#e2e8f0"}`,background:f.stabilisantHaut?"#fffbeb":"rgba(255,255,255,0.6)",transition:"all .2s"}}>
+                <input type="checkbox" checked={!!f.stabilisantHaut} onChange={e=>set("stabilisantHaut",e.target.checked)} style={{width:20,height:20,accentColor:"#b45309"}}/>
                 <span style={{fontSize:13,fontWeight:700,color:f.stabilisantHaut?"#b45309":"#64748b"}}>⚠️ Stabilisant HAUT</span>
+                {f.stabilisantHaut&&<span style={{marginLeft:"auto",fontSize:20}}>⚠️</span>}
               </label>
             </div>
           )}
