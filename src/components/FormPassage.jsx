@@ -576,10 +576,18 @@ function SignaturePad({ value, onChange, label }) {
   );
 }
 
-function MRow({label,unit,value,onChange,ideal,okFn,icon,color="#0891b2"}) {
+function MRow({label,unit,value,onChange,ideal,okFn,icon,color="#0891b2",compact=false}) {
   const hasVal = value!==""&&value!==null&&value!==undefined&&value!==false;
   const ok = hasVal&&okFn ? okFn(+value) : true;
   const statusColor = !hasVal?"#e2e8f0":ok?"#22c55e":"#ef4444";
+  // Mode compact : juste l'input + indicateur (utilisé dans la grille analyses)
+  if (compact) return (
+    <div style={{display:"flex",alignItems:"center",gap:4,justifyContent:"center"}}>
+      <input type="number" step="0.1" value={value===""||value===null||value===undefined?"":value} onChange={e=>onChange(e.target.value===""?"":+e.target.value)}
+        style={{width:64,padding:"7px 8px",borderRadius:8,border:`2px solid ${statusColor}`,fontSize:14,fontWeight:800,boxSizing:"border-box",color:hasVal?(ok?"#16a34a":"#be123c"):DS.dark,background:hasVal?(ok?"#f0fdf4":"#fef2f2"):"rgba(255,255,255,0.8)",textAlign:"center",outline:"none",fontFamily:"inherit",transition:"all .2s"}}/>
+      {ideal&&<div style={{fontSize:9,color:"#94a3b8",lineHeight:1.1}}>{ideal}</div>}
+    </div>
+  );
   return (
     <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:12,background:hasVal?(ok?"#f0fdf4":"#fef2f2"):DS.white,border:`1px solid ${hasVal?(ok?"#bbf7d0":"#fecaca"):"#f1f5f9"}`,transition:"all .25s"}}>
       <div style={{width:34,height:34,borderRadius:10,background:color+"15",border:`1px solid ${color}22`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -760,7 +768,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
   const isDevis = f.type==="Demande de devis";
   const isSansDonnees = f.type==="Passage sans données";
   const isSimplified = isSAV || isDevis;
-  const STEPS = isSansDonnees ? 1 : isSimplified ? 3 : 6;
+  const STEPS = isSansDonnees ? 1 : isSimplified ? 3 : 5;
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
 
   const ph=Number(f.tPH)||Number(f.ph);
@@ -848,8 +856,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
   const STEP_INFO_FULL = [
     {ic:STEP_ICONS[0],l:isMobile?"Interv.":"Intervention",color:"#0891b2"},
     {ic:STEP_ICONS[1],l:isMobile?"Analyses":"Analyses eau",color:"#0891b2"},
-    {ic:STEP_ICONS[2],l:isMobile?"Bassin":"État bassin",color:"#059669"},
-    {ic:STEP_ICONS[3],l:"Correctifs",color:"#4f46e5"},
+    {ic:STEP_ICONS[2],l:isMobile?"Bassin":"Bassin & Correctifs",color:"#059669"},
     {ic:STEP_ICONS[4],l:"Clôture",color:"#b45309"},
     {ic:STEP_ICONS[5],l:isMobile?"Sign.":"Signatures",color:"#059669"},
   ];
@@ -1222,79 +1229,91 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
 
       {step===2 && !isSimplified && (
         <div className="fade-in">
-          {(()=>{
-            const okCount = [
-              f.chloreLibre!==undefined&&f.chloreLibre!==""&&+f.chloreLibre>=1&&+f.chloreLibre<=3,
-              f.ph!==undefined&&f.ph!==""&&+f.ph>=7.2&&+f.ph<=7.8,
-              f.alcalinite!==undefined&&f.alcalinite!==""&&+f.alcalinite>=80&&+f.alcalinite<=120,
-              f.stabilisant!==undefined&&f.stabilisant!==""&&+f.stabilisant>=30&&+f.stabilisant<=50,
-            ].filter(Boolean).length;
-            const filledCount = [f.chloreLibre,f.ph,f.alcalinite,f.stabilisant].filter(v=>v!==""&&v!==null&&v!==undefined).length;
-            return (
-          <div style={{display:"flex",flexDirection:"column",gap:12}}>
-            <div style={{borderRadius:DS.radius,overflow:"hidden",border:"1px solid "+DS.border,boxShadow:DS.shadow}}>
-              <div style={{background:"linear-gradient(135deg,#0891b2,#06b6d4)",padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <div style={{width:32,height:32,borderRadius:10,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.phTest(16,"#fff")}</div>
-                  <div>
-                    <div style={{fontSize:13,fontWeight:800,color:"#fff",letterSpacing:.3}}>Test Bandelette</div>
-                    <div style={{fontSize:10,color:"rgba(255,255,255,0.75)",marginTop:1}}>Analyse chimique de l'eau</div>
-                  </div>
-                </div>
-                <div style={{background:"rgba(255,255,255,0.2)",borderRadius:20,padding:"4px 12px",display:"flex",alignItems:"center",gap:5}}>
-                  <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  <span style={{fontSize:11,fontWeight:800,color:"#fff"}}>{okCount}/{filledCount||4} OK</span>
-                </div>
-              </div>
-              <div style={{background:DS.white,padding:"10px 12px",display:"flex",flexDirection:"column",gap:6}}>
-                <MRow label="Chlore libre" unit="ppm" value={f.chloreLibre} onChange={v=>set("chloreLibre",v)} ideal="1 – 3" okFn={v=>v>=1&&v<=3} color="#0891b2"
-                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>}/>
-                <MRow label="pH" value={f.ph} onChange={v=>set("ph",v)} ideal="7.2 – 7.8" okFn={v=>v>=7.2&&v<=7.8} color="#0891b2"
-                  icon={<span style={{fontSize:13,fontWeight:900,color:"#0891b2",letterSpacing:-1}}>pH</span>}/>
-                <MRow label="Alcalinité totale" unit="ppm" value={f.alcalinite} onChange={v=>set("alcalinite",v)} ideal="80 – 120" okFn={v=>v>=80&&v<=120} color="#0284c7"
-                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="1.8" strokeLinecap="round"><path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/><path d="M2 16c2.5 3 5 3 7.5 0S14 13 16.5 16s5 3 7.5 0"/></svg>}/>
-                <div>
-                  <MRow label="Stabilisant" unit="ppm" value={f.stabilisant} onChange={v=>set("stabilisant",v)} ideal="30 – 50" okFn={v=>v>=30&&v<=50} color="#0891b2"
-                    icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}/>
-                  <label style={{display:"flex",alignItems:"center",gap:8,marginTop:6,padding:"6px 10px",borderRadius:8,background:f.stabilisantHaut?"#fff7ed":"#f8fafc",border:"1px solid "+(f.stabilisantHaut?"#fcd34d":"#e2e8f0"),cursor:"pointer",width:"fit-content"}}>
-                    <input type="checkbox" checked={!!f.stabilisantHaut} onChange={e=>set("stabilisantHaut",e.target.checked)} style={{width:16,height:16,accentColor:"#b45309"}}/>
-                    <span style={{fontSize:12,fontWeight:700,color:f.stabilisantHaut?"#b45309":"#64748b"}}>⚠️ Stabilisant HAUT</span>
-                  </label>
-                </div>
+          <div style={{borderRadius:DS.radius,overflow:"hidden",border:"1px solid "+DS.border,boxShadow:DS.shadow}}>
+            {/* En-tête */}
+            <div style={{background:"linear-gradient(135deg,#0891b2,#4f46e5)",padding:"12px 16px",display:"flex",alignItems:"center",gap:10}}>
+              <div style={{width:32,height:32,borderRadius:10,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.phTest(16,"#fff")}</div>
+              <div>
+                <div style={{fontSize:13,fontWeight:800,color:"#fff",letterSpacing:.3}}>Analyses eau</div>
+                <div style={{fontSize:10,color:"rgba(255,255,255,0.75)",marginTop:1}}>Bandelette &amp; Électronique</div>
               </div>
             </div>
-            <div style={{borderRadius:DS.radius,overflow:"hidden",border:"1px solid "+DS.border,boxShadow:DS.shadow}}>
-              <div style={{background:"linear-gradient(135deg,#4f46e5,#818cf8)",padding:"12px 16px",display:"flex",alignItems:"center",gap:10}}>
-                <div style={{width:32,height:32,borderRadius:10,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.chart(16,"#fff")}</div>
-                <div>
-                  <div style={{fontSize:13,fontWeight:800,color:"#fff",letterSpacing:.3}}>Mesures Électroniques</div>
-                  <div style={{fontSize:10,color:"rgba(255,255,255,0.75)",marginTop:1}}>Relevés appareils de mesure</div>
+            {/* Légende colonnes */}
+            <div style={{background:"#f8fafc",borderBottom:"1px solid "+DS.border,padding:"5px 12px",display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center"}}>
+              <div style={{fontSize:10,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5}}>Paramètre</div>
+              <div style={{fontSize:10,fontWeight:700,color:"#0891b2",textTransform:"uppercase",letterSpacing:.5,textAlign:"center"}}>🧪 Bandelette</div>
+              <div style={{fontSize:10,fontWeight:700,color:"#4f46e5",textTransform:"uppercase",letterSpacing:.5,textAlign:"center"}}>📊 Électronique</div>
+            </div>
+            <div style={{background:DS.white,padding:"8px 12px",display:"flex",flexDirection:"column",gap:0}}>
+              {/* Chlore */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center",padding:"6px 0",borderBottom:"1px solid "+DS.light}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,color:DS.dark}}>
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>
+                  Chlore <span style={{fontSize:10,color:DS.mid,fontWeight:500}}>ppm</span>
                 </div>
+                <MRow value={f.chloreLibre} onChange={v=>set("chloreLibre",v)} ideal="1–3" okFn={v=>v>=1&&v<=3} color="#0891b2" compact/>
+                <MRow value={f.tChlore} onChange={v=>set("tChlore",v)} ideal="1–1.5" okFn={v=>v>=0.5&&v<=3} color="#4f46e5" compact/>
               </div>
-              <div style={{background:DS.white,padding:"10px 12px",display:"flex",flexDirection:"column",gap:6}}>
-                <MRow label="Taux de sel" value={f.tSel} onChange={v=>set("tSel",v)} color="#4f46e5"
-                  icon={<span style={{fontSize:16}}>🧂</span>}/>
-                <MRow label="Taux de phosphate" value={f.tPhosphate} onChange={v=>set("tPhosphate",v)} color="#4f46e5"
-                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#4f46e5" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v5l3 9a3 3 0 01-3 3H9a3 3 0 01-3-3l3-9V3z"/><path d="M6.5 15h11"/></svg>}/>
-                <MRow label="Taux de chlore" value={f.tChlore} onChange={v=>set("tChlore",v)} ideal="1 – 1.5" okFn={v=>v>=0.5&&v<=3} color="#0891b2"
-                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>}/>
-                <MRow label="Taux de pH" value={f.tPH} onChange={v=>set("tPH",v)} ideal="7.2 – 7.4" okFn={v=>v>=7.0&&v<=7.6} color="#0891b2"
-                  icon={<span style={{fontSize:13,fontWeight:900,color:"#4f46e5",letterSpacing:-1}}>pH</span>}/>
-                <MRow label="Taux stabilisant" value={f.tStabilisant} onChange={v=>set("tStabilisant",v)} color="#4f46e5"
-                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#4f46e5" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}/>
-                <MRow label="Alcalinité" unit="ppm" value={f.tAlcalinite} onChange={v=>set("tAlcalinite",v)} ideal="80 – 120" okFn={v=>v>=80&&v<=120} color="#0891b2"
-                  icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/><path d="M8 12h8M12 8v8"/></svg>}/>
+              {/* pH */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center",padding:"6px 0",borderBottom:"1px solid "+DS.light}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,color:DS.dark}}>
+                  <span style={{fontSize:12,fontWeight:900,color:"#0891b2",letterSpacing:-1}}>pH</span>
+                </div>
+                <MRow value={f.ph} onChange={v=>set("ph",v)} ideal="7.2–7.8" okFn={v=>v>=7.2&&v<=7.8} color="#0891b2" compact/>
+                <MRow value={f.tPH} onChange={v=>set("tPH",v)} ideal="7.2–7.4" okFn={v=>v>=7.0&&v<=7.6} color="#4f46e5" compact/>
               </div>
+              {/* Alcalinité */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center",padding:"6px 0",borderBottom:"1px solid "+DS.light}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,color:DS.dark}}>
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2" strokeLinecap="round"><path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/><path d="M2 16c2.5 3 5 3 7.5 0S14 13 16.5 16s5 3 7.5 0"/></svg>
+                  Alcalinité <span style={{fontSize:10,color:DS.mid,fontWeight:500}}>ppm</span>
+                </div>
+                <MRow value={f.alcalinite} onChange={v=>set("alcalinite",v)} ideal="80–120" okFn={v=>v>=80&&v<=120} color="#0891b2" compact/>
+                <MRow value={f.tAlcalinite} onChange={v=>set("tAlcalinite",v)} ideal="80–120" okFn={v=>v>=80&&v<=120} color="#4f46e5" compact/>
+              </div>
+              {/* Stabilisant */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center",padding:"6px 0",borderBottom:"1px solid "+DS.light}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,color:DS.dark}}>
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                  Stabilisant <span style={{fontSize:10,color:DS.mid,fontWeight:500}}>ppm</span>
+                </div>
+                <MRow value={f.stabilisant} onChange={v=>set("stabilisant",v)} ideal="30–50" okFn={v=>v>=30&&v<=50} color="#0891b2" compact/>
+                <MRow value={f.tStabilisant} onChange={v=>set("tStabilisant",v)} color="#4f46e5" compact/>
+              </div>
+              {/* Sel — électronique uniquement */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center",padding:"6px 0",borderBottom:"1px solid "+DS.light}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,color:DS.dark}}>
+                  <span style={{fontSize:14}}>🧂</span> Sel
+                </div>
+                <div style={{fontSize:11,color:DS.mid,textAlign:"center"}}>—</div>
+                <MRow value={f.tSel} onChange={v=>set("tSel",v)} color="#4f46e5" compact/>
+              </div>
+              {/* Phosphate — électronique uniquement */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,alignItems:"center",padding:"6px 0"}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,color:DS.dark}}>
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#4f46e5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v5l3 9a3 3 0 01-3 3H9a3 3 0 01-3-3l3-9V3z"/><path d="M6.5 15h11"/></svg>
+                  Phosphate
+                </div>
+                <div style={{fontSize:11,color:DS.mid,textAlign:"center"}}>—</div>
+                <MRow value={f.tPhosphate} onChange={v=>set("tPhosphate",v)} color="#4f46e5" compact/>
+              </div>
+            </div>
+            {/* Checkbox stabilisant haut */}
+            <div style={{background:"#f8fafc",borderTop:"1px solid "+DS.border,padding:"8px 12px"}}>
+              <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",background:f.stabilisantHaut?"#fff7ed":"transparent",padding:"6px 10px",borderRadius:8,border:"1px solid "+(f.stabilisantHaut?"#fcd34d":"transparent"),width:"fit-content"}}>
+                <input type="checkbox" checked={!!f.stabilisantHaut} onChange={e=>set("stabilisantHaut",e.target.checked)} style={{width:16,height:16,accentColor:"#b45309"}}/>
+                <span style={{fontSize:12,fontWeight:700,color:f.stabilisantHaut?"#b45309":"#64748b"}}>⚠️ Stabilisant HAUT</span>
+              </label>
             </div>
           </div>
-            );
-          })()}
         </div>
       )}
 
+      {/* ÉTAPE 3 — État bassin + Correctifs (fusionnés) */}
       {step===3 && !isSimplified && (
         <div className="fade-in">
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16}}>
+            {/* Colonne gauche : État du bassin */}
             <div style={{display:"flex",flexDirection:"column",gap:16}}>
               {/* Qualité eau — chips visuels colorés */}
               <div>
@@ -1319,25 +1338,18 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
               </div>
               <MultiCheck label="État du fond" values={f.etatFond} onChange={v=>set("etatFond",v)} options={["Sale","Très sale","Attaque d'algues"]}/>
               <MultiCheck label="État des parois" values={f.etatParois} onChange={v=>set("etatParois",v)} options={["Propre","Sale","Attaque d'algues"]}/>
-            </div>
-            <div style={{display:"flex",flexDirection:"column",gap:16}}>
               <MultiCheck label="État du local" values={f.etatLocal} onChange={v=>set("etatLocal",v)} options={ETAT_LOCAL_OPTIONS}/>
               <MultiCheck label="État du bac tampon" values={f.etatBacTampon} onChange={v=>set("etatBacTampon",v)} options={["Propre","Sale","Passage de balai","Nettoyage au jet d'eau","Nettoyage au Karcher"]}/>
               <MultiCheck label="État du volet / bac" values={f.etatVoletBac} onChange={v=>set("etatVoletBac",v)} options={["Propre","Sale","Passage de balai","Nettoyage au jet d'eau","Nettoyage au karcher"]}/>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* ÉTAPE 4 — Correctifs avec Alcafix */}
-      {step===4 && !isSimplified && (
-        <div className="fade-in">
-          <div style={{background:`linear-gradient(135deg,#7c3aed08,#7c3aed12)`,borderRadius:DS.radius,padding:18,border:"1px solid #7c3aed18",marginBottom:16}}>
+            {/* Colonne droite : Produits apportés + Devis */}
+            <div style={{display:"flex",flexDirection:"column",gap:16}}>
+          <div style={{background:`linear-gradient(135deg,#7c3aed08,#7c3aed12)`,borderRadius:DS.radius,padding:18,border:"1px solid #7c3aed18"}}>
             <div style={{fontSize:11,fontWeight:800,color:"#4f46e5",textTransform:"uppercase",letterSpacing:.8,marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
               <div style={{width:26,height:26,borderRadius:8,background:"#4f46e5",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.chemicals(13,"#fff")}</div>
               Produits apportés
             </div>
-            <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"1fr 1fr 1fr",gap:10}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
               {[
                 {k:"corrChlore",l:"Chlore",ico:"🧪",col:"#0891b2"},
                 {k:"corrPH",l:"pH",ico:"⚗️",col:"#4f46e5"},
@@ -1363,10 +1375,12 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
           <div style={{marginTop:8}}>
             <OuiNon label="Devis à faire ?" value={f.devis} onChange={v=>set("devis",v)}/>
           </div>
+            </div>{/* fin colonne droite */}
+          </div>{/* fin grille */}
         </div>
       )}
 
-      {(step===5 || (isSimplified && step===3)) && (
+      {(step===4 || (isSimplified && step===3)) && (
         <div className="fade-in">
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16}}>
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
@@ -1475,7 +1489,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
         </div>
       )}
 
-      {step===6 && !isSimplified && (
+      {step===5 && !isSimplified && (
         <div className="fade-in">
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16,marginBottom:16}}>
             <SignaturePad label="Signature du technicien" value={f.signatureTech} onChange={v=>set("signatureTech",v)}/>

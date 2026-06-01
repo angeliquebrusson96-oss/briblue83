@@ -9,6 +9,7 @@
 //   data:    → base64 direct
 
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { signInAnonymously } from "firebase/auth";
 import { storage, auth } from "./firebase";
 
 // ─── INDEXEDDB ───────────────────────────────────────────────────────────────
@@ -179,6 +180,10 @@ const UPLOAD_TIMEOUT_MS = 20000;
 
 async function uploadOne(key, dataUrl) {
   if (!dataUrl || !navigator.onLine) return null;
+  // Auto-signin anonyme si l'auth n'est pas encore prête (fire-and-forget dans App)
+  if (!auth.currentUser) {
+    try { await signInAnonymously(auth); } catch { /* réseau indisponible */ }
+  }
   if (!auth.currentUser) return null;
   try {
     // Compresser avant envoi pour réduire la taille sur le réseau mobile
