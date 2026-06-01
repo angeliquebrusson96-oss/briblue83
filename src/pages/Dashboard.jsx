@@ -124,27 +124,6 @@ export function DashboardHero({ clients, passages, rdvs, saisonNow, isMobile, on
             </div>
           </div>
 
-          {/* Stats grid 2x2 */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-            {[
-              {val:totalClients, label:"Clients", icon:<><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></>, color:"#38bdf8", bg:"rgba(56,189,248,0.15)"},
-              {val:passAujourd, label:"Interventions du jour", icon:<><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></>, color:"#4ade80", bg:"rgba(74,222,128,0.15)"},
-              {val:rapportsEnvoyer, label:"Rapports à envoyer", icon:<><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></>, color:"#fbbf24", bg:"rgba(251,191,36,0.15)"},
-              {val:passMois, label:"Passages ce mois", icon:<><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></>, color:"#4ade80", bg:"rgba(74,222,128,0.15)"},
-            ].map(s=>(
-              <div key={s.label} className="db-stat-shimmer" style={{background:s.bg,borderRadius:14,padding:"12px 14px",border:"1px solid rgba(255,255,255,0.12)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",position:"relative",overflow:"hidden"}}>
-                <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
-                  <div>
-                    <div style={{fontSize:28,fontWeight:800,color:"#fff",lineHeight:1,letterSpacing:"-1px"}}>{s.val}</div>
-                    <div style={{fontSize:10,color:"rgba(255,255,255,0.7)",marginTop:3,fontWeight:500,lineHeight:1.3}}>{s.label}</div>
-                  </div>
-                  <div style={{width:30,height:30,borderRadius:8,background:"rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={s.color} strokeWidth="2" strokeLinecap="round">{s.icon}</svg>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
 

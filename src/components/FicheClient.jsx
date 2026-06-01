@@ -278,25 +278,7 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
             </div>
           )}
 
-          <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(3,1fr)":"repeat(5,1fr)",gap:isMobile?6:8,marginBottom:0,paddingBottom:18,position:"relative"}}>
-            {[
-              {label:"Entretiens",val:`${effE}/${totalE}`,ok:effE>=totalE,sub:"effectués"},
-              {label:"Contrôles", val:`${effC}/${totalC}`,ok:effC>=totalC,sub:"effectués"},
-              {label:"Restants",  val:rest,ok:rest===0,sub:"contrat",highlight:rest>0},
-              {label:"Ce mois",   val:restantsCeMois,ok:restantsCeMois===0,sub:"à planifier",highlight:restantsCeMois>0},
-              {label:"Mensualité",val:mensualite+"€",ok:true,sub:"/mois"},
-            ].map(({label,val,ok,sub,highlight},i)=>(
-              <div key={i} style={{background:"rgba(255,255,255,0.6)",borderRadius:14,padding:isMobile?"8px 4px":"11px 6px",textAlign:"center",border:"1px solid rgba(255,255,255,0.5)",backdropFilter:"blur(14px) saturate(180%)",WebkitBackdropFilter:"blur(14px) saturate(180%)",boxShadow:"0 4px 14px rgba(6,182,212,0.10)"}}>
-                <div style={{fontSize:9,color:"#475569",fontWeight:800,textTransform:"uppercase",letterSpacing:.4,marginBottom:4}}>{label}</div>
-                <div style={{fontSize:isMobile?16:i===2?22:17,fontWeight:900,color:highlight?"#d97706":(ok?"#059669":"#0891b2"),lineHeight:1,letterSpacing:-0.5}}>{val}</div>
-                <div style={{fontSize:9,color:"#64748b",marginTop:3,fontWeight:600}}>{sub}</div>
-              </div>
-            ))}
-          </div>
-
-          <div style={{height:4,background:"rgba(255,255,255,0.35)",margin:"0 0 0",position:"relative"}}>
-            <div style={{height:"100%",width:pct+"%",background:"linear-gradient(90deg,#06b6d4,#10b981)",transition:"width 1s ease",borderRadius:"0 99px 99px 0",boxShadow:"0 0 12px rgba(6,182,212,0.5)"}}/>
-          </div>
+          <div style={{paddingBottom:18}}/>
         </div>
 
         <div style={{background:"rgba(255,255,255,0.6)",backdropFilter:"blur(20px) saturate(180%)",WebkitBackdropFilter:"blur(20px) saturate(180%)",display:"flex",borderBottom:"1px solid rgba(255,255,255,0.4)",overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none",padding:"0 4px"}}>

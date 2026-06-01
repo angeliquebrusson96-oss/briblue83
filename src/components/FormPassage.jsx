@@ -1305,20 +1305,16 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
                         const tCol=isFilled?(isOk===true?"#16a34a":isOk===false?"#dc2626":DS.dark):"#94a3b8";
                         const iBg=isFilled?(isOk===true?"#f0fdf4":isOk===false?"#fef2f2":"#fafafa"):"#fafafa";
                         return (
-                          <div key={field} style={{display:"flex",alignItems:"center",gap:10}}>
-                            <div style={{display:"flex",flexDirection:"column",gap:1,minWidth:108,flexShrink:0}}>
-                              <div style={{display:"flex",alignItems:"center",gap:5}}>
-                                <span style={{fontSize:15}}>{ico}</span>
-                                <span style={{fontSize:11,fontWeight:700,color:"#64748b"}}>{lbl}</span>
-                              </div>
-                              {ideal&&<span style={{fontSize:9,color:"#94a3b8",paddingLeft:20}}>{ideal}</span>}
+                          <div key={field}>
+                            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                              <span style={{fontSize:16}}>{ico}</span>
+                              <span style={{fontSize:12,fontWeight:700,color:"#64748b"}}>{lbl}</span>
+                              {ideal&&<span style={{fontSize:10,color:"#94a3b8",marginLeft:2}}>{ideal}</span>}
+                              {isFilled&&isOk===true&&<span style={{marginLeft:"auto",fontSize:18}}>✅</span>}
+                              {isFilled&&isOk===false&&<span style={{marginLeft:"auto",fontSize:18}}>❌</span>}
                             </div>
                             <input type="number" inputMode="decimal" step="0.1" value={val||""} onChange={e=>set(field,e.target.value)}
-                              style={{flex:1,height:52,padding:"0 10px",borderRadius:10,border:`2.5px solid ${bCol}`,fontSize:22,fontWeight:800,color:tCol,textAlign:"center",background:iBg,boxSizing:"border-box",fontFamily:"inherit",outline:"none",transition:"all .2s"}}/>
-                            <div style={{width:26,textAlign:"center",flexShrink:0,fontSize:18,lineHeight:1}}>
-                              {isFilled&&isOk===true&&"✅"}
-                              {isFilled&&isOk===false&&"❌"}
-                            </div>
+                              style={{width:"100%",height:60,padding:"0 10px",borderRadius:12,border:`2.5px solid ${bCol}`,fontSize:28,fontWeight:800,color:tCol,textAlign:"center",background:iBg,boxSizing:"border-box",fontFamily:"inherit",outline:"none",transition:"all .2s"}}/>
                           </div>
                         );
                       })}
