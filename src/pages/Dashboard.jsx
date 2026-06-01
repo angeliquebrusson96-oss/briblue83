@@ -1,9 +1,9 @@
 // @ts-nocheck
 import React, { useState } from "react";
 import { DS, Ico, MOIS_L } from "../utils/constants";
-import { TODAY, alerteClient, getSaison, getEntretienMois, getControleMois, isEntretienType, isControleType, MOIS_NOW, YEAR_NOW } from "../utils/helpers";
+import { TODAY, getSaison, getEntretienMois, getControleMois, isEntretienType, isControleType, MOIS_NOW, YEAR_NOW } from "../utils/helpers";
 import { Avatar, useIsMobile } from "../components/ui";
-import { CalendrierInteractif, AlertesBlock } from "../components/Calendrier";
+import { CalendrierInteractif } from "../components/Calendrier";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VDM BLAGUES — carrousel de citations pisciniste
@@ -70,7 +70,7 @@ export function DashboardHero({ clients, passages, rdvs, saisonNow, isMobile, on
   const totalClients = clients.length;
   const passAujourd = passages.filter(p => p.date === TODAY).length;
   const rapportsEnvoyer = passages.filter(p => p.rapportStatut !== "envoye" && p.ok).length;
-  const alertes = clients.filter(c => alerteClient(c, passages) !== "ok").length;
+  const passMois = passages.filter(p => new Date(p.date).getMonth()+1 === new Date().getMonth()+1 && new Date(p.date).getFullYear() === new Date().getFullYear()).length;
 
   const rdvsFuturs = rdvs.filter(r => r.date >= TODAY).sort((a,b) => a.date.localeCompare(b.date));
   const rdvsToday = rdvsFuturs.filter(r => r.date === TODAY);
@@ -130,7 +130,7 @@ export function DashboardHero({ clients, passages, rdvs, saisonNow, isMobile, on
               {val:totalClients, label:"Clients", icon:<><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></>, color:"#38bdf8", bg:"rgba(56,189,248,0.15)"},
               {val:passAujourd, label:"Interventions du jour", icon:<><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></>, color:"#4ade80", bg:"rgba(74,222,128,0.15)"},
               {val:rapportsEnvoyer, label:"Rapports à envoyer", icon:<><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></>, color:"#fbbf24", bg:"rgba(251,191,36,0.15)"},
-              {val:alertes, label:"Alertes à traiter", icon:<><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>, color:"#f87171", bg:"rgba(248,113,113,0.15)"},
+              {val:passMois, label:"Passages ce mois", icon:<><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></>, color:"#4ade80", bg:"rgba(74,222,128,0.15)"},
             ].map(s=>(
               <div key={s.label} className="db-stat-shimmer" style={{background:s.bg,borderRadius:14,padding:"12px 14px",border:"1px solid rgba(255,255,255,0.12)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",position:"relative",overflow:"hidden"}}>
                 <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
@@ -358,12 +358,6 @@ export function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPass
         <CalendrierInteractif passages={passages} rdvs={rdvs} clients={clients} onClientClick={onClientClick} onEditPassage={onEditPassage} onEditRdv={onEditRdv}/>
       </div>
 
-      {/* ── ALERTES ── */}
-      {(()=>{
-        const alertes = clients.filter(c=>alerteClient(c,passages)!=="ok");
-        if (alertes.length===0) return null;
-        return <AlertesBlock alertes={alertes} passages={passages} onClientClick={onClientClick}/>;
-      })()}
 
     </div>
   );

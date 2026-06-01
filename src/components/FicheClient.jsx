@@ -179,7 +179,12 @@ export function PassageDetailModal({ passage, client, onClose }) {
 
 // ─── FICHE CLIENT ─────────────────────────────────────────────────────────────
 export function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[], contrats={}, onUpdateContrat, onUpdateClient, onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onDeletePassage, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
-  const [tab, setTab] = useState("historique");
+  const [tab, setTab] = useState("gestion");
+  const [notesPrivees, setNotesPrivees] = useState(client.notesPrivees||"");
+  const [notesSaved, setNotesSaved] = useState(false);
+  const saveNotesPrivees = () => {
+    if (onUpdateClient) { onUpdateClient({...client, notesPrivees}); setNotesSaved(true); setTimeout(()=>setNotesSaved(false),2000); }
+  };
   const [detailPassageFiche, setDetailPassageFiche] = useState(null);
   const [showFormLiv, setShowFormLiv] = useState(false);
   const [editLiv, setEditLiv] = useState(null);
@@ -225,17 +230,19 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
       case "rdvs":       return <svg {...s}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="12" cy="15" r="1.5" fill={color}/></svg>;
       case "livraisons": return <svg {...s}><path d="M16 16V7a1 1 0 00-1-1H4a1 1 0 00-1 1v9h13z"/><path d="M16 10h3l3 3v3h-6"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></svg>;
       case "carnet":     return <svg {...s}><path d="M4 4.5A2.5 2.5 0 016.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15z"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>;
+      case "gestion":    return <svg {...s}><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>;
       default: return null;
     }
   };
   const TABS = [
-    {id:"historique", label:"Historique"},
-    {id:"passages",   label:"Passages"},
-    {id:"saisons",    label:"Planning"},
-    {id:"infos",      label:"Infos"},
-    {id:"rdvs",       label:"RDV"},
-    {id:"livraisons", label:"Livraisons"},
-    {id:"carnet",     label:"Carnet"},
+    {id:"gestion",    label:"Gestion",   color:"#0891b2"},
+    {id:"historique", label:"Historique",color:"#64748b"},
+    {id:"passages",   label:"Passages",  color:"#64748b"},
+    {id:"saisons",    label:"Planning",  color:"#64748b"},
+    {id:"infos",      label:"Infos",     color:"#64748b"},
+    {id:"rdvs",       label:"RDV",       color:"#64748b"},
+    {id:"livraisons", label:"Livraisons",color:"#64748b"},
+    {id:"carnet",     label:"Carnet",    color:"#64748b"},
   ];
 
   return (
@@ -293,17 +300,160 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
         </div>
 
         <div style={{background:"rgba(255,255,255,0.6)",backdropFilter:"blur(20px) saturate(180%)",WebkitBackdropFilter:"blur(20px) saturate(180%)",display:"flex",borderBottom:"1px solid rgba(255,255,255,0.4)",overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none",padding:"0 4px"}}>
-          {TABS.map(({id,label})=>(
-            <button key={id} onClick={()=>setTab(id)}
-              style={{flexShrink:0,padding:isMobile?"10px 10px":"12px 14px",border:"none",cursor:"pointer",fontWeight:tab===id?800:600,fontSize:isMobile?11.5:12.5,fontFamily:"inherit",background:"transparent",color:tab===id?"#0891b2":"#64748b",borderBottom:tab===id?"2.5px solid #06b6d4":"2.5px solid transparent",transition:"all .18s",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:6,WebkitTapHighlightColor:"transparent",letterSpacing:"0.01em"}}>
-              <TabIcon name={id} size={15} color={tab===id?"#0891b2":"#64748b"}/>
-              {label}
-            </button>
-          ))}
+          {TABS.map(({id,label,color})=>{
+            const active=tab===id;
+            const activeColor = id==="gestion"?"#0891b2":active?"#0891b2":"#64748b";
+            return (
+              <button key={id} onClick={()=>setTab(id)}
+                style={{flexShrink:0,padding:isMobile?"10px 10px":"12px 14px",border:"none",cursor:"pointer",fontWeight:active?800:600,fontSize:isMobile?11.5:12.5,fontFamily:"inherit",background:active&&id==="gestion"?"rgba(8,145,178,0.08)":"transparent",color:activeColor,borderBottom:active?`2.5px solid ${id==="gestion"?"#0891b2":"#06b6d4"}`:"2.5px solid transparent",transition:"all .18s",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:6,WebkitTapHighlightColor:"transparent",letterSpacing:"0.01em",position:"relative"}}>
+                {id==="gestion"&&<div style={{position:"absolute",inset:0,background:active?"rgba(8,145,178,0.06)":"transparent",borderRadius:"4px 4px 0 0",pointerEvents:"none"}}/>}
+                <TabIcon name={id} size={15} color={activeColor}/>
+                {label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       <div style={{paddingTop:16}}>
+
+      {/* ══ GESTION ══ */}
+      {tab==="gestion" && (()=>{
+        const carnetUrl2=window.location.origin+window.location.pathname+"?carnet="+generateCarnetCode(client.id);
+        const hasAlert = al !== "ok";
+        const livsEnAttente = (livraisons||[]).filter(l=>l.statut==="aFacturer").length;
+
+        return (
+          <div className="fade-in" style={{display:"flex",flexDirection:"column",gap:14}}>
+
+            {/* Alerte active */}
+            {hasAlert && (
+              <div style={{padding:"12px 16px",borderRadius:14,background:col.bg+"44",border:`1.5px solid ${col.tx}33`,display:"flex",alignItems:"center",gap:10}}>
+                <div style={{width:36,height:36,borderRadius:10,background:col.bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={col.tx} strokeWidth="2.2" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                </div>
+                <div>
+                  <div style={{fontSize:13,fontWeight:800,color:col.tx}}>{col.lbl}</div>
+                  <div style={{fontSize:11,color:col.tx,opacity:.7,marginTop:1}}>Vérifier l'historique et les passages planifiés</div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Actions rapides ── */}
+            <div>
+              <div style={{fontSize:10,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>Actions rapides</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>
+                {[
+                  {label:"Nouveau passage",ico:<><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><line x1="12" y1="13" x2="12" y2="17"/><line x1="10" y1="15" x2="14" y2="15"/></>,col:"#0891b2",bg:"linear-gradient(135deg,#e0f2fe,#f0f9ff)",border:"#bae6fd",onClick:onAddPassage},
+                  {label:"Nouveau RDV",ico:<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="14" x2="12" y2="18"/><line x1="10" y1="16" x2="14" y2="16"/></>,col:"#7c3aed",bg:"linear-gradient(135deg,#ede9fe,#f5f3ff)",border:"#ddd6fe",onClick:onAddRdv},
+                  {label:"Livraison produits",ico:<><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></>,col:"#059669",bg:"linear-gradient(135deg,#d1fae5,#f0fdf4)",border:"#a7f3d0",onClick:()=>{setEditLiv(null);setShowFormLiv(true);}},
+                  {label:"Modifier le client",ico:<><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></>,col:"#64748b",bg:"linear-gradient(135deg,#f1f5f9,#f8fafc)",border:"#e2e8f0",onClick:onEdit},
+                ].map(a=>(
+                  <button key={a.label} onClick={a.onClick}
+                    style={{display:"flex",alignItems:"center",gap:10,padding:"13px 14px",borderRadius:14,border:`1.5px solid ${a.border}`,background:a.bg,cursor:"pointer",fontFamily:"inherit",textAlign:"left",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",WebkitTapHighlightColor:"transparent"}}>
+                    <div style={{width:34,height:34,borderRadius:10,background:"rgba(255,255,255,0.75)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"0 1px 4px rgba(0,0,0,0.1)"}}>
+                      <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={a.col} strokeWidth="2" strokeLinecap="round">{a.ico}</svg>
+                    </div>
+                    <span style={{fontSize:12,fontWeight:700,color:"#334155",lineHeight:1.3}}>{a.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Contrat & Finance ── */}
+            <div style={{background:"rgba(255,255,255,0.55)",borderRadius:14,border:"1px solid #f1f5f9",overflow:"hidden",boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+              <div style={{padding:"10px 14px",background:"linear-gradient(135deg,#0891b208,#0891b212)",borderBottom:"1px solid #e0f2fe",display:"flex",alignItems:"center",gap:8}}>
+                <div style={{width:26,height:26,borderRadius:8,background:"#0891b2",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.euro(12,"#fff")}</div>
+                <span style={{fontSize:11,fontWeight:800,color:"#0891b2",textTransform:"uppercase",letterSpacing:.7}}>Contrat &amp; Finance</span>
+              </div>
+              <div style={{padding:"12px 14px"}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:12}}>
+                  {[
+                    {label:"Prix annuel",val:client.prix?client.prix+"€":null},
+                    {label:"Mensualité",val:mensualite?mensualite+"€":null},
+                    {label:"Fin contrat",val:client.dateFin?new Date(client.dateFin).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"2-digit"}):null,alert:jours!==null&&jours<=30},
+                  ].filter(x=>x.val).map(({label,val,alert})=>(
+                    <div key={label} style={{background:alert?"#fff7ed":"#f8fafc",borderRadius:10,padding:"8px 8px",textAlign:"center",border:`1px solid ${alert?"#fcd34d":"#e2e8f0"}`}}>
+                      <div style={{fontSize:9,color:alert?"#b45309":"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.4,marginBottom:3}}>{label}</div>
+                      <div style={{fontSize:14,fontWeight:800,color:alert?"#d97706":"#0f172a",lineHeight:1}}>{val}</div>
+                    </div>
+                  ))}
+                </div>
+                {/* Livraisons en attente */}
+                {livsEnAttente>0&&(
+                  <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:9,background:"#fffbeb",border:"1px solid #fde68a",marginBottom:10}}>
+                    <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round"><path d="M16 16V7a1 1 0 00-1-1H4a1 1 0 00-1 1v9h13z"/><path d="M16 10h3l3 3v3h-6"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></svg>
+                    <span style={{fontSize:12,fontWeight:700,color:"#92400e",flex:1}}>{livsEnAttente} livraison{livsEnAttente>1?"s":""} à facturer</span>
+                    <button onClick={()=>setTab("livraisons")} style={{fontSize:10,fontWeight:700,color:"#d97706",background:"rgba(217,119,6,0.1)",border:"none",borderRadius:6,padding:"3px 8px",cursor:"pointer",fontFamily:"inherit"}}>Voir</button>
+                  </div>
+                )}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
+                  <button onClick={()=>{ouvrirContrat(client,contratClient?.signaturePrestataire||"",contratClient?.signatureClient||"");if(!contratClient?.statut&&onUpdateContrat)onUpdateContrat("CT-"+client.id,{clientId:client.id,statut:"cree"});}}
+                    style={{height:38,borderRadius:10,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,WebkitTapHighlightColor:"transparent"}}>
+                    {Ico.contract(12,"#fff")} Ouvrir contrat
+                  </button>
+                  <button
+                    onClick={contratClient?.statut==="signe_complet"?undefined:()=>envoyerContratSignature(client)}
+                    style={{height:38,borderRadius:10,background:contratClient?.statut==="signe_complet"?DS.greenSoft:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:contratClient?.statut==="signe_complet"?"default":"pointer",fontWeight:700,fontSize:12,color:contratClient?.statut==="signe_complet"?DS.green:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,WebkitTapHighlightColor:"transparent"}}>
+                    {Ico.sign(12,contratClient?.statut==="signe_complet"?DS.green:"#fff")}
+                    {contratClient?.statut==="signe_complet"?"Co-signé ✓":"Envoyer signature"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Notes privées ── */}
+            <div style={{background:"rgba(255,255,255,0.55)",borderRadius:14,border:"1px solid #f1f5f9",overflow:"hidden",boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+              <div style={{padding:"10px 14px",background:"linear-gradient(135deg,#6d28d908,#6d28d912)",borderBottom:"1px solid #ede9fe",display:"flex",alignItems:"center",gap:8}}>
+                <div style={{width:26,height:26,borderRadius:8,background:"#7c3aed",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </div>
+                <span style={{fontSize:11,fontWeight:800,color:"#7c3aed",textTransform:"uppercase",letterSpacing:.7}}>Notes privées</span>
+                <span style={{marginLeft:"auto",fontSize:10,color:"#94a3b8",fontWeight:500}}>Visible uniquement par vous</span>
+              </div>
+              <div style={{padding:"12px 14px"}}>
+                <textarea
+                  value={notesPrivees}
+                  onChange={e=>setNotesPrivees(e.target.value)}
+                  placeholder="Informations privées, habitudes client, accès propriété, préférences techniques..."
+                  style={{width:"100%",padding:"10px 12px",borderRadius:10,border:"1.5px solid #e2e8f0",fontSize:13,minHeight:90,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit",color:"#0f172a",background:"rgba(255,255,255,0.7)",lineHeight:1.5,outline:"none"}}/>
+                <button onClick={saveNotesPrivees}
+                  style={{marginTop:8,height:36,width:"100%",borderRadius:9,background:notesSaved?"linear-gradient(135deg,#059669,#34d399)":"linear-gradient(135deg,#7c3aed,#8b5cf6)",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6,transition:"background .3s",WebkitTapHighlightColor:"transparent"}}>
+                  {notesSaved
+                    ? <><svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Sauvegardé !</>
+                    : <><svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg> Sauvegarder</>
+                  }
+                </button>
+              </div>
+            </div>
+
+            {/* ── Carnet numérique ── */}
+            <div style={{background:"linear-gradient(135deg,#0c1f3f,#0e3460)",borderRadius:14,padding:"14px 16px",display:"flex",alignItems:"center",gap:12,boxShadow:"0 4px 16px rgba(8,145,178,0.2)"}}>
+              <div style={{width:44,height:44,borderRadius:12,background:"rgba(8,145,178,0.25)",border:"1px solid rgba(56,189,248,0.3)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <TabIcon name="carnet" size={20} color="#38bdf8"/>
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:800,color:"#fff",marginBottom:2}}>Carnet client</div>
+                <div style={{fontSize:11,color:"rgba(255,255,255,0.5)"}}>Lien partageable pour le client</div>
+              </div>
+              <button onClick={()=>window.open(carnetUrl2,"_blank")}
+                style={{padding:"9px 14px",borderRadius:10,background:"rgba(56,189,248,0.2)",border:"1px solid rgba(56,189,248,0.35)",cursor:"pointer",fontWeight:700,fontSize:12,color:"#7dd3fc",fontFamily:"inherit",WebkitTapHighlightColor:"transparent",flexShrink:0}}>
+                Ouvrir →
+              </button>
+            </div>
+
+            {/* ── Zone danger ── */}
+            <div style={{background:"#fff5f5",borderRadius:14,border:"1px solid #fecaca",padding:"12px 14px"}}>
+              <div style={{fontSize:10,fontWeight:800,color:"#b91c1c",textTransform:"uppercase",letterSpacing:.7,marginBottom:10}}>⚠ Zone danger</div>
+              <button onClick={onDelete}
+                style={{width:"100%",height:40,borderRadius:10,background:"#fef2f2",border:"1.5px solid #fca5a5",cursor:"pointer",fontWeight:700,fontSize:13,color:"#dc2626",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:7,WebkitTapHighlightColor:"transparent"}}>
+                {Ico.trash(14,"#dc2626")} Supprimer ce client définitivement
+              </button>
+            </div>
+
+          </div>
+        );
+      })()}
 
       {/* -- HISTORIQUE -- */}
       {tab==="historique" && (()=>{
