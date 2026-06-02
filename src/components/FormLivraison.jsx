@@ -63,6 +63,7 @@ export function FormLivraison({ initial, clientId, clients=[], produitsStock=[],
   const isEdit = !!initial?.id;
   const isMobile = useIsMobile();
   const [step, setStep] = useState(1);
+  const [clientSearch, setClientSearch] = useState("");
   const [f, setF] = useState(()=>initial || { id:uid(), clientId:clientId||"", date:TODAY, produits:[], description:"", montant:"", statut:"aFacturer", photos:[] });
   const set = (k,v) => setF(p=>({...p,[k]:v}));
   const PLIV = produitsStock.length > 0 ? produitsStock : PRODUITS_DEFAUT;
@@ -114,22 +115,39 @@ export function FormLivraison({ initial, clientId, clients=[], produitsStock=[],
               {clients.length>1&&(
                 <>
                   <FmSectionTitle icon={<><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></>}>Client *</FmSectionTitle>
-                  <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight:200,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
-                    {clients.map(c=>{
-                      const sel=f.clientId===c.id;
-                      return (
-                        <button key={c.id} className={`fm-client-row${sel?" sel":""}`} onClick={()=>set("clientId",c.id)}>
-                          <Avatar nom={c.nom} size={34}/>
-                          <div style={{flex:1,minWidth:0}}>
-                            <div style={{fontSize:13,fontWeight:sel?700:500,color:sel?"#0891b2":"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
-                            <div style={{fontSize:11,color:"#94a3b8"}}>{c.formule}</div>
-                          </div>
-                          {sel&&<div style={{width:20,height:20,borderRadius:"50%",background:"#0891b2",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                            <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-                          </div>}
-                        </button>
-                      );
-                    })}
+                  {/* Barre de recherche avec dropdown */}
+                  <div style={{position:"relative"}}>
+                    <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.2" strokeLinecap="round" style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",zIndex:1}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="search" value={clientSearch} onChange={e=>setClientSearch(e.target.value)}
+                      placeholder={selectedClient?selectedClient.nom:"Rechercher un client…"}
+                      style={{width:"100%",padding:"12px 36px 12px 36px",borderRadius:12,border:`1.5px solid ${clientSearch?"#0891b2":"#e2e8f0"}`,fontSize:15,fontFamily:"inherit",color:"#0f172a",boxSizing:"border-box",outline:"none",background:"#fff",transition:"all .2s"}}/>
+                    {clientSearch
+                      ? <button onClick={()=>setClientSearch("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"rgba(148,163,184,.15)",border:"none",cursor:"pointer",padding:"3px 7px",borderRadius:7,color:"#64748b",fontSize:12,fontWeight:700}}>✕</button>
+                      : selectedClient && <div style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",width:20,height:20,borderRadius:10,background:"#059669",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                          <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        </div>
+                    }
+                    {clientSearch.length>0&&(
+                      <div style={{position:"absolute",top:"calc(100% + 5px)",left:0,right:0,zIndex:100,background:"rgba(255,255,255,0.97)",borderRadius:12,border:"1.5px solid #0891b244",boxShadow:"0 8px 28px rgba(8,145,178,0.15)",maxHeight:220,overflowY:"auto"}}>
+                        {clients.filter(c=>c.nom.toLowerCase().includes(clientSearch.toLowerCase())).length===0
+                          ? <div style={{padding:16,textAlign:"center",color:"#94a3b8",fontSize:13}}>Aucun client trouvé</div>
+                          : clients.filter(c=>c.nom.toLowerCase().includes(clientSearch.toLowerCase())).map(c=>{
+                              const sel=f.clientId===c.id;
+                              return (
+                                <button key={c.id} onMouseDown={e=>e.preventDefault()} onClick={()=>{set("clientId",c.id);setClientSearch("");}}
+                                  style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"10px 12px",border:"none",borderBottom:"1px solid #f1f5f9",background:sel?"#e0f2fe":"transparent",cursor:"pointer",textAlign:"left",fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>
+                                  <Avatar nom={c.nom} size={32}/>
+                                  <div style={{flex:1,minWidth:0}}>
+                                    <div style={{fontWeight:sel?700:500,fontSize:13,color:sel?"#0891b2":"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
+                                    <div style={{fontSize:11,color:"#94a3b8"}}>{c.formule}</div>
+                                  </div>
+                                  {sel&&<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                                </button>
+                              );
+                          })
+                        }
+                      </div>
+                    )}
                   </div>
                 </>
               )}

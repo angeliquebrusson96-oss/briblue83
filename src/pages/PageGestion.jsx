@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React, { useState, useMemo, useCallback } from "react";
-import { DS } from "../utils/constants";
+import { DS, Ico } from "../utils/constants";
+import { calcMensualites } from "../utils/helpers";
 import { useIsMobile, Avatar } from "../components/ui";
 
 const MOIS_LONG = ["","Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
@@ -20,12 +21,21 @@ const VersementsClient = ({ client, versements, onToggleVersement, retardVisible
   const [open, setOpen] = useState(false);
   if (!client.prix || !client.dateDebut) return null;
 
-  const montantMensuel = Math.round(client.prix / 12);
+  // Mensualités exactes au centime — mois 1 = solde ajusté, mois 2-12 = base
+  const { m1: mensualite1, m11: mensualiteBase } = calcMensualites(client.prix);
+  const fmtEur = (v) => v % 1 === 0 ? `${v}€` : `${v.toFixed(2).replace(".", ",")}€`;
+
   const today = new Date();
   const debut = new Date(client.dateDebut);
+  const debutYear  = debut.getFullYear();
+  const debutMonth = debut.getMonth() + 1;
   const fin = client.dateFin
     ? new Date(client.dateFin)
     : new Date(debut.getFullYear() + 1, debut.getMonth(), debut.getDate());
+
+  // Montant du mois : mois 1 du contrat = mensualite1, autres = mensualiteBase
+  const getMontantMois = (year, month) =>
+    (year === debutYear && month === debutMonth) ? mensualite1 : mensualiteBase;
 
   const mensualites = [];
   let current = new Date(debut.getFullYear(), debut.getMonth(), 1);
@@ -39,13 +49,13 @@ const VersementsClient = ({ client, versements, onToggleVersement, retardVisible
     const isPaid = versements?.[key] === true;
     const isCurrentMonth = year === today.getFullYear() && month === today.getMonth() + 1;
     const isOverdue = !isCurrentMonth && !isPaid;
-    mensualites.push({ key, year, month, isPaid, isCurrentMonth, isOverdue });
+    const montant = getMontantMois(year, month);
+    mensualites.push({ key, year, month, isPaid, isCurrentMonth, isOverdue, montant });
     current = new Date(current.getFullYear(), current.getMonth() + 1, 1);
   }
 
   const overdueCount = mensualites.filter(m => m.isOverdue).length;
-  const unpaidCount = mensualites.filter(m => !m.isPaid).length;
-  const totalDue = unpaidCount * montantMensuel;
+  const totalDue = mensualites.filter(m => !m.isPaid).reduce((s, m) => s + m.montant, 0);
   const hasRetard = overdueCount > 0;
 
   return (
@@ -55,10 +65,10 @@ const VersementsClient = ({ client, versements, onToggleVersement, retardVisible
         onClick={() => setOpen(o => !o)}
         style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",background:"none",border:"none",cursor:"pointer",padding:0,marginBottom: open ? 8 : 0}}
       >
-        <span style={{fontSize:11,color:"#64748b"}}>{montantMensuel}€/mois · {mensualites.length} mois</span>
+        <span style={{fontSize:11,color:"#64748b"}}>{fmtEur(mensualiteBase)}/mois · {mensualites.length} mois</span>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           {totalDue > 0
-            ? <span style={{fontSize:13,fontWeight:800,color:overdueCount>0?"#dc2626":"#0369a1"}}>{totalDue}€ dû</span>
+            ? <span style={{fontSize:13,fontWeight:800,color:overdueCount>0?"#dc2626":"#0369a1"}}>{fmtEur(totalDue)} dû</span>
             : <span style={{fontSize:11,fontWeight:700,color:"#16a34a"}}>✓ À jour</span>
           }
           <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round"
@@ -98,7 +108,7 @@ const VersementsClient = ({ client, versements, onToggleVersement, retardVisible
                   </span>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{fontSize:12,fontWeight:700,color:m.isPaid?"#15803d":m.isOverdue?"#dc2626":"#0f172a"}}>{montantMensuel}€</span>
+                  <span style={{fontSize:12,fontWeight:700,color:m.isPaid?"#15803d":m.isOverdue?"#dc2626":"#0f172a"}}>{fmtEur(m.montant)}</span>
                   <button
                     onClick={() => onToggleVersement(m.key, !m.isPaid)}
                     style={{width:24,height:24,borderRadius:6,border:`1.5px solid ${m.isPaid?"#16a34a":"#cbd5e1"}`,cursor:"pointer",background:m.isPaid?"#16a34a":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"}}>
@@ -222,6 +232,8 @@ export function PageGestion({
   onUpdateStatutLivraison,
   retardsCarnet = {},
   onToggleRetardCarnet,
+  contrats = {},
+  onOpenContrat,
 }) {
   const [tab, setTab] = useState("mensualites");
   const isMobile = useIsMobile();
@@ -236,12 +248,13 @@ export function PageGestion({
     return clients.filter(c => ids.has(c.id));
   }, [clients, livraisons]);
 
-  // Total mensualités en retard
+  // Total mensualités en retard — au centime près
   const totalMensualitesDu = useMemo(() => {
     const today = new Date();
     return clientsAvecMensualites.reduce((sum, c) => {
-      const montantMensuel = Math.round(c.prix / 12);
+      const { m1: men1, m11: menBase } = calcMensualites(c.prix);
       const debut = new Date(c.dateDebut);
+      const debutY = debut.getFullYear(), debutM = debut.getMonth()+1;
       const fin = c.dateFin
         ? new Date(c.dateFin)
         : new Date(debut.getFullYear() + 1, debut.getMonth(), debut.getDate());
@@ -252,10 +265,11 @@ export function PageGestion({
         const y = cur.getFullYear(), m = cur.getMonth() + 1;
         const key = `${c.id}_${y}_${String(m).padStart(2, "0")}`;
         const isCurrentMonth = y === today.getFullYear() && m === today.getMonth() + 1;
-        if (!versements?.[key] && !isCurrentMonth) sum += montantMensuel;
+        const montant = (y === debutY && m === debutM) ? men1 : menBase;
+        if (!versements?.[key] && !isCurrentMonth) sum += montant;
         cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
       }
-      return sum;
+      return Math.round(sum * 100) / 100;
     }, 0);
   }, [clientsAvecMensualites, versements]);
 
@@ -299,18 +313,19 @@ export function PageGestion({
       </div>
 
       {/* ─── Tabs ─── */}
-      <div style={{display:"flex",gap:4,marginBottom:14,background:"rgba(255,255,255,0.45)",borderRadius:14,padding:4,border:"1px solid " + DS.border}}>
+      <div style={{display:"flex",gap:4,marginBottom:14,background:"rgba(255,255,255,0.45)",borderRadius:14,padding:4,border:"1px solid "+DS.border,overflowX:"auto",scrollbarWidth:"none"}}>
         {[
           { key:"mensualites", label:"Mensualités", count:clientsAvecMensualites.length },
           { key:"livraisons",  label:"Livraisons",  count:clientsAvecLivraisons.length  },
+          { key:"documents",   label:"Contrats",    count:Object.values(contrats).filter(c=>c?.statut&&c.statut!=="reset").length },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            style={{flex:1,padding:"9px 8px",borderRadius:10,border:"none",cursor:"pointer",
+            style={{flex:1,padding:"9px 8px",borderRadius:10,border:"none",cursor:"pointer",flexShrink:0,
               background:tab===t.key?"linear-gradient(135deg,#06b6d4,#0891b2)":"transparent",
               color:tab===t.key?"#fff":DS.mid,fontWeight:700,fontSize:12,fontFamily:"inherit",
-              transition:"all .2s",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+              transition:"all .2s",display:"flex",alignItems:"center",justifyContent:"center",gap:6,WebkitTapHighlightColor:"transparent"}}>
             {t.label}
-            <span style={{background:tab===t.key?"rgba(255,255,255,0.25)":"rgba(8,145,178,0.1)",color:tab===t.key?"#fff":DS.blue,borderRadius:20,padding:"1px 7px",fontSize:10,fontWeight:800}}>{t.count}</span>
+            {t.count>0&&<span style={{background:tab===t.key?"rgba(255,255,255,0.25)":"rgba(8,145,178,0.1)",color:tab===t.key?"#fff":DS.blue,borderRadius:20,padding:"1px 7px",fontSize:10,fontWeight:800}}>{t.count}</span>}
           </button>
         ))}
       </div>
@@ -371,6 +386,72 @@ export function PageGestion({
           })}
         </div>
       )}
+
+      {/* ─── Documents / Contrats ─── */}
+      {tab === "documents" && (()=>{
+        const STATUT = {
+          signe_complet:   { label:"Signé ✓",   color:"#059669", bg:"#f0fdf4", border:"#86efac" },
+          signe_client:    { label:"En attente", color:"#4f46e5", bg:"#eef2ff", border:"#a5b4fc" },
+          demande_envoyee: { label:"Envoyé",     color:"#0891b2", bg:"#e0f2fe", border:"#7dd3fc" },
+          reset:           { label:"Réinit.",    color:"#94a3b8", bg:"#f8fafc", border:"#e2e8f0" },
+        };
+        const actifs = Object.entries(contrats)
+          .filter(([k]) => k !== "__archives__")
+          .map(([contractId, ct]) => ({ contractId, ct, client: clients.find(c=>c.id===ct.clientId) }))
+          .filter(x => x.client && x.ct.statut && x.ct.statut !== "reset")
+          .sort((a,b) => (b.ct.signedAt||b.ct.signedByPrestaAt||"").localeCompare(a.ct.signedAt||a.ct.signedByPrestaAt||""));
+        const nbSigned = actifs.filter(x=>x.ct.statut==="signe_complet").length;
+        return (
+          <div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:14}}>
+              {[{label:"Signés",val:nbSigned,color:"#059669",bg:"#f0fdf4"},{label:"En attente",val:actifs.filter(x=>x.ct.statut==="signe_client").length,color:"#4f46e5",bg:"#eef2ff"},{label:"Total",val:actifs.length,color:"#0891b2",bg:"#e0f2fe"}].map(s=>(
+                <div key={s.label} style={{background:s.bg,borderRadius:12,padding:"10px 8px",textAlign:"center",border:"1px solid "+s.color+"22"}}>
+                  <div style={{fontSize:22,fontWeight:900,color:s.color,lineHeight:1}}>{s.val}</div>
+                  <div style={{fontSize:10,color:s.color,fontWeight:700,marginTop:3,textTransform:"uppercase",letterSpacing:.4}}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+            {actifs.length===0
+              ? <div style={{textAlign:"center",padding:40,color:DS.mid,fontSize:13}}>
+                  <div style={{fontSize:40,marginBottom:10}}>📄</div>
+                  Aucun contrat enregistré
+                </div>
+              : <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {actifs.map(({contractId,ct,client})=>{
+                    const s = STATUT[ct.statut]||STATUT.reset;
+                    const dateSign = ct.signedAt ? new Date(ct.signedAt).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"2-digit"}) : null;
+                    return (
+                      <div key={contractId} style={{background:"rgba(255,255,255,0.55)",borderRadius:14,border:"1.5px solid "+s.border,overflow:"hidden"}}>
+                        <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10}}>
+                          <div style={{width:40,height:40,borderRadius:11,background:s.bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:18}}>
+                            {ct.statut==="signe_complet"?"✅":ct.statut==="signe_client"?"✍️":"📄"}
+                          </div>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontWeight:700,fontSize:13,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{client.nom}</div>
+                            <div style={{fontSize:10,color:DS.mid,marginTop:1}}>{client.formule}{dateSign?" · Signé le "+dateSign:""}</div>
+                          </div>
+                          <span style={{fontSize:11,fontWeight:700,color:s.color,background:s.bg,padding:"3px 10px",borderRadius:20,border:"1px solid "+s.border,flexShrink:0}}>{s.label}</span>
+                        </div>
+                        <div style={{display:"flex",borderTop:"1px solid #f1f5f9"}}>
+                          <button onClick={()=>onOpenContrat&&onOpenContrat(client,ct)}
+                            style={{flex:1,padding:"9px",background:"rgba(255,255,255,0.45)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,fontWeight:700,color:"#0891b2",fontFamily:"inherit"}}>
+                            {Ico.pdf(13,"#0891b2")} Voir PDF signé
+                          </button>
+                          {ct.statut==="signe_client"&&(
+                            <><div style={{width:1,background:"#f1f5f9"}}/><a href={`/sign-prestataire.html?clientId=${client.id}&contractId=${contractId}`} target="_blank" rel="noopener"
+                              style={{flex:1,padding:"9px",background:"#f5f3ff",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,fontWeight:700,color:"#4f46e5",textDecoration:"none"}}>
+                              ✍️ Co-signer
+                            </a></>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+            }
+          </div>
+        );
+      })()}
     </div>
   );
 }

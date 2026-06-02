@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { DS, Ico, MOIS_L } from "../utils/constants";
 import { TODAY, getSaison, getEntretienMois, getControleMois, isEntretienType, isControleType, MOIS_NOW, YEAR_NOW } from "../utils/helpers";
 import { Avatar, useIsMobile } from "../components/ui";
@@ -127,24 +127,126 @@ export function DashboardHero({ clients, passages, rdvs, saisonNow, isMobile, on
         </div>
       </div>
 
-      {/* ── ACTIONS RAPIDES ── */}
-      <div className="db-s2" style={{marginBottom:14}}>
-        <div style={{fontSize:12,fontWeight:600,color:"#94a3b8",textTransform:"uppercase",letterSpacing:"0.6px",marginBottom:8,paddingLeft:2}}>Actions rapides</div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
-          {[
-            {label:"Nouvelle\nintervention", icon:<><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><line x1="12" y1="13" x2="12" y2="17"/><line x1="10" y1="15" x2="14" y2="15"/></>, color:"#0891b2", bg:"linear-gradient(135deg,#e0f2fe,#f0f9ff)", border:"#bae6fd", onClick:onAddPassage},
-            {label:"Nouveau\nclient", icon:<><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></>, color:"#7c3aed", bg:"linear-gradient(135deg,#ede9fe,#f5f3ff)", border:"#ddd6fe", onClick:onAddClient},
-            {label:"Livraison\nproduits", icon:<><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></>, color:"#059669", bg:"linear-gradient(135deg,#d1fae5,#f0fdf4)", border:"#a7f3d0", onClick:onAddLivraison},
-            {label:"Nouveau\nRDV", icon:<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="14" x2="12" y2="18"/><line x1="10" y1="16" x2="14" y2="16"/></>, color:"#7c3aed", bg:"linear-gradient(135deg,#ede9fe,#f5f3ff)", border:"#ddd6fe", onClick:onAddRdv},
-          ].map(a=>(
-            <button key={a.label} className="db-btn" onClick={a.onClick} style={{background:a.bg,border:`1px solid ${a.border}`,borderRadius:14,padding:"12px 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:7,cursor:"pointer",fontFamily:"inherit",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
-              <div style={{width:34,height:34,borderRadius:10,background:"white",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 8px rgba(0,0,0,0.08)"}}>
-                <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={a.color} strokeWidth="2" strokeLinecap="round">{a.icon}</svg>
+      {/* ── NOTES DRAG & DROP ── */}
+      <StickyNotes/>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STICKY NOTES — drag & drop + auto-save localStorage
+// ─────────────────────────────────────────────────────────────────────────────
+const NOTE_COLORS = ["#fef9c3","#dcfce7","#dbeafe","#fce7f3","#ede9fe","#ffedd5","#fff","#fef2f2"];
+const NOTE_KEY = "briblue_dashboard_notes";
+
+function StickyNotes() {
+  const [notes, setNotes] = useState(() => {
+    try { const s=localStorage.getItem(NOTE_KEY); return s?JSON.parse(s):[{id:"1",text:"",color:"#fef9c3"}]; }
+    catch { return [{id:"1",text:"",color:"#fef9c3"}]; }
+  });
+  const saveTimer = useRef(null);
+  const dragIdx   = useRef(null);
+  const dragOverIdx = useRef(null);
+  const [dragOver, setDragOver] = useState(-1);
+
+  // Auto-save 300 ms après chaque changement
+  useEffect(() => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      try { localStorage.setItem(NOTE_KEY, JSON.stringify(notes)); } catch {}
+    }, 300);
+    return () => { if(saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [notes]);
+
+  const addNote = () => {
+    const colors = NOTE_COLORS;
+    const col = colors[Math.floor(Math.random()*colors.length)];
+    setNotes(p => [...p, {id:Date.now().toString(), text:"", color:col}]);
+  };
+  const delNote  = (id) => setNotes(p => p.filter(n=>n.id!==id));
+  const editText = (id, text) => setNotes(p => p.map(n=>n.id===id?{...n,text}:n));
+  const editColor= (id, color) => setNotes(p => p.map(n=>n.id===id?{...n,color}:n));
+
+  const onDragStart = (i) => { dragIdx.current = i; };
+  const onDragOver  = (e,i) => { e.preventDefault(); dragOverIdx.current=i; setDragOver(i); };
+  const onDrop      = () => {
+    const from=dragIdx.current, to=dragOverIdx.current;
+    if (from!==null && to!==null && from!==to) {
+      setNotes(p => {
+        const a=[...p];
+        const [el]=a.splice(from,1);
+        a.splice(to,0,el);
+        return a;
+      });
+    }
+    dragIdx.current=null; dragOverIdx.current=null; setDragOver(-1);
+  };
+
+  return (
+    <div className="db-s2" style={{marginBottom:14}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+        <span style={{fontSize:12,fontWeight:600,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".6px"}}>
+          📝 Notes
+        </span>
+        <button onClick={addNote}
+          style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:20,background:"#f0f9ff",border:"1px solid #bae6fd",cursor:"pointer",fontSize:12,fontWeight:700,color:"#0891b2",fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>
+          <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Note
+        </button>
+      </div>
+
+      {notes.length===0 && (
+        <button onClick={addNote}
+          style={{width:"100%",padding:20,borderRadius:16,border:"2px dashed #e2e8f0",background:"rgba(255,255,255,0.5)",cursor:"pointer",fontSize:13,color:"#94a3b8",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+          📝 Ajouter une note
+        </button>
+      )}
+
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {notes.map((note, i) => (
+          <div key={note.id}
+            draggable
+            onDragStart={()=>onDragStart(i)}
+            onDragOver={e=>onDragOver(e,i)}
+            onDrop={onDrop}
+            onDragEnd={()=>{dragIdx.current=null;dragOverIdx.current=null;setDragOver(-1);}}
+            style={{
+              borderRadius:16,
+              background:note.color||"#fef9c3",
+              border:`2px solid ${dragOver===i&&dragIdx.current!==i?"#0891b2":"rgba(0,0,0,0.07)"}`,
+              boxShadow:"0 2px 10px rgba(0,0,0,0.07)",
+              opacity:dragIdx.current===i?0.45:1,
+              transition:"opacity .2s, border .15s",
+            }}>
+            {/* Barre de contrôle */}
+            <div style={{display:"flex",alignItems:"center",padding:"7px 10px 4px",gap:6,userSelect:"none"}}>
+              {/* Poignée drag */}
+              <div style={{cursor:"grab",color:"#94a3b8",fontSize:15,lineHeight:1,flexShrink:0,touchAction:"none"}}>⠿</div>
+              {/* Palette couleurs */}
+              <div style={{display:"flex",gap:4,flex:1,flexWrap:"wrap"}}>
+                {NOTE_COLORS.map(c=>(
+                  <button key={c} onClick={()=>editColor(note.id,c)}
+                    style={{width:14,height:14,borderRadius:7,background:c,border:note.color===c?"2.5px solid #0891b2":"1.5px solid rgba(0,0,0,0.12)",cursor:"pointer",padding:0,flexShrink:0,transition:"transform .15s",transform:note.color===c?"scale(1.25)":"scale(1)"}}/>
+                ))}
               </div>
-              <div style={{fontSize:10,fontWeight:600,color:"#475569",textAlign:"center",lineHeight:1.3,whiteSpace:"pre-line"}}>{a.label}</div>
-            </button>
-          ))}
-        </div>
+              {/* Supprimer */}
+              <button onClick={()=>delNote(note.id)}
+                style={{background:"none",border:"none",cursor:"pointer",color:"#94a3b8",fontSize:15,lineHeight:1,padding:"0 2px",flexShrink:0,WebkitTapHighlightColor:"transparent"}}>✕</button>
+            </div>
+            {/* Zone texte */}
+            <textarea
+              value={note.text}
+              onChange={e=>editText(note.id,e.target.value)}
+              placeholder="📝 Écris ta note ici…"
+              style={{
+                width:"100%",padding:"2px 12px 12px",background:"transparent",border:"none",
+                outline:"none",resize:"none",fontFamily:"inherit",fontSize:13,
+                color:"#374151",lineHeight:1.7,minHeight:60,boxSizing:"border-box",
+                WebkitTapHighlightColor:"transparent",
+              }}
+            />
+          </div>
+        ))}
       </div>
     </div>
   );
