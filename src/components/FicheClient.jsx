@@ -247,7 +247,7 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
 
   return (
     <>
-    <Modal title="" onClose={onClose} wide defaultFull noHeader>
+    <Modal title="" onClose={onClose} wide defaultFull>
       <div style={{margin:isMobile?"-18px -20px 0":"-24px -28px 0"}}>
 
         {client.photoPiscine&&(
@@ -268,13 +268,7 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
                 {[client.formule,client.bassin,client.volume?client.volume+"m³":null].filter(Boolean).join(" · ")}
               </div>
             </div>
-            <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-              <div style={{background:"rgba(255,255,255,0.75)",color:col.tx,fontSize:11,fontWeight:800,padding:"5px 12px",borderRadius:20,border:"1px solid "+col.tx+"55",whiteSpace:"nowrap",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",boxShadow:"0 4px 12px rgba(0,0,0,0.08)"}}>{col.lbl}</div>
-              <button onClick={onClose}
-                style={{width:34,height:34,borderRadius:11,background:"rgba(255,255,255,0.3)",border:"1.5px solid rgba(255,255,255,0.5)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,WebkitTapHighlightColor:"transparent",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
-                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="rgba(11,18,32,0.7)" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
-            </div>
+            <div style={{background:"rgba(255,255,255,0.75)",color:col.tx,fontSize:11,fontWeight:800,padding:"5px 12px",borderRadius:20,flexShrink:0,border:"1px solid "+col.tx+"55",whiteSpace:"nowrap",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",boxShadow:"0 4px 12px rgba(0,0,0,0.08)"}}>{col.lbl}</div>
           </div>
 
           {/* Stats rapides sous le nom */}
