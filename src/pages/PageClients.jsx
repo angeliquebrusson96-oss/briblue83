@@ -236,10 +236,10 @@ export function PageClients({ clients, passages, contrats={}, onUpdateContrat, o
 
   return (
     <div>
-      {/* ═══ STATS HEADER — design soleil moderne ═══ */}
-      <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(2,1fr)":"repeat(4,1fr)",gap:10,marginBottom:16}}>
+      {/* ═══ STATS HEADER ═══ */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
         {/* Total clients */}
-        <div onClick={()=>setFilterStat("all")} style={{cursor:"pointer",transform:filterStat==="all"?"scale(1.04)":"scale(1)",transition:"transform .2s",background:"linear-gradient(135deg,#0c1f3f 0%,#0369a1 100%)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:"0 8px 24px rgba(12,31,63,0.25)"}}>
+        <div onClick={()=>setFilterStat("all")} style={{cursor:"pointer",transform:filterStat==="all"?"scale(1.03)":"scale(1)",transition:"transform .2s",background:"linear-gradient(135deg,#0c1f3f 0%,#0369a1 100%)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:"0 8px 24px rgba(12,31,63,0.25)"}}>
           <div style={{position:"absolute",top:-15,right:-15,width:80,height:80,borderRadius:"50%",background:"rgba(56,189,248,0.15)",pointerEvents:"none"}}/>
           <div style={{display:"flex",alignItems:"center",gap:10,position:"relative"}}>
             <div style={{width:42,height:42,borderRadius:12,background:"rgba(56,189,248,0.25)",border:"1.5px solid rgba(56,189,248,0.4)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -253,7 +253,7 @@ export function PageClients({ clients, passages, contrats={}, onUpdateContrat, o
         </div>
 
         {/* Sous contrat */}
-        <div onClick={()=>setFilterStat(filterStat==="contrat"?"all":"contrat")} style={{cursor:"pointer",transform:filterStat==="contrat"?"scale(1.04)":"scale(1)",transition:"transform .2s",background:"linear-gradient(135deg,#059669,#10b981)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:"0 8px 24px rgba(5,150,105,0.25)"}}>
+        <div onClick={()=>setFilterStat(filterStat==="contrat"?"all":"contrat")} style={{cursor:"pointer",transform:filterStat==="contrat"?"scale(1.03)":"scale(1)",transition:"transform .2s",background:"linear-gradient(135deg,#059669,#10b981)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:"0 8px 24px rgba(5,150,105,0.25)"}}>
           <div style={{position:"absolute",top:-15,right:-15,width:80,height:80,borderRadius:"50%",background:"rgba(255,255,255,0.12)",pointerEvents:"none"}}/>
           <div style={{display:"flex",alignItems:"center",gap:10,position:"relative"}}>
             <div style={{width:42,height:42,borderRadius:12,background:"rgba(255,255,255,0.2)",border:"1.5px solid rgba(255,255,255,0.3)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -265,45 +265,17 @@ export function PageClients({ clients, passages, contrats={}, onUpdateContrat, o
             </div>
           </div>
         </div>
-
-        {/* Alertes */}
-        <div onClick={()=>setFilterStat(filterStat==="alertes"?"all":"alertes")} style={{cursor:"pointer",transform:filterStat==="alertes"?"scale(1.04)":"scale(1)",transition:"transform .2s",background:statsClients.alertes>0?"linear-gradient(135deg,#dc2626,#ef4444)":"linear-gradient(135deg,#94a3b8,#64748b)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:`0 8px 24px ${statsClients.alertes>0?"rgba(220,38,38,0.25)":"rgba(100,116,139,0.18)"}`}}>
-          <div style={{position:"absolute",top:-15,right:-15,width:80,height:80,borderRadius:"50%",background:"rgba(255,255,255,0.12)",pointerEvents:"none"}}/>
-          <div style={{display:"flex",alignItems:"center",gap:10,position:"relative"}}>
-            <div style={{width:42,height:42,borderRadius:12,background:"rgba(255,255,255,0.2)",border:"1.5px solid rgba(255,255,255,0.3)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              {Ico.alert(18,"#fff")}
-            </div>
-            <div>
-              <div style={{fontSize:22,fontWeight:900,color:"#fff",lineHeight:1}}>{statsClients.alertes}</div>
-              <div style={{fontSize:10,color:"rgba(255,255,255,0.85)",fontWeight:700,textTransform:"uppercase",letterSpacing:0.5,marginTop:2}}>{statsClients.alertes>1?"Alertes":"Alerte"}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Expirent < 30j */}
-        <div onClick={()=>setFilterStat(filterStat==="expires"?"all":"expires")} style={{cursor:"pointer",transform:filterStat==="expires"?"scale(1.04)":"scale(1)",transition:"transform .2s",background:statsClients.expires>0?"linear-gradient(135deg,#d97706,#f59e0b)":"linear-gradient(135deg,#94a3b8,#64748b)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:`0 8px 24px ${statsClients.expires>0?"rgba(217,119,6,0.25)":"rgba(100,116,139,0.18)"}`}}>
-          <div style={{position:"absolute",top:-15,right:-15,width:80,height:80,borderRadius:"50%",background:"rgba(255,255,255,0.12)",pointerEvents:"none"}}/>
-          <div style={{display:"flex",alignItems:"center",gap:10,position:"relative"}}>
-            <div style={{width:42,height:42,borderRadius:12,background:"rgba(255,255,255,0.2)",border:"1.5px solid rgba(255,255,255,0.3)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              {Ico.clock(18,"#fff")}
-            </div>
-            <div>
-              <div style={{fontSize:22,fontWeight:900,color:"#fff",lineHeight:1}}>{statsClients.expires}</div>
-              <div style={{fontSize:10,color:"rgba(255,255,255,0.85)",fontWeight:700,textTransform:"uppercase",letterSpacing:0.5,marginTop:2}}>Bientôt fin</div>
-            </div>
-          </div>
-        </div>
       </div>
       {/* Badge filtre actif */}
-      {filterStat !== "all" && (
-        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,padding:"8px 12px",borderRadius:12,background:"linear-gradient(135deg, rgba(8,145,178,0.1), rgba(8,145,178,0.05))",border:"1px solid rgba(8,145,178,0.2)"}}>
-          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.4" strokeLinecap="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-          <span style={{fontSize:12,fontWeight:700,color:"#0891b2",flex:1}}>
-            Filtre actif : {filterStat === "contrat" ? "Sous contrat" : filterStat === "alertes" ? "Avec alertes" : "Bientôt fin"} — {filtered.length} client{filtered.length>1?"s":""}
+      {filterStat === "contrat" && (
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,padding:"8px 12px",borderRadius:12,background:"linear-gradient(135deg,rgba(5,150,105,0.1),rgba(5,150,105,0.05))",border:"1px solid rgba(5,150,105,0.2)"}}>
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.4" strokeLinecap="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+          <span style={{fontSize:12,fontWeight:700,color:"#059669",flex:1}}>
+            Filtre : Sous contrat — {filtered.length} client{filtered.length>1?"s":""}
           </span>
-          <button onClick={()=>setFilterStat("all")} style={{padding:"4px 10px",borderRadius:8,background:"rgba(255,255,255,0.7)",border:"1px solid rgba(8,145,178,0.25)",cursor:"pointer",fontSize:11,fontWeight:700,color:"#0891b2",fontFamily:"inherit",display:"flex",alignItems:"center",gap:4}}>
+          <button onClick={()=>setFilterStat("all")} style={{padding:"4px 10px",borderRadius:8,background:"rgba(255,255,255,0.7)",border:"1px solid rgba(5,150,105,0.25)",cursor:"pointer",fontSize:11,fontWeight:700,color:"#059669",fontFamily:"inherit",display:"flex",alignItems:"center",gap:4}}>
             <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            Effacer
+            Tout voir
           </button>
         </div>
       )}

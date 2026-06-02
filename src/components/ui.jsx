@@ -6,12 +6,14 @@ import { normalizeRapportStatus } from "../utils/helpers";
 import { resolvePhoto } from "../lib/photoStore";
 
 // ─── HOOKS ────────────────────────────────────────────────────────────────────
+// ─ Seuil : < 1024 px = mobile/tablette (bottom-sheet tactile)
+//            ≥ 1024 px = bureau (dialog centré + sidebar)
 export function useIsMobile() {
   const [m, setM] = useState(() => {
-    try { return window.innerWidth < 768; } catch { return false; }
+    try { return window.innerWidth < 1024; } catch { return false; }
   });
   useEffect(()=>{
-    const handleResize = () => setM(window.innerWidth < 768);
+    const handleResize = () => setM(window.innerWidth < 1024);
     window.addEventListener("resize", handleResize, {passive:true});
     window.addEventListener("orientationchange", handleResize, {passive:true});
     window.addEventListener("load", handleResize, {once:true,passive:true});
