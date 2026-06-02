@@ -329,6 +329,7 @@ export function Modal({ title, onClose, children, wide, noHeader }) {
 
       {/* ── Sheet ── */}
       <div
+        onClick={isPeek ? ()=>doSnap(SNAP.mid) : undefined}
         style={{
           position:"absolute", bottom:0, left:0, right:0,
           height:"100dvh",
@@ -337,6 +338,7 @@ export function Modal({ title, onClose, children, wide, noHeader }) {
             ? "transform .40s cubic-bezier(.22,1,.36,1), border-radius .28s"
             : "none",
           borderRadius: isFullScreen ? 0 : "28px 28px 0 0",
+          cursor: isPeek ? "pointer" : "default",
           background:"rgba(255,255,255,0.86)",
           backdropFilter:"blur(30px) saturate(200%)",
           WebkitBackdropFilter:"blur(30px) saturate(200%)",
@@ -357,35 +359,53 @@ export function Modal({ title, onClose, children, wide, noHeader }) {
           style={{
             flexShrink:0,
             paddingTop: isFullScreen ? "max(env(safe-area-inset-top,0px),14px)" : 14,
-            paddingBottom:10,
-            display:"flex", flexDirection:"column", alignItems:"center", gap:0,
+            paddingBottom: isPeek ? 14 : 10,
+            minHeight: isPeek ? 72 : "auto",
+            display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:0,
             cursor:"grab",
             touchAction:"none",
             userSelect:"none",
+            background: isPeek
+              ? "linear-gradient(180deg,rgba(6,182,212,0.07),transparent)"
+              : "transparent",
+            borderRadius: isPeek ? "28px 28px 0 0" : 0,
+            transition:"min-height .3s, background .3s",
           }}
         >
-          {/* Barre bleue */}
+          {/* Barre bleue — plus épaisse et plus lumineuse en mode peek */}
           <div style={{
-            width:44, height:5, borderRadius:3,
-            background:"linear-gradient(90deg,#22d3ee,#0891b2)",
-            opacity: .65,
-            boxShadow: "0 2px 8px rgba(8,145,178,0.35)",
+            width: isPeek ? 56 : 44,
+            height: isPeek ? 6 : 5,
+            borderRadius: 3,
+            background: isPeek
+              ? "linear-gradient(90deg,#06b6d4,#0891b2,#06b6d4)"
+              : "linear-gradient(90deg,#22d3ee,#0891b2)",
+            opacity: isPeek ? 0.9 : 0.65,
+            boxShadow: isPeek
+              ? "0 0 16px rgba(6,182,212,0.5), 0 2px 8px rgba(8,145,178,0.3)"
+              : "0 2px 8px rgba(8,145,178,0.25)",
+            transition:"all .3s",
           }}/>
-          {/* Indicateurs de position : 3 segments, le segment actif s'allonge */}
-          <div style={{display:"flex",gap:5,marginTop:9,alignItems:"center"}}>
+          {/* Indicateurs position */}
+          <div style={{display:"flex",gap:5,marginTop:8,alignItems:"center"}}>
             {[SNAP.full, SNAP.mid, SNAP.peek].map((s,i)=>{
               const active = Math.abs(tVhRef.current - s) < 12;
               return (
                 <div key={i} style={{
-                  width: active ? 20 : 7,
-                  height: 4,
-                  borderRadius: 2,
+                  width: active ? 20 : 7, height: 4, borderRadius: 2,
                   background: active ? "#0891b2" : "#dde4ed",
-                  transition: "width .25s cubic-bezier(.22,1,.36,1), background .25s",
+                  transition:"width .25s cubic-bezier(.22,1,.36,1), background .25s",
                 }}/>
               );
             })}
           </div>
+          {/* Hint texte en mode peek */}
+          {isPeek && (
+            <div style={{marginTop:8,fontSize:11,fontWeight:800,color:"#0891b2",letterSpacing:.3,display:"flex",alignItems:"center",gap:4,opacity:.75}}>
+              <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+              Glisser pour agrandir
+            </div>
+          )}
         </div>
 
         {/* ── En-tête ── */}

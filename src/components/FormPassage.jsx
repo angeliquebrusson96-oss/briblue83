@@ -625,31 +625,76 @@ function MRow({label,unit,value,onChange,ideal,okFn,icon,color="#0891b2",compact
   const hasVal = value!==""&&value!==null&&value!==undefined&&value!==false;
   const ok = hasVal&&okFn ? okFn(+value) : true;
   const statusColor = !hasVal?"#e2e8f0":ok?"#22c55e":"#ef4444";
-  // Mode compact : juste l'input + indicateur idéal en dessous (utilisé dans la grille analyses)
+  // Mode compact — utilisé dans la grille analyses côte à côte
   if (compact) return (
-    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,justifyContent:"center"}}>
-      <input type="number" step="0.1" value={value===""||value===null||value===undefined?"":value} onChange={e=>onChange(e.target.value===""?"":+e.target.value)}
-        style={{width:76,padding:"8px 6px",borderRadius:8,border:`2px solid ${statusColor}`,fontSize:15,fontWeight:800,boxSizing:"border-box",color:hasVal?(ok?"#16a34a":"#be123c"):DS.dark,background:hasVal?(ok?"#f0fdf4":"#fef2f2"):"rgba(255,255,255,0.8)",textAlign:"center",outline:"none",fontFamily:"inherit",transition:"all .2s"}}/>
-      {ideal&&<div style={{fontSize:9,color:"#94a3b8",lineHeight:1.1,textAlign:"center",letterSpacing:-.2}}>{ideal}</div>}
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+      <div style={{position:"relative",width:"100%"}}>
+        <input type="number" inputMode="decimal" step="0.1"
+          value={value===""||value===null||value===undefined?"":value}
+          onChange={e=>onChange(e.target.value===""?"":+e.target.value)}
+          style={{width:"100%",padding:"10px 8px",borderRadius:10,border:`2.5px solid ${statusColor}`,fontSize:18,fontWeight:900,boxSizing:"border-box",
+            color:hasVal?(ok?"#059669":"#be123c"):"#64748b",
+            background:hasVal?(ok?"#f0fdf4":"#fef2f2"):"rgba(255,255,255,0.85)",
+            textAlign:"center",outline:"none",fontFamily:"inherit",transition:"all .2s",
+            boxShadow:hasVal?`0 0 0 3px ${ok?"#22c55e":"#ef4444"}22`:"none"}}/>
+        {hasVal&&(
+          <div style={{position:"absolute",top:-7,right:-7,width:18,height:18,borderRadius:9,background:ok?"#22c55e":"#ef4444",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 2px 6px ${ok?"#22c55e":"#ef4444"}55`}}>
+            {ok
+              ? <svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              : <svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            }
+          </div>
+        )}
+      </div>
+      {ideal&&<div style={{fontSize:9,color:"#94a3b8",lineHeight:1,textAlign:"center",letterSpacing:-.2,fontWeight:600}}>idéal {ideal}</div>}
     </div>
   );
   return (
-    <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:12,background:hasVal?(ok?"#f0fdf4":"#fef2f2"):DS.white,border:`1px solid ${hasVal?(ok?"#bbf7d0":"#fecaca"):"#f1f5f9"}`,transition:"all .25s"}}>
-      <div style={{width:34,height:34,borderRadius:10,background:color+"15",border:`1px solid ${color}22`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+    <div style={{
+      display:"flex",alignItems:"center",gap:12,
+      padding:"12px 14px",borderRadius:14,
+      background:hasVal?(ok?"linear-gradient(135deg,#f0fdf4,#dcfce7)":"linear-gradient(135deg,#fef2f2,#fee2e2)"):"rgba(255,255,255,0.9)",
+      border:`1.5px solid ${hasVal?(ok?"#86efac":"#fca5a5"):"rgba(6,182,212,0.12)"}`,
+      boxShadow:hasVal?`0 4px 16px ${ok?"#22c55e":"#ef4444"}14`:"0 2px 8px rgba(6,182,212,0.06)",
+      transition:"all .3s",
+    }}>
+      {/* Icône colorée */}
+      <div style={{width:42,height:42,borderRadius:13,background:`linear-gradient(135deg,${color},${color}cc)`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:`0 4px 12px ${color}44`}}>
         {icon}
       </div>
+      {/* Label + idéal */}
       <div style={{flex:1,minWidth:0}}>
-        <div style={{fontSize:13,fontWeight:600,color:DS.dark,lineHeight:1.2}}>{label}{unit&&<span style={{fontSize:11,color:"#94a3b8",fontWeight:400}}> ({unit})</span>}</div>
-        {ideal&&<div style={{fontSize:10,color:"#94a3b8",marginTop:2,fontWeight:500}}>idéal {ideal}</div>}
+        <div style={{fontSize:14,fontWeight:700,color:"#0f172a",lineHeight:1.2}}>
+          {label}
+          {unit&&<span style={{fontSize:11,color:"#94a3b8",fontWeight:500,marginLeft:5}}>{unit}</span>}
+        </div>
+        {ideal&&<div style={{fontSize:10,color:hasVal?(ok?"#059669":"#dc2626"):"#94a3b8",marginTop:3,fontWeight:700}}>idéal {ideal}</div>}
       </div>
-      <input type="number" step="0.1" value={value===""||value===null||value===undefined?"":value} onChange={e=>onChange(e.target.value===""?"":+e.target.value)}
-        style={{width:72,padding:"8px 10px",borderRadius:9,border:`2px solid ${statusColor}`,fontSize:15,fontWeight:800,boxSizing:"border-box",color:hasVal?(ok?"#16a34a":"#be123c"):DS.dark,background:"rgba(255,255,255,0.55)",textAlign:"center",outline:"none",fontFamily:"inherit",flexShrink:0,transition:"all .2s"}}/>
-      <div style={{width:28,height:28,borderRadius:14,background:!hasVal?"#f1f5f9":ok?"#22c55e":"#ef4444",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .3s",boxShadow:hasVal?`0 2px 6px ${ok?"#22c55e":"#ef4444"}44`:"none"}}>
+      {/* Input valeur */}
+      <div style={{position:"relative",flexShrink:0}}>
+        <input type="number" inputMode="decimal" step="0.1"
+          value={value===""||value===null||value===undefined?"":value}
+          onChange={e=>onChange(e.target.value===""?"":+e.target.value)}
+          style={{width:80,padding:"10px 8px",borderRadius:12,
+            border:`2.5px solid ${statusColor}`,
+            fontSize:20,fontWeight:900,boxSizing:"border-box",
+            color:hasVal?(ok?"#059669":"#dc2626"):"#64748b",
+            background:hasVal?(ok?"rgba(240,253,244,0.8)":"rgba(254,242,242,0.8)"):"rgba(255,255,255,0.8)",
+            textAlign:"center",outline:"none",fontFamily:"inherit",
+            boxShadow:hasVal?`0 0 0 3px ${ok?"#22c55e":"#ef4444"}18`:"none",
+            transition:"all .25s"}}/>
+      </div>
+      {/* Indicateur OK/KO */}
+      <div style={{width:34,height:34,borderRadius:17,
+        background:!hasVal?"rgba(226,232,240,0.6)":ok?"linear-gradient(135deg,#22c55e,#16a34a)":"linear-gradient(135deg,#ef4444,#dc2626)",
+        display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
+        transition:"all .35s",
+        boxShadow:hasVal?`0 4px 12px ${ok?"#22c55e":"#ef4444"}55`:"none"}}>
         {!hasVal
-          ? <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          ? <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           : ok
-            ? <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            : <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            ? <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            : <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         }
       </div>
     </div>
@@ -984,35 +1029,47 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
           </div>
         </div>
       )}
-      {/* Bandeau client sélectionné */}
+      {/* ═══ BANDEAU CLIENT ═══ */}
       {clientSel && (
-        <div style={{margin:"-24px -28px 16px",marginTop:isMobile?"-18px":"-24px",marginLeft:isMobile?"-20px":"-28px",marginRight:isMobile?"-20px":"-28px",position:"relative",overflow:"hidden"}}>
-          {/* Fond avec photo piscine si dispo */}
+        <div style={{margin:isMobile?"-18px -20px 20px":"-24px -28px 20px",position:"relative",overflow:"hidden",minHeight:100}}>
+          {/* Fond */}
           {clientSel.photoPiscine
-            ? <div style={{position:"absolute",inset:0,background:`url(${clientSel.photoPiscine}) center/cover`,filter:"brightness(0.35)"}}/>
-            : <div style={{position:"absolute",inset:0,background:"linear-gradient(135deg,#0c1222 0%,#0f2a4a 50%,#0369a1 100%)"}}/>
+            ? <div style={{position:"absolute",inset:0,background:`url(${clientSel.photoPiscine}) center/cover`,filter:"brightness(0.28) saturate(1.2)"}}/>
+            : <div style={{position:"absolute",inset:0,background:"linear-gradient(135deg,#050d1c 0%,#0a1f44 45%,#0c3875 100%)"}}/>
           }
-          {/* Motif décoratif */}
-          <div style={{position:"absolute",top:-30,right:-30,width:140,height:140,borderRadius:70,background:"rgba(56,189,248,0.08)",pointerEvents:"none"}}/>
-          <div style={{position:"absolute",bottom:-20,left:-20,width:100,height:100,borderRadius:50,background:"rgba(14,165,233,0.06)",pointerEvents:"none"}}/>
-          <div style={{position:"relative",padding:"12px 16px",display:"flex",alignItems:"center",gap:10,flexWrap:"nowrap"}}>
-            {/* Icône pool compact */}
-            <div style={{width:36,height:36,borderRadius:10,background:"rgba(8,145,178,0.25)",border:"1px solid rgba(56,189,248,0.3)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              {Ico.pool(16,"#38bdf8")}
+          {/* Cercles lumineux décoratifs */}
+          <div style={{position:"absolute",right:-50,top:-50,width:200,height:200,borderRadius:100,background:"radial-gradient(circle,rgba(34,211,238,0.18) 0%,transparent 70%)",pointerEvents:"none"}}/>
+          <div style={{position:"absolute",left:-30,bottom:-30,width:130,height:130,borderRadius:65,background:"radial-gradient(circle,rgba(99,102,241,0.15) 0%,transparent 70%)",pointerEvents:"none"}}/>
+          <div style={{position:"absolute",right:80,bottom:-20,width:100,height:100,borderRadius:50,background:"radial-gradient(circle,rgba(6,182,212,0.1) 0%,transparent 70%)",pointerEvents:"none"}}/>
+          {/* Contenu */}
+          <div style={{position:"relative",padding:"20px 20px 18px",display:"flex",alignItems:"center",gap:14}}>
+            {/* Icône piscine premium */}
+            <div style={{width:52,height:52,borderRadius:16,background:"linear-gradient(135deg,rgba(6,182,212,0.35),rgba(8,145,178,0.2))",border:"1.5px solid rgba(34,211,238,0.35)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"0 8px 24px rgba(6,182,212,0.25)"}}>
+              {Ico.pool(24,"#67e8f9")}
             </div>
-            {/* Nom + badges — prend tout l'espace disponible */}
+            {/* Infos client */}
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontWeight:900,fontSize:isMobile?14:16,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:-0.3,lineHeight:1.2}}>{clientSel.nom}</div>
-              <div style={{display:"flex",gap:5,marginTop:4,flexWrap:"nowrap",overflow:"hidden"}}>
-                <span style={{background:"rgba(56,189,248,0.2)",color:"#7dd3fc",fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:5,border:"1px solid rgba(56,189,248,0.3)",whiteSpace:"nowrap",flexShrink:0}}>{clientSel.formule}</span>
-                {clientSel.bassin&&<span style={{background:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.65)",fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:5,whiteSpace:"nowrap",flexShrink:0}}>{clientSel.bassin}</span>}
+              <div style={{fontWeight:900,fontSize:isMobile?18:21,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:-0.5,lineHeight:1.15,textShadow:"0 2px 8px rgba(0,0,0,0.4)"}}>{clientSel.nom}</div>
+              <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
+                {clientSel.formule&&<span style={{background:"rgba(34,211,238,0.18)",color:"#67e8f9",fontSize:11,fontWeight:800,padding:"3px 10px",borderRadius:20,border:"1px solid rgba(34,211,238,0.3)"}}>{clientSel.formule}</span>}
+                {clientSel.bassin&&<span style={{background:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.7)",fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20,border:"1px solid rgba(255,255,255,0.12)"}}>{clientSel.bassin}</span>}
+                {clientSel.volume&&<span style={{background:"rgba(99,102,241,0.2)",color:"#a5b4fc",fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20,border:"1px solid rgba(99,102,241,0.25)"}}>{clientSel.volume} m³</span>}
               </div>
             </div>
-            {/* Date à droite */}
-            <div style={{flexShrink:0,textAlign:"center",background:"rgba(14,165,233,0.2)",border:"1px solid rgba(14,165,233,0.3)",borderRadius:8,padding:"5px 10px"}}>
-              <div style={{fontSize:10,fontWeight:800,color:"#38bdf8",whiteSpace:"nowrap"}}>{new Date(f.date).toLocaleDateString("fr",{day:"2-digit",month:"short"})}</div>
-              <div style={{fontSize:9,color:"rgba(255,255,255,0.45)",marginTop:1}}>{new Date(f.date).toLocaleDateString("fr",{weekday:"short"})}</div>
+            {/* Date + jour */}
+            <div style={{flexShrink:0,textAlign:"center",background:"rgba(6,182,212,0.18)",border:"1.5px solid rgba(34,211,238,0.25)",borderRadius:14,padding:"8px 14px",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
+              <div style={{fontSize:18,fontWeight:900,color:"#22d3ee",lineHeight:1}}>{new Date(f.date).toLocaleDateString("fr",{day:"2-digit"})}</div>
+              <div style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.6)",marginTop:2,letterSpacing:.5,textTransform:"uppercase"}}>{new Date(f.date).toLocaleDateString("fr",{month:"short"})}</div>
+              <div style={{fontSize:9,color:"rgba(255,255,255,0.38)",marginTop:1,letterSpacing:.3}}>{new Date(f.date).toLocaleDateString("fr",{weekday:"short"})}</div>
             </div>
+          </div>
+          {/* Barre de progression étapes */}
+          <div style={{position:"relative",display:"flex",gap:3,padding:"0 20px 14px"}}>
+            {STEP_INFO.map((_,i)=>{
+              const done=i+1<=step;
+              const col=(STEP_INFO[step-1]||{}).color||"#0891b2";
+              return <div key={i} style={{flex:1,height:3,borderRadius:2,background:done?col:"rgba(255,255,255,0.15)",transition:"background .4s",boxShadow:done?`0 0 6px ${col}88`:"none"}}/>;
+            })}
           </div>
         </div>
       )}
@@ -1075,23 +1132,25 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
             <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5,display:"block",marginBottom:10}}>Type d'intervention</span>
             <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
               {[
-                {v:"Entretien complet",    l:"Entretien",   ico:Ico.wrench,   col:"#0284c7",bg:"#e0f2fe"},
-                {v:"Contrôle d'eau",       l:"Contrôle",    ico:Ico.drop,     col:"#0891b2",bg:"#e0f7fa"},
-                {v:"Visite technique",     l:"Visite",      ico:Ico.brush,    col:"#4f46e5",bg:"#eef2ff"},
-                {v:"Bassin en rattrapage", l:"Rattrapage",  ico:Ico.chemicals,col:"#b45309",bg:"#fef3c7"},
-                {v:"Fin de rattrapage",    l:"Fin ratt.",   ico:Ico.check,    col:"#059669",bg:"#d1fae5"},
-                {v:"SAV",                  l:"SAV",         ico:(s,c)=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17" strokeWidth="2.5"/></svg>,col:"#dc2626",bg:"#fef2f2"},
-                {v:"Demande de devis",     l:"Devis",       ico:(s,c)=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>,col:"#7c3aed",bg:"#f5f3ff"},
-                {v:"Passage sans données", l:"Sans data",   ico:(s,c)=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16" strokeWidth="2.5"/></svg>,col:"#64748b",bg:"#f1f5f9"},
-              ].map(({v,l,ico,col,bg})=>{
+                {v:"Entretien complet",    l:"Entretien",   ico:Ico.wrench,   col:"#0284c7",g:"linear-gradient(135deg,#0284c7,#0ea5e9)"},
+                {v:"Contrôle d'eau",       l:"Contrôle",    ico:Ico.drop,     col:"#0891b2",g:"linear-gradient(135deg,#0891b2,#06b6d4)"},
+                {v:"Visite technique",     l:"Visite",      ico:Ico.brush,    col:"#4f46e5",g:"linear-gradient(135deg,#4f46e5,#818cf8)"},
+                {v:"Bassin en rattrapage", l:"Rattrapage",  ico:Ico.chemicals,col:"#b45309",g:"linear-gradient(135deg,#b45309,#f59e0b)"},
+                {v:"Fin de rattrapage",    l:"Fin ratt.",   ico:Ico.check,    col:"#059669",g:"linear-gradient(135deg,#059669,#34d399)"},
+                {v:"SAV",                  l:"SAV",         ico:(s,c)=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17" strokeWidth="2.5"/></svg>,col:"#dc2626",g:"linear-gradient(135deg,#dc2626,#f87171)"},
+                {v:"Demande de devis",     l:"Devis",       ico:(s,c)=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>,col:"#7c3aed",g:"linear-gradient(135deg,#7c3aed,#a78bfa)"},
+                {v:"Passage sans données", l:"Sans data",   ico:(s,c)=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16" strokeWidth="2.5"/></svg>,col:"#64748b",g:"linear-gradient(135deg,#64748b,#94a3b8)"},
+              ].map(({v,l,ico,col,g})=>{
                 const sel=f.type===v;
                 return (
                   <button key={v} onClick={()=>set("type",v)}
-                    style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"12px 4px",borderRadius:14,border:`2px solid ${sel?col:DS.border}`,background:sel?bg:DS.white,cursor:"pointer",textAlign:"center",fontFamily:"inherit",transition:"all .2s",boxShadow:sel?`0 4px 14px ${col}33`:"none",WebkitTapHighlightColor:"transparent",minHeight:76}}>
-                    <div style={{width:38,height:38,borderRadius:11,background:sel?col:"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .2s",boxShadow:sel?`0 3px 10px ${col}44`:"none"}}>
-                      {ico(18,sel?"#fff":DS.mid)}
+                    style={{display:"flex",flexDirection:"column",alignItems:"center",gap:7,padding:"14px 4px 12px",borderRadius:16,border:`2px solid ${sel?col:DS.border}`,background:sel?"transparent":DS.white,cursor:"pointer",textAlign:"center",fontFamily:"inherit",transition:"all .22s",boxShadow:sel?`0 6px 20px ${col}44`:"0 1px 4px rgba(0,0,0,0.04)",WebkitTapHighlightColor:"transparent",minHeight:88,position:"relative",overflow:"hidden"}}>
+                    {sel&&<div style={{position:"absolute",inset:0,background:g,opacity:.12,pointerEvents:"none"}}/>}
+                    <div style={{width:44,height:44,borderRadius:13,background:sel?g:"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .22s",boxShadow:sel?`0 4px 14px ${col}55`:"none",position:"relative"}}>
+                      {ico(20,sel?"#fff":DS.mid)}
                     </div>
-                    <span style={{fontSize:11,fontWeight:sel?800:500,color:sel?col:DS.mid,lineHeight:1.2}}>{l}</span>
+                    <span style={{fontSize:11,fontWeight:sel?900:500,color:sel?col:"#64748b",lineHeight:1.2,letterSpacing:sel?.1:0}}>{l}</span>
+                    {sel&&<div style={{position:"absolute",bottom:6,left:"50%",transform:"translateX(-50%)",width:22,height:3,borderRadius:2,background:col}}/>}
                   </button>
                 );
               })}
@@ -1623,31 +1682,44 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
         </div>
       )}
 
-      {/* ── NAVIGATION ── */}
-      <div style={{marginTop:24,paddingTop:16,borderTop:"1px solid "+DS.border,display:"flex",gap:8,alignItems:"center"}}>
+      {/* ── BARRE DE NAVIGATION ── */}
+      <div style={{marginTop:28,margin:"28px -18px -24px",padding:"14px 16px 20px",background:"rgba(255,255,255,0.75)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",borderTop:"1px solid rgba(6,182,212,0.15)",display:"flex",gap:10,alignItems:"center",boxShadow:"0 -4px 20px rgba(6,182,212,0.08)"}}>
         {/* Retour / Annuler */}
-        <button onClick={step===1?onClose:()=>setStep(s=>s-1)} style={{flex:1,height:50,borderRadius:14,border:"1.5px solid "+DS.border,background:"rgba(255,255,255,0.7)",cursor:"pointer",fontWeight:700,fontSize:13,color:"#64748b",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6,WebkitTapHighlightColor:"transparent",transition:"all .2s"}}>
+        <button onClick={step===1?onClose:()=>setStep(s=>s-1)}
+          style={{flex:1,height:54,borderRadius:16,border:"1.5px solid rgba(6,182,212,0.18)",background:"rgba(240,249,255,0.6)",cursor:"pointer",fontWeight:700,fontSize:13,color:"#0891b2",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:7,WebkitTapHighlightColor:"transparent",transition:"all .2s"}}>
           {step===1
-            ? <><svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Annuler</>
-            : <><svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>Retour</>
+            ? <><svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Annuler</>
+            : <><svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>Retour</>
           }
         </button>
         {/* Brouillon */}
-        <button onClick={saveDraftManual} title="Sauvegarder brouillon" style={{flexShrink:0,width:50,height:50,borderRadius:14,border:`1.5px solid ${draftSaved?"#a7f3d0":DS.border}`,background:draftSaved?"#f0fdf4":"rgba(255,255,255,0.7)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .3s",WebkitTapHighlightColor:"transparent"}}>
+        <button onClick={saveDraftManual} title="Sauvegarder brouillon"
+          style={{flexShrink:0,width:54,height:54,borderRadius:16,border:`1.5px solid ${draftSaved?"#86efac":"rgba(6,182,212,0.18)"}`,background:draftSaved?"linear-gradient(135deg,#f0fdf4,#dcfce7)":"rgba(240,249,255,0.6)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .35s",WebkitTapHighlightColor:"transparent"}}>
           {draftSaved
-            ? <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            : <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            ? <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            : <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
           }
         </button>
         {/* Suivant / Enregistrer */}
         {step<STEPS
-          ? <button onClick={()=>setStep(s=>s+1)} style={{flex:2,height:50,borderRadius:14,border:"none",background:`linear-gradient(135deg,${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color},${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}bb)`,cursor:"pointer",fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit",boxShadow:`0 6px 20px ${(STEP_INFO[step]||STEP_INFO[STEPS-1]).color}44`,display:"flex",alignItems:"center",justifyContent:"center",gap:8,WebkitTapHighlightColor:"transparent",transition:"all .2s"}}>
-              Suivant
-              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-            </button>
-          : <button onClick={handleSave} style={{flex:2,height:50,borderRadius:14,border:"none",background:"linear-gradient(135deg,#059669,#10b981)",cursor:"pointer",fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit",boxShadow:"0 6px 20px rgba(5,150,105,0.4)",display:"flex",alignItems:"center",justifyContent:"center",gap:8,WebkitTapHighlightColor:"transparent",transition:"all .2s"}}>
-              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              Enregistrer
+          ? (()=>{
+              const nextCol=(STEP_INFO[step]||STEP_INFO[STEPS-1]).color;
+              return (
+                <button onClick={()=>setStep(s=>s+1)}
+                  style={{flex:2,height:54,borderRadius:16,border:"none",background:`linear-gradient(135deg,${nextCol},${nextCol}cc)`,cursor:"pointer",fontWeight:900,fontSize:15,color:"#fff",fontFamily:"inherit",boxShadow:`0 8px 24px ${nextCol}55`,display:"flex",alignItems:"center",justifyContent:"center",gap:10,WebkitTapHighlightColor:"transparent",transition:"all .25s",letterSpacing:.2}}>
+                  <span>Suivant</span>
+                  <div style={{width:28,height:28,borderRadius:10,background:"rgba(255,255,255,0.22)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                  </div>
+                </button>
+              );
+            })()
+          : <button onClick={handleSave}
+              style={{flex:2,height:54,borderRadius:16,border:"none",background:"linear-gradient(135deg,#059669,#10b981,#34d399)",cursor:"pointer",fontWeight:900,fontSize:15,color:"#fff",fontFamily:"inherit",boxShadow:"0 8px 24px rgba(5,150,105,0.45)",display:"flex",alignItems:"center",justifyContent:"center",gap:10,WebkitTapHighlightColor:"transparent",transition:"all .25s",letterSpacing:.2}}>
+              <div style={{width:28,height:28,borderRadius:10,background:"rgba(255,255,255,0.22)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <span>Enregistrer</span>
             </button>
         }
       </div>
