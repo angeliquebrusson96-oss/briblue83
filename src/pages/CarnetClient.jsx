@@ -1,9 +1,8 @@
 // @ts-nocheck
-/* eslint-disable react-hooks/static-components */
 import React, { useState, useEffect, useCallback } from "react";
 import { getDoc } from "firebase/firestore";
 import { APP_DOC } from "../lib/firebase";
-import { getPH, getCL, getTemp, getResumePassage, isControleType, generateCarnetCode, calculerPassagesPrevusContrat, isPassageEffectue, isPassageDansContrat, calcMensualites, migrateMois, totalAnnuel } from "../utils/helpers";
+import { getPH, getCL, getTemp, getResumePassage, isControleType, generateCarnetCode, calculerPassagesPrevusContrat, isPassageEffectue, isPassageDansContrat, calcMensualites, totalAnnuel } from "../utils/helpers";
 import { genererContratHTML } from "../components/FormPassage";
 import { resolvePhoto } from "../lib/photoStore";
 import { PhotoImg } from "../components/ui";
@@ -93,8 +92,15 @@ function buildRapportHTML(passage, client) {
       <button class="print-btn" onclick="window.print()">🖨️ Enregistrer en PDF</button>
     </main></body></html>`;
 }
-function ouvrirContrat(client, sigPrestataire="", sigClient="") {
-  const html = genererContratHTML(client, sigPrestataire, sigClient);
+async function ouvrirContrat(client, sigPrestataire="", sigClient="") {
+  // Résoudre les clés idb: avant de générer le PDF signé
+  let sigPre = sigPrestataire||"";
+  let sigCli = sigClient||"";
+  if (sigPre.startsWith("idb:") || sigCli.startsWith("idb:")) {
+    if (sigPre.startsWith("idb:")) sigPre = (await resolvePhoto(sigPre)) || "";
+    if (sigCli.startsWith("idb:")) sigCli = (await resolvePhoto(sigCli)) || "";
+  }
+  const html = genererContratHTML(client, sigPre, sigCli);
   const blob = new Blob([html], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -131,12 +137,12 @@ async function ouvrirRapport(passage, client) {
   }
   setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
-function telechargerRapport(passage, client, existingUrl) {
-  const p = passage || {};
-  const url = existingUrl || (() => {
-    const html = buildRapportHTML(p, client);
-    return URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
-  })();
+async function telechargerRapport(passage, client, existingUrl) {
+  // Résoudre les clés idb: avant de générer le PDF (photos locales → base64)
+  const p = existingUrl ? (passage||{}) : await resolvePassagePhotosLocal(passage||{});
+  const url = existingUrl || URL.createObjectURL(
+    new Blob([buildRapportHTML(p, client)], { type: "text/html;charset=utf-8" })
+  );
   const a = document.createElement("a");
   a.href = url;
   a.download = `${cleanFileName(client?.nom)}-${cleanFileName(p.date)}-rapport.html`;
@@ -178,7 +184,7 @@ export function CarnetPublic({ code }) {
   const [loadedPassages, setLoadedPassages] = useState(null);
   const [loadedLivraisons, setLoadedLivraisons] = useState([]);
   const [loadedVersements, setLoadedVersements] = useState({});
-  const [loadedRetardsCarnet, setLoadedRetardsCarnet] = useState({});
+  const [, setLoadedRetardsCarnet] = useState({});
   const [loadedContrats, setLoadedContrats] = useState({});
   const [refreshing, setRefreshing] = useState(false);
 
@@ -248,7 +254,7 @@ export function CarnetPublic({ code }) {
   const clientContrat = loadedContrats["CT-"+client.id]
     || Object.values(loadedContrats).find(ct=>ct?.clientId===client.id)
     || {};
-  return <CarnetView client={client} passages={loadedPassages||[]} livraisons={clientLivraisons} versements={loadedVersements} retardsCarnet={loadedRetardsCarnet} contrat={clientContrat} onRefresh={loadData} refreshing={refreshing}/>;
+  return <CarnetView client={client} passages={loadedPassages||[]} livraisons={clientLivraisons} versements={loadedVersements} contrat={clientContrat} onRefresh={loadData} refreshing={refreshing}/>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -461,10 +467,12 @@ function SOSModal({ show, onClose, clientNom }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // VUE CARNET COMMUNE (partagée entre CarnetPublicInline et CarnetPublic)
 // ─────────────────────────────────────────────────────────────────────────────
-export function CarnetView({ client, passages, livraisons=[], versements={}, retardsCarnet={}, contrat={}, onRefresh, refreshing }) {
+export function CarnetView({ client, passages, livraisons=[], versements={}, contrat={}, onRefresh, refreshing }) {
   const [selectedPassage, setSelectedPassage] = useState(null);
   const [activeTab, setActiveTab] = useState("accueil");
   const [showSOS, setShowSOS] = useState(false);
+  // openYears ici pour éviter un hook dans RapportsList (composant défini dans le rendu)
+  const [openYears, setOpenYears] = useState({});
 
   const passClient = (passages||[])
     .filter(p => p.clientId === client.id)
@@ -479,8 +487,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, ret
   const totalVisitesPrevues = calculerPassagesPrevusContrat(client);
   const passagesDeduits = passClient.filter(p => isPassageDansContrat(p, client) && isPassageEffectue(p));
   const visitesEffectuees = passagesDeduits.length;
-  const visitesRestantes = Math.max(0, totalVisitesPrevues - visitesEffectuees);
-  const _progressPct = totalVisitesPrevues > 0 ? Math.min(100, (visitesEffectuees / totalVisitesPrevues) * 100) : 0;
+  const progressPct = totalVisitesPrevues > 0 ? Math.min(100, (visitesEffectuees / totalVisitesPrevues) * 100) : 0;
 
   const daysUntilFin = client.dateFin ? Math.ceil((new Date(client.dateFin) - new Date()) / (1000*60*60*24)) : null;
   const contratActif = daysUntilFin === null || daysUntilFin > 0;
@@ -492,13 +499,12 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, ret
   const prixAnnuel = totalAnnuel(client.moisParMois||client.saisons,"entretien") * (client.prixPassageE||0)
                    + totalAnnuel(client.moisParMois||client.saisons,"controle")  * (client.prixPassageC||0)
                    || client.prix || 0;
-  const { m1: mensualiteSolde, m11: mensualiteBase, estRond } = calcMensualites(prixAnnuel);
+  const { m1: mensualiteSolde, m11: mensualiteBase } = calcMensualites(prixAnnuel);
 
   // Mois de solde = 1er mois du contrat (1er prélèvement = ajustement)
   const debutDate = client.dateDebut ? new Date(client.dateDebut) : null;
   const isMoisSolde = (y, m) => debutDate && y === debutDate.getFullYear() && m === debutDate.getMonth()+1;
   const getMensualite = (y, m) => isMoisSolde(y, m) ? mensualiteSolde : mensualiteBase;
-  const fmtEur = (v) => v % 1 === 0 ? `${v}€` : `${v.toFixed(2).replace(".", ",")}€`;
 
   const mensualite = mensualiteBase;
   const MOIS_LONG = ["","Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
@@ -698,6 +704,20 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, ret
               {client.dateFin ? fmtDate(client.dateFin,{day:"2-digit",month:"short",year:"numeric"}) : "—"}
             </div>
           </div>
+          <div className="cv-glass" style={{borderRadius:12,padding:"11px 13px"}}>
+            <div style={{fontSize:10,color:"rgba(255,255,255,0.65)",marginBottom:3,display:"flex",alignItems:"center",gap:4}}>
+              <svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.65)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Visites
+            </div>
+            <div style={{fontSize:14,fontWeight:600,color:"#fff"}}>
+              {visitesEffectuees}<span style={{fontSize:11,color:"rgba(255,255,255,0.5)",fontWeight:400}}>/{totalVisitesPrevues||"—"}</span>
+            </div>
+            {totalVisitesPrevues>0&&(
+              <div style={{marginTop:5,height:4,borderRadius:2,background:"rgba(255,255,255,0.15)",overflow:"hidden"}}>
+                <div style={{height:"100%",width:`${progressPct}%`,background:"linear-gradient(90deg,#4ade80,#86efac)",borderRadius:2,transition:"width .5s"}}/>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -757,9 +777,10 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, ret
   ) : null;
 
   // ─── RAPPORTS LIST ─────────────────────────────────────────────────────────
+  // Note : openYears est dans le parent pour éviter un useState dans un composant
+  // défini à l'intérieur du rendu (violation de règle des hooks React).
   const RapportsList = ({list, showAll}) => {
     const currentYear = new Date().getFullYear();
-    const [openYears, setOpenYears] = React.useState({});
     const toggleYear = (y) => setOpenYears(prev => ({...prev, [y]: !prev[y]}));
 
     // Grouper par année si showAll, sinon afficher tel quel
@@ -1266,7 +1287,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, ret
         {/* ACCUEIL */}
         {activeTab==="accueil" && <>
           <div className="cv-stagger-2"><DerniereIntervention/></div>
-          {retardsCarnet?.[client.id] && <div className="cv-stagger-3"><VersementWidget/></div>}
+          {mensualite>0 && client.dateDebut && <div className="cv-stagger-3"><VersementWidget/></div>}
           <div className="cv-stagger-4"><RapportsList list={passClient.slice(0,3)} showAll={false}/></div>
           <div className="cv-stagger-5"><RapportDetail/></div>
         </>}

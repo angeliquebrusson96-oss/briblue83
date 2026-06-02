@@ -247,7 +247,7 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
 
   return (
     <>
-    <Modal title="" onClose={onClose} wide>
+    <Modal title="" onClose={onClose} wide defaultFull>
       <div style={{margin:isMobile?"-18px -20px 0":"-24px -28px 0"}}>
 
         {client.photoPiscine&&(

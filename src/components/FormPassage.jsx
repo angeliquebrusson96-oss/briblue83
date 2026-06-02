@@ -206,8 +206,13 @@ setupCanvas('sigPresta');setupCanvas('sigClient');
 </body></html>`;
 }
 
-export function ouvrirContrat(client, sigPrestataire="", sigClient="") {
-  const html = genererContratHTML(client, sigPrestataire, sigClient);
+export async function ouvrirContrat(client, sigPrestataire="", sigClient="") {
+  // Résoudre les clés idb: en base64 avant de générer le PDF
+  let sigPre = sigPrestataire||"";
+  let sigCli = sigClient||"";
+  if (sigPre.startsWith("idb:")) sigPre = (await resolvePhoto(sigPre)) || "";
+  if (sigCli.startsWith("idb:")) sigCli = (await resolvePhoto(sigCli)) || "";
+  const html = genererContratHTML(client, sigPre, sigCli);
   const blob = new Blob([html], {type:"text/html;charset=utf-8"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -472,24 +477,24 @@ export async function envoyerEmail(passage, client, onSent) {
 
 // ─── COMPOSANTS LOCAUX ───────────────────────────────────────────────────────
 
-function MultiCheck({ label, options, values, onChange }) {
+function MultiCheck({ label, options, values, onChange, compact=false }) {
   const toggle = (v) => { const arr = values.includes(v) ? values.filter(x=>x!==v) : [...values,v]; onChange(arr); };
   return (
     <div>
       {label && (
-        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-          <span style={{fontSize:13,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5}}>{label}</span>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:compact?6:10}}>
+          <span style={{fontSize:compact?11:13,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5}}>{label}</span>
           {values.length>0 && <span style={{background:DS.blue,color:"#fff",fontSize:11,fontWeight:800,borderRadius:10,padding:"2px 8px"}}>{values.length}</span>}
         </div>
       )}
-      <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+      <div style={{display:"flex",flexWrap:"wrap",gap:compact?5:8}}>
         {options.map(o=>{
           const sel=values.includes(o);
           return (
-            <button key={o} onClick={()=>toggle(o)} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"10px 16px",minHeight:46,borderRadius:22,border:`2px solid ${sel?DS.blue:DS.border}`,background:sel?"linear-gradient(135deg,#0891b2,#0ea5e9)":DS.white,cursor:"pointer",fontFamily:"inherit",fontWeight:600,fontSize:14,color:sel?"#fff":DS.mid,boxShadow:sel?"0 3px 10px "+DS.blue+"33":"none",transition:"all .2s",WebkitTapHighlightColor:"transparent"}}>
+            <button key={o} onClick={()=>toggle(o)} style={{display:"inline-flex",alignItems:"center",gap:compact?4:6,padding:compact?"6px 11px":"10px 16px",minHeight:compact?34:46,borderRadius:22,border:`2px solid ${sel?DS.blue:DS.border}`,background:sel?"linear-gradient(135deg,#0891b2,#0ea5e9)":DS.white,cursor:"pointer",fontFamily:"inherit",fontWeight:600,fontSize:compact?12:14,color:sel?"#fff":DS.mid,boxShadow:sel?"0 3px 10px "+DS.blue+"33":"none",transition:"all .2s",WebkitTapHighlightColor:"transparent"}}>
               {sel
-                ? <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                : <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={DS.border} strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                ? <svg width={compact?10:12} height={compact?10:12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                : <svg width={compact?10:12} height={compact?10:12} viewBox="0 0 24 24" fill="none" stroke={DS.border} strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               }
               {o}
             </button>
@@ -1011,7 +1016,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
   const clientSel = clients.find(c=>c.id===f.clientId);
 
   return (
-    <Modal title={isEdit ? "Modifier le passage" : "Rapport"} onClose={onClose} wide>
+    <Modal title={isEdit ? "Modifier le passage" : "Rapport"} onClose={onClose} wide defaultFull>
 
             {/* ═══ BROUILLON DÉTECTÉ ═══ */}
       {hasDraft && (
@@ -1092,38 +1097,42 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
           {/* Client */}
           <div>
             <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5,display:"block",marginBottom:8}}>Client *</span>
-            {/* Barre de recherche */}
-            <div style={{position:"relative",marginBottom:8}}>
-              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.2" strokeLinecap="round" style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            {/* Barre de recherche + dropdown autocomplete */}
+            <div style={{position:"relative"}}>
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.2" strokeLinecap="round" style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",zIndex:1}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               <input
-                type="search" value={clientSearch} onChange={e=>setClientSearch(e.target.value)}
-                placeholder="Rechercher un client…"
-                style={{width:"100%",padding:"12px 14px 12px 40px",borderRadius:14,border:"2px solid "+DS.border,fontSize:16,fontFamily:"inherit",color:DS.dark,boxSizing:"border-box",outline:"none",background:"#fff"}}/>
-              {clientSearch && (
-                <button onClick={()=>setClientSearch("")} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",padding:4,color:"#94a3b8",fontSize:16,lineHeight:1}}>✕</button>
-              )}
-            </div>
-            {/* Liste filtrée */}
-            <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:220,overflowY:"auto",WebkitOverflowScrolling:"touch",borderRadius:14,border:"2px solid "+DS.border,padding:8,background:DS.light}}>
-              {clients.filter(c=>c.nom.toLowerCase().includes(clientSearch.toLowerCase())).length===0
-                ? <div style={{padding:"20px",textAlign:"center",color:DS.mid,fontSize:14}}>Aucun client trouvé</div>
-                : clients.filter(c=>c.nom.toLowerCase().includes(clientSearch.toLowerCase())).map(c=>{
-                  const sel=f.clientId===c.id;
-                  return (
-                    <button key={c.id} onClick={()=>{set("clientId",c.id);setClientSearch("");}}
-                      style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,border:`2px solid ${sel?DS.blue:DS.border}`,background:sel?DS.blueSoft:"rgba(255,255,255,0.9)",cursor:"pointer",textAlign:"left",fontFamily:"inherit",transition:"all .2s",minHeight:60,WebkitTapHighlightColor:"transparent",boxShadow:sel?"0 3px 14px "+DS.blue+"22":"none"}}>
-                      <Avatar nom={c.nom} size={38}/>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontWeight:700,fontSize:15,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
-                        <div style={{fontSize:12,color:DS.mid,marginTop:2}}>{c.formule}{c.bassin?" · "+c.bassin:""}</div>
-                      </div>
-                      {sel && <div style={{width:28,height:28,borderRadius:14,background:"linear-gradient(135deg,#0891b2,#06b6d4)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                        {Ico.check(13,"#fff")}
-                      </div>}
-                    </button>
-                  );
-                })
+                type="search" value={clientSearch}
+                onChange={e=>setClientSearch(e.target.value)}
+                placeholder={clientSel ? `${clientSel.nom}` : "Rechercher un client…"}
+                style={{width:"100%",padding:"14px 40px 14px 42px",borderRadius:14,border:`2px solid ${clientSearch?DS.blue:DS.border}`,fontSize:16,fontFamily:"inherit",color:DS.dark,boxSizing:"border-box",outline:"none",background:"#fff",boxShadow:clientSearch?"0 0 0 3px "+DS.blue+"22":"none",transition:"all .2s"}}/>
+              {clientSearch
+                ? <button onClick={()=>setClientSearch("")} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"rgba(148,163,184,0.15)",border:"none",cursor:"pointer",padding:"4px 7px",borderRadius:8,color:"#64748b",fontSize:13,fontWeight:700,lineHeight:1}}>✕</button>
+                : clientSel && <div style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",width:22,height:22,borderRadius:11,background:"linear-gradient(135deg,#059669,#34d399)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    {Ico.check(10,"#fff")}
+                  </div>
               }
+              {/* Dropdown résultats — visible seulement pendant la saisie */}
+              {clientSearch.length>0 && (
+                <div style={{position:"absolute",top:"calc(100% + 6px)",left:0,right:0,zIndex:100,background:"rgba(255,255,255,0.97)",borderRadius:14,border:"2px solid "+DS.blue+"44",boxShadow:"0 8px 32px rgba(8,145,178,0.18)",maxHeight:240,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+                  {clients.filter(c=>c.nom.toLowerCase().includes(clientSearch.toLowerCase())).length===0
+                    ? <div style={{padding:"18px",textAlign:"center",color:DS.mid,fontSize:14}}>Aucun client trouvé</div>
+                    : clients.filter(c=>c.nom.toLowerCase().includes(clientSearch.toLowerCase())).map(c=>{
+                        const sel=f.clientId===c.id;
+                        return (
+                          <button key={c.id} onMouseDown={e=>e.preventDefault()} onClick={()=>{set("clientId",c.id);setClientSearch("");}}
+                            style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"12px 14px",border:"none",borderBottom:"1px solid #f1f5f9",background:sel?"linear-gradient(135deg,#e0f2fe,#f0f9ff)":"transparent",cursor:"pointer",textAlign:"left",fontFamily:"inherit",transition:"background .15s",WebkitTapHighlightColor:"transparent"}}>
+                            <Avatar nom={c.nom} size={36}/>
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{fontWeight:700,fontSize:14,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
+                              <div style={{fontSize:11,color:DS.mid,marginTop:1}}>{c.formule}{c.bassin?" · "+c.bassin:""}</div>
+                            </div>
+                            {sel&&<svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                          </button>
+                        );
+                      })
+                  }
+                </div>
+              )}
             </div>
           </div>
 
@@ -1527,7 +1536,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
               <OuiNon label="Livraison de produits ?" value={f.livraisonProduits} onChange={v=>set("livraisonProduits",v)}/>
               {f.livraisonProduits && (
                 <>
-                  <MultiCheck label="Produit(s) livré(s)" values={f.produitsLivres} onChange={v=>set("produitsLivres",v)} options={produitsStock&&produitsStock.length>0?produitsStock:PRODUITS_DEFAUT}/>
+                  <MultiCheck label="Produit(s) livré(s)" values={f.produitsLivres} onChange={v=>set("produitsLivres",v)} options={produitsStock&&produitsStock.length>0?produitsStock:PRODUITS_DEFAUT} compact/>
                   <div>
                     <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:4}}>Autre (quantités, marques…)</span>
                     <textarea value={f.livraisonAutre} onChange={e=>set("livraisonAutre",e.target.value)}

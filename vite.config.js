@@ -29,6 +29,9 @@ export default defineConfig({
         sequences: false,
         // Conserver les noms de fonctions pour le débogage
         keep_fnames: true,
+        // Supprimer tous les console.* en production → moins d'infos en clair
+        drop_console: true,
+        drop_debugger: true,
       },
       format: {
         // Supprimer les commentaires pour réduire la taille

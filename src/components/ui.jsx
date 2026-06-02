@@ -194,7 +194,7 @@ export function Tag({ children, color=DS.blue, bg, style={} }) {
 // Glisser le handle bleu vers le haut ou le bas pour changer d'état.
 // Swipe rapide bas depuis "réduit" → fermeture.
 
-export function Modal({ title, onClose, children, wide, noHeader }) {
+export function Modal({ title, onClose, children, wide, noHeader, defaultFull=false }) {
   const isMobile = useIsMobile();
 
   // ── Verrouillage scroll body ─────────────────────────────────────────────────
@@ -226,13 +226,14 @@ export function Modal({ title, onClose, children, wide, noHeader }) {
 
   const setTVh = (v) => { tVhRef.current = v; _setTVh(v); };
 
-  // Animation d'ouverture : glisse depuis le bas vers mid
+  // Animation d'ouverture : glisse depuis le bas vers mid ou full
   useEffect(() => {
     if (!isMobile) return;
+    const target = defaultFull ? SNAP.full : SNAP.mid;
     const raf = requestAnimationFrame(() => {
-      drag.current.baseVh = SNAP.mid;
+      drag.current.baseVh = target;
       setSnapping(true);
-      setTVh(SNAP.mid);
+      setTVh(target);
     });
     return () => cancelAnimationFrame(raf);
   // eslint-disable-next-line react-hooks/exhaustive-deps
