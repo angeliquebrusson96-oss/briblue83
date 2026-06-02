@@ -187,54 +187,231 @@ export function Tag({ children, color=DS.blue, bg, style={} }) {
 }
 
 // ─── MODAL ───────────────────────────────────────────────────────────────────
+// Sur mobile : bottom sheet draggable à 3 positions :
+//   • Plein écran (translateY = 0)
+//   • Par défaut  (translateY = 8 vh → 92 vh visible)
+//   • Réduit/peek (translateY = 57 vh → 43 vh visible)
+// Glisser le handle bleu vers le haut ou le bas pour changer d'état.
+// Swipe rapide bas depuis "réduit" → fermeture.
+
 export function Modal({ title, onClose, children, wide, noHeader }) {
   const isMobile = useIsMobile();
+
+  // ── Verrouillage scroll body ─────────────────────────────────────────────────
   useEffect(()=>{
-    const prev = document.body.style.overflow;
+    const prev    = document.body.style.overflow;
     const prevPos = document.body.style.position;
     const prevTop = document.body.style.top;
     const scrollY = window.scrollY;
-    document.body.style.overflow = "hidden";
-    document.body.style.position = "fixed";
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.width = "100%";
+    document.body.style.overflow  = "hidden";
+    document.body.style.position  = "fixed";
+    document.body.style.top       = `-${scrollY}px`;
+    document.body.style.width     = "100%";
     return ()=>{
-      document.body.style.overflow = prev;
-      document.body.style.position = prevPos;
-      document.body.style.top = prevTop;
-      document.body.style.width = "";
+      document.body.style.overflow  = prev;
+      document.body.style.position  = prevPos;
+      document.body.style.top       = prevTop;
+      document.body.style.width     = "";
       window.scrollTo(0, scrollY);
     };
   },[]);
-  const maxH = isMobile ? "min(92dvh,92vh)" : "min(88dvh,88vh)";
+
+  // ── Bottom sheet state (mobile uniquement) ───────────────────────────────────
+  const SNAP = { full:0, mid:8, peek:57 };
+  // On commence offscreen (100) puis on anime vers mid à l'ouverture
+  const tVhRef  = useRef(100);
+  const [tVh, _setTVh]   = useState(100);
+  const [snapping, setSnapping] = useState(true);
+  const drag = useRef({ active:false, startY:0, startT:0, baseVh:100 });
+
+  const setTVh = (v) => { tVhRef.current = v; _setTVh(v); };
+
+  // Animation d'ouverture : glisse depuis le bas vers mid
+  useEffect(() => {
+    if (!isMobile) return;
+    const raf = requestAnimationFrame(() => {
+      drag.current.baseVh = SNAP.mid;
+      setSnapping(true);
+      setTVh(SNAP.mid);
+    });
+    return () => cancelAnimationFrame(raf);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const doSnap = (target) => {
+    drag.current.active  = false;
+    drag.current.baseVh  = target;
+    setSnapping(true);
+    setTVh(target);
+  };
+
+  const onHandleTouchStart = (e) => {
+    drag.current.active  = true;
+    drag.current.startY  = e.touches[0].clientY;
+    drag.current.startT  = Date.now();
+    drag.current.baseVh  = tVhRef.current;
+    setSnapping(false);      // live follow sans transition
+  };
+
+  const onHandleTouchMove = (e) => {
+    if (!drag.current.active) return;
+    const dy   = e.touches[0].clientY - drag.current.startY;
+    const vhPx = window.innerHeight / 100;
+    const next = Math.max(0, Math.min(88, drag.current.baseVh + dy / vhPx));
+    setTVh(next);
+  };
+
+  const onHandleTouchEnd = (e) => {
+    if (!drag.current.active) return;
+    const dy   = e.changedTouches[0].clientY - drag.current.startY;
+    const dt   = Math.max(1, Date.now() - drag.current.startT);
+    const vel  = dy / dt;   // px/ms  (positif = vers le bas)
+    const vhPx = window.innerHeight / 100;
+    const cur  = Math.max(0, Math.min(88, drag.current.baseVh + dy / vhPx));
+
+    // Fermeture : trop bas ou swipe rapide vers le bas depuis peek/mid
+    if (cur > 78 || (vel > 0.85 && cur > 44)) { onClose(); return; }
+
+    // Swipe rapide vers le haut → plein écran
+    if (vel < -0.5) { doSnap(SNAP.full); return; }
+
+    // Swipe rapide vers le bas
+    if (vel > 0.5) {
+      doSnap(drag.current.baseVh <= SNAP.mid + 4 ? SNAP.peek : SNAP.mid);
+      return;
+    }
+
+    // Glissement lent → snap le plus proche
+    const nearest = Object.entries(SNAP).reduce((best, [k, v]) =>
+      Math.abs(cur - v) < Math.abs(cur - SNAP[best]) ? k : best
+    , "mid");
+    doSnap(SNAP[nearest]);
+  };
+
+  // ── BUREAU (inchangé) ────────────────────────────────────────────────────────
+  if (!isMobile) {
+    return (
+      <div style={{position:"fixed",inset:0,background:"rgba(11,18,32,0.45)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:"12px",backdropFilter:"blur(14px) saturate(140%)",WebkitBackdropFilter:"blur(14px) saturate(140%)"}}>
+        <div className="scale-in"
+          style={{background:"rgba(255,255,255,0.72)",backdropFilter:"blur(28px) saturate(200%)",WebkitBackdropFilter:"blur(28px) saturate(200%)",borderRadius:DS.radiusLg,width:"100%",maxWidth:wide?720:560,maxHeight:"min(88dvh,88vh)",display:"flex",flexDirection:"column",boxShadow:"0 30px 80px rgba(6,182,212,0.22),0 10px 30px rgba(15,23,42,0.18),inset 0 1px 0 rgba(255,255,255,0.8)",border:"1px solid rgba(255,255,255,0.55)",overflowY:"hidden",overscrollBehavior:"contain"}}>
+          {!noHeader && <div style={{flexShrink:0,padding:"14px 24px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid rgba(255,255,255,0.45)"}}>
+            <span style={{color:DS.dark,fontWeight:800,fontSize:17,letterSpacing:"-0.01em"}}>{title}</span>
+            <button onClick={onClose} style={{width:44,height:44,borderRadius:14,background:"linear-gradient(135deg,#ef4444,#dc2626)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 12px rgba(220,38,38,0.35)"}}>
+              {Ico.close(18,"#fff")}
+            </button>
+          </div>}
+          <div data-modal-body="1" style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",padding:noHeader?"0":"20px 24px 24px",overscrollBehavior:"contain"}}>
+            {children}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── MOBILE BOTTOM SHEET ──────────────────────────────────────────────────────
+  const isFullScreen = tVh < 3;
+  const isPeek       = tVh > 42;
+
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(11,18,32,0.45)",zIndex:200,display:"flex",alignItems:isMobile?"flex-end":"center",justifyContent:"center",padding:isMobile?"0":"12px",backdropFilter:"blur(14px) saturate(140%)",WebkitBackdropFilter:"blur(14px) saturate(140%)"}}>
-      <div className={isMobile?"slide-up":"scale-in"}
+    <div style={{position:"fixed",inset:0,zIndex:200,overflow:"hidden"}}>
+
+      {/* ── Backdrop ── */}
+      <div
+        onClick={()=> isPeek ? doSnap(SNAP.mid) : onClose()}
         style={{
-          background:"rgba(255,255,255,0.72)",
-          backdropFilter:"blur(28px) saturate(200%)",
-          WebkitBackdropFilter:"blur(28px) saturate(200%)",
-          borderRadius:isMobile?"28px 28px 0 0":DS.radiusLg,
-          width:"100%",maxWidth:isMobile?"100%":wide?720:560,
-          maxHeight:maxH,
-          display:"flex",flexDirection:"column",
-          boxShadow:"0 30px 80px rgba(6,182,212,0.22), 0 10px 30px rgba(15,23,42,0.18), inset 0 1px 0 rgba(255,255,255,0.8)",
-          border:"1px solid rgba(255,255,255,0.55)",
-          overflowY:"hidden",
+          position:"absolute",inset:0,
+          background:`rgba(11,18,32,${isPeek ? 0.18 : 0.48})`,
+          backdropFilter: isFullScreen ? "none" : isPeek ? "blur(4px)" : "blur(14px) saturate(140%)",
+          WebkitBackdropFilter: isFullScreen ? "none" : isPeek ? "blur(4px)" : "blur(14px) saturate(140%)",
+          transition:"background .3s",
+        }}
+      />
+
+      {/* ── Sheet ── */}
+      <div
+        style={{
+          position:"absolute", bottom:0, left:0, right:0,
+          height:"100dvh",
+          transform:`translateY(${tVh}vh)`,
+          transition: snapping
+            ? "transform .40s cubic-bezier(.22,1,.36,1), border-radius .28s"
+            : "none",
+          borderRadius: isFullScreen ? 0 : "28px 28px 0 0",
+          background:"rgba(255,255,255,0.86)",
+          backdropFilter:"blur(30px) saturate(200%)",
+          WebkitBackdropFilter:"blur(30px) saturate(200%)",
+          display:"flex", flexDirection:"column",
+          boxShadow:"0 -6px 40px rgba(6,182,212,0.18), 0 -2px 16px rgba(15,23,42,0.12)",
+          border:"1px solid rgba(255,255,255,0.62)",
+          borderBottom:"none",
           paddingBottom:"env(safe-area-inset-bottom,0px)",
           overscrollBehavior:"contain",
-          WebkitOverflowScrolling:"touch",
-        }}>
-        {isMobile && <div style={{flexShrink:0,display:"flex",justifyContent:"center",paddingTop:10,paddingBottom:2}}>
-          <div style={{width:42,height:5,borderRadius:3,background:"linear-gradient(90deg,#22d3ee,#0891b2)",opacity:0.6}}/>
-        </div>}
-        {!noHeader && <div style={{flexShrink:0,padding:isMobile?"8px 18px 12px":"14px 24px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid rgba(255,255,255,0.45)"}}>
-          <span style={{color:DS.dark,fontWeight:800,fontSize:17,letterSpacing:"-0.01em"}}>{title}</span>
-          <button onClick={onClose} style={{width:44,height:44,borderRadius:14,background:"linear-gradient(135deg,#ef4444,#dc2626)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 12px rgba(220,38,38,0.35)",flexShrink:0}}>
-            {Ico.close(18,"#fff")}
-          </button>
-        </div>}
-        <div data-modal-body="1" style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",padding:noHeader?"0":isMobile?"14px 18px 24px":"20px 24px 24px",overscrollBehavior:"contain"}}>
+          willChange:"transform",
+        }}
+      >
+        {/* ── Poignée de glissement ── */}
+        <div
+          onTouchStart={onHandleTouchStart}
+          onTouchMove={onHandleTouchMove}
+          onTouchEnd={onHandleTouchEnd}
+          style={{
+            flexShrink:0,
+            paddingTop: isFullScreen ? "max(env(safe-area-inset-top,0px),14px)" : 14,
+            paddingBottom:10,
+            display:"flex", flexDirection:"column", alignItems:"center", gap:0,
+            cursor:"grab",
+            touchAction:"none",
+            userSelect:"none",
+          }}
+        >
+          {/* Barre bleue */}
+          <div style={{
+            width:44, height:5, borderRadius:3,
+            background:"linear-gradient(90deg,#22d3ee,#0891b2)",
+            opacity: .65,
+            boxShadow: "0 2px 8px rgba(8,145,178,0.35)",
+          }}/>
+          {/* Indicateurs de position : 3 segments, le segment actif s'allonge */}
+          <div style={{display:"flex",gap:5,marginTop:9,alignItems:"center"}}>
+            {[SNAP.full, SNAP.mid, SNAP.peek].map((s,i)=>{
+              const active = Math.abs(tVhRef.current - s) < 12;
+              return (
+                <div key={i} style={{
+                  width: active ? 20 : 7,
+                  height: 4,
+                  borderRadius: 2,
+                  background: active ? "#0891b2" : "#dde4ed",
+                  transition: "width .25s cubic-bezier(.22,1,.36,1), background .25s",
+                }}/>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── En-tête ── */}
+        {!noHeader && (
+          <div style={{flexShrink:0,padding:"2px 18px 12px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid rgba(255,255,255,0.5)"}}>
+            <span style={{color:DS.dark,fontWeight:800,fontSize:17,letterSpacing:"-0.01em"}}>{title}</span>
+            <button onClick={onClose} style={{width:40,height:40,borderRadius:13,background:"linear-gradient(135deg,#ef4444,#dc2626)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 12px rgba(220,38,38,0.35)",flexShrink:0,WebkitTapHighlightColor:"transparent"}}>
+              {Ico.close(16,"#fff")}
+            </button>
+          </div>
+        )}
+
+        {/* ── Contenu scrollable ── */}
+        <div
+          data-modal-body="1"
+          style={{
+            flex:1,
+            overflowY: isPeek ? "hidden" : "auto",
+            WebkitOverflowScrolling:"touch",
+            padding: noHeader ? "0" : "10px 18px 24px",
+            overscrollBehavior:"contain",
+            opacity: isPeek ? 0.55 : 1,
+            transition:"opacity .3s",
+            pointerEvents: isPeek ? "none" : "auto",
+          }}
+        >
           {children}
         </div>
       </div>

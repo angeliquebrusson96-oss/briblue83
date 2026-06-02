@@ -923,25 +923,44 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
   ];
   const STEP_INFO = isSansDonnees ? STEP_INFO_SANS : isSAV ? STEP_INFO_SAV : isDevis ? STEP_INFO_DEVIS : STEP_INFO_FULL;
 
-  const Stepper = () => (
-    <div style={{marginBottom:16,margin:"0 -2px 16px",padding:"0 2px"}}>
-      <div style={{display:"flex",gap:7,overflowX:"auto",paddingBottom:3,scrollbarWidth:"none",msOverflowStyle:"none",WebkitOverflowScrolling:"touch"}}>
-        {STEP_INFO.map((s,i)=>{
-          const active=i+1===step, done=i+1<step;
-          const col=s.color;
-          return (
-            <button key={i} onClick={()=>setStep(i+1)} style={{flexShrink:0,padding:"9px 15px",borderRadius:22,border:"none",cursor:"pointer",fontFamily:"inherit",background:active?col:done?col+"18":"#f1f5f9",color:active?"#fff":done?col:"#94a3b8",fontWeight:active?800:600,fontSize:12,display:"flex",alignItems:"center",gap:6,boxShadow:active?`0 4px 14px ${col}44`:"none",transition:"all .25s",WebkitTapHighlightColor:"transparent",letterSpacing:active?0.1:0}}>
-              {done
-                ? <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                : (typeof s.ic==="function" ? s.ic(active?"#fff":"#94a3b8",14) : <span style={{fontSize:14,lineHeight:1}}>{s.ic}</span>)
-              }
-              {s.l}
-            </button>
-          );
-        })}
+  const Stepper = () => {
+    const stepColor = STEP_INFO[step-1]?.color || DS.blue;
+    return (
+      <div style={{marginBottom:20,padding:"0 2px"}}>
+        {/* Cercles numérotés + ligne de progression */}
+        <div style={{display:"flex",alignItems:"center"}}>
+          {STEP_INFO.map((s,i)=>{
+            const active=i+1===step, done=i+1<step;
+            const col=s.color;
+            return (
+              <React.Fragment key={i}>
+                {i>0 && (
+                  <div style={{flex:1,height:3,borderRadius:2,background:done||i+1===step
+                    ? `linear-gradient(90deg,${STEP_INFO[i-1].color},${col}${done?"":"66"})`
+                    : "#e2e8f0",transition:"background .35s"}}/>
+                )}
+                <button onClick={()=>setStep(i+1)}
+                  style={{flexShrink:0,width:42,height:42,borderRadius:21,border:`3px solid ${active?col:done?col:"#e2e8f0"}`,background:active?`linear-gradient(135deg,${col},${col}cc)`:done?col+"16":"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:active?`0 6px 20px ${col}55`:done?`0 2px 8px ${col}22`:"none",transition:"all .3s",WebkitTapHighlightColor:"transparent",position:"relative",zIndex:2}}>
+                  {done
+                    ? <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    : active
+                      ? (typeof s.ic==="function" ? s.ic("#fff",16) : <span style={{fontSize:15,lineHeight:1}}>{s.ic}</span>)
+                      : <span style={{fontSize:13,fontWeight:900,color:"#cbd5e1"}}>{i+1}</span>
+                  }
+                </button>
+              </React.Fragment>
+            );
+          })}
+        </div>
+        {/* Bandeau étape courante */}
+        <div style={{marginTop:12,display:"flex",alignItems:"center",gap:10,padding:"10px 16px",borderRadius:14,background:stepColor+"0e",border:`1.5px solid ${stepColor}20`}}>
+          <div style={{width:10,height:10,borderRadius:5,background:stepColor,boxShadow:`0 0 8px ${stepColor}88`,flexShrink:0}}/>
+          <span style={{fontSize:13,fontWeight:900,color:stepColor,letterSpacing:.1,flex:1}}>{STEP_INFO[step-1]?.l||""}</span>
+          <span style={{fontSize:11,fontWeight:700,color:stepColor+"88",background:stepColor+"18",borderRadius:8,padding:"2px 10px"}}>{step}&thinsp;/&thinsp;{STEPS}</span>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
 
   const clientSel = clients.find(c=>c.id===f.clientId);
@@ -1240,6 +1259,17 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
 
       {step===2 && !isSimplified && (
         <div className="fade-in" style={{display:"flex",flexDirection:"column",gap:14}}>
+          {/* Step hero */}
+          <div style={{background:"linear-gradient(135deg,#0891b20f,#06b6d418)",borderRadius:16,padding:"14px 18px",border:"1.5px solid #0891b228",display:"flex",alignItems:"center",gap:14,overflow:"hidden",position:"relative"}}>
+            <div style={{position:"absolute",right:-18,top:-18,width:90,height:90,borderRadius:45,background:"#06b6d415",pointerEvents:"none"}}/>
+            <div style={{width:48,height:48,borderRadius:15,background:"linear-gradient(135deg,#0891b2,#06b6d4)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"0 6px 20px #0891b244"}}>
+              {STEP_ICONS[1]("#fff",22)}
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:17,fontWeight:900,color:"#0e4f6f",lineHeight:1.1,letterSpacing:-.3}}>Analyses eau</div>
+              <div style={{fontSize:12,color:"#0891b2",marginTop:4,fontWeight:600,opacity:.85}}>Bandelettes &amp; mesures électroniques</div>
+            </div>
+          </div>
           {/* Gate : prise d'échantillon */}
           <OuiNon label="Prise d'échantillon ?" value={f.priseEchantillon} onChange={v=>set("priseEchantillon",v)}/>
 
@@ -1336,6 +1366,17 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
       {/* ÉTAPE 3 — État bassin + Correctifs (fusionnés) */}
       {step===3 && !isSimplified && (
         <div className="fade-in">
+          {/* Step hero */}
+          <div style={{background:"linear-gradient(135deg,#05996908,#34d39914)",borderRadius:16,padding:"14px 18px",border:"1.5px solid #05996922",display:"flex",alignItems:"center",gap:14,overflow:"hidden",position:"relative",marginBottom:16}}>
+            <div style={{position:"absolute",right:-18,top:-18,width:90,height:90,borderRadius:45,background:"#34d39910",pointerEvents:"none"}}/>
+            <div style={{width:48,height:48,borderRadius:15,background:"linear-gradient(135deg,#059669,#34d399)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"0 6px 20px #05996944"}}>
+              {STEP_ICONS[2]("#fff",22)}
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:17,fontWeight:900,color:"#064e3b",lineHeight:1.1,letterSpacing:-.3}}>Bassin &amp; Correctifs</div>
+              <div style={{fontSize:12,color:"#059669",marginTop:4,fontWeight:600,opacity:.85}}>État du bassin + produits apportés</div>
+            </div>
+          </div>
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16}}>
             {/* Colonne gauche : État du bassin */}
             <div style={{display:"flex",flexDirection:"column",gap:16}}>
@@ -1406,6 +1447,17 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
 
       {(step===4 || (isSimplified && step===3)) && (
         <div className="fade-in">
+          {/* Step hero */}
+          <div style={{background:"linear-gradient(135deg,#b4530908,#f59e0b14)",borderRadius:16,padding:"14px 18px",border:"1.5px solid #b4530922",display:"flex",alignItems:"center",gap:14,overflow:"hidden",position:"relative",marginBottom:16}}>
+            <div style={{position:"absolute",right:-18,top:-18,width:90,height:90,borderRadius:45,background:"#f59e0b10",pointerEvents:"none"}}/>
+            <div style={{width:48,height:48,borderRadius:15,background:"linear-gradient(135deg,#b45309,#f59e0b)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"0 6px 20px #b4530944"}}>
+              {STEP_ICONS[4]("#fff",22)}
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:17,fontWeight:900,color:"#451a03",lineHeight:1.1,letterSpacing:-.3}}>Clôture</div>
+              <div style={{fontSize:12,color:"#b45309",marginTop:4,fontWeight:600,opacity:.85}}>Commentaires, livraisons &amp; ressenti</div>
+            </div>
+          </div>
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16}}>
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
               {!isSimplified && <div>
@@ -1520,6 +1572,17 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
 
       {step===5 && !isSimplified && (
         <div className="fade-in">
+          {/* Step hero */}
+          <div style={{background:"linear-gradient(135deg,#7c3aed08,#a78bfa14)",borderRadius:16,padding:"14px 18px",border:"1.5px solid #7c3aed22",display:"flex",alignItems:"center",gap:14,overflow:"hidden",position:"relative",marginBottom:16}}>
+            <div style={{position:"absolute",right:-18,top:-18,width:90,height:90,borderRadius:45,background:"#a78bfa10",pointerEvents:"none"}}/>
+            <div style={{width:48,height:48,borderRadius:15,background:"linear-gradient(135deg,#7c3aed,#a78bfa)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"0 6px 20px #7c3aed44"}}>
+              {STEP_ICONS[5]("#fff",22)}
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:17,fontWeight:900,color:"#2e1065",lineHeight:1.1,letterSpacing:-.3}}>Signatures &amp; Export</div>
+              <div style={{fontSize:12,color:"#7c3aed",marginTop:4,fontWeight:600,opacity:.85}}>Signer et envoyer le rapport</div>
+            </div>
+          </div>
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16,marginBottom:16}}>
             <SignaturePad label="Signature du technicien" value={f.signatureTech} onChange={v=>set("signatureTech",v)}/>
             <SignaturePad label="Signature du client / propriétaire" value={f.signatureClient} onChange={v=>set("signatureClient",v)}/>

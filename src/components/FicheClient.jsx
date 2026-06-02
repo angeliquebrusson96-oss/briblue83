@@ -271,25 +271,40 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
             <div style={{background:"rgba(255,255,255,0.75)",color:col.tx,fontSize:11,fontWeight:800,padding:"5px 12px",borderRadius:20,flexShrink:0,border:"1px solid "+col.tx+"55",whiteSpace:"nowrap",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",boxShadow:"0 4px 12px rgba(0,0,0,0.08)"}}>{col.lbl}</div>
           </div>
 
-          {jours!==null&&(
-            <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"rgba(255,255,255,0.55)",borderRadius:20,padding:"5px 12px",marginBottom:16,backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",border:"1px solid rgba(255,255,255,0.4)"}}>
-              <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={jours<=30?"#d97706":"#0891b2"} strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              <span style={{fontSize:11,fontWeight:800,color:jours<=30?"#92400e":"#0e4f6f"}}>{jours>=0?jours+" j restants":"Contrat expiré"}</span>
-            </div>
-          )}
+          {/* Stats rapides sous le nom */}
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
+            {jours!==null&&(
+              <div style={{display:"inline-flex",alignItems:"center",gap:5,background:jours<=30?"rgba(217,119,6,0.15)":"rgba(255,255,255,0.55)",borderRadius:20,padding:"5px 12px",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",border:`1px solid ${jours<=30?"rgba(217,119,6,0.3)":"rgba(255,255,255,0.4)"}`}}>
+                <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={jours<=30?"#d97706":"#0891b2"} strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span style={{fontSize:11,fontWeight:800,color:jours<=30?"#92400e":"#0e4f6f"}}>{jours>=0?jours+" j restants":"Contrat expiré"}</span>
+              </div>
+            )}
+            {total>0&&(
+              <div style={{display:"inline-flex",alignItems:"center",gap:5,background:"rgba(255,255,255,0.55)",borderRadius:20,padding:"5px 12px",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",border:"1px solid rgba(255,255,255,0.35)"}}>
+                <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                <span style={{fontSize:11,fontWeight:800,color:"#064e3b"}}>{eff}/{total} passages</span>
+              </div>
+            )}
+            {pct>0&&(
+              <div style={{display:"inline-flex",alignItems:"center",gap:5,background:"rgba(255,255,255,0.55)",borderRadius:20,padding:"5px 12px",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",border:"1px solid rgba(255,255,255,0.35)"}}>
+                <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={pct>=80?"#059669":"#0891b2"} strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 2 A10 10 0 0 1 22 12"/></svg>
+                <span style={{fontSize:11,fontWeight:800,color:pct>=80?"#064e3b":"#0e4f6f"}}>{pct}% réalisé</span>
+              </div>
+            )}
+          </div>
 
-          <div style={{paddingBottom:18}}/>
+          <div style={{paddingBottom:4}}/>
         </div>
 
-        <div style={{background:"rgba(255,255,255,0.6)",backdropFilter:"blur(20px) saturate(180%)",WebkitBackdropFilter:"blur(20px) saturate(180%)",display:"flex",borderBottom:"1px solid rgba(255,255,255,0.4)",overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none",padding:"0 4px"}}>
-          {TABS.map(({id,label,color})=>{
+        <div style={{background:"rgba(255,255,255,0.65)",backdropFilter:"blur(20px) saturate(180%)",WebkitBackdropFilter:"blur(20px) saturate(180%)",borderBottom:"1px solid rgba(255,255,255,0.35)",overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none",padding:"8px 10px",display:"flex",gap:6}}>
+          {TABS.map(({id,label})=>{
             const active=tab===id;
-            const activeColor = id==="gestion"?"#0891b2":active?"#0891b2":"#64748b";
+            const TAB_COLORS = {gestion:"#0891b2",historique:"#64748b",passages:"#0284c7",saisons:"#7c3aed",infos:"#0891b2",rdvs:"#059669",livraisons:"#f59e0b",carnet:"#be185d"};
+            const col = TAB_COLORS[id]||"#64748b";
             return (
               <button key={id} onClick={()=>setTab(id)}
-                style={{flexShrink:0,padding:isMobile?"10px 10px":"12px 14px",border:"none",cursor:"pointer",fontWeight:active?800:600,fontSize:isMobile?11.5:12.5,fontFamily:"inherit",background:active&&id==="gestion"?"rgba(8,145,178,0.08)":"transparent",color:activeColor,borderBottom:active?`2.5px solid ${id==="gestion"?"#0891b2":"#06b6d4"}`:"2.5px solid transparent",transition:"all .18s",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:6,WebkitTapHighlightColor:"transparent",letterSpacing:"0.01em",position:"relative"}}>
-                {id==="gestion"&&<div style={{position:"absolute",inset:0,background:active?"rgba(8,145,178,0.06)":"transparent",borderRadius:"4px 4px 0 0",pointerEvents:"none"}}/>}
-                <TabIcon name={id} size={15} color={activeColor}/>
+                style={{flexShrink:0,padding:active?"9px 14px":"9px 12px",borderRadius:22,border:`1.5px solid ${active?col+"55":DS.border}`,cursor:"pointer",fontWeight:active?800:600,fontSize:isMobile?11.5:12,fontFamily:"inherit",background:active?`linear-gradient(135deg,${col},${col}cc)`:"rgba(255,255,255,0.7)",color:active?"#fff":"#64748b",display:"flex",alignItems:"center",gap:5,WebkitTapHighlightColor:"transparent",transition:"all .22s",whiteSpace:"nowrap",boxShadow:active?`0 4px 14px ${col}44`:"none",letterSpacing:active?.1:0}}>
+                <TabIcon name={id} size={13} color={active?"#fff":"#94a3b8"}/>
                 {label}
               </button>
             );
@@ -323,30 +338,31 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
 
             {/* ── Actions rapides ── */}
             <div>
-              <div style={{fontSize:10,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>Actions rapides</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>
+              <div style={{fontSize:10,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>Actions rapides</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                 {[
-                  {label:"Nouveau passage",ico:<><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><line x1="12" y1="13" x2="12" y2="17"/><line x1="10" y1="15" x2="14" y2="15"/></>,col:"#0891b2",bg:"linear-gradient(135deg,#e0f2fe,#f0f9ff)",border:"#bae6fd",onClick:onAddPassage},
-                  {label:"Nouveau RDV",ico:<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="14" x2="12" y2="18"/><line x1="10" y1="16" x2="14" y2="16"/></>,col:"#7c3aed",bg:"linear-gradient(135deg,#ede9fe,#f5f3ff)",border:"#ddd6fe",onClick:onAddRdv},
-                  {label:"Livraison produits",ico:<><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></>,col:"#059669",bg:"linear-gradient(135deg,#d1fae5,#f0fdf4)",border:"#a7f3d0",onClick:()=>{setEditLiv(null);setShowFormLiv(true);}},
-                  {label:"Modifier le client",ico:<><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></>,col:"#64748b",bg:"linear-gradient(135deg,#f1f5f9,#f8fafc)",border:"#e2e8f0",onClick:onEdit},
+                  {label:"Nouveau passage",emoji:"📋",col:"#0891b2",grad:"linear-gradient(135deg,#0891b2,#06b6d4)",onClick:onAddPassage},
+                  {label:"Nouveau RDV",emoji:"📅",col:"#7c3aed",grad:"linear-gradient(135deg,#7c3aed,#a78bfa)",onClick:onAddRdv},
+                  {label:"Livraison produits",emoji:"📦",col:"#059669",grad:"linear-gradient(135deg,#059669,#34d399)",onClick:()=>{setEditLiv(null);setShowFormLiv(true);}},
+                  {label:"Modifier client",emoji:"✏️",col:"#64748b",grad:"linear-gradient(135deg,#64748b,#94a3b8)",onClick:onEdit},
                 ].map(a=>(
                   <button key={a.label} onClick={a.onClick}
-                    style={{display:"flex",alignItems:"center",gap:10,padding:"13px 14px",borderRadius:14,border:`1.5px solid ${a.border}`,background:a.bg,cursor:"pointer",fontFamily:"inherit",textAlign:"left",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",WebkitTapHighlightColor:"transparent"}}>
-                    <div style={{width:34,height:34,borderRadius:10,background:"rgba(255,255,255,0.75)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"0 1px 4px rgba(0,0,0,0.1)"}}>
-                      <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={a.col} strokeWidth="2" strokeLinecap="round">{a.ico}</svg>
+                    style={{display:"flex",flexDirection:"column",alignItems:"flex-start",gap:8,padding:"14px 14px",borderRadius:16,border:"none",background:a.grad,cursor:"pointer",fontFamily:"inherit",textAlign:"left",boxShadow:`0 4px 16px ${a.col}33`,WebkitTapHighlightColor:"transparent",minHeight:76,position:"relative",overflow:"hidden"}}>
+                    <div style={{position:"absolute",right:-10,bottom:-10,fontSize:36,opacity:.18,lineHeight:1}}>{a.emoji}</div>
+                    <div style={{width:34,height:34,borderRadius:10,background:"rgba(255,255,255,0.22)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      <span style={{fontSize:18,lineHeight:1}}>{a.emoji}</span>
                     </div>
-                    <span style={{fontSize:12,fontWeight:700,color:"#334155",lineHeight:1.3}}>{a.label}</span>
+                    <span style={{fontSize:12,fontWeight:800,color:"#fff",lineHeight:1.3,letterSpacing:.1}}>{a.label}</span>
                   </button>
                 ))}
               </div>
             </div>
 
             {/* ── Contrat & Finance ── */}
-            <div style={{background:"rgba(255,255,255,0.55)",borderRadius:14,border:"1px solid #f1f5f9",overflow:"hidden",boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
-              <div style={{padding:"10px 14px",background:"linear-gradient(135deg,#0891b208,#0891b212)",borderBottom:"1px solid #e0f2fe",display:"flex",alignItems:"center",gap:8}}>
-                <div style={{width:26,height:26,borderRadius:8,background:"#0891b2",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.euro(12,"#fff")}</div>
-                <span style={{fontSize:11,fontWeight:800,color:"#0891b2",textTransform:"uppercase",letterSpacing:.7}}>Contrat &amp; Finance</span>
+            <div style={{background:"rgba(255,255,255,0.6)",borderRadius:16,border:"1px solid #e0f2fe",overflow:"hidden",boxShadow:"0 2px 12px rgba(8,145,178,0.08)"}}>
+              <div style={{padding:"12px 16px",background:"linear-gradient(135deg,#0891b212,#06b6d418)",borderBottom:"1px solid #bae6fd44",display:"flex",alignItems:"center",gap:10}}>
+                <div style={{width:32,height:32,borderRadius:10,background:"linear-gradient(135deg,#0891b2,#06b6d4)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 12px #0891b244"}}>{Ico.euro(14,"#fff")}</div>
+                <span style={{fontSize:12,fontWeight:800,color:"#0e4f6f",textTransform:"uppercase",letterSpacing:.7}}>Contrat &amp; Finance</span>
               </div>
               <div style={{padding:"12px 14px"}}>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:12}}>
@@ -385,13 +401,13 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
             </div>
 
             {/* ── Notes privées ── */}
-            <div style={{background:"rgba(255,255,255,0.55)",borderRadius:14,border:"1px solid #f1f5f9",overflow:"hidden",boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
-              <div style={{padding:"10px 14px",background:"linear-gradient(135deg,#6d28d908,#6d28d912)",borderBottom:"1px solid #ede9fe",display:"flex",alignItems:"center",gap:8}}>
-                <div style={{width:26,height:26,borderRadius:8,background:"#7c3aed",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <div style={{background:"rgba(255,255,255,0.6)",borderRadius:16,border:"1px solid #ede9fe",overflow:"hidden",boxShadow:"0 2px 12px rgba(124,58,237,0.07)"}}>
+              <div style={{padding:"12px 16px",background:"linear-gradient(135deg,#7c3aed12,#a78bfa18)",borderBottom:"1px solid #ddd6fe44",display:"flex",alignItems:"center",gap:10}}>
+                <div style={{width:32,height:32,borderRadius:10,background:"linear-gradient(135deg,#7c3aed,#a78bfa)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 12px #7c3aed33"}}>
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                 </div>
-                <span style={{fontSize:11,fontWeight:800,color:"#7c3aed",textTransform:"uppercase",letterSpacing:.7}}>Notes privées</span>
-                <span style={{marginLeft:"auto",fontSize:10,color:"#94a3b8",fontWeight:500}}>Visible uniquement par vous</span>
+                <span style={{fontSize:12,fontWeight:800,color:"#4c1d95",textTransform:"uppercase",letterSpacing:.7}}>Notes privées</span>
+                <span style={{marginLeft:"auto",fontSize:10,color:"#94a3b8",fontWeight:600,background:"rgba(148,163,184,0.12)",borderRadius:6,padding:"2px 8px"}}>🔒 Privé</span>
               </div>
               <div style={{padding:"12px 14px"}}>
                 <textarea
@@ -410,26 +426,28 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
             </div>
 
             {/* ── Carnet numérique ── */}
-            <div style={{background:"linear-gradient(135deg,#0c1f3f,#0e3460)",borderRadius:14,padding:"14px 16px",display:"flex",alignItems:"center",gap:12,boxShadow:"0 4px 16px rgba(8,145,178,0.2)"}}>
-              <div style={{width:44,height:44,borderRadius:12,background:"rgba(8,145,178,0.25)",border:"1px solid rgba(56,189,248,0.3)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                <TabIcon name="carnet" size={20} color="#38bdf8"/>
+            <div style={{background:"linear-gradient(135deg,#0c1f3f,#0e3460)",borderRadius:16,padding:"16px 18px",display:"flex",alignItems:"center",gap:14,boxShadow:"0 6px 24px rgba(8,145,178,0.28)",border:"1px solid rgba(56,189,248,0.15)"}}>
+              <div style={{width:48,height:48,borderRadius:14,background:"rgba(8,145,178,0.28)",border:"1px solid rgba(56,189,248,0.35)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"0 4px 14px rgba(56,189,248,0.2)"}}>
+                <TabIcon name="carnet" size={22} color="#38bdf8"/>
               </div>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:13,fontWeight:800,color:"#fff",marginBottom:2}}>Carnet client</div>
-                <div style={{fontSize:11,color:"rgba(255,255,255,0.5)"}}>Lien partageable pour le client</div>
+                <div style={{fontSize:14,fontWeight:900,color:"#fff",marginBottom:3,letterSpacing:-.2}}>Carnet client</div>
+                <div style={{fontSize:11,color:"rgba(255,255,255,0.45)",fontWeight:500}}>Lien partageable pour le client</div>
               </div>
               <button onClick={()=>window.open(carnetUrl2,"_blank")}
-                style={{padding:"9px 14px",borderRadius:10,background:"rgba(56,189,248,0.2)",border:"1px solid rgba(56,189,248,0.35)",cursor:"pointer",fontWeight:700,fontSize:12,color:"#7dd3fc",fontFamily:"inherit",WebkitTapHighlightColor:"transparent",flexShrink:0}}>
+                style={{padding:"10px 16px",borderRadius:12,background:"linear-gradient(135deg,rgba(56,189,248,0.25),rgba(56,189,248,0.15))",border:"1px solid rgba(56,189,248,0.4)",cursor:"pointer",fontWeight:800,fontSize:12,color:"#7dd3fc",fontFamily:"inherit",WebkitTapHighlightColor:"transparent",flexShrink:0,whiteSpace:"nowrap"}}>
                 Ouvrir →
               </button>
             </div>
 
             {/* ── Zone danger ── */}
-            <div style={{background:"#fff5f5",borderRadius:14,border:"1px solid #fecaca",padding:"12px 14px"}}>
-              <div style={{fontSize:10,fontWeight:800,color:"#b91c1c",textTransform:"uppercase",letterSpacing:.7,marginBottom:10}}>⚠ Zone danger</div>
+            <div style={{background:"linear-gradient(135deg,#fff5f5,#fef2f2)",borderRadius:16,border:"1.5px solid #fecaca",padding:"14px 16px"}}>
+              <div style={{fontSize:10,fontWeight:800,color:"#b91c1c",textTransform:"uppercase",letterSpacing:.7,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
+                <span style={{fontSize:14}}>⚠️</span> Zone danger
+              </div>
               <button onClick={onDelete}
-                style={{width:"100%",height:40,borderRadius:10,background:"#fef2f2",border:"1.5px solid #fca5a5",cursor:"pointer",fontWeight:700,fontSize:13,color:"#dc2626",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:7,WebkitTapHighlightColor:"transparent"}}>
-                {Ico.trash(14,"#dc2626")} Supprimer ce client définitivement
+                style={{width:"100%",height:46,borderRadius:12,background:"#fef2f2",border:"2px solid #fca5a5",cursor:"pointer",fontWeight:800,fontSize:13,color:"#dc2626",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,WebkitTapHighlightColor:"transparent",transition:"all .2s"}}>
+                {Ico.trash(15,"#dc2626")} Supprimer ce client définitivement
               </button>
             </div>
 
