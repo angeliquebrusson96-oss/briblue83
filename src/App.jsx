@@ -629,33 +629,44 @@ export default function App() {
         </button>
         <div style={{width:9,height:9,borderRadius:"50%",background:online?"#34d399":"#f87171",boxShadow:online?"0 0 0 3px rgba(52,211,153,0.25)":"0 0 0 3px rgba(248,113,113,0.25)",flexShrink:0}}/>
         <div style={{flex:1}}/>
-        <div style={{display:"flex",gap:isMobile?6:10,alignItems:"center",flexShrink:0}}>
-          {!isMobile&&(
-            <button onClick={()=>setShowImport(true)} style={{display:"flex",alignItems:"center",gap:7,padding:"0 16px",height:40,borderRadius:20,background:"rgba(255,255,255,0.45)",border:"none",cursor:"pointer",flexShrink:0,fontFamily:"inherit",boxShadow:DS.nmShadow}}>
-              <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v7a2 2 0 002 2h12a2 2 0 002-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-              <span style={{fontSize:12,fontWeight:600,color:"#64748b"}}>Import</span>
-            </button>
-          )}
-          <button onClick={()=>setShowStock(true)} title="Stock" style={{position:"relative",width:isMobile?40:undefined,height:isMobile?40:40,padding:isMobile?0:"0 14px",display:"flex",alignItems:"center",justifyContent:"center",gap:6,borderRadius:isMobile?12:20,background:"linear-gradient(135deg,#059669,#10b981)",border:"none",cursor:"pointer",flexShrink:0,fontFamily:"inherit",boxShadow:"3px 3px 10px rgba(5,150,105,0.4),-2px -2px 6px rgba(255,255,255,0.6)"}}>
-            <svg width={isMobile?18:15} height={isMobile?18:15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8V21H3V8"/><path d="M23 3H1v5h22V3z"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-            {!isMobile&&<span style={{fontSize:12,fontWeight:700,color:"#fff"}}>Stock</span>}
-            {nbStockBas>0&&<span style={{position:"absolute",top:-5,right:-5,minWidth:17,height:17,borderRadius:9,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",boxShadow:"0 2px 6px rgba(239,68,68,0.5)"}}>{nbStockBas}</span>}
+        {/* ── BOUTONS D'ACTION RAPIDE ── */}
+        <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+
+          {/* Stock */}
+          <button onClick={()=>setShowStock(true)}
+            style={{position:"relative",display:"flex",alignItems:"center",gap:5,padding:"0 11px",height:38,borderRadius:19,background:"rgba(5,150,105,0.1)",border:"1.5px solid rgba(5,150,105,0.28)",cursor:"pointer",flexShrink:0,fontFamily:"inherit",WebkitTapHighlightColor:"transparent",transition:"all .18s"}}>
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8V21H3V8"/><path d="M23 3H1v5h22V3z"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+            <span style={{fontSize:12,fontWeight:800,color:"#059669",letterSpacing:.1}}>Stock</span>
+            {nbStockBas>0&&<span style={{position:"absolute",top:-6,right:-6,minWidth:16,height:16,borderRadius:8,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",boxShadow:"0 2px 6px rgba(239,68,68,0.55)"}}>{nbStockBas}</span>}
           </button>
-          <button onClick={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} title="Livraison" style={{width:isMobile?40:undefined,height:isMobile?40:40,padding:isMobile?0:"0 14px",display:"flex",alignItems:"center",justifyContent:"center",gap:6,borderRadius:isMobile?12:20,background:"linear-gradient(135deg,#f59e0b,#f97316)",border:"none",cursor:"pointer",flexShrink:0,fontFamily:"inherit",boxShadow:"3px 3px 10px rgba(245,158,11,0.4),-2px -2px 6px rgba(255,255,255,0.6)"}}>
-            <svg width={isMobile?18:15} height={isMobile?18:15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 4v4h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-            {!isMobile&&<span style={{fontSize:12,fontWeight:700,color:"#fff"}}>Livraison</span>}
+
+          {/* Livraison */}
+          <button onClick={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}}
+            style={{display:"flex",alignItems:"center",gap:5,padding:"0 11px",height:38,borderRadius:19,background:"rgba(217,119,6,0.1)",border:"1.5px solid rgba(217,119,6,0.28)",cursor:"pointer",flexShrink:0,fontFamily:"inherit",WebkitTapHighlightColor:"transparent",transition:"all .18s"}}>
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 4v4h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            <span style={{fontSize:12,fontWeight:800,color:"#d97706",letterSpacing:.1}}>Livr.</span>
           </button>
+
+          {/* Nouveau client (mobile uniquement) */}
           {isMobile&&(
-            <button onClick={openAddClient} title="Nouveau client" style={{width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:12,background:"linear-gradient(135deg,#7c3aed,#4f46e5)",border:"none",cursor:"pointer",flexShrink:0,boxShadow:"3px 3px 10px rgba(79,70,229,0.4),-2px -2px 6px rgba(255,255,255,0.6)"}}>
-              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="3" x2="19" y2="9"/><line x1="16" y1="6" x2="22" y2="6"/></svg>
+            <button onClick={openAddClient}
+              style={{display:"flex",alignItems:"center",gap:5,padding:"0 11px",height:38,borderRadius:19,background:"rgba(124,58,237,0.1)",border:"1.5px solid rgba(124,58,237,0.28)",cursor:"pointer",flexShrink:0,WebkitTapHighlightColor:"transparent",transition:"all .18s"}}>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="3" x2="19" y2="9"/><line x1="16" y1="6" x2="22" y2="6"/></svg>
+              <span style={{fontSize:12,fontWeight:800,color:"#7c3aed",letterSpacing:.1}}>Client</span>
             </button>
           )}
-          <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} style={{width:isMobile?40:undefined,height:isMobile?40:40,padding:isMobile?0:"0 18px",display:"flex",alignItems:"center",justifyContent:"center",gap:7,borderRadius:isMobile?12:20,background:"linear-gradient(135deg,#06b6d4,#0891b2)",border:"none",cursor:"pointer",flexShrink:0,fontFamily:"inherit",boxShadow:"3px 3px 10px rgba(8,145,178,0.4),-2px -2px 6px rgba(255,255,255,0.6)"}}>
-            <svg width={isMobile?18:15} height={isMobile?18:15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
-            {!isMobile&&<span style={{fontSize:12,fontWeight:700,color:"#fff",whiteSpace:"nowrap"}}>Rapport</span>}
+
+          {/* Nouveau rapport — bouton principal */}
+          <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}}
+            style={{display:"flex",alignItems:"center",gap:6,padding:"0 14px",height:38,borderRadius:19,background:"linear-gradient(135deg,#0891b2,#06b6d4)",border:"none",cursor:"pointer",flexShrink:0,fontFamily:"inherit",WebkitTapHighlightColor:"transparent",boxShadow:"0 4px 14px rgba(8,145,178,0.4)",transition:"all .18s"}}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+            <span style={{fontSize:12,fontWeight:900,color:"#fff",letterSpacing:.2}}>Rapport</span>
           </button>
-          <button onClick={handleLogout} title="Déconnexion" style={{width:isMobile?40:40,height:isMobile?40:40,borderRadius:12,background:"linear-gradient(135deg,#be123c,#e11d48)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"3px 3px 10px rgba(190,18,60,0.35),-2px -2px 6px rgba(255,255,255,0.6)"}}>
-            <svg width={isMobile?17:15} height={isMobile?17:15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+
+          {/* Déconnexion */}
+          <button onClick={handleLogout} title="Déconnexion"
+            style={{width:38,height:38,borderRadius:19,background:"rgba(190,18,60,0.08)",border:"1.5px solid rgba(190,18,60,0.22)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,WebkitTapHighlightColor:"transparent",transition:"all .18s"}}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#be123c" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           </button>
         </div>
       </div>
