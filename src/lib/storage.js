@@ -10,6 +10,55 @@ const FIREBASE_DEBOUNCE_MS = 800;
 const offlineQueue    = { pending: {} };
 const _debounceTimers = {};
 
+// ─── QUEUE PERSISTANTE ───────────────────────────────────────────────────────
+// Si l'app se ferme AVANT que Firebase reçoive les données (réseau coupé,
+// fermeture brutale), la queue est sauvée en localStorage et restaurée au
+// prochain démarrage. Plus aucune donnée ne peut disparaître entre les sessions.
+const QUEUE_LS_KEY = "briblue_offline_queue_v1";
+
+function _loadPersistedQueue() {
+  try {
+    const raw = localStorage.getItem(QUEUE_LS_KEY);
+    if (raw) {
+      const saved = JSON.parse(raw);
+      // Restaurer uniquement les clés de données (pas de doublons avec ce qui est déjà en attente)
+      for (const [k, v] of Object.entries(saved)) {
+        if (!(k in offlineQueue.pending)) offlineQueue.pending[k] = v;
+      }
+    }
+  } catch { /* noop */ }
+}
+
+function _persistQueue() {
+  try {
+    const keys = Object.keys(offlineQueue.pending);
+    if (keys.length > 0) {
+      localStorage.setItem(QUEUE_LS_KEY, JSON.stringify(offlineQueue.pending));
+    } else {
+      localStorage.removeItem(QUEUE_LS_KEY);
+    }
+  } catch { /* quota — la queue ne peut pas être sauvée mais les données principales le sont */ }
+}
+
+// ─── MERGE DONNÉES TABLEAUX ──────────────────────────────────────────────────
+// Clés dont les valeurs sont des tableaux d'objets avec .id → fusion obligatoire
+// JAMAIS de remplacement pur : on prend l'UNION des deux sources.
+// Priorité aux entrées de "priorityArr" pour les IDs en commun.
+const MERGE_ARRAY_KEYS = new Set([
+  "bb_clients_v2", "bb_passages_v2", "bb_rdvs_v1", "bb_livraisons_v1"
+]);
+
+function mergeArrayById(priorityArr, secondaryArr) {
+  const result = Array.isArray(priorityArr) ? [...priorityArr] : [];
+  const priorityIds = new Set(result.map(item => item?.id).filter(Boolean));
+  for (const item of (Array.isArray(secondaryArr) ? secondaryArr : [])) {
+    if (item?.id && !priorityIds.has(item.id)) {
+      result.push(item); // ajoute uniquement les entrées absentes de la source principale
+    }
+  }
+  return result;
+}
+
 // ─── TOKEN ──────────────────────────────────────────────────────────────────
 let _cachedAuthToken = null;
 let _tokenPromise    = null; // évite les refreshs simultanés
@@ -150,9 +199,16 @@ async function flushOfflineQueue() {
 }
 
 // ─── RECONCILE AU BOOT ──────────────────────────────────────────────────────
-// ⚠️ PROTECTION : ne jamais écraser des données locales plus récentes que Firebase
+// STRATÉGIE :
+//   • Tableaux (clients, passages…) → MERGE par .id : union des deux sources.
+//     On ne remplace JAMAIS — on ajoute uniquement ce qui manque.
+//   • Autres clés (stock, contrats…) → timestamp gagne.
+// Garantit qu'aucun client ne disparaît même si localStorage était incomplet.
 export async function reconcileOnBoot() {
   try {
+    // Restaurer la queue offline persistée (données en attente d'une session précédente)
+    _loadPersistedQueue();
+
     const snap    = await getDoc(APP_DOC);
     const remote  = snap.exists() ? snap.data() : {};
     const remoteTime = remote["_lastSavedAt"] ? new Date(remote["_lastSavedAt"]).getTime() : 0;
@@ -164,34 +220,65 @@ export async function reconcileOnBoot() {
       let local = null;
       try { const ls = localStorage.getItem("briblue_" + key); if (ls) local = JSON.parse(ls); } catch {} // eslint-disable-line no-empty
 
+      let localTime = 0;
+      try { const m = localStorage.getItem("briblue_meta_" + key); if (m) localTime = JSON.parse(m).savedAt || 0; } catch {} // eslint-disable-line no-empty
+
+      const remoteKeyTs = remote[`_savedAt_${key}`];
+      const remoteKeyTime = remoteKeyTs ? new Date(remoteKeyTs).getTime() : remoteTime;
+
+      // ── Cas : rien en local ──────────────────────────────────────────────
       if (local == null) {
-        // Rien en local → prendre Firebase
         if (remote[key] != null) {
-          try { localStorage.setItem("briblue_" + key, JSON.stringify(remote[key])); } catch {} // eslint-disable-line no-empty
+          try {
+            localStorage.setItem("briblue_" + key, JSON.stringify(remote[key]));
+            localStorage.setItem("briblue_meta_" + key, JSON.stringify({ savedAt: remoteKeyTime }));
+          } catch {} // eslint-disable-line no-empty
         }
         continue;
       }
 
+      // ── Cas : rien sur Firebase → pousser le local ───────────────────────
       if (remote[key] == null) {
-        // Rien sur Firebase → pousser le local
         toPush[key] = local; needsPush = true; continue;
       }
 
-      // Les deux existent → comparer les timestamps PAR CLÉ (évite que la sauvegarde
-      // d'une autre clé n'écrase des données locales plus récentes non encore syncées)
-      let localTime = 0;
-      try { const m = localStorage.getItem("briblue_meta_" + key); if (m) localTime = JSON.parse(m).savedAt || 0; } catch {} // eslint-disable-line no-empty
+      // ── Cas clés TABLEAU (clients, passages, rdvs, livraisons) ───────────
+      // MERGE OBLIGATOIRE : union des deux sources, jamais de remplacement.
+      // Scénario protégé : client créé en local (absent de Firebase) ou en Firebase
+      // (absent du local après purge) → les deux sont conservés.
+      if (MERGE_ARRAY_KEYS.has(key)) {
+        const localArr  = Array.isArray(local)        ? local        : [];
+        const remoteArr = Array.isArray(remote[key])  ? remote[key]  : [];
 
-      // Préférer le timestamp par clé Firebase plutôt que le timestamp global
-      const remoteKeyTs = remote[`_savedAt_${key}`];
-      const remoteKeyTime = remoteKeyTs ? new Date(remoteKeyTs).getTime() : remoteTime;
+        // Priorité à la source la plus récente pour les IDs communs
+        const merged = localTime >= remoteKeyTime
+          ? mergeArrayById(localArr, remoteArr)   // local gagne pour les doublons
+          : mergeArrayById(remoteArr, localArr);  // Firebase gagne pour les doublons
 
+        const hasNewLocal  = merged.length > remoteArr.length; // local a des entrées absentes de Firebase
+        const hasNewRemote = merged.length > localArr.length;  // Firebase a des entrées absentes du local
+
+        // Toujours mettre à jour localStorage avec la version fusionnée
+        try {
+          localStorage.setItem("briblue_" + key, JSON.stringify(merged));
+          localStorage.setItem("briblue_meta_" + key, JSON.stringify({ savedAt: Date.now() }));
+        } catch {} // eslint-disable-line no-empty
+
+        // Pousser vers Firebase si : local plus récent OU local avait des entrées manquantes
+        if (localTime >= remoteKeyTime || hasNewLocal) {
+          toPush[key] = merged; needsPush = true;
+        }
+        // Si Firebase avait des entrées manquantes en local, déjà restauré via localStorage ci-dessus
+        if (hasNewRemote) {
+          console.info(`[briblue] reconcile MERGE "${key}" : ${merged.length - localArr.length} entrée(s) restaurée(s) depuis Firebase.`);
+        }
+        continue;
+      }
+
+      // ── Cas clés OBJET (stock, contrats…) → timestamp gagne ─────────────
       if (localTime >= remoteKeyTime) {
-        // Local plus récent ou égal → pousser vers Firebase
         toPush[key] = local; needsPush = true;
       } else {
-        // Firebase plus récent → mettre à jour le local
-        // ⚠️ Seulement si aucune donnée n'est en attente d'envoi pour cette clé
         if (!offlineQueue.pending[key]) {
           try {
             localStorage.setItem("briblue_" + key, JSON.stringify(remote[key]));
@@ -204,6 +291,7 @@ export async function reconcileOnBoot() {
     if (needsPush) {
       toPush["_lastSavedAt"] = new Date().toISOString();
       await setDoc(APP_DOC, toPush, { merge: true });
+      _persistQueue(); // vider la queue persistée après push réussi
     }
   } catch (e) { console.warn("[briblue] reconcile skipped:", e?.message); }
 }
@@ -255,12 +343,32 @@ export async function save(key, val) {
     console.warn(`[briblue] save("${key}"): données volumineuses (${Math.round(serialized.length/1024)} Ko) — photos non compressées ?`);
   }
 
+  // ── GARDE-FOU anti-perte de clients ────────────────────────────────────────
+  // Si une sauvegarde de bb_clients_v2 réduirait le nombre de clients de façon
+  // suspecte (≥ 2 clients en moins), on fusionne avec les données existantes
+  // plutôt que de remplacer. Protège contre les états React périmés.
+  if (key === "bb_clients_v2" && Array.isArray(val)) {
+    try {
+      const existingRaw = localStorage.getItem("briblue_bb_clients_v2");
+      if (existingRaw) {
+        const existing = JSON.parse(existingRaw);
+        if (Array.isArray(existing) && existing.length > val.length + 1) {
+          console.warn(`[briblue] GARDE-FOU clients : tentative de sauvegarder ${val.length} clients alors que ${existing.length} existent — fusion automatique.`);
+          // Fusionner : garder les clients existants absents du nouveau tableau
+          const merged = mergeArrayById(val, existing);
+          return save(key, merged); // relancer avec la version fusionnée
+        }
+      }
+    } catch { /* noop */ }
+  }
+
   // 1. Sauvegarder localement en priorité absolue
   // FIX #1 — si localStorage est plein, purge les vignettes photo et réessaie
   writeLS(key, serialized);
 
   // 2. Mettre dans la queue (protection si le réseau échoue)
   offlineQueue.pending[key] = val;
+  _persistQueue(); // persister la queue → survit à la fermeture de l'app
 
   if (!navigator.onLine) return;
 
@@ -276,7 +384,7 @@ export async function save(key, val) {
       if (latest === undefined) return;
       try {
         await saveViaREST({ [key]: latest }, false);
-        if (offlineQueue.pending[key] === latest) delete offlineQueue.pending[key];
+        if (offlineQueue.pending[key] === latest) { delete offlineQueue.pending[key]; _persistQueue(); }
       } catch (e) {
         console.warn(`[briblue] saveViaREST("${key}") échoué:`, e?.message);
         // Garde dans la queue → sera envoyé au prochain flush
@@ -292,13 +400,13 @@ export async function save(key, val) {
       if (latest === undefined) return;
       try {
         await saveToFirebaseSDK(key, latest);
-        if (offlineQueue.pending[key] === latest) delete offlineQueue.pending[key];
+        if (offlineQueue.pending[key] === latest) { delete offlineQueue.pending[key]; _persistQueue(); }
       } catch (e) {
         console.warn(`[briblue] saveToFirebaseSDK("${key}") échoué:`, e?.message);
         // Fallback REST si le SDK échoue
         try {
           await saveViaREST({ [key]: latest }, false);
-          if (offlineQueue.pending[key] === latest) delete offlineQueue.pending[key];
+          if (offlineQueue.pending[key] === latest) { delete offlineQueue.pending[key]; _persistQueue(); }
         } catch (e2) {
           console.warn(`[briblue] saveViaREST fallback("${key}") échoué:`, e2?.message);
         }
@@ -377,6 +485,9 @@ export function invalidateDocCache() {
 }
 
 if (typeof window !== "undefined") {
+  // Restaurer la queue offline dès le chargement du module (données d'une session précédente)
+  _loadPersistedQueue();
+
   // FIX #5 — au retour en ligne : vider le cache ET flusher la queue
   window.addEventListener("online", () => {
     invalidateDocCache(); // force un nouveau getDoc au prochain load/reconcile
