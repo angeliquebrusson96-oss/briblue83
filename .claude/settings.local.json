@@ -24,7 +24,9 @@
       "Bash(git commit -m 'fix: supprime les 6 erreurs ESLint dans les fichiers API *)",
       "Bash(git commit -m 'fix: supprime les 6 avertissements Microsoft Edge Tools dans les HTML *)",
       "Bash(git commit -m 'fix: ID client basé sur MAX existant au lieu de clients.length *)",
-      "Bash(git commit -m 'fix: transaction Firestore atomique pour éviter les emails en double *)"
+      "Bash(git commit -m 'fix: transaction Firestore atomique pour éviter les emails en double *)",
+      "Bash(git commit -m 'fix: verrou anti-doublon sur envoyerContratSignature *)",
+      "Bash(git commit -m 'fix: verification integrale - MERGE, queue persistante, garde-fou clients *)"
     ]
   }
 }
