@@ -178,7 +178,7 @@ export function PassageDetailModal({ passage, client, onClose }) {
 }
 
 // ─── FICHE CLIENT ─────────────────────────────────────────────────────────────
-export function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[], contrats={}, onUpdateContrat, onUpdateClient, onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onDeletePassage, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
+export function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[], contrats={}, versements={}, onToggleVersement, onUpdateContrat, onUpdateClient, onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onDeletePassage, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
   const [tab, setTab] = useState("gestion");
   const [notesPrivees, setNotesPrivees] = useState(client.notesPrivees||"");
   const [notesSaved, setNotesSaved] = useState(false);
@@ -230,6 +230,7 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
       case "rdvs":       return <svg {...s}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="12" cy="15" r="1.5" fill={color}/></svg>;
       case "livraisons": return <svg {...s}><path d="M16 16V7a1 1 0 00-1-1H4a1 1 0 00-1 1v9h13z"/><path d="M16 10h3l3 3v3h-6"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></svg>;
       case "carnet":     return <svg {...s}><path d="M4 4.5A2.5 2.5 0 016.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15z"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>;
+      case "contrat":    return <svg {...s}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>;
       case "gestion":    return <svg {...s}><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>;
       default: return null;
     }
@@ -239,6 +240,7 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
     {id:"historique", label:"Historique",color:"#64748b"},
     {id:"passages",   label:"Passages",  color:"#64748b"},
     {id:"saisons",    label:"Planning",  color:"#64748b"},
+    {id:"contrat",    label:"Contrat",   color:"#059669"},
     {id:"infos",      label:"Infos",     color:"#64748b"},
     {id:"rdvs",       label:"RDV",       color:"#64748b"},
     {id:"livraisons", label:"Livraisons",color:"#64748b"},
@@ -355,48 +357,6 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
                     <span style={{fontSize:12,fontWeight:800,color:"#fff",lineHeight:1.3,letterSpacing:.1}}>{a.label}</span>
                   </button>
                 ))}
-              </div>
-            </div>
-
-            {/* ── Contrat & Finance ── */}
-            <div style={{background:"rgba(255,255,255,0.6)",borderRadius:16,border:"1px solid #e0f2fe",overflow:"hidden",boxShadow:"0 2px 12px rgba(8,145,178,0.08)"}}>
-              <div style={{padding:"12px 16px",background:"linear-gradient(135deg,#0891b212,#06b6d418)",borderBottom:"1px solid #bae6fd44",display:"flex",alignItems:"center",gap:10}}>
-                <div style={{width:32,height:32,borderRadius:10,background:"linear-gradient(135deg,#0891b2,#06b6d4)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 12px #0891b244"}}>{Ico.euro(14,"#fff")}</div>
-                <span style={{fontSize:12,fontWeight:800,color:"#0e4f6f",textTransform:"uppercase",letterSpacing:.7}}>Contrat &amp; Finance</span>
-              </div>
-              <div style={{padding:"12px 14px"}}>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:12}}>
-                  {[
-                    {label:"Prix annuel",val:client.prix?client.prix+"€":null},
-                    {label:"Mensualité",val:mensualite?mensualite+"€":null},
-                    {label:"Fin contrat",val:client.dateFin?new Date(client.dateFin).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"2-digit"}):null,alert:jours!==null&&jours<=30},
-                  ].filter(x=>x.val).map(({label,val,alert})=>(
-                    <div key={label} style={{background:alert?"#fff7ed":"#f8fafc",borderRadius:10,padding:"8px 8px",textAlign:"center",border:`1px solid ${alert?"#fcd34d":"#e2e8f0"}`}}>
-                      <div style={{fontSize:9,color:alert?"#b45309":"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.4,marginBottom:3}}>{label}</div>
-                      <div style={{fontSize:14,fontWeight:800,color:alert?"#d97706":"#0f172a",lineHeight:1}}>{val}</div>
-                    </div>
-                  ))}
-                </div>
-                {/* Livraisons en attente */}
-                {livsEnAttente>0&&(
-                  <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:9,background:"#fffbeb",border:"1px solid #fde68a",marginBottom:10}}>
-                    <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round"><path d="M16 16V7a1 1 0 00-1-1H4a1 1 0 00-1 1v9h13z"/><path d="M16 10h3l3 3v3h-6"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></svg>
-                    <span style={{fontSize:12,fontWeight:700,color:"#92400e",flex:1}}>{livsEnAttente} livraison{livsEnAttente>1?"s":""} à facturer</span>
-                    <button onClick={()=>setTab("livraisons")} style={{fontSize:10,fontWeight:700,color:"#d97706",background:"rgba(217,119,6,0.1)",border:"none",borderRadius:6,padding:"3px 8px",cursor:"pointer",fontFamily:"inherit"}}>Voir</button>
-                  </div>
-                )}
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
-                  <button onClick={()=>{ouvrirContrat(client,contratClient?.signaturePrestataire||"",contratClient?.signatureClient||"");if(!contratClient?.statut&&onUpdateContrat)onUpdateContrat("CT-"+client.id,{clientId:client.id,statut:"cree"});}}
-                    style={{height:38,borderRadius:10,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,WebkitTapHighlightColor:"transparent"}}>
-                    {Ico.contract(12,"#fff")} Ouvrir contrat
-                  </button>
-                  <button
-                    onClick={contratClient?.statut==="signe_complet"?undefined:()=>envoyerContratSignature(client)}
-                    style={{height:38,borderRadius:10,background:contratClient?.statut==="signe_complet"?DS.greenSoft:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:contratClient?.statut==="signe_complet"?"default":"pointer",fontWeight:700,fontSize:12,color:contratClient?.statut==="signe_complet"?DS.green:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,WebkitTapHighlightColor:"transparent"}}>
-                    {Ico.sign(12,contratClient?.statut==="signe_complet"?DS.green:"#fff")}
-                    {contratClient?.statut==="signe_complet"?"Co-signé ✓":"Envoyer signature"}
-                  </button>
-                </div>
               </div>
             </div>
 
@@ -822,9 +782,6 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
             {ico:Ico.mail(15,DS.blue),l:"Email",v:client.email,href:client.email?"mailto:"+client.email:null},
             {ico:Ico.pin(15,DS.blue),l:"Adresse",v:client.adresse},
             {ico:Ico.pool(15,DS.blue),l:"Bassin",v:[client.bassin,client.volume?client.volume+" m³":null].filter(Boolean).join(" — ")},
-            {ico:Ico.euro(15,DS.blue),l:"Tarif annuel",v:client.prix?client.prix+"€/an":null},
-            {ico:Ico.calendar(15,DS.blue),l:"Début contrat",v:client.dateDebut?new Date(client.dateDebut).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}):null},
-            {ico:Ico.calendar(15,jours!==null&&jours<=30?DS.orange:DS.blue),l:"Fin contrat",v:client.dateFin?new Date(client.dateFin).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}):null},
           ].filter(r=>r.v).map((r,i,arr)=>(
             <div key={r.l} style={{display:"flex",gap:12,padding:"13px 16px",alignItems:"center",borderBottom:i<arr.length-1?"1px solid #f8fafc":"none"}}>
               <div style={{width:34,height:34,borderRadius:9,background:"rgba(224,242,254,0.5)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{r.ico}</div>
@@ -836,54 +793,10 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
           ))}
           </div>
 
-          {(()=>{
-            const ct=contratClient;
-            if(!ct) return null;
-            const cfg={
-              signe_complet:{bg:"#f0fdf4",border:"#6ee7b7",color:DS.green,label:"Contrat co-signé ✓",sub:"Signé le "+new Date(ct.signedAt||0).toLocaleDateString("fr")},
-              signe_client: {bg:"#eff6ff",border:"#93c5fd",color:DS.blue,label:"Client signé",sub:"En attente de votre signature"},
-              signe:        {bg:"#f0fdf4",border:"#6ee7b7",color:DS.green,label:"Contrat signé",sub:""},
-            }[ct.statut]||{bg:"#fff7ed",border:"#fed7aa",color:DS.orange,label:"En attente de signature",sub:""};
-            return <>
-              <div style={{background:cfg.bg,border:"1px solid "+cfg.border,borderRadius:10,padding:"8px 12px",display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:12,fontWeight:800,color:cfg.color}}>{cfg.label}</div>
-                  {cfg.sub&&<div style={{fontSize:10,color:DS.mid,marginTop:1}}>{cfg.sub}</div>}
-                </div>
-              </div>
-              {(ct.statut==="signe_complet"||ct.statut==="signe_client")&&(ct.signatureClient||ct.signaturePrestataire)&&(
-                <div style={{display:"grid",gridTemplateColumns:ct.signatureClient&&ct.signaturePrestataire?"1fr 1fr":"1fr",gap:8,marginBottom:12}}>
-                  {ct.signatureClient&&(
-                    <div style={{background:"#f8fafc",borderRadius:10,border:"1px solid #e2e8f0",padding:"8px 10px",textAlign:"center"}}>
-                      <div style={{fontSize:9,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Signature client</div>
-                      <img src={ct.signatureClient} style={{width:"100%",maxHeight:56,objectFit:"contain",borderRadius:6}} alt="signature client"/>
-                    </div>
-                  )}
-                  {ct.signaturePrestataire&&(
-                    <div style={{background:"#f8fafc",borderRadius:10,border:"1px solid #e2e8f0",padding:"8px 10px",textAlign:"center"}}>
-                      <div style={{fontSize:9,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Signature prestataire</div>
-                      <img src={ct.signaturePrestataire} style={{width:"100%",maxHeight:56,objectFit:"contain",borderRadius:6}} alt="signature prestataire"/>
-                    </div>
-                  )}
-                </div>
-              )}
-            </>;
-          })()}
-
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:8}}>
-            <button onClick={()=>{ouvrirContrat(client,contratClient?.signaturePrestataire||"",contratClient?.signatureClient||"");if(!contratClient?.statut&&onUpdateContrat)onUpdateContrat("CT-"+client.id,{clientId:client.id,statut:"cree"});}}
-              style={{height:44,borderRadius:12,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,boxShadow:"0 2px 8px rgba(2,132,199,0.25)",WebkitTapHighlightColor:"transparent"}}>
-              {Ico.contract(12,"#fff")} Contrat
-            </button>
-            <button
-              onClick={contratClient?.statut==="signe_complet"?undefined:()=>envoyerContratSignature(client)}
-              style={{height:44,borderRadius:12,background:contratClient?.statut==="signe_complet"?DS.greenSoft:contratClient?.statut==="signe_client"?DS.blueSoft:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:contratClient?.statut==="signe_complet"?"default":"pointer",fontWeight:700,fontSize:12,color:contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,WebkitTapHighlightColor:"transparent",opacity:contratClient?.statut==="signe_complet"?0.85:1}}>
-              {Ico.sign(12,contratClient?.statut==="signe_complet"?DS.green:contratClient?.statut==="signe_client"?DS.blue:"#fff")}
-              {contratClient?.statut==="signe_complet"?"Co-signé ✓":contratClient?.statut==="signe_client"?"Attente":"Envoyer"}
-            </button>
+          <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:8}}>
             <button onClick={onEdit}
-              style={{height:44,borderRadius:12,background:"rgba(255,255,255,0.4)",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:5,WebkitTapHighlightColor:"transparent"}}>
-              {Ico.edit(12,DS.dark)} Modifier
+              style={{height:44,borderRadius:12,background:"rgba(255,255,255,0.4)",border:"1px solid #e2e8f0",cursor:"pointer",fontWeight:700,fontSize:13,color:DS.dark,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6,WebkitTapHighlightColor:"transparent"}}>
+              {Ico.edit(14,DS.dark)} Modifier les infos
             </button>
             <button onClick={onDelete}
               style={{width:44,height:44,borderRadius:12,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",WebkitTapHighlightColor:"transparent"}}>
@@ -892,6 +805,180 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
           </div>
         </div>
       )}
+
+      {/* ══ CONTRAT ══ */}
+      {tab==="contrat" && (()=>{
+        const ct = contratClient;
+        const STATUTS = {
+          signe_complet:   {label:"✅ Contrat signé par les deux parties", color:"#059669", bg:"#f0fdf4", border:"#86efac"},
+          signe_client:    {label:"✍️ Client signé — votre signature requise", color:"#4f46e5", bg:"#eef2ff", border:"#a5b4fc"},
+          demande_envoyee: {label:"📧 Contrat envoyé au client", color:"#0891b2", bg:"#e0f2fe", border:"#7dd3fc"},
+          cree:            {label:"📄 Contrat créé", color:"#0891b2", bg:"#f0f9ff", border:"#bae6fd"},
+          reset:           {label:"🔄 Contrat réinitialisé", color:"#94a3b8", bg:"#f8fafc", border:"#e2e8f0"},
+        };
+        const statutCfg = STATUTS[ct?.statut] || {label:"📋 Aucun contrat signé", color:"#94a3b8", bg:"#f8fafc", border:"#e2e8f0"};
+
+        // Mensualités
+        const {m1: mensualite1, m11: mensualiteBase} = calcMensualites(client.prix||0);
+        const fmtEur = (v) => v%1===0?`${v}€`:`${v.toFixed(2).replace(".",",")}€`;
+        const today = new Date();
+        const debut = client.dateDebut ? new Date(client.dateDebut) : null;
+        const fin = client.dateFin ? new Date(client.dateFin) : null;
+        const debutY = debut?.getFullYear(), debutM = debut ? debut.getMonth()+1 : null;
+        const getMontantMois = (year, month) => (year===debutY && month===debutM) ? mensualite1 : mensualiteBase;
+
+        const mensualites = [];
+        if (debut && fin && client.prix) {
+          let cur = new Date(debut.getFullYear(), debut.getMonth(), 1);
+          const finMois = new Date(fin.getFullYear(), fin.getMonth(), 1);
+          const curMois = new Date(today.getFullYear(), today.getMonth(), 1);
+          while (cur <= finMois && cur <= curMois) {
+            const y = cur.getFullYear(), m = cur.getMonth()+1;
+            const key = `${client.id}_${y}_${String(m).padStart(2,"0")}`;
+            const isPaid = versements?.[key]===true;
+            const isCurrentMonth = y===today.getFullYear()&&m===today.getMonth()+1;
+            const isOverdue = !isCurrentMonth && !isPaid;
+            const montant = getMontantMois(y, m);
+            mensualites.push({key, y, m, isPaid, isCurrentMonth, isOverdue, montant});
+            cur = new Date(cur.getFullYear(), cur.getMonth()+1, 1);
+          }
+        }
+        const totalDu = mensualites.filter(m=>!m.isPaid).reduce((s,m)=>s+m.montant,0);
+        const overdueCount = mensualites.filter(m=>m.isOverdue).length;
+        const MOIS_COURT = ["","Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
+
+        return (
+          <div className="fade-in" style={{display:"flex",flexDirection:"column",gap:14}}>
+
+            {/* Statut */}
+            <div style={{padding:"14px 16px",borderRadius:14,background:statutCfg.bg,border:"1.5px solid "+statutCfg.border,display:"flex",alignItems:"center",gap:10}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:14,fontWeight:800,color:statutCfg.color}}>{statutCfg.label}</div>
+                {ct?.signedAt&&<div style={{fontSize:11,color:"#64748b",marginTop:3}}>Signé le {new Date(ct.signedAt).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"})}</div>}
+              </div>
+            </div>
+
+            {/* Infos financières */}
+            {client.prix > 0 && (
+              <div style={{background:"rgba(255,255,255,0.6)",borderRadius:14,border:"1px solid #e0f2fe",overflow:"hidden"}}>
+                <div style={{padding:"10px 14px",background:"linear-gradient(135deg,#f0f9ff,#e0f2fe)",borderBottom:"1px solid #bae6fd55"}}>
+                  <span style={{fontSize:11,fontWeight:800,color:"#0369a1",textTransform:"uppercase",letterSpacing:.7}}>💰 Informations financières</span>
+                </div>
+                <div style={{padding:"12px 14px"}}>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:10}}>
+                    {[
+                      {label:"Prix annuel", val:client.prix+"€"},
+                      {label:"Mensualité",  val:mensualiteBase?fmtEur(mensualiteBase):null},
+                      {label:"Fin contrat", val:fin?fin.toLocaleDateString("fr",{day:"2-digit",month:"short",year:"2-digit"}):null, alert:jours!==null&&jours<=30},
+                    ].filter(x=>x.val).map(({label,val,alert})=>(
+                      <div key={label} style={{background:alert?"#fff7ed":"#f8fafc",borderRadius:10,padding:"8px",textAlign:"center",border:`1px solid ${alert?"#fcd34d":"#e2e8f0"}`}}>
+                        <div style={{fontSize:9,color:alert?"#b45309":"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.4,marginBottom:3}}>{label}</div>
+                        <div style={{fontSize:14,fontWeight:800,color:alert?"#d97706":"#0f172a",lineHeight:1}}>{val}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {jours!==null&&(
+                    <div style={{padding:"8px 12px",borderRadius:9,background:jours<=30?"#fff7ed":"#f0f9ff",border:`1px solid ${jours<=30?"#fcd34d":"#bae6fd"}`,fontSize:12,fontWeight:700,color:jours<=30?"#b45309":"#0369a1",display:"flex",alignItems:"center",gap:6}}>
+                      <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                      {jours>=0?`${jours} jours restants sur le contrat`:"Contrat expiré"}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Actions contrat */}
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              <div style={{fontSize:10,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.8}}>Actions</div>
+              <button onClick={()=>{ouvrirContrat(client,ct?.signaturePrestataire||"",ct?.signatureClient||"");if(!ct?.statut&&onUpdateContrat)onUpdateContrat("CT-"+client.id,{clientId:client.id,statut:"cree"});}}
+                style={{height:44,borderRadius:12,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:7,boxShadow:"0 2px 10px rgba(2,132,199,0.3)",WebkitTapHighlightColor:"transparent"}}>
+                {Ico.contract(14,"#fff")} Ouvrir le contrat PDF
+              </button>
+              {ct?.statut!=="signe_complet"&&(
+                <button onClick={()=>envoyerContratSignature(client)}
+                  style={{height:44,borderRadius:12,background:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:7,boxShadow:"0 2px 10px rgba(5,150,105,0.3)",WebkitTapHighlightColor:"transparent"}}>
+                  {Ico.sign(14,"#fff")} {ct?.statut==="signe_client"?"Renvoyer le contrat":"Envoyer pour signature"}
+                </button>
+              )}
+              {ct?.statut==="signe_client"&&(
+                <a href={`/sign-prestataire.html?clientId=${client.id}&contractId=CT-${client.id}`} target="_blank" rel="noopener"
+                  style={{height:44,borderRadius:12,background:"linear-gradient(135deg,#4f46e5,#6366f1)",border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:7,textDecoration:"none",boxShadow:"0 2px 10px rgba(79,70,229,0.3)"}}>
+                  ✍️ Co-signer maintenant
+                </a>
+              )}
+            </div>
+
+            {/* Signatures */}
+            {ct&&(ct.signatureClient||ct.signaturePrestataire)&&(
+              <div style={{background:"rgba(255,255,255,0.6)",borderRadius:14,border:"1px solid #f1f5f9",overflow:"hidden"}}>
+                <div style={{padding:"10px 14px",background:"linear-gradient(135deg,#f8fafc,#f1f5f9)",borderBottom:"1px solid #f1f5f9"}}>
+                  <span style={{fontSize:11,fontWeight:800,color:"#475569",textTransform:"uppercase",letterSpacing:.7}}>✍️ Signatures</span>
+                </div>
+                <div style={{padding:"12px 14px",display:"grid",gridTemplateColumns:ct.signatureClient&&ct.signaturePrestataire?"1fr 1fr":"1fr",gap:10}}>
+                  {ct.signatureClient&&(
+                    <div style={{background:"#f8fafc",borderRadius:10,border:"1px solid #e2e8f0",padding:"10px",textAlign:"center"}}>
+                      <div style={{fontSize:9,fontWeight:700,color:"#64748b",textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>Signature client</div>
+                      <img src={ct.signatureClient} style={{width:"100%",maxHeight:70,objectFit:"contain",borderRadius:6}} alt="signature client"/>
+                      <div style={{fontSize:9,color:"#94a3b8",marginTop:4}}>✓ Signé</div>
+                    </div>
+                  )}
+                  {ct.signaturePrestataire&&(
+                    <div style={{background:"#f8fafc",borderRadius:10,border:"1px solid #e2e8f0",padding:"10px",textAlign:"center"}}>
+                      <div style={{fontSize:9,fontWeight:700,color:"#64748b",textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>Signature Dorian</div>
+                      <img src={ct.signaturePrestataire} style={{width:"100%",maxHeight:70,objectFit:"contain",borderRadius:6}} alt="signature prestataire"/>
+                      <div style={{fontSize:9,color:"#94a3b8",marginTop:4}}>✓ Co-signé</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Mensualités / Paiements */}
+            {mensualites.length > 0 && (
+              <div style={{background:"rgba(255,255,255,0.6)",borderRadius:14,border:"1px solid #e0f2fe",overflow:"hidden"}}>
+                <div style={{padding:"10px 14px",background:"linear-gradient(135deg,#f0f9ff,#e0f2fe)",borderBottom:"1px solid #bae6fd55",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                  <span style={{fontSize:11,fontWeight:800,color:"#0369a1",textTransform:"uppercase",letterSpacing:.7}}>💳 Suivi des paiements</span>
+                  {totalDu>0
+                    ?<span style={{fontSize:12,fontWeight:800,color:overdueCount>0?"#dc2626":"#0369a1"}}>{fmtEur(totalDu)} dû</span>
+                    :<span style={{fontSize:11,fontWeight:700,color:"#16a34a"}}>✓ À jour</span>
+                  }
+                </div>
+                <div style={{padding:"10px 12px",display:"flex",flexDirection:"column",gap:4}}>
+                  {mensualites.map((m)=>(
+                    <div key={m.key} style={{
+                      display:"flex",alignItems:"center",justifyContent:"space-between",
+                      padding:"7px 10px",borderRadius:8,
+                      background:m.isPaid?"#f0fdf4":m.isOverdue?"#fef2f2":m.isCurrentMonth?"#fefce8":"#f8fafc",
+                      border:`1px solid ${m.isPaid?"#bbf7d0":m.isOverdue?"#fecaca":m.isCurrentMonth?"#fde047":"#e2e8f0"}`
+                    }}>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontSize:11,fontWeight:700,color:"#475569",minWidth:28}}>{MOIS_COURT[m.m]}</span>
+                        <span style={{fontSize:10,color:"#94a3b8"}}>{m.y}</span>
+                        <span style={{fontSize:10,fontWeight:600,color:m.isPaid?"#15803d":m.isOverdue?"#dc2626":m.isCurrentMonth?"#a16207":"#94a3b8"}}>
+                          {m.isPaid?"Payé":m.isOverdue?"Retard":m.isCurrentMonth?"En cours":"À venir"}
+                        </span>
+                      </div>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontSize:12,fontWeight:700,color:m.isPaid?"#15803d":m.isOverdue?"#dc2626":"#0f172a"}}>{fmtEur(m.montant)}</span>
+                        {onToggleVersement&&(
+                          <button onClick={()=>onToggleVersement(m.key,!m.isPaid)}
+                            style={{width:24,height:24,borderRadius:6,border:`1.5px solid ${m.isPaid?"#16a34a":"#cbd5e1"}`,cursor:"pointer",background:m.isPaid?"#16a34a":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"}}>
+                            {m.isPaid
+                              ?<svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                              :<div style={{width:7,height:7,borderRadius:4,border:"2px solid #cbd5e1"}}/>
+                            }
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          </div>
+        );
+      })()}
 
       {/* -- RDV -- */}
       {tab==="rdvs" && (
@@ -1033,7 +1120,7 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
                   <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
                   Copier le lien
                 </button>
-                <button onClick={()=>{const w=window.open("","_blank");w.document.write(`<html><body style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;background:#f8fafc;gap:16px;padding:32px"><div style="font-size:22px;font-weight:900;color:#1e3a5f">Carnet BRIBLUE</div><div style="font-size:14px;color:#64748b">${client.nom}</div><img src="${qrUrl}" width="200" height="200"/><div style="font-size:32px;font-weight:900;letter-spacing:6px;color:#0891b2">${code}</div><div style="font-size:11px;color:#94a3b8;text-align:center">Scannez le QR code ou rendez-vous sur<br/>${carnetUrl}</div><script>window.print();<\/script></body></html>`);w.document.close();}}
+                <button onClick={()=>{const w=window.open("","_blank");w.document.write(`<html><body style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;background:#f8fafc;gap:16px;padding:32px"><div style="font-size:22px;font-weight:900;color:#1e3a5f">Carnet BRIBLUE</div><div style="font-size:14px;color:#64748b">${client.nom}</div><img src="${qrUrl}" width="200" height="200"/><div style="font-size:32px;font-weight:900;letter-spacing:6px;color:#0891b2">${code}</div><div style="font-size:11px;color:#94a3b8;text-align:center">Scannez le QR code ou rendez-vous sur<br/>${carnetUrl}</div><script>window.print();</` + `</script></body></html>`);w.document.close();}}
                   style={{padding:"10px 8px",background:"rgba(8,145,178,0.2)",border:"1px solid rgba(8,145,178,0.35)",borderRadius:10,fontSize:12,fontWeight:700,color:"#7dd3fc",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6,WebkitTapHighlightColor:"transparent"}}>
                   <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                   Imprimer QR
