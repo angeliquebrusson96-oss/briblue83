@@ -234,135 +234,197 @@ export function PageClients({ clients, passages, contrats={}, onUpdateContrat, o
     return { total: clients.length, sousContrat, alertes: alertCount, expires };
   }, [clients, alertCount]);
 
+  // Dégradés avatar selon l'initiale
+  const avatarGrad = (nom) => {
+    const g = [
+      "linear-gradient(135deg,#0891b2,#06b6d4)","linear-gradient(135deg,#7c3aed,#a78bfa)",
+      "linear-gradient(135deg,#059669,#34d399)","linear-gradient(135deg,#d97706,#fbbf24)",
+      "linear-gradient(135deg,#dc2626,#f87171)","linear-gradient(135deg,#0369a1,#38bdf8)",
+      "linear-gradient(135deg,#7e22ce,#c084fc)","linear-gradient(135deg,#be185d,#f472b6)",
+    ];
+    return g[(nom?.charCodeAt(0)||0) % g.length];
+  };
+
   return (
     <div>
-      {/* ═══ STATS HEADER ═══ */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
-        {/* Total clients */}
-        <div onClick={()=>setFilterStat("all")} style={{cursor:"pointer",transform:filterStat==="all"?"scale(1.03)":"scale(1)",transition:"transform .2s",background:"linear-gradient(135deg,#0c1f3f 0%,#0369a1 100%)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:"0 8px 24px rgba(12,31,63,0.25)"}}>
-          <div style={{position:"absolute",top:-15,right:-15,width:80,height:80,borderRadius:"50%",background:"rgba(56,189,248,0.15)",pointerEvents:"none"}}/>
-          <div style={{display:"flex",alignItems:"center",gap:10,position:"relative"}}>
-            <div style={{width:42,height:42,borderRadius:12,background:"rgba(56,189,248,0.25)",border:"1.5px solid rgba(56,189,248,0.4)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              {Ico.clients(18,"#7dd3fc")}
-            </div>
-            <div>
-              <div style={{fontSize:22,fontWeight:900,color:"#fff",lineHeight:1}}>{statsClients.total}</div>
-              <div style={{fontSize:10,color:"rgba(255,255,255,0.6)",fontWeight:700,textTransform:"uppercase",letterSpacing:0.5,marginTop:2}}>Clients</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Sous contrat */}
-        <div onClick={()=>setFilterStat(filterStat==="contrat"?"all":"contrat")} style={{cursor:"pointer",transform:filterStat==="contrat"?"scale(1.03)":"scale(1)",transition:"transform .2s",background:"linear-gradient(135deg,#059669,#10b981)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:"0 8px 24px rgba(5,150,105,0.25)"}}>
-          <div style={{position:"absolute",top:-15,right:-15,width:80,height:80,borderRadius:"50%",background:"rgba(255,255,255,0.12)",pointerEvents:"none"}}/>
-          <div style={{display:"flex",alignItems:"center",gap:10,position:"relative"}}>
-            <div style={{width:42,height:42,borderRadius:12,background:"rgba(255,255,255,0.2)",border:"1.5px solid rgba(255,255,255,0.3)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              {Ico.contract(18,"#fff")}
-            </div>
-            <div>
-              <div style={{fontSize:22,fontWeight:900,color:"#fff",lineHeight:1}}>{statsClients.sousContrat}</div>
-              <div style={{fontSize:10,color:"rgba(255,255,255,0.85)",fontWeight:700,textTransform:"uppercase",letterSpacing:0.5,marginTop:2}}>Sous contrat</div>
-            </div>
-          </div>
-        </div>
+      {/* ═══ BARRE STATS / FILTRES ═══ */}
+      <div style={{display:"flex",gap:8,marginBottom:16,overflowX:"auto",scrollbarWidth:"none",WebkitOverflowScrolling:"touch",paddingBottom:2}}>
+        {[
+          { key:"all",      icon:"🏊", label:"Tous",          val:statsClients.total,     color:"#0891b2", grad:"linear-gradient(135deg,#0c1f3f,#0369a1)" },
+          { key:"contrat",  icon:"📋", label:"Sous contrat",  val:statsClients.sousContrat,color:"#059669",grad:"linear-gradient(135deg,#064e3b,#059669)" },
+          { key:"alertes",  icon:"⚠️", label:"Alertes",       val:statsClients.alertes,   color:"#d97706", grad:"linear-gradient(135deg,#78350f,#d97706)" },
+          { key:"expires",  icon:"⏰", label:"Expirent < 30j",val:statsClients.expires,   color:"#dc2626", grad:"linear-gradient(135deg,#7f1d1d,#dc2626)" },
+        ].map(f=>{
+          const active = filterStat === f.key;
+          return (
+            <button key={f.key} onClick={()=>setFilterStat(active && f.key!=="all" ? "all" : f.key)}
+              style={{flexShrink:0,display:"flex",alignItems:"center",gap:8,padding:"10px 16px",borderRadius:16,border:"none",cursor:"pointer",fontFamily:"inherit",transition:"all .2s",WebkitTapHighlightColor:"transparent",
+                background:active ? f.grad : "rgba(255,255,255,0.55)",
+                boxShadow:active ? "0 4px 16px rgba(0,0,0,0.2)" : "0 1px 4px rgba(0,0,0,0.06)",
+                transform:active?"scale(1.04)":"scale(1)",
+              }}>
+              <span style={{fontSize:16,lineHeight:1}}>{f.icon}</span>
+              <div style={{textAlign:"left"}}>
+                <div style={{fontSize:18,fontWeight:900,color:active?"#fff":DS.dark,lineHeight:1}}>{f.val}</div>
+                <div style={{fontSize:10,fontWeight:700,color:active?"rgba(255,255,255,0.75)":DS.mid,letterSpacing:.3,marginTop:1,whiteSpace:"nowrap"}}>{f.label}</div>
+              </div>
+            </button>
+          );
+        })}
       </div>
-      {/* Badge filtre actif */}
-      {filterStat === "contrat" && (
-        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,padding:"8px 12px",borderRadius:12,background:"linear-gradient(135deg,rgba(5,150,105,0.1),rgba(5,150,105,0.05))",border:"1px solid rgba(5,150,105,0.2)"}}>
-          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.4" strokeLinecap="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-          <span style={{fontSize:12,fontWeight:700,color:"#059669",flex:1}}>
-            Filtre : Sous contrat — {filtered.length} client{filtered.length>1?"s":""}
-          </span>
-          <button onClick={()=>setFilterStat("all")} style={{padding:"4px 10px",borderRadius:8,background:"rgba(255,255,255,0.7)",border:"1px solid rgba(5,150,105,0.25)",cursor:"pointer",fontSize:11,fontWeight:700,color:"#059669",fontFamily:"inherit",display:"flex",alignItems:"center",gap:4}}>
-            <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            Tout voir
-          </button>
+
+      {/* ═══ BARRE RECHERCHE + AJOUT ═══ */}
+      <div style={{display:"flex",gap:10,marginBottom:18,alignItems:"center"}}>
+        <div style={{flex:1,position:"relative"}}>
+          <div style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}>
+            {Ico.search(16,"#94a3b8")}
+          </div>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher un client…"
+            style={{width:"100%",padding:"13px 16px 13px 44px",borderRadius:16,border:"1.5px solid rgba(8,145,178,0.15)",fontSize:14,outline:"none",boxSizing:"border-box",background:"rgba(255,255,255,0.8)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",color:DS.dark,fontFamily:"inherit",boxShadow:"0 2px 12px rgba(8,145,178,0.08)",transition:"border .2s"}}/>
+          {search&&<button onClick={()=>setSearch("")} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"#94a3b8",fontSize:18,lineHeight:1,padding:4}}>×</button>}
+        </div>
+        <button onClick={onAdd}
+          style={{height:46,borderRadius:16,background:"linear-gradient(135deg,#0891b2,#06b6d4)",border:"none",cursor:"pointer",fontWeight:800,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:7,padding:"0 20px",boxShadow:"0 4px 16px rgba(8,145,178,0.4)",flexShrink:0,WebkitTapHighlightColor:"transparent",whiteSpace:"nowrap"}}>
+          {Ico.userPlus(15,"#fff")}
+          {!isMobile&&"Nouveau client"}
+        </button>
+      </div>
+
+      {/* ═══ RÉSULTATS ═══ */}
+      {filterStat!=="all"&&filtered.length>0&&(
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:12,padding:"6px 12px",borderRadius:10,background:"rgba(8,145,178,0.06)",border:"1px solid rgba(8,145,178,0.12)"}}>
+          <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.5" strokeLinecap="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+          <span style={{fontSize:12,fontWeight:600,color:"#0891b2",flex:1}}>{filtered.length} client{filtered.length>1?"s":""} affiché{filtered.length>1?"s":""}</span>
+          <button onClick={()=>setFilterStat("all")} style={{fontSize:11,fontWeight:700,color:"#0891b2",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",textDecoration:"underline"}}>Tout voir</button>
         </div>
       )}
 
-      <div style={{display:"flex",gap:10,marginBottom:14}}>
-        <div style={{flex:1,position:"relative"}}>
-          <div style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}>{Ico.search(16,"#94a3b8")}</div>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher…"
-            style={{width:"100%",padding:"11px 14px 11px 40px",borderRadius:DS.radius,border:"none",fontSize:13,outline:"none",boxSizing:"border-box",background:"rgba(255,255,255,0.45)",boxShadow:"inset 3px 3px 6px rgba(6,182,212,0.15), inset -2px -2px 5px rgba(255,255,255,0.8)",color:DS.dark,fontFamily:"inherit"}}/>
+      {filtered.length===0&&(
+        <div style={{textAlign:"center",padding:"60px 20px",color:DS.mid}}>
+          <div style={{fontSize:48,marginBottom:12}}>🔍</div>
+          <div style={{fontSize:15,fontWeight:700,color:"#374151",marginBottom:4}}>Aucun client trouvé</div>
+          <div style={{fontSize:13}}>Essayez un autre terme de recherche</div>
         </div>
-        <BtnPrimary onClick={onAdd} bg={DS.blueGrad} icon={Ico.userPlus(14,"#fff")} style={{flexShrink:0,padding:"10px 16px",fontSize:13,borderRadius:14,boxShadow:"4px 4px 12px rgba(8,145,178,0.3)"}}>
-          {!isMobile && "Nouveau"}
-        </BtnPrimary>
-      </div>
-      {filtered.length===0&&<div style={{textAlign:"center",color:DS.mid,padding:40,fontSize:13}}>Aucun client trouvé</div>}
-      <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:10}}>
+      )}
+
+      <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(auto-fill,minmax(300px,1fr))",gap:14}}>
         {filtered.map((c,idx)=>{
-          const al=alerteClient(c,passages); const col=AC[al];
-          const mpm=c.moisParMois||c.saisons||{};
-          const tE=totalAnnuel(mpm,"entretien"), tC=totalAnnuel(mpm,"controle");
-          const tot=calculerPassagesPrevusContrat(c);
-          const passEff=passages.filter(p=>p.clientId===c.id&&isPassageDansContrat(p,c)&&isPassageEffectue(p));
-          const eE=passEff.filter(p=>isEntretienType(p.type)).length;
-          const eC=passEff.filter(p=>isControleType(p.type)).length;
-          const eff=eE+eC;
-          const pct=tot>0?Math.round(eff/tot*100):0;
-          const rest=Math.max(0,tot-eff);
-          const accentColor=al==="rouge"?DS.red:al==="jaune"?"#d97706":al==="orange"?"#d97706":DS.green;
+          const al  = alerteClient(c,passages);
+          const col = AC[al];
+          const mpm = c.moisParMois||c.saisons||{};
+          const tE  = totalAnnuel(mpm,"entretien");
+          const tC  = totalAnnuel(mpm,"controle");
+          const tot = calculerPassagesPrevusContrat(c);
+          const passEff = passages.filter(p=>p.clientId===c.id&&isPassageDansContrat(p,c)&&isPassageEffectue(p));
+          const eE  = passEff.filter(p=>isEntretienType(p.type)).length;
+          const eC  = passEff.filter(p=>isControleType(p.type)).length;
+          const eff = eE+eC;
+          const pct = tot>0?Math.round(eff/tot*100):0;
+          const rest= Math.max(0,tot-eff);
+          const jours = daysUntil(c.dateFin);
+
+          const statusBar = pct>=100?"#10b981":pct>=60?"#0891b2":pct>=30?"#f59e0b":"#ef4444";
+          const meta        = getStatutMeta(c.id);
+          const isOpen      = openPicker===c.id;
+
           return (
-            <div key={c.id} onClick={()=>onClientClick(c)} className="fade-in card-hover"
-              style={{animationDelay:`${idx*0.03}s`,background:"rgba(255,255,255,0.45)",borderRadius:DS.radius,
-                overflow:openPicker===c.id?"visible":"hidden",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",
-                border:"1px solid "+DS.border,borderTop:"2px solid "+accentColor,
-                cursor:"pointer",display:"flex",flexDirection:"column",position:"relative",zIndex:openPicker===c.id?999:1}}>
-              {c.photoPiscine&&(
-                <div style={{height:72,position:"relative",flexShrink:0,overflow:"hidden"}}>
-                  <img src={c.photoPiscine} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
-                  <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,transparent 40%,rgba(0,0,0,0.35))"}}/>
+            <div key={c.id} onClick={()=>onClientClick(c)} className="fade-in"
+              style={{animationDelay:`${idx*0.04}s`,borderRadius:20,overflow:isOpen?"visible":"hidden",
+                boxShadow:"0 4px 24px rgba(0,0,0,0.09)",border:"1px solid rgba(255,255,255,0.8)",
+                cursor:"pointer",display:"flex",flexDirection:"column",position:"relative",
+                zIndex:isOpen?999:1,background:"#fff",transition:"box-shadow .2s, transform .15s",
+              }}
+              onMouseEnter={e=>{ if(!isMobile){e.currentTarget.style.boxShadow="0 8px 32px rgba(8,145,178,0.18)";e.currentTarget.style.transform="translateY(-2px)";} }}
+              onMouseLeave={e=>{ if(!isMobile){e.currentTarget.style.boxShadow="0 4px 24px rgba(0,0,0,0.09)";e.currentTarget.style.transform="translateY(0)";} }}>
+
+              {/* ── HEADER : photo ou dégradé ── */}
+              <div style={{height:110,position:"relative",flexShrink:0,overflow:"hidden",borderRadius:"20px 20px 0 0"}}>
+                {c.photoPiscine
+                  ? <>
+                      <img src={c.photoPiscine} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+                      <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,rgba(0,0,0,0.08) 0%,rgba(0,0,0,0.55) 100%)"}}/>
+                    </>
+                  : <div style={{width:"100%",height:"100%",background:avatarGrad(c.nom),display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
+                      <div style={{position:"absolute",right:-20,top:-20,width:100,height:100,borderRadius:"50%",background:"rgba(255,255,255,0.1)"}}/>
+                      <div style={{position:"absolute",left:-10,bottom:-10,width:70,height:70,borderRadius:"50%",background:"rgba(255,255,255,0.08)"}}/>
+                      <span style={{fontSize:36,fontWeight:900,color:"rgba(255,255,255,0.9)",letterSpacing:-1,zIndex:1}}>
+                        {c.nom?.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()}
+                      </span>
+                    </div>
+                }
+                {/* Badge alerte */}
+                <div style={{position:"absolute",top:10,left:12}}>
+                  <span style={{fontSize:10,fontWeight:800,color:col.tx,background:col.bg,padding:"3px 9px",borderRadius:20,border:"1.5px solid "+col.tx+"44",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>{col.lbl}</span>
                 </div>
-              )}
-              <div style={{padding:"12px",flex:1,display:"flex",flexDirection:"column",gap:7}}>
-                <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
-                  <Avatar nom={c.nom} size={34}/>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontWeight:700,fontSize:13,color:DS.dark,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
-                    <div style={{display:"flex",gap:4,marginTop:3,flexWrap:"wrap"}}>
-                      <span style={{background:"rgba(255,255,255,0.4)",color:DS.mid,padding:"1px 7px",borderRadius:20,fontWeight:600,fontSize:10,border:"1px solid "+DS.border}}>{c.formule}</span>
-                      {c.bassin&&<span style={{background:DS.light,color:DS.mid,padding:"1px 6px",borderRadius:20,fontWeight:500,fontSize:10}}>{c.bassin}</span>}
+                {/* Jours restants */}
+                {jours!==null&&(
+                  <div style={{position:"absolute",top:10,right:12}}>
+                    <span style={{fontSize:10,fontWeight:800,color:jours<=30?"#fff":"#fff",background:jours<=30?"rgba(239,68,68,0.85)":"rgba(0,0,0,0.45)",padding:"3px 9px",borderRadius:20,backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
+                      {jours>=0?jours+"j":"Expiré"}
+                    </span>
+                  </div>
+                )}
+                {/* Nom sur la photo */}
+                <div style={{position:"absolute",bottom:10,left:14,right:14}}>
+                  <div style={{fontSize:16,fontWeight:900,color:"#fff",letterSpacing:-0.3,textShadow:"0 1px 4px rgba(0,0,0,0.5)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
+                  <div style={{fontSize:11,color:"rgba(255,255,255,0.8)",fontWeight:600,marginTop:1,display:"flex",gap:6,alignItems:"center"}}>
+                    <span>{c.formule}</span>
+                    {c.bassin&&<><span style={{opacity:.5}}>·</span><span>{c.bassin}{c.volume?" "+c.volume+"m³":""}</span></>}
+                  </div>
+                </div>
+              </div>
+
+              {/* ── CORPS ── */}
+              <div style={{padding:"14px 14px 12px",flex:1,display:"flex",flexDirection:"column",gap:10}}>
+
+                {/* Adresse */}
+                {c.adresse&&(
+                  <div style={{display:"flex",alignItems:"center",gap:6,color:"#64748b"}}>
+                    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{flexShrink:0}}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    <span style={{fontSize:11,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.adresse}</span>
+                  </div>
+                )}
+
+                {/* Progression passages */}
+                {tot>0&&(
+                  <div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                      <span style={{fontSize:11,fontWeight:700,color:"#374151"}}>Passages {eff}/{tot}</span>
+                      <span style={{fontSize:12,fontWeight:900,color:statusBar}}>{pct}%</span>
+                    </div>
+                    <div style={{height:6,background:"#f1f5f9",borderRadius:99,overflow:"hidden"}}>
+                      <div style={{height:"100%",width:`${pct}%`,background:pct>=100?"linear-gradient(90deg,#10b981,#34d399)":pct>=60?"linear-gradient(90deg,#0891b2,#38bdf8)":pct>=30?"linear-gradient(90deg,#f59e0b,#fbbf24)":"linear-gradient(90deg,#ef4444,#f87171)",borderRadius:99,transition:"width .5s ease"}}/>
+                    </div>
+                    <div style={{display:"flex",gap:8,marginTop:6}}>
+                      {tE>0&&<span style={{fontSize:10,fontWeight:700,color:eE>=tE?"#059669":"#0891b2",background:eE>=tE?"#f0fdf4":"#e0f2fe",padding:"2px 8px",borderRadius:8}}>🔧 {eE}/{tE}</span>}
+                      {tC>0&&<span style={{fontSize:10,fontWeight:700,color:eC>=tC?"#059669":"#0369a1",background:eC>=tC?"#f0fdf4":"#e0f2fe",padding:"2px 8px",borderRadius:8}}>💧 {eC}/{tC}</span>}
+                      {rest>0&&<span style={{fontSize:10,fontWeight:700,color:"#b45309",background:"#fef3c7",padding:"2px 8px",borderRadius:8}}>{rest} restant{rest>1?"s":""}</span>}
                     </div>
                   </div>
-                  <Tag color={col.tx} bg={col.bg} style={{fontSize:9,fontWeight:700,flexShrink:0,padding:"2px 6px"}}>{col.lbl}</Tag>
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:3}}>
-                  <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"rgba(255,255,255,0.45)",border:"1px solid "+DS.border}}>
-                    <div style={{fontSize:13,fontWeight:800,color:DS.blue}}>{eE}<span style={{fontSize:9,color:DS.mid}}>/{tE}</span></div>
-                    <div style={{fontSize:9,color:DS.mid}}>Entret.</div>
-                  </div>
-                  <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"rgba(255,255,255,0.45)",border:"1px solid "+DS.border}}>
-                    <div style={{fontSize:13,fontWeight:800,color:DS.teal}}>{eC}<span style={{fontSize:9,color:DS.mid}}>/{tC}</span></div>
-                    <div style={{fontSize:9,color:DS.mid}}>Contrôl.</div>
-                  </div>
-                  <div style={{textAlign:"center",padding:"4px 2px",borderRadius:6,background:"rgba(255,255,255,0.45)",border:"1px solid "+DS.border}}>
-                    <div style={{fontSize:13,fontWeight:800,color:rest>0?"#b45309":DS.green}}>{pct}<span style={{fontSize:9,color:DS.mid}}>%</span></div>
-                    <div style={{fontSize:9,color:DS.mid}}>{rest>0?rest+" rest.":"À jour"}</div>
-                  </div>
-                </div>
-                {tot>0&&<div style={{height:3,background:DS.light,borderRadius:99,overflow:"hidden"}}>
-                  <div style={{height:"100%",width:`${pct}%`,background:pct>=100?"#059669":pct>=50?"#0891b2":"#f59e0b",borderRadius:99}}/>
-                </div>}
-                {/* Badge statut contrat — cliquable */}
+                )}
+
+                {/* Badge statut contrat — picker */}
                 {(()=>{
-                  const meta = getStatutMeta(c.id);
-                  const isOpen = openPicker===c.id;
                   return (
-                    <div style={{position:"relative"}}>
+                    <div style={{position:"relative",marginTop:"auto"}}>
                       <button onClick={e=>{e.stopPropagation();setOpenPicker(isOpen?null:c.id);}}
-                        style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"4px 8px",borderRadius:6,background:meta.bg,border:"1px solid "+meta.border,cursor:"pointer",fontFamily:"inherit"}}>
-                        <span style={{fontSize:10,fontWeight:700,color:meta.color}}>{meta.label}</span>
-                        <svg width={8} height={8} viewBox="0 0 24 24" fill="none" stroke={meta.color} strokeWidth="3" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+                        style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",borderRadius:10,background:meta.bg,border:"1.5px solid "+meta.border,cursor:"pointer",fontFamily:"inherit",transition:"all .15s"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:6}}>
+                          <div style={{width:7,height:7,borderRadius:4,background:meta.color,flexShrink:0}}/>
+                          <span style={{fontSize:11,fontWeight:700,color:meta.color}}>{meta.label}</span>
+                        </div>
+                        <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={meta.color} strokeWidth="2.5" strokeLinecap="round" style={{transition:"transform .2s",transform:isOpen?"rotate(180deg)":"rotate(0deg)"}}>
+                          <polyline points="6 9 12 15 18 9"/>
+                        </svg>
                       </button>
                       {isOpen&&(
-                        <div onClick={e=>e.stopPropagation()} style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,background:"rgba(255,255,255,0.45)",borderRadius:8,boxShadow:"0 4px 20px rgba(0,0,0,0.15)",border:"1px solid "+DS.border,zIndex:100,overflow:"auto",maxHeight:220}}>
-                          {CONTRAT_STATUTS.map(s=>(
+                        <div onClick={e=>e.stopPropagation()} style={{position:"absolute",bottom:"calc(100% + 6px)",left:0,right:0,background:"#fff",borderRadius:12,boxShadow:"0 8px 32px rgba(0,0,0,0.16)",border:"1px solid #e2e8f0",zIndex:100,overflow:"hidden"}}>
+                          {CONTRAT_STATUTS.map((s,si)=>(
                             <button key={s.key} onClick={()=>setStatut(c.id,s.key)}
-                              style={{width:"100%",display:"flex",alignItems:"center",gap:6,padding:"7px 10px",background:meta.key===s.key?s.bg:DS.white,border:"none",cursor:"pointer",fontFamily:"inherit",borderBottom:"1px solid "+DS.light}}>
-                              <span style={{fontSize:11,fontWeight:meta.key===s.key?700:500,color:meta.key===s.key?s.color:DS.dark}}>{s.label}</span>
-                              {meta.key===s.key&&<svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke={s.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft:"auto"}}><polyline points="20 6 9 17 4 12"/></svg>}
+                              style={{width:"100%",display:"flex",alignItems:"center",gap:8,padding:"9px 12px",background:meta.key===s.key?s.bg:"#fff",border:"none",borderBottom:si<CONTRAT_STATUTS.length-1?"1px solid #f8fafc":"none",cursor:"pointer",fontFamily:"inherit",transition:"background .1s"}}>
+                              <div style={{width:8,height:8,borderRadius:4,background:s.color,flexShrink:0}}/>
+                              <span style={{fontSize:11,fontWeight:meta.key===s.key?700:500,color:meta.key===s.key?s.color:"#374151",flex:1,textAlign:"left"}}>{s.label}</span>
+                              {meta.key===s.key&&<svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={s.color} strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
                             </button>
                           ))}
                         </div>
