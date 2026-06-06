@@ -15,6 +15,20 @@ if (!getApps().length) {
 }
 
 const db = getFirestore();
+const COLL = db.collection("briblue");
+
+// Lit un champ depuis le nouveau document OU depuis l'ancien app_data (fallback migration)
+async function readField(docName, field, legacyKey) {
+  const snap = await COLL.doc(docName).get();
+  if (snap.exists) {
+    const val = snap.data()[field];
+    if (val !== undefined) return val;
+  }
+  // Fallback : ancien document app_data
+  const legacy = await COLL.doc("app_data").get();
+  if (legacy.exists) return legacy.data()[legacyKey] ?? null;
+  return null;
+}
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -26,37 +40,38 @@ export default async function handler(req, res) {
   if (!clientId) return res.status(400).json({ error: "clientId manquant" });
 
   try {
-    const snap = await db.collection("briblue").doc("app_data").get();
-    if (!snap.exists) return res.status(500).json({ error: "Document app_data introuvable" });
+    // Lecture parallèle des deux documents concernés
+    const [clients, contrats] = await Promise.all([
+      readField("clients",  "data", "bb_clients_v2"),
+      readField("contrats", "data", "bb_contrats_v1"),
+    ]);
 
-    const allData = snap.data() || {};
-    const clients = allData["bb_clients_v2"] || [];
-    const client = clients.find(c => c.id === clientId);
+    const clientList = Array.isArray(clients) ? clients : [];
+    const client = clientList.find(c => c.id === clientId);
     if (!client) return res.status(404).json({ error: `Client introuvable (id: ${clientId})` });
 
-    const contrats = allData["bb_contrats_v1"] || {};
     const contractId = `CT-${clientId}`;
-    const contrat = contrats[contractId] || null;
+    const contrat = (contrats && contrats[contractId]) || null;
 
     return res.status(200).json({
       client: {
-        id: client.id,
-        nom: client.nom,
-        adresse: client.adresse || "",
-        formule: client.formule || "",
-        bassin: client.bassin || "",
-        volume: client.volume || 0,
-        prixPassageE: client.prixPassageE || 0,
-        prixPassageC: client.prixPassageC || 0,
-        dateDebut: client.dateDebut || "",
-        dateFin: client.dateFin || "",
-        moisParMois: client.moisParMois || {},
-        email: client.email || "",
-        notesTarifaires: client.notesTarifaires || "",
+        id:               client.id,
+        nom:              client.nom,
+        adresse:          client.adresse          || "",
+        formule:          client.formule          || "",
+        bassin:           client.bassin           || "",
+        volume:           client.volume           || 0,
+        prixPassageE:     client.prixPassageE     || 0,
+        prixPassageC:     client.prixPassageC     || 0,
+        dateDebut:        client.dateDebut        || "",
+        dateFin:          client.dateFin          || "",
+        moisParMois:      client.moisParMois      || {},
+        email:            client.email            || "",
+        notesTarifaires:  client.notesTarifaires  || "",
       },
       contrat,
       dejaSigné: contrat?.statut === "signe_complet",
-      signedAt: contrat?.signedAt || null,
+      signedAt:  contrat?.signedAt || null,
     });
   } catch (err) {
     console.error("get-contract error:", err);

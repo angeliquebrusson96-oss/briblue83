@@ -1,5 +1,5 @@
 import { getDoc, setDoc } from "firebase/firestore";
-import { APP_DOC, FIRESTORE_REST_URL, auth } from "./firebase";
+import { DOCS, KEY_MAP, REST_URLS, auth } from "./firebase";
 
 export const IS_IOS =
   typeof navigator !== "undefined" &&
@@ -110,60 +110,64 @@ function toFirestoreValue(v) {
   return { stringValue: String(v) };
 }
 
-// Sauvegarde REST Firestore (fonctionne sur iOS, survit au background)
-async function saveViaREST(pending, keepalive = false) {
-  const keys = Object.keys(pending);
-  if (!keys.length) return;
+// Groupe les clés en attente par document Firestore cible
+function _groupByDoc(pending) {
+  const byDoc = {}; // { docName: { field: value, ... } }
+  const now = new Date().toISOString();
+  for (const [key, val] of Object.entries(pending)) {
+    const mapping = KEY_MAP[key];
+    if (!mapping) continue;
+    if (!byDoc[mapping.doc]) byDoc[mapping.doc] = { savedAt: now };
+    byDoc[mapping.doc][mapping.field] = val;
+  }
+  return byDoc;
+}
 
+// Sauvegarde REST Firestore par document (iOS — SDK tué en arrière-plan)
+async function saveViaREST(pending, keepalive = false) {
+  if (!Object.keys(pending).length) return;
   const token = await getAuthToken();
   if (!token) {
-    // Pas de token → fallback SDK
-    for (const key of keys) {
-      await saveToFirebaseSDK(key, pending[key]);
-    }
+    for (const [k, v] of Object.entries(pending)) await saveToFirebaseSDK(k, v);
     return;
   }
-
-  const fields = {};
-  const updateMask = [];
-  const now = new Date().toISOString();
-  keys.forEach(key => {
-    fields[key] = toFirestoreValue(pending[key]);
-    updateMask.push(`updateMask.fieldPaths=${encodeURIComponent(key)}`);
-    // Timestamp par clé → reconcile peut comparer clé par clé au lieu du timestamp global
-    fields[`_savedAt_${key}`] = { stringValue: now };
-    updateMask.push(`updateMask.fieldPaths=${encodeURIComponent(`_savedAt_${key}`)}`);
-  });
-  fields["_lastSavedAt"] = { stringValue: now };
-  updateMask.push("updateMask.fieldPaths=_lastSavedAt");
-
-  const url = `${FIRESTORE_REST_URL}?${updateMask.join("&")}`;
-  const opts = {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-    body: JSON.stringify({ fields }),
-  };
-  if (keepalive) opts.keepalive = true;
-
-  const res = await fetch(url, opts);
-
-  // Token expiré → refresh et retry une fois
-  if (res.status === 401) {
-    const newToken = await refreshAuthToken(true);
-    if (newToken) {
-      opts.headers["Authorization"] = `Bearer ${newToken}`;
-      opts.keepalive = false; // keepalive + retry peut échouer
-      await fetch(url, opts).catch(() => {});
+  const byDoc = _groupByDoc(pending);
+  for (const [docName, docFields] of Object.entries(byDoc)) {
+    const url = REST_URLS[docName];
+    if (!url) continue;
+    const fields = {};
+    const mask = [];
+    for (const [f, v] of Object.entries(docFields)) {
+      fields[f] = toFirestoreValue(v);
+      mask.push(`updateMask.fieldPaths=${encodeURIComponent(f)}`);
     }
-    return;
+    const patchUrl = `${url}?${mask.join("&")}`;
+    const opts = {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+      body: JSON.stringify({ fields }),
+    };
+    if (keepalive) opts.keepalive = true;
+    const res = await fetch(patchUrl, opts);
+    if (res.status === 401) {
+      const newToken = await refreshAuthToken(true);
+      if (newToken) {
+        opts.headers["Authorization"] = `Bearer ${newToken}`;
+        opts.keepalive = false;
+        await fetch(patchUrl, opts).catch(() => {});
+      }
+      continue;
+    }
+    if (!res.ok) throw new Error(`REST ${res.status} (${docName})`);
   }
-  if (!res.ok) throw new Error(`REST ${res.status}`);
 }
 
 // ─── FIREBASE SDK (desktop/Android, connexion stable) ───────────────────────
 async function saveToFirebaseSDK(key, val) {
+  const mapping = KEY_MAP[key];
+  if (!mapping) return;
   const now = new Date().toISOString();
-  await setDoc(APP_DOC, { [key]: val, [`_savedAt_${key}`]: now, _lastSavedAt: now }, { merge: true });
+  await setDoc(DOCS[mapping.doc], { [mapping.field]: val, savedAt: now }, { merge: true });
 }
 
 // ─── FLUSH (iOS background / fermeture de page) ─────────────────────────────
@@ -206,92 +210,124 @@ async function flushOfflineQueue() {
 // Garantit qu'aucun client ne disparaît même si localStorage était incomplet.
 export async function reconcileOnBoot() {
   try {
-    // Restaurer la queue offline persistée (données en attente d'une session précédente)
     _loadPersistedQueue();
 
-    const snap    = await getDoc(APP_DOC);
-    const remote  = snap.exists() ? snap.data() : {};
-    const remoteTime = remote["_lastSavedAt"] ? new Date(remote["_lastSavedAt"]).getTime() : 0;
-    const KEYS = ["bb_clients_v2","bb_passages_v2","bb_livraisons_v1","bb_rdvs_v1","bb_stock_v1","bb_contrats_v1","bb_versements_v1","bb_retards_carnet_v1"];
-    const toPush = {};
+    const KEYS = ["bb_clients_v2","bb_passages_v2","bb_livraisons_v1","bb_rdvs_v1",
+                  "bb_stock_v1","bb_contrats_v1","bb_versements_v1","bb_retards_carnet_v1","bb_notes_v1"];
+
+    // ── Lire TOUS les documents Firestore en parallèle ───────────────────────
+    const docNames = [...new Set(KEYS.map(k => KEY_MAP[k]?.doc).filter(Boolean))];
+    const snapshots = {};
+    await Promise.all(docNames.map(async (docName) => {
+      try {
+        const s = await getDoc(DOCS[docName]);
+        snapshots[docName] = s.exists() ? s.data() : null;
+      } catch { snapshots[docName] = null; }
+    }));
+
+    // ── Migration automatique depuis l'ancien app_data (1ère connexion) ──────
+    const hasNewDocs = docNames.some(d => snapshots[d] !== null);
+    let legacyData = null;
+    if (!hasNewDocs) {
+      try {
+        const legacySnap = await getDoc(DOCS.app_data);
+        if (legacySnap.exists()) {
+          legacyData = legacySnap.data();
+          console.info("[briblue] 🔄 Migration Firebase : app_data → documents séparés (clients, passages, contrats…)");
+        }
+      } catch { /* noop */ }
+    }
+
+    const toPush = {}; // { docName: { field: value, ... } }
     let needsPush = false;
+    const now = new Date().toISOString();
 
     for (const key of KEYS) {
-      let local = null;
-      try { const ls = localStorage.getItem("briblue_" + key); if (ls) local = JSON.parse(ls); } catch {} // eslint-disable-line no-empty
+      const mapping = KEY_MAP[key];
+      if (!mapping) continue;
 
+      // Valeur distante (nouveau doc ou legacy)
+      let remoteVal = null;
+      let remoteTime = 0;
+      const docSnap = snapshots[mapping.doc];
+      if (docSnap) {
+        remoteVal = docSnap[mapping.field] ?? null;
+        remoteTime = docSnap.savedAt ? new Date(docSnap.savedAt).getTime() : 0;
+      } else if (legacyData) {
+        remoteVal = legacyData[key] ?? null;
+        const legacyTs = legacyData[`_savedAt_${key}`] || legacyData["_lastSavedAt"];
+        remoteTime = legacyTs ? new Date(legacyTs).getTime() : 0;
+      }
+
+      // Valeur locale
+      let local = null;
       let localTime = 0;
+      try { const ls = localStorage.getItem("briblue_" + key); if (ls) local = JSON.parse(ls); } catch {} // eslint-disable-line no-empty
       try { const m = localStorage.getItem("briblue_meta_" + key); if (m) localTime = JSON.parse(m).savedAt || 0; } catch {} // eslint-disable-line no-empty
 
-      const remoteKeyTs = remote[`_savedAt_${key}`];
-      const remoteKeyTime = remoteKeyTs ? new Date(remoteKeyTs).getTime() : remoteTime;
+      if (local == null && remoteVal == null) continue;
 
-      // ── Cas : rien en local ──────────────────────────────────────────────
+      // Rien en local → prendre Firebase
       if (local == null) {
-        if (remote[key] != null) {
-          try {
-            localStorage.setItem("briblue_" + key, JSON.stringify(remote[key]));
-            localStorage.setItem("briblue_meta_" + key, JSON.stringify({ savedAt: remoteKeyTime }));
-          } catch {} // eslint-disable-line no-empty
-        }
+        try {
+          localStorage.setItem("briblue_" + key, JSON.stringify(remoteVal));
+          localStorage.setItem("briblue_meta_" + key, JSON.stringify({ savedAt: remoteTime }));
+        } catch {} // eslint-disable-line no-empty
         continue;
       }
 
-      // ── Cas : rien sur Firebase → pousser le local ───────────────────────
-      if (remote[key] == null) {
-        toPush[key] = local; needsPush = true; continue;
+      // Rien sur Firebase → pousser le local
+      if (remoteVal == null) {
+        if (!toPush[mapping.doc]) toPush[mapping.doc] = { savedAt: now };
+        toPush[mapping.doc][mapping.field] = local;
+        needsPush = true;
+        continue;
       }
 
-      // ── Cas clés TABLEAU (clients, passages, rdvs, livraisons) ───────────
-      // MERGE OBLIGATOIRE : union des deux sources, jamais de remplacement.
-      // Scénario protégé : client créé en local (absent de Firebase) ou en Firebase
-      // (absent du local après purge) → les deux sont conservés.
+      // ── MERGE pour les tableaux (clients, passages, rdvs, livraisons) ─────
       if (MERGE_ARRAY_KEYS.has(key)) {
-        const localArr  = Array.isArray(local)        ? local        : [];
-        const remoteArr = Array.isArray(remote[key])  ? remote[key]  : [];
-
-        // Priorité à la source la plus récente pour les IDs communs
-        const merged = localTime >= remoteKeyTime
-          ? mergeArrayById(localArr, remoteArr)   // local gagne pour les doublons
-          : mergeArrayById(remoteArr, localArr);  // Firebase gagne pour les doublons
-
-        const hasNewLocal  = merged.length > remoteArr.length; // local a des entrées absentes de Firebase
-        const hasNewRemote = merged.length > localArr.length;  // Firebase a des entrées absentes du local
-
-        // Toujours mettre à jour localStorage avec la version fusionnée
+        const localArr  = Array.isArray(local)     ? local     : [];
+        const remoteArr = Array.isArray(remoteVal) ? remoteVal : [];
+        const merged = localTime >= remoteTime
+          ? mergeArrayById(localArr, remoteArr)
+          : mergeArrayById(remoteArr, localArr);
+        const hasNewLocal  = merged.length > remoteArr.length;
+        const hasNewRemote = merged.length > localArr.length;
         try {
           localStorage.setItem("briblue_" + key, JSON.stringify(merged));
           localStorage.setItem("briblue_meta_" + key, JSON.stringify({ savedAt: Date.now() }));
         } catch {} // eslint-disable-line no-empty
-
-        // Pousser vers Firebase si : local plus récent OU local avait des entrées manquantes
-        if (localTime >= remoteKeyTime || hasNewLocal) {
-          toPush[key] = merged; needsPush = true;
+        if (localTime >= remoteTime || hasNewLocal) {
+          if (!toPush[mapping.doc]) toPush[mapping.doc] = { savedAt: now };
+          toPush[mapping.doc][mapping.field] = merged;
+          needsPush = true;
         }
-        // Si Firebase avait des entrées manquantes en local, déjà restauré via localStorage ci-dessus
-        if (hasNewRemote) {
-          console.info(`[briblue] reconcile MERGE "${key}" : ${merged.length - localArr.length} entrée(s) restaurée(s) depuis Firebase.`);
-        }
+        if (hasNewRemote) console.info(`[briblue] ✅ MERGE "${key}" : ${merged.length - localArr.length} entrée(s) restaurée(s).`);
         continue;
       }
 
-      // ── Cas clés OBJET (stock, contrats…) → timestamp gagne ─────────────
-      if (localTime >= remoteKeyTime) {
-        toPush[key] = local; needsPush = true;
+      // ── Timestamp gagne pour les objets (stock, contrats…) ───────────────
+      if (localTime >= remoteTime) {
+        if (!toPush[mapping.doc]) toPush[mapping.doc] = { savedAt: now };
+        toPush[mapping.doc][mapping.field] = local;
+        needsPush = true;
       } else {
         if (!offlineQueue.pending[key]) {
           try {
-            localStorage.setItem("briblue_" + key, JSON.stringify(remote[key]));
-            localStorage.setItem("briblue_meta_" + key, JSON.stringify({ savedAt: remoteKeyTime }));
+            localStorage.setItem("briblue_" + key, JSON.stringify(remoteVal));
+            localStorage.setItem("briblue_meta_" + key, JSON.stringify({ savedAt: remoteTime }));
           } catch {} // eslint-disable-line no-empty
         }
       }
     }
 
     if (needsPush) {
-      toPush["_lastSavedAt"] = new Date().toISOString();
-      await setDoc(APP_DOC, toPush, { merge: true });
-      _persistQueue(); // vider la queue persistée après push réussi
+      await Promise.all(
+        Object.entries(toPush).map(([docName, fields]) =>
+          setDoc(DOCS[docName], fields, { merge: true })
+        )
+      );
+      _persistQueue();
     }
   } catch (e) { console.warn("[briblue] reconcile skipped:", e?.message); }
 }
@@ -415,30 +451,25 @@ export async function save(key, val) {
   }
 }
 
-// ─── CACHE getDoc (partage la requête entre les 6 load() simultanés du boot) ──
-let _getDocCache = null;
-let _getDocCacheAt = 0;
-let _getDocPromise = null;
-const GET_DOC_CACHE_MS = 8_000; // 8s : couvre le boot, périmé avant le poll des contrats (10s)
+// ─── CACHE getDoc par document (8s — couvre le boot, périmé avant le poll) ──
+const _docCache    = {}; // { docName: { snap, at } }
+const _docPromises = {}; // { docName: Promise }
+const GET_DOC_CACHE_MS = 8_000;
 
-async function fetchAppDoc() {
-  const now = Date.now();
-  if (_getDocCache && now - _getDocCacheAt < GET_DOC_CACHE_MS) return _getDocCache;
-  if (_getDocPromise) return _getDocPromise;
-  _getDocPromise = getDoc(APP_DOC).then(snap => {
-    _getDocCache = snap;
-    _getDocCacheAt = Date.now();
-    _getDocPromise = null;
+async function fetchDoc(docName) {
+  const cached = _docCache[docName];
+  if (cached && Date.now() - cached.at < GET_DOC_CACHE_MS) return cached.snap;
+  if (_docPromises[docName]) return _docPromises[docName];
+  _docPromises[docName] = getDoc(DOCS[docName]).then(snap => {
+    _docCache[docName] = { snap, at: Date.now() };
+    delete _docPromises[docName];
     return snap;
-  }).catch(e => { _getDocPromise = null; throw e; });
-  return _getDocPromise;
+  }).catch(e => { delete _docPromises[docName]; throw e; });
+  return _docPromises[docName];
 }
 
 // ─── LOAD ─────────────────────────────────────────────────────────────────────
-// Priorité au local s'il est aussi récent ou plus récent que Firebase.
-// Évite d'écraser des sauvegardes iOS dont le push réseau a été interrompu.
 export async function load(key, fallback) {
-  // 1. Lire localStorage en premier (instantané, sans réseau)
   let localData = null;
   let localTime = 0;
   try {
@@ -448,28 +479,21 @@ export async function load(key, fallback) {
     if (m) localTime = JSON.parse(m).savedAt || 0;
   } catch {} // eslint-disable-line no-empty
 
-  // 2. Ne jamais écraser une donnée en attente d'envoi
   if (offlineQueue.pending[key] !== undefined) return localData ?? fallback;
 
-  // 3. Firebase avec vérification de timestamp
+  const mapping = KEY_MAP[key];
+  if (!mapping) return localData ?? fallback;
+
   try {
-    const snap = await fetchAppDoc();
+    const snap = await fetchDoc(mapping.doc);
     if (snap.exists()) {
-      const allData = snap.data();
-      // Préférer le timestamp par clé (mis à jour par sign-contract) plutôt que le timestamp global
-      const remoteKeyTs = allData[`_savedAt_${key}`];
-      const remoteGlobalTs = allData["_lastSavedAt"];
-      const remoteTime = remoteKeyTs
-        ? new Date(remoteKeyTs).getTime()
-        : remoteGlobalTs ? new Date(remoteGlobalTs).getTime() : 0;
-      if (key in allData) {
-        if (localData !== null && localTime >= remoteTime) {
-          // Local identique ou plus récent → ne pas écraser
-          return localData;
-        }
-        // Firebase plus récent → mettre à jour le cache local
-        try { localStorage.setItem("briblue_" + key, JSON.stringify(allData[key])); } catch {} // eslint-disable-line no-empty
-        return allData[key];
+      const docData = snap.data();
+      const remoteVal  = docData[mapping.field];
+      const remoteTime = docData.savedAt ? new Date(docData.savedAt).getTime() : 0;
+      if (remoteVal !== undefined) {
+        if (localData !== null && localTime >= remoteTime) return localData;
+        try { localStorage.setItem("briblue_" + key, JSON.stringify(remoteVal)); } catch {} // eslint-disable-line no-empty
+        return remoteVal;
       }
     }
   } catch { /* réseau indisponible → utiliser local */ }
@@ -480,8 +504,8 @@ export async function load(key, fallback) {
 // ─── EVENT LISTENERS ─────────────────────────────────────────────────────────
 // ─── FIX #5 : expose invalidation du cache pour forcer un re-fetch Firebase ──
 export function invalidateDocCache() {
-  _getDocCache = null;
-  _getDocCacheAt = 0;
+  // Vider le cache de TOUS les documents
+  Object.keys(_docCache).forEach(k => delete _docCache[k]);
 }
 
 if (typeof window !== "undefined") {

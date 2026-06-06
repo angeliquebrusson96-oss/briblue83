@@ -14,8 +14,13 @@ if (!getApps().length) {
   initializeApp({ credential: cert(serviceAccount) });
 }
 
-const db = getFirestore();
-const APP_DOC = db.collection("briblue").doc("app_data");
+const db   = getFirestore();
+const COLL = db.collection("briblue");
+
+// Documents séparés — nouvelle architecture
+const CLIENTS_DOC  = COLL.doc("clients");
+const CONTRATS_DOC = COLL.doc("contrats");
+const LEGACY_DOC   = COLL.doc("app_data"); // fallback migration
 
 const RESEND_KEY = "re_FLTMeUdh_vL8QGqJhP2C293WEVCm9c7rh";
 const FROM = "rapport-piscine@briblue83.com";
@@ -60,13 +65,24 @@ export default async function handler(req, res) {
 
   try {
     await db.runTransaction(async (tx) => {
-      const snap = await tx.get(APP_DOC);
-      if (!snap.exists) throw new Error("Document app_data introuvable");
+      // Lire les deux documents concernés (+ legacy pour migration)
+      const [clientsSnap, contratsSnap, legacySnap] = await Promise.all([
+        tx.get(CLIENTS_DOC),
+        tx.get(CONTRATS_DOC),
+        tx.get(LEGACY_DOC),
+      ]);
 
-      const allData = snap.data() || {};
-      const clients = allData["bb_clients_v2"] || [];
-      client = clients.find(c => c.id === clientId) || null;
-      const contrats = { ...(allData["bb_contrats_v1"] || {}) };
+      // Clients : nouveau document en priorité, sinon legacy
+      const clientsData = (clientsSnap.exists && clientsSnap.data().data)
+        || (legacySnap.exists && legacySnap.data()["bb_clients_v2"])
+        || [];
+      client = (Array.isArray(clientsData) ? clientsData : []).find(c => c.id === clientId) || null;
+
+      // Contrats : nouveau document en priorité, sinon legacy
+      const contratsData = (contratsSnap.exists && contratsSnap.data().data)
+        || (legacySnap.exists && legacySnap.data()["bb_contrats_v1"])
+        || {};
+      const contrats = { ...contratsData };
       const existing = contrats[contractId] || {};
       const nowTs = new Date().toISOString();
 
@@ -76,7 +92,7 @@ export default async function handler(req, res) {
           actionDone = "skipped"; return;
         }
         contrats[contractId] = { ...existing, clientId, statut: "demande_envoyee" };
-        tx.set(APP_DOC, { "bb_contrats_v1": contrats, "_lastSavedAt": nowTs, "_savedAt_bb_contrats_v1": nowTs }, { merge: true });
+        tx.set(CONTRATS_DOC, { data: contrats, savedAt: nowTs }, { merge: true });
         actionDone = "demande_envoyee";
         return;
       }
@@ -90,7 +106,7 @@ export default async function handler(req, res) {
           signedByPrestaAt: signedAt || nowTs,
           statut: "signe_complet",
         };
-        tx.set(APP_DOC, { "bb_contrats_v1": contrats, "_lastSavedAt": nowTs, "_savedAt_bb_contrats_v1": nowTs }, { merge: true });
+        tx.set(CONTRATS_DOC, { data: contrats, savedAt: nowTs }, { merge: true });
         contractSnapshot = contrats[contractId];
         actionDone = "signe_complet";
         return;
@@ -107,7 +123,7 @@ export default async function handler(req, res) {
         signedAt: signedAt || nowTs,
         statut: "signe_client",
       };
-      tx.set(APP_DOC, { "bb_contrats_v1": contrats, "_lastSavedAt": nowTs, "_savedAt_bb_contrats_v1": nowTs }, { merge: true });
+      tx.set(CONTRATS_DOC, { data: contrats, savedAt: nowTs }, { merge: true });
       contractSnapshot = contrats[contractId];
       actionDone = "signe_client";
     });
