@@ -236,15 +236,15 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
     }
   };
   const TABS = [
-    {id:"gestion",    label:"Gestion",   color:"#0891b2"},
-    {id:"historique", label:"Historique",color:"#64748b"},
-    {id:"passages",   label:"Passages",  color:"#64748b"},
-    {id:"saisons",    label:"Planning",  color:"#64748b"},
-    {id:"contrat",    label:"Contrat",   color:"#059669"},
-    {id:"infos",      label:"Infos",     color:"#64748b"},
-    {id:"rdvs",       label:"RDV",       color:"#64748b"},
-    {id:"livraisons", label:"Livraisons",color:"#64748b"},
-    {id:"carnet",     label:"Carnet",    color:"#64748b"},
+    {id:"gestion",    label:"Général",   color:"#0891b2"},   // vue d'ensemble + actions
+    {id:"infos",      label:"Infos",     color:"#0284c7"},   // coordonnées client
+    {id:"contrat",    label:"Contrat",   color:"#059669"},   // contrat + paiements
+    {id:"passages",   label:"Rapports",  color:"#7c3aed"},   // rapports d'intervention
+    {id:"saisons",    label:"Planning",  color:"#0891b2"},   // planning mensuel
+    {id:"historique", label:"Historique",color:"#64748b"},   // chronologie complète
+    {id:"rdvs",       label:"RDV",       color:"#6d28d9"},   // rendez-vous
+    {id:"livraisons", label:"Livraisons",color:"#d97706"},   // livraisons produits
+    {id:"carnet",     label:"Carnet",    color:"#be185d"},   // carnet numérique client
   ];
 
   return (
