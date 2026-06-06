@@ -1,4 +1,4 @@
-import { getDoc, setDoc } from "firebase/firestore";
+import { getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { DOCS, KEY_MAP, REST_URLS, auth } from "./firebase";
 
 export const IS_IOS =
@@ -563,4 +563,82 @@ if (typeof window !== "undefined") {
   });
   window.briblue._forceFlush = flushPendingNow;
   window.briblue._forceReconcile = reconcileOnBoot;
+}
+
+// ─── REAL-TIME LISTENERS ─────────────────────────────────────────────────────
+// Écoute les documents Firestore en temps réel avec onSnapshot.
+// Dès qu'un autre appareil (ou la même session) modifie les données,
+// le callback est appelé avec les nouvelles valeurs → React se met à jour.
+//
+// callbacks: {
+//   clients: (array) => void        — bb_clients_v2
+//   passages: (array) => void       — bb_passages_v2
+//   rdvs: (array) => void           — bb_rdvs_v1
+//   livraisons: (array) => void     — bb_livraisons_v1
+//   contrats: (obj) => void         — bb_contrats_v1
+//   stock: (obj) => void            — bb_stock_v1
+//   meta: ({ notes, versements, retards }) => void
+// }
+// Retourne une fonction de désabonnement à appeler dans useEffect cleanup.
+export function subscribeToRealtime(callbacks) {
+  const unsubscribers = [];
+
+  // Correspondance document → clé localStorage → champ → callback
+  const DOC_SPEC = {
+    clients:    { keys: ["bb_clients_v2"],                          cb: (d) => callbacks.clients?.(d["data"]) },
+    passages:   { keys: ["bb_passages_v2"],                         cb: (d) => callbacks.passages?.(d["data"]) },
+    rdvs:       { keys: ["bb_rdvs_v1"],                             cb: (d) => callbacks.rdvs?.(d["data"]) },
+    livraisons: { keys: ["bb_livraisons_v1"],                       cb: (d) => callbacks.livraisons?.(d["data"]) },
+    contrats:   { keys: ["bb_contrats_v1"],                         cb: (d) => callbacks.contrats?.(d["data"]) },
+    stock:      { keys: ["bb_stock_v1"],                            cb: (d) => callbacks.stock?.(d["data"]) },
+    meta:       { keys: ["bb_versements_v1","bb_retards_carnet_v1","bb_notes_v1"], cb: (d) => callbacks.meta?.(d) },
+  };
+
+  for (const [docName, spec] of Object.entries(DOC_SPEC)) {
+    if (!callbacks[docName]) continue; // pas de callback → inutile d'écouter
+
+    const unsub = onSnapshot(
+      DOCS[docName],
+      { includeMetadataChanges: false }, // ignorer les changements de métadonnées (hasPendingWrites, etc.)
+      (snap) => {
+        if (!snap.exists()) return;
+
+        // ── Ignorer si nous avons des écritures en attente sur ce document ──
+        // (nos propres modifications pas encore confirmées par Firebase)
+        const hasPending = spec.keys.some(k => offlineQueue.pending[k] !== undefined);
+        if (hasPending) return;
+
+        const data = snap.data();
+
+        // ── Mettre à jour le cache getDoc pour éviter un re-fetch inutile ──
+        _docCache[docName] = { snap, at: Date.now() };
+
+        // ── Mettre à jour localStorage ──────────────────────────────────────
+        const remoteTime = data.savedAt ? new Date(data.savedAt).getTime() : 0;
+        for (const key of spec.keys) {
+          const mapping = KEY_MAP[key];
+          if (!mapping) continue;
+          const val = data[mapping.field];
+          if (val === undefined) continue;
+          try {
+            localStorage.setItem("briblue_" + key, JSON.stringify(val));
+            localStorage.setItem("briblue_meta_" + key, JSON.stringify({ savedAt: remoteTime }));
+          } catch { /* quota → pas critique, le state React sera à jour */ }
+        }
+
+        // ── Notifier l'app React ────────────────────────────────────────────
+        spec.cb(data);
+      },
+      (err) => {
+        // Erreur réseau normale (offline) — silencieuse
+        if (err.code !== "unavailable") {
+          console.warn(`[briblue] realtime(${docName}):`, err.message);
+        }
+      }
+    );
+
+    unsubscribers.push(unsub);
+  }
+
+  return () => unsubscribers.forEach(u => u());
 }

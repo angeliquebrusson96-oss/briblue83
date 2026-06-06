@@ -227,7 +227,7 @@ export async function extractPassagePhotos(passage) {
   // Si échec → idb: reste → migrateAllPassagesPhotos tentera plus tard.
   if (toUpload.length > 0 && navigator.onLine) {
     if (!auth.currentUser) {
-      try { await (await import("firebase/auth")).signInAnonymously(auth); } catch { /* réseau indisponible */ }
+      try { await signInAnonymously(auth); } catch { /* réseau indisponible */ }
     }
     if (auth.currentUser) {
       await Promise.all(

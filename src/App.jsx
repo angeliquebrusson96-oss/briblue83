@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { save, load, flushPendingNow, IS_IOS, reconcileOnBoot, invalidateDocCache } from "./lib/storage";
+import { save, flushPendingNow, IS_IOS, reconcileOnBoot, invalidateDocCache, subscribeToRealtime } from "./lib/storage";
 import { extractPassagePhotos, migratePassagePhotosToStorage, migrateAllPassagesPhotos } from "./lib/photoStore";
 import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import { auth } from "./lib/firebase";
@@ -328,6 +328,8 @@ export default function App() {
   const [dismissedAlertes, setDismissedAlertes] = useState(()=>{ try{ return JSON.parse(localStorage.getItem("briblue_dismissed_alertes")||"[]"); }catch{return [];} });
   const dismissAlerte = (clientId) => { setDismissedAlertes(prev=>{ const next=[...new Set([...prev,clientId])]; try{ localStorage.setItem("briblue_dismissed_alertes", JSON.stringify(next)); }catch{ /* noop */ } return next; }); };
   const prevTaskCount = useRef(0);
+  const clientsRef = useRef(clients); // ref toujours à jour pour les callbacks onSnapshot
+  useEffect(() => { clientsRef.current = clients; }, [clients]);
   const isMobile = useIsMobile();
 
   useEffect(()=>{
@@ -433,33 +435,70 @@ export default function App() {
     return () => unsub();
   }, [ready, runPhotoMigration]);
 
-  useEffect(()=>{
-    if(!ready) return;
-    const interval = setInterval(async()=>{
-      const ct = await load("bb_contrats_v1", {});
-      setContrats(prev => {
-        const keys = Object.keys(ct);
-        const newSig = keys.map(k=>ct[k]).find(c =>
-          (c.statut === "signe_client" || c.statut === "signe_complet") &&
-          (!prev[keys.find(k=>ct[k]===c)] || prev[keys.find(k=>ct[k]===c)]?.statut !== c.statut)
-        );
-        if (newSig) {
-          playNotifSound();
-          const cli = clients.find(cl => cl.id === newSig.clientId);
-          const nomCli = cli?.nom || newSig.clientId;
-          const isComplet = newSig.statut === "signe_complet";
-          toastInfo(isComplet ? `✅ Contrat co-signé par ${nomCli} !` : `📝 ${nomCli} a signé son contrat — votre signature est requise.`);
-          sendLocalNotification(
-            isComplet ? "✅ Contrat co-signé !" : "📝 Signature requise",
-            isComplet ? `${nomCli} a co-signé le contrat.` : `${nomCli} a signé — votre tour !`,
-            { tag: "briblue-contrat-" + newSig.clientId, requireInteraction: !isComplet }
-          );
+  // ─── TEMPS RÉEL : onSnapshot sur tous les documents Firestore ─────────────
+  // Toute modification (ajout, modif, suppression) sur cet appareil OU un autre
+  // met à jour le state React instantanément, sans rechargement.
+  useEffect(() => {
+    if (!ready) return;
+    const unsub = subscribeToRealtime({
+      clients: (data) => {
+        if (!Array.isArray(data)) return;
+        setClients(data.map(cl => ({
+          ...cl,
+          moisParMois: migrateMois(cl.moisParMois || cl.saisons),
+          photoPiscine: cl.photoPiscine || "",
+          prixPassageE: cl.prixPassageE || 0,
+          prixPassageC: cl.prixPassageC || 0,
+        })));
+      },
+      passages:   (data) => { if (Array.isArray(data)) setPassages(data); },
+      rdvs:       (data) => { if (Array.isArray(data)) setRdvs(data); },
+      livraisons: (data) => { if (Array.isArray(data)) setLivraisons(data); },
+      contrats: (data) => {
+        if (!data || typeof data !== "object") return;
+        setContrats(prev => {
+          // Détecter les nouvelles signatures et notifier
+          const keys = Object.keys(data);
+          const newSig = keys
+            .map(k => data[k])
+            .find(ct =>
+              (ct.statut === "signe_client" || ct.statut === "signe_complet") &&
+              (!prev[keys.find(k => data[k] === ct)] ||
+               prev[keys.find(k => data[k] === ct)]?.statut !== ct.statut)
+            );
+          if (newSig) {
+            playNotifSound();
+            const cli = clientsRef.current.find(cl => cl.id === newSig.clientId);
+            const nomCli = cli?.nom || newSig.clientId;
+            const isComplet = newSig.statut === "signe_complet";
+            toastInfo(isComplet
+              ? `✅ Contrat co-signé par ${nomCli} !`
+              : `📝 ${nomCli} a signé son contrat — votre signature est requise.`
+            );
+            sendLocalNotification(
+              isComplet ? "✅ Contrat co-signé !" : "📝 Signature requise",
+              isComplet ? `${nomCli} a co-signé le contrat.` : `${nomCli} a signé — votre tour !`,
+              { tag: "briblue-contrat-" + newSig.clientId, requireInteraction: !isComplet }
+            );
+          }
+          return data;
+        });
+      },
+      stock:      (data) => {
+        if (data && typeof data === "object") {
+          setStock({ ...Object.fromEntries(PRODUITS_DEFAUT.map(n => [n, 0])), ...data });
         }
-        return ct;
-      });
-    }, 10000);
-    return ()=>clearInterval(interval);
-  },[ready, clients]);
+      },
+      meta: (data) => {
+        if (Array.isArray(data.notes))                       setNotes(data.notes);
+        if (data.versements && typeof data.versements === "object") setVersements(data.versements);
+        if (data.retards    && typeof data.retards    === "object") setRetardsCarnet(data.retards);
+      },
+    });
+    return unsub; // désabonnement au démontage
+  }, [ready]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Polling contrats supprimé — remplacé par onSnapshot dans subscribeToRealtime
 
   useEffect(()=>{
     if(!ready) return;
