@@ -187,6 +187,32 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
   };
   const [detailPassageFiche, setDetailPassageFiche] = useState(null);
   const [showFormLiv, setShowFormLiv] = useState(false);
+  // État d'édition inline du contrat
+  const [editContrat, setEditContrat] = useState(false);
+  const [editContratData, setEditContratData] = useState(null);
+  const openEditContrat = () => {
+    setEditContratData({
+      formule:      client.formule || "VAC",
+      dateDebut:    client.dateDebut || "",
+      dateFin:      client.dateFin || "",
+      prixPassageE: client.prixPassageE || 0,
+      prixPassageC: client.prixPassageC || 0,
+      notesTarifaires: client.notesTarifaires || "",
+      moisParMois:  JSON.parse(JSON.stringify(client.moisParMois || {})),
+    });
+    setEditContrat(true);
+  };
+  const saveEditContrat = () => {
+    if (!editContratData || !onUpdateClient) return;
+    const tE = Object.values(editContratData.moisParMois||{}).reduce((s,v)=>s+(v.entretien||0),0);
+    const tC = Object.values(editContratData.moisParMois||{}).reduce((s,v)=>s+(v.controle||0),0);
+    const prix = tE*(editContratData.prixPassageE||0)+tC*(editContratData.prixPassageC||0);
+    onUpdateClient({...client, ...editContratData, prix});
+    setEditContrat(false);
+    setEditContratData(null);
+  };
+  const setECD = (k,v) => setEditContratData(p=>({...p,[k]:v}));
+  const setECDMois = (m,type,v) => setEditContratData(p=>({...p,moisParMois:{...p.moisParMois,[m]:{...p.moisParMois[m],[type]:Math.max(0,parseInt(v)||0)}}}));
   const [editLiv, setEditLiv] = useState(null);
   const [selectedMois, setSelectedMois] = useState(null);
   const [expandedEv, setExpandedEv] = useState(null);
@@ -896,16 +922,140 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
         const overdueCount = mensualites.filter(m=>m.isOverdue).length;
         const MOIS_COURT = ["","Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
 
+        const MOIS_NOM = ["","Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
+        const inputStyle = {width:"100%",padding:"9px 12px",borderRadius:10,border:"1.5px solid #e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box",fontFamily:"inherit",color:"#0f172a",background:"#fff",transition:"border .15s"};
+        const labelStyle = {fontSize:10,fontWeight:700,color:"#64748b",textTransform:"uppercase",letterSpacing:.5,display:"block",marginBottom:5};
+
         return (
           <div className="fade-in" style={{display:"flex",flexDirection:"column",gap:14}}>
 
-            {/* Statut */}
+            {/* Statut + bouton Modifier */}
             <div style={{padding:"14px 16px",borderRadius:14,background:statutCfg.bg,border:"1.5px solid "+statutCfg.border,display:"flex",alignItems:"center",gap:10}}>
               <div style={{flex:1}}>
                 <div style={{fontSize:14,fontWeight:800,color:statutCfg.color}}>{statutCfg.label}</div>
                 {ct?.signedAt&&<div style={{fontSize:11,color:"#64748b",marginTop:3}}>Signé le {new Date(ct.signedAt).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"})}</div>}
               </div>
+              {onUpdateClient&&!editContrat&&(
+                <button onClick={openEditContrat}
+                  style={{height:34,padding:"0 14px",borderRadius:10,background:"rgba(255,255,255,0.8)",border:"1.5px solid rgba(0,0,0,0.1)",cursor:"pointer",fontWeight:700,fontSize:12,color:"#374151",fontFamily:"inherit",display:"flex",alignItems:"center",gap:5,flexShrink:0,WebkitTapHighlightColor:"transparent"}}>
+                  <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  Modifier
+                </button>
+              )}
             </div>
+
+            {/* ── FORMULAIRE D'ÉDITION INLINE ── */}
+            {editContrat && editContratData && (
+              <div style={{background:"#fff",borderRadius:16,border:"2px solid #7c3aed33",overflow:"hidden",boxShadow:"0 4px 20px rgba(124,58,237,0.12)"}}>
+                <div style={{padding:"12px 16px",background:"linear-gradient(135deg,#7c3aed,#a78bfa)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                  <span style={{fontSize:13,fontWeight:800,color:"#fff",display:"flex",alignItems:"center",gap:7}}>
+                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    Modifier le contrat
+                  </span>
+                  <button onClick={()=>setEditContrat(false)}
+                    style={{background:"rgba(255,255,255,0.2)",border:"none",borderRadius:8,width:28,height:28,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",WebkitTapHighlightColor:"transparent"}}>
+                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+
+                <div style={{padding:"16px",display:"flex",flexDirection:"column",gap:14}}>
+
+                  {/* Formule + Dates */}
+                  <div>
+                    <div style={{fontSize:11,fontWeight:800,color:"#7c3aed",textTransform:"uppercase",letterSpacing:.6,marginBottom:10}}>📋 Contrat</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr",gap:10}}>
+                      <div>
+                        <label style={labelStyle}>Formule</label>
+                        <select value={editContratData.formule} onChange={e=>setECD("formule",e.target.value)} style={inputStyle}>
+                          {["VAC","VAC+","PREMIUM","SAV","Autre"].map(o=><option key={o}>{o}</option>)}
+                        </select>
+                      </div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                        <div>
+                          <label style={labelStyle}>Début</label>
+                          <input type="date" value={editContratData.dateDebut} onChange={e=>setECD("dateDebut",e.target.value)} style={inputStyle}/>
+                        </div>
+                        <div>
+                          <label style={labelStyle}>Fin</label>
+                          <input type="date" value={editContratData.dateFin} onChange={e=>setECD("dateFin",e.target.value)} style={inputStyle}/>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tarifs */}
+                  <div>
+                    <div style={{fontSize:11,fontWeight:800,color:"#7c3aed",textTransform:"uppercase",letterSpacing:.6,marginBottom:10}}>💰 Tarifs</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                      <div>
+                        <label style={labelStyle}>Prix entretien (€)</label>
+                        <input type="number" value={editContratData.prixPassageE} onChange={e=>setECD("prixPassageE",+e.target.value)} min="0" style={inputStyle}/>
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Prix contrôle (€)</label>
+                        <input type="number" value={editContratData.prixPassageC} onChange={e=>setECD("prixPassageC",+e.target.value)} min="0" style={inputStyle}/>
+                      </div>
+                    </div>
+                    {(editContratData.prixPassageE>0||editContratData.prixPassageC>0)&&(()=>{
+                      const tE=Object.values(editContratData.moisParMois||{}).reduce((s,v)=>s+(v.entretien||0),0);
+                      const tC=Object.values(editContratData.moisParMois||{}).reduce((s,v)=>s+(v.controle||0),0);
+                      const p=tE*editContratData.prixPassageE+tC*editContratData.prixPassageC;
+                      return p>0?<div style={{marginTop:8,padding:"8px 12px",borderRadius:9,background:"#f0fdf4",border:"1px solid #86efac",fontSize:12,fontWeight:700,color:"#059669"}}>
+                        Total annuel calculé : {p}€ ({tE} entretiens × {editContratData.prixPassageE}€ + {tC} contrôles × {editContratData.prixPassageC}€)
+                      </div>:null;
+                    })()}
+                    <div style={{marginTop:10}}>
+                      <label style={labelStyle}>Notes tarifaires</label>
+                      <textarea value={editContratData.notesTarifaires} onChange={e=>setECD("notesTarifaires",e.target.value)}
+                        placeholder="Conditions particulières, remises…"
+                        style={{...inputStyle,minHeight:60,resize:"vertical",lineHeight:1.5}}/>
+                    </div>
+                  </div>
+
+                  {/* Planning mensuel */}
+                  <div>
+                    <div style={{fontSize:11,fontWeight:800,color:"#7c3aed",textTransform:"uppercase",letterSpacing:.6,marginBottom:10}}>📅 Planning mensuel</div>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
+                      {[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>{
+                        const mv = editContratData.moisParMois?.[m] || {entretien:0,controle:0};
+                        return (
+                          <div key={m} style={{background:"#f8fafc",borderRadius:10,padding:"8px",border:"1px solid #e2e8f0"}}>
+                            <div style={{fontSize:10,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:.4,marginBottom:6,textAlign:"center"}}>{MOIS_NOM[m]}</div>
+                            <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                              <div style={{display:"flex",alignItems:"center",gap:4}}>
+                                <span style={{fontSize:9,color:"#0891b2",fontWeight:700,width:14}}>🔧</span>
+                                <input type="number" value={mv.entretien} onChange={e=>setECDMois(m,"entretien",e.target.value)} min="0" max="9"
+                                  style={{flex:1,padding:"3px 6px",borderRadius:6,border:"1px solid #e2e8f0",fontSize:12,fontWeight:700,textAlign:"center",outline:"none",color:mv.entretien>0?"#0891b2":"#94a3b8",background:mv.entretien>0?"#e0f2fe":"#fff"}}/>
+                              </div>
+                              <div style={{display:"flex",alignItems:"center",gap:4}}>
+                                <span style={{fontSize:9,color:"#0891b2",fontWeight:700,width:14}}>💧</span>
+                                <input type="number" value={mv.controle} onChange={e=>setECDMois(m,"controle",e.target.value)} min="0" max="9"
+                                  style={{flex:1,padding:"3px 6px",borderRadius:6,border:"1px solid #e2e8f0",fontSize:12,fontWeight:700,textAlign:"center",outline:"none",color:mv.controle>0?"#059669":"#94a3b8",background:mv.controle>0?"#f0fdf4":"#fff"}}/>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{marginTop:8,padding:"8px 12px",borderRadius:9,background:"#f0f9ff",border:"1px solid #bae6fd",fontSize:11,color:"#0369a1",fontWeight:600}}>
+                      Total : {Object.values(editContratData.moisParMois||{}).reduce((s,v)=>s+(v.entretien||0),0)} entretiens 🔧 + {Object.values(editContratData.moisParMois||{}).reduce((s,v)=>s+(v.controle||0),0)} contrôles 💧
+                    </div>
+                  </div>
+
+                  {/* Boutons */}
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,paddingTop:4,borderTop:"1px solid #f1f5f9"}}>
+                    <button onClick={()=>setEditContrat(false)}
+                      style={{height:44,borderRadius:12,background:"#f1f5f9",border:"1px solid #e2e8f0",cursor:"pointer",fontWeight:700,fontSize:13,color:"#64748b",fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>
+                      Annuler
+                    </button>
+                    <button onClick={saveEditContrat}
+                      style={{height:44,borderRadius:12,background:"linear-gradient(135deg,#7c3aed,#a78bfa)",border:"none",cursor:"pointer",fontWeight:800,fontSize:13,color:"#fff",fontFamily:"inherit",boxShadow:"0 4px 14px rgba(124,58,237,0.4)",WebkitTapHighlightColor:"transparent"}}>
+                      ✓ Enregistrer
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Infos financières */}
             {client.prix > 0 && (
