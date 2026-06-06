@@ -41,11 +41,15 @@ function _persistQueue() {
 }
 
 // ─── MERGE DONNÉES TABLEAUX ──────────────────────────────────────────────────
-// Clés dont les valeurs sont des tableaux d'objets avec .id → fusion obligatoire
-// JAMAIS de remplacement pur : on prend l'UNION des deux sources.
-// Priorité aux entrées de "priorityArr" pour les IDs en commun.
+// UNIQUEMENT pour bb_clients_v2 : les clients ne doivent JAMAIS disparaître
+// accidentellement (scénario FOULON — localStorage plein + Firebase offline).
+//
+// ⚠️ NE PAS mettre bb_passages_v2 / bb_rdvs_v1 / bb_livraisons_v1 ici :
+// le MERGE réajouterait les rapports/rdvs SUPPRIMÉS INTENTIONNELLEMENT depuis
+// Firebase (la suppression locale serait annulée au prochain reconcile).
+// Pour ces clés : le timestamp gagne (local plus récent = suppression respectée).
 const MERGE_ARRAY_KEYS = new Set([
-  "bb_clients_v2", "bb_passages_v2", "bb_rdvs_v1", "bb_livraisons_v1"
+  "bb_clients_v2",  // ← seule clé avec MERGE : protect contre perte accidentelle
 ]);
 
 function mergeArrayById(priorityArr, secondaryArr) {
