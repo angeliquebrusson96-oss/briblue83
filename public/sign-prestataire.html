@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Co-signature — BRIBLUE</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -33,6 +33,7 @@ canvas{border:2px dashed #cbd5e1;border-radius:10px;cursor:crosshair;display:blo
 .success-title{font-size:20px;font-weight:900;color:#059669;margin-bottom:6px}
 .success-sub{font-size:13px;color:#047857}
 .loading{text-align:center;padding:60px 20px;color:#64748b;font-size:15px}
+.hidden{display:none}
 .error-box{background:#fee2e2;border:1px solid #fca5a5;border-radius:12px;padding:16px;color:#dc2626;font-size:13px;margin-bottom:16px}
 </style>
 </head>
@@ -47,8 +48,8 @@ canvas{border:2px dashed #cbd5e1;border-radius:10px;cursor:crosshair;display:blo
 
 <div class="container">
   <div id="loading" class="loading">Chargement du contrat...</div>
-  <div id="content" style="display:none"></div>
-  <div id="success" class="success" style="display:none">
+  <div id="content" class="hidden"></div>
+  <div id="success" class="success hidden">
     <div class="success-icon">✅</div>
     <div class="success-title">Contrat co-signé !</div>
     <div class="success-sub">Le contrat est maintenant signé par les deux parties.</div>
