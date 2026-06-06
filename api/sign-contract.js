@@ -19,19 +19,15 @@ const APP_DOC = db.collection("briblue").doc("app_data");
 
 const RESEND_KEY = "re_FLTMeUdh_vL8QGqJhP2C293WEVCm9c7rh";
 const FROM = "rapport-piscine@briblue83.com";
-const COPY_TO = "briblue83@hotmail.com"; // Copie systématique sur tous les emails client
+const COPY_TO = "briblue83@hotmail.com";
 
-// FIX #6 — BCC systématique sur tous les emails envoyés aux clients
-// FIX #3 — sendEmail centralise les options pour éviter les oublis
+// BCC automatique sur tous les emails client sauf ceux déjà adressés à Dorian
 async function sendEmail({ to, bcc, subject, html, text }) {
   const payload = {
     from: `BRIBLUE <${FROM}>`,
     to: Array.isArray(to) ? to : [to],
-    subject,
-    html,
-    text,
+    subject, html, text,
   };
-  // Toujours copier Dorian sauf si l'email est déjà pour lui
   const allTo = payload.to.map(e => e.toLowerCase());
   if (!allTo.includes(COPY_TO.toLowerCase())) {
     payload.bcc = bcc ? [...(Array.isArray(bcc) ? bcc : [bcc]), COPY_TO] : [COPY_TO];
@@ -44,19 +40,6 @@ async function sendEmail({ to, bcc, subject, html, text }) {
   return res.ok;
 }
 
-// FIX #3 — Mise à jour Firebase ciblée (pas de spread allData)
-// ⚠️ APP_DOC.set({ champ: valeur }, { merge: true }) ne touche QUE les champs spécifiés.
-// L'ancien APP_DOC.set({ ...allData, ... }) réécrivait tout le document, risquant
-// d'écraser des données plus récentes (ex: FOULON) sauvegardées entre le GET et le SET.
-async function saveContrats(contrats, nowTs) {
-  await APP_DOC.set({
-    "bb_contrats_v1": contrats,
-    // FIX #2 — timestamps mis à jour pour que le polling de l'app détecte le changement
-    "_lastSavedAt": nowTs,
-    "_savedAt_bb_contrats_v1": nowTs,
-  }, { merge: true });
-}
-
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -67,45 +50,82 @@ export default async function handler(req, res) {
   const { contractId, clientId, signatureClient, signaturePrestataire, signedAt, statut_override, isPrestataire } = req.body;
   if (!contractId || !clientId) return res.status(400).json({ error: "contractId et clientId requis" });
 
+  // ── TRANSACTION ATOMIQUE ──────────────────────────────────────────────────
+  // Garantit qu'une seule requête passe même si 3 clics simultanés arrivent.
+  // La lecture + écriture sont atomiques : impossible d'envoyer 2 emails.
+  let client = null;
+  let actionDone = null;
+  let contractSnapshot = null;
+  const baseUrl = req.headers.origin || "https://briblue83.vercel.app";
+
   try {
-    const snap = await APP_DOC.get();
-    if (!snap.exists) return res.status(500).json({ error: "Document app_data introuvable" });
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(APP_DOC);
+      if (!snap.exists) throw new Error("Document app_data introuvable");
 
-    const allData = snap.data() || {};
-    const clients = allData["bb_clients_v2"] || [];
-    const client = clients.find(c => c.id === clientId);
-    // FIX #3 — on clone uniquement bb_contrats_v1, pas tout allData
-    const contrats = { ...(allData["bb_contrats_v1"] || {}) };
-    const existing = contrats[contractId] || {};
-    const baseUrl = req.headers.origin || "https://briblue83.vercel.app";
-    const nowTs = new Date().toISOString();
+      const allData = snap.data() || {};
+      const clients = allData["bb_clients_v2"] || [];
+      client = clients.find(c => c.id === clientId) || null;
+      const contrats = { ...(allData["bb_contrats_v1"] || {}) };
+      const existing = contrats[contractId] || {};
+      const nowTs = new Date().toISOString();
 
-    // ── CAS 1 : marquer comme "demande envoyée" ──────────────────────────────
-    if (statut_override === "demande_envoyee") {
-      if (existing.statut && existing.statut !== "demande_envoyee") {
-        return res.status(200).json({ success: true, skipped: true });
+      // CAS 1 — demande envoyée
+      if (statut_override === "demande_envoyee") {
+        if (existing.statut && existing.statut !== "demande_envoyee") {
+          actionDone = "skipped"; return;
+        }
+        contrats[contractId] = { ...existing, clientId, statut: "demande_envoyee" };
+        tx.set(APP_DOC, { "bb_contrats_v1": contrats, "_lastSavedAt": nowTs, "_savedAt_bb_contrats_v1": nowTs }, { merge: true });
+        actionDone = "demande_envoyee";
+        return;
       }
-      contrats[contractId] = { ...existing, clientId, statut: "demande_envoyee" };
-      await saveContrats(contrats, nowTs);
-      return res.status(200).json({ success: true });
-    }
 
-    // ── CAS 2 : co-signature prestataire (Dorian) ────────────────────────────
-    if (isPrestataire === true) {
-      if (existing.statut === "signe_complet") {
-        return res.status(200).json({ success: true, already: true });
+      // CAS 2 — co-signature Dorian
+      if (isPrestataire === true) {
+        if (existing.statut === "signe_complet") { actionDone = "already"; return; }
+        contrats[contractId] = {
+          ...existing, clientId,
+          signaturePrestataire: signaturePrestataire || "",
+          signedByPrestaAt: signedAt || nowTs,
+          statut: "signe_complet",
+        };
+        tx.set(APP_DOC, { "bb_contrats_v1": contrats, "_lastSavedAt": nowTs, "_savedAt_bb_contrats_v1": nowTs }, { merge: true });
+        contractSnapshot = contrats[contractId];
+        actionDone = "signe_complet";
+        return;
+      }
+
+      // CAS 3 — signature client
+      if (!signatureClient) throw new Error("signatureClient manquant");
+      if (existing.statut === "signe_client" || existing.statut === "signe_complet") {
+        actionDone = "already"; return;
       }
       contrats[contractId] = {
-        ...existing, clientId,
-        signaturePrestataire: signaturePrestataire || "",
-        signedByPrestaAt: signedAt || nowTs,
-        statut: "signe_complet",
+        ...existing, clientId, signatureClient,
+        signaturePrestataire: existing.signaturePrestataire || "",
+        signedAt: signedAt || nowTs,
+        statut: "signe_client",
       };
-      await saveContrats(contrats, nowTs);
+      tx.set(APP_DOC, { "bb_contrats_v1": contrats, "_lastSavedAt": nowTs, "_savedAt_bb_contrats_v1": nowTs }, { merge: true });
+      contractSnapshot = contrats[contractId];
+      actionDone = "signe_client";
+    });
+  } catch (err) {
+    console.error("sign-contract transaction error:", err);
+    return res.status(500).json({ error: err.message });
+  }
 
-      // Email de confirmation au client (avec copie Dorian en BCC)
+  // ── EMAILS (hors transaction — Firestore est déjà validé) ─────────────────
+  try {
+    if (actionDone === "skipped")        return res.status(200).json({ success: true, skipped: true });
+    if (actionDone === "already")        return res.status(200).json({ success: true, already: true });
+    if (actionDone === "demande_envoyee") return res.status(200).json({ success: true });
+
+    // Co-signature Dorian → email confirmation au client
+    if (actionDone === "signe_complet") {
       if (client?.email) {
-        const dateStr = new Date(contrats[contractId].signedAt || nowTs)
+        const dateStr = new Date(contractSnapshot?.signedAt || new Date())
           .toLocaleDateString("fr", { day: "2-digit", month: "long", year: "numeric" });
         await sendEmail({
           to: [client.email],
@@ -113,7 +133,7 @@ export default async function handler(req, res) {
           html: `<body style="font-family:Arial,sans-serif;padding:20px">
             <h2 style="color:#059669">Contrat signé par les deux parties</h2>
             <p>Bonjour <strong>${client.nom}</strong>,</p>
-            <p>Votre contrat d'entretien piscine BRIBLUE est maintenant signé par les deux parties (${dateStr}).</p>
+            <p>Votre contrat est maintenant signé par les deux parties (${dateStr}).</p>
             <p>Cordialement,<br/>Dorian Briaire - BRI BLUE</p>
           </body>`,
           text: `Bonjour ${client.nom},\n\nContrat signé par les deux parties (${dateStr}).\n\nCordialement,\nDorian Briaire - BRI BLUE`,
@@ -122,57 +142,47 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, contractId });
     }
 
-    // ── CAS 3 : signature client ─────────────────────────────────────────────
-    if (!signatureClient) return res.status(400).json({ error: "signatureClient manquant" });
-    if (existing.statut === "signe_client" || existing.statut === "signe_complet") {
-      return res.status(200).json({ success: true, already: true });
-    }
+    // Signature client → confirmation + notification Dorian
+    if (actionDone === "signe_client") {
+      const dateStr = new Date(contractSnapshot?.signedAt || new Date())
+        .toLocaleDateString("fr", { day: "2-digit", month: "long", year: "numeric" });
 
-    contrats[contractId] = {
-      ...existing, clientId, signatureClient,
-      signaturePrestataire: existing.signaturePrestataire || "",
-      signedAt: signedAt || nowTs,
-      statut: "signe_client",
-    };
-    await saveContrats(contrats, nowTs);
+      if (client?.email) {
+        await sendEmail({
+          to: [client.email],
+          subject: "Signature enregistrée — Contrat BRIBLUE",
+          html: `<body style="font-family:Arial,sans-serif;padding:20px">
+            <p>Bonjour <strong>${client.nom}</strong>,</p>
+            <p>Votre signature du ${dateStr} a bien été enregistrée. Dorian Briaire co-signera votre contrat sous peu.</p>
+            <p>Cordialement,<br/>Dorian Briaire - BRI BLUE</p>
+          </body>`,
+          text: `Bonjour ${client.nom},\n\nVotre signature du ${dateStr} a bien été enregistrée.\n\nCordialement,\nDorian Briaire - BRI BLUE`,
+        });
+      }
 
-    const dateStr = new Date(contrats[contractId].signedAt)
-      .toLocaleDateString("fr", { day: "2-digit", month: "long", year: "numeric" });
-
-    // Confirmation au client (BCC Dorian automatique)
-    if (client?.email) {
+      const sigLinkDorian = `${baseUrl}/sign-prestataire.html?clientId=${clientId}&contractId=${contractId}`;
       await sendEmail({
-        to: [client.email],
-        subject: "Signature enregistrée — Contrat BRIBLUE",
+        to: ["briblue83@hotmail.com"],
+        subject: `Contrat signé par ${client?.nom || clientId} — À co-signer`,
         html: `<body style="font-family:Arial,sans-serif;padding:20px">
-          <p>Bonjour <strong>${client.nom}</strong>,</p>
-          <p>Votre signature du ${dateStr} a bien été enregistrée. Votre contrat sera co-signé par Dorian Briaire sous peu.</p>
-          <p>Cordialement,<br/>Dorian Briaire - BRI BLUE</p>
+          <p>Bonjour Dorian,</p>
+          <p><strong>${client?.nom || clientId}</strong> a signé son contrat le ${dateStr}.</p>
+          <table cellpadding="0" cellspacing="0" style="margin:20px 0">
+            <tr><td style="background:#0369a1;border-radius:10px;padding:14px 24px">
+              <a href="${sigLinkDorian}" style="color:#fff;font-size:16px;font-weight:bold;text-decoration:none">Co-signer le contrat</a>
+            </td></tr>
+          </table>
         </body>`,
-        text: `Bonjour ${client.nom},\n\nVotre signature du ${dateStr} a bien été enregistrée.\n\nCordialement,\nDorian Briaire - BRI BLUE`,
+        text: `${client?.nom || clientId} a signé.\n\nCo-signez ici :\n${sigLinkDorian}`,
       });
+
+      return res.status(200).json({ success: true, contractId });
     }
 
-    // Notification à Dorian avec lien de co-signature
-    const sigLinkDorian = `${baseUrl}/sign-prestataire.html?clientId=${clientId}&contractId=${contractId}`;
-    await sendEmail({
-      to: ["briblue83@hotmail.com"],
-      subject: `Contrat signé par ${client?.nom || clientId} — À co-signer`,
-      html: `<body style="font-family:Arial,sans-serif;padding:20px">
-        <p>Bonjour Dorian,</p>
-        <p><strong>${client?.nom || clientId}</strong> a signé son contrat le ${dateStr}.</p>
-        <table cellpadding="0" cellspacing="0" style="margin:20px 0">
-          <tr><td style="background:#0369a1;border-radius:10px;padding:14px 24px">
-            <a href="${sigLinkDorian}" style="color:#fff;font-size:16px;font-weight:bold;text-decoration:none">Co-signer le contrat</a>
-          </td></tr>
-        </table>
-      </body>`,
-      text: `${client?.nom || clientId} a signé.\n\nCo-signez ici :\n${sigLinkDorian}`,
-    });
-
-    return res.status(200).json({ success: true, contractId });
+    return res.status(200).json({ success: true });
   } catch (err) {
-    console.error("sign-contract error:", err);
-    return res.status(500).json({ error: err.message });
+    console.error("sign-contract email error:", err);
+    // La signature est déjà enregistrée dans Firestore, l'email seul a échoué
+    return res.status(200).json({ success: true, emailError: err.message });
   }
 }
