@@ -366,7 +366,9 @@ export function PageClients({ clients, passages, contrats={}, onUpdateContrat, o
                 )}
                 {/* Nom sur la photo */}
                 <div style={{position:"absolute",bottom:10,left:14,right:14}}>
-                  <div style={{fontSize:16,fontWeight:900,color:"#fff",letterSpacing:-0.3,textShadow:"0 1px 4px rgba(0,0,0,0.5)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
+                  <div style={{fontSize:16,fontWeight:900,color:"#fff",letterSpacing:-0.3,textShadow:"0 1px 4px rgba(0,0,0,0.5)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    {c.civilite&&<span style={{fontSize:12,fontWeight:700,opacity:.85,marginRight:5}}>{c.civilite}</span>}{c.nom}
+                  </div>
                   <div style={{fontSize:11,color:"rgba(255,255,255,0.8)",fontWeight:600,marginTop:1,display:"flex",gap:6,alignItems:"center"}}>
                     <span>{c.formule}</span>
                     {c.bassin&&<><span style={{opacity:.5}}>·</span><span>{c.bassin}{c.volume?" "+c.volume+"m³":""}</span></>}

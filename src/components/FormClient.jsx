@@ -2,12 +2,11 @@
 import React, { useState } from "react";
 import { DS, MOIS_PAR_MOIS_DEF, MOIS, SAISONS_META } from "../utils/constants";
 import { migrateMois, getMoisVal, getSaison, totalAnnuel, calcMensualites, TODAY } from "../utils/helpers";
-import { useIsMobile, useFormDraft, DraftBanner, Modal, PhotoPicker, FmField, FmSectionTitle, FmHeader, FmSteps } from "./ui";
+import { useFormDraft, DraftBanner, Modal, PhotoPicker, FmField, FmSectionTitle, FmHeader, FmSteps } from "./ui";
 import { toastWarn } from "../styles";
 
 export function FormClient({ initial, clients, onSave, onClose }) {
   const isNew = !initial?.id;
-  const isMobile = useIsMobile();
   const [step, setStep] = useState(1);
   const [f, setF] = useState(() => {
     if (initial) return { ...initial, moisParMois: migrateMois(initial.moisParMois||initial.saisons), photoPiscine: initial.photoPiscine||"", prixPassageE: initial.prixPassageE||0, prixPassageC: initial.prixPassageC||0, notesTarifaires: initial.notesTarifaires||"" };
@@ -18,7 +17,7 @@ export function FormClient({ initial, clients, onSave, onClose }) {
       return isNaN(n) ? max : Math.max(max, n);
     }, 0);
     const nextId = `C${String(maxNum + 1).padStart(3, "0")}`;
-    return { id:nextId, nom:"", tel:"", email:"", adresse:"", bassin:"Liner", volume:30, formule:"VAC", prix:0, prixPassageE:0, prixPassageC:0, dateDebut:TODAY, photoPiscine:"", notesTarifaires:"", dateFin:`${new Date().getFullYear()+1}-03-31`, moisParMois:{...MOIS_PAR_MOIS_DEF} };
+    return { id:nextId, civilite:"", nom:"", tel:"", email:"", adresse:"", bassin:"Liner", volume:30, formule:"VAC", prix:0, prixPassageE:0, prixPassageC:0, dateDebut:TODAY, photoPiscine:"", notesTarifaires:"", dateFin:`${new Date().getFullYear()+1}-03-31`, moisParMois:{...MOIS_PAR_MOIS_DEF} };
   });
   const set = (k,v) => setF(p=>({...p,[k]:v}));
   const setMoisVal = (m,type,v) => setF(p=>({...p,moisParMois:{...p.moisParMois,[m]:{...p.moisParMois[m],[type]:Math.max(0,v)}}}));
@@ -51,8 +50,36 @@ export function FormClient({ initial, clients, onSave, onClose }) {
           {step===1&&(
             <div className="fm-in" style={{display:"flex",flexDirection:"column",gap:12}}>
               <FmSectionTitle icon={<><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></>}>Identité</FmSectionTitle>
+
+              {/* Civilité */}
+              <FmField label="Civilité">
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  {[
+                    {val:"M.",   label:"M.",    sub:"Monsieur"},
+                    {val:"Mme",  label:"Mme",   sub:"Madame"},
+                    {val:"Mlle", label:"Mlle",  sub:"Mademoiselle"},
+                  ].map(({val,label,sub})=>{
+                    const active = f.civilite===val;
+                    return (
+                      <button key={val} type="button"
+                        onClick={()=>set("civilite", active?"":val)}
+                        style={{
+                          display:"flex",flexDirection:"column",alignItems:"center",gap:2,
+                          padding:"8px 18px",borderRadius:12,cursor:"pointer",fontFamily:"inherit",
+                          border:`2px solid ${active?"#7c3aed":"#e2e8f0"}`,
+                          background:active?"linear-gradient(135deg,#7c3aed,#a78bfa)":"rgba(255,255,255,0.6)",
+                          transition:"all .15s",WebkitTapHighlightColor:"transparent",
+                        }}>
+                        <span style={{fontSize:15,fontWeight:900,color:active?"#fff":"#374151"}}>{label}</span>
+                        <span style={{fontSize:9,fontWeight:600,color:active?"rgba(255,255,255,0.75)":"#94a3b8",letterSpacing:.3}}>{sub}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </FmField>
+
               <FmField label="Nom complet *">
-                <input value={f.nom} onChange={e=>set("nom",e.target.value)} placeholder="Ex : Mme Dupont"/>
+                <input value={f.nom} onChange={e=>set("nom",e.target.value)} placeholder="Ex : Dupont Marie"/>
               </FmField>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                 <FmField label="Téléphone"><input value={f.tel} onChange={e=>set("tel",e.target.value)} type="tel" placeholder="06 ..."/></FmField>

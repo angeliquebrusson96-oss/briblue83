@@ -265,7 +265,9 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
 
           <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10,marginBottom:10,position:"relative"}}>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:isMobile?20:26,fontWeight:900,color:"#0b1220",lineHeight:1.15,letterSpacing:-0.5}}>{client.nom}</div>
+              <div style={{fontSize:isMobile?20:26,fontWeight:900,color:"#0b1220",lineHeight:1.15,letterSpacing:-0.5}}>
+                {client.civilite&&<span style={{fontSize:isMobile?14:16,fontWeight:700,opacity:.65,marginRight:6}}>{client.civilite}</span>}{client.nom}
+              </div>
               <div style={{fontSize:12,color:"rgba(11,18,32,0.65)",marginTop:4,fontWeight:600}}>
                 {[client.formule,client.bassin,client.volume?client.volume+"m³":null].filter(Boolean).join(" · ")}
               </div>
