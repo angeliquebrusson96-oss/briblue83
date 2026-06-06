@@ -125,6 +125,28 @@ export async function preloadPhotos(values) {
   );
 }
 
+// ─── CLÉ TEMPORAIRE ──────────────────────────────────────────────────────────
+// Préfixe des clés IDB temporaires créées IMMÉDIATEMENT quand une photo est prise.
+// Elles sont renommées en clés permanentes (${passageId}_${field}) lors du save.
+// Avantage : le draft localStorage ne stocke jamais de data: (évite QuotaExceededError).
+const TMP_PREFIX = "tmp_";
+
+// Sauvegarde immédiate dans IDB avec une clé temporaire — appelé par PhotoPicker.
+// Retourne la clé tmp ou null si IDB indisponible (fallback : data: conservé).
+export async function savePhotoTemp(dataUrl) {
+  if (!dataUrl?.startsWith("data:")) return null;
+  const key = TMP_PREFIX + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
+  const ok = await savePhoto(key, dataUrl);
+  return ok ? key : null;
+}
+
+// Copie une entrée IDB d'une clé vers une autre (tmp → permanente).
+export async function copyPhoto(fromKey, toKey) {
+  const data = await loadPhoto(fromKey);
+  if (!data) return false;
+  return savePhoto(toKey, data);
+}
+
 // ─── MIGRATION VERS IDB (sauvegarde principale — instantanée) ────────────────
 const _SINGLE = ["photoArrivee", "photoDepart"];
 const _ARRAYS = ["photos", "photosDepart"];
@@ -132,21 +154,45 @@ const _ARRAYS = ["photos", "photosDepart"];
 export async function extractPassagePhotos(passage) {
   if (!passage?.id) return passage;
   const p = { ...passage };
+
   for (const field of _SINGLE) {
-    if (p[field]?.startsWith("data:")) {
+    const val = p[field];
+    if (!val) continue;
+    if (val.startsWith("data:")) {
+      // Ancien flux : data: → IDB permanent
       const key = `${p.id}_${field}`;
-      const ok = await savePhoto(key, p[field]);
+      const ok = await savePhoto(key, val);
       if (ok) p[field] = `idb:${key}`;
+    } else if (val.startsWith("idb:")) {
+      const rawKey = val.slice(4);
+      if (rawKey.startsWith(TMP_PREFIX)) {
+        // Nouveau flux : clé tmp → clé permanente
+        const permKey = `${p.id}_${field}`;
+        const ok = await copyPhoto(rawKey, permKey);
+        if (ok) p[field] = `idb:${permKey}`;
+      }
+      // idb:permanent → déjà correct, ne pas toucher
     }
   }
+
   for (const field of _ARRAYS) {
     if (!Array.isArray(p[field])) continue;
     p[field] = await Promise.all(
       p[field].map(async (v, i) => {
-        if (!v?.startsWith("data:")) return v;
-        const key = `${p.id}_${field}_${i}`;
-        const ok = await savePhoto(key, v);
-        return ok ? `idb:${key}` : v;
+        if (!v) return v;
+        if (v.startsWith("data:")) {
+          const key = `${p.id}_${field}_${i}`;
+          const ok = await savePhoto(key, v);
+          return ok ? `idb:${key}` : v;
+        } else if (v.startsWith("idb:")) {
+          const rawKey = v.slice(4);
+          if (rawKey.startsWith(TMP_PREFIX)) {
+            const permKey = `${p.id}_${field}_${i}`;
+            const ok = await copyPhoto(rawKey, permKey);
+            return ok ? `idb:${permKey}` : v;
+          }
+        }
+        return v;
       })
     );
   }
@@ -188,7 +234,7 @@ async function uploadOne(key, dataUrl) {
   try {
     // Compresser avant envoi pour réduire la taille sur le réseau mobile
     const compressed = await compressForUpload(dataUrl);
-    const [header, b64] = compressed.split(",");
+    const [, b64] = compressed.split(",");
     if (!b64) return null;
     const binary = atob(b64);
     const bytes = new Uint8Array(binary.length);

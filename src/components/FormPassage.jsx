@@ -752,6 +752,22 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
   // Récupération auto si crash, fermeture onglet, perte de réseau…
   // ═══════════════════════════════════════════════════════════════════
   const DRAFT_KEY = isEdit ? `briblue_draft_rapport_${initial.id}` : "briblue_draft_rapport_new";
+
+  // ── Protection draft : ne jamais stocker de data: (QuotaExceededError) ──────
+  // Avec PhotoPicker, les photos sont déjà en IDB sous idb:tmp_* avant le draft.
+  // Ce filtre est un filet de sécurité au cas où IDB aurait échoué (fallback data:).
+  const sanitizeDraft = (formState) => {
+    const PHOTO_FIELDS = ["photoArrivee", "photoDepart", "signatureTech", "signatureClient"];
+    const PHOTO_ARRAYS = ["photos", "photosDepart"];
+    const s = { ...formState };
+    for (const f2 of PHOTO_FIELDS) {
+      if (s[f2]?.startsWith("data:")) s[f2] = ""; // strip — sera redemandé si draft restauré sans photo
+    }
+    for (const f2 of PHOTO_ARRAYS) {
+      if (Array.isArray(s[f2])) s[f2] = s[f2].map(v => v?.startsWith("data:") ? "" : v).filter(Boolean);
+    }
+    return s;
+  };
   const loadDraft = () => {
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
@@ -809,7 +825,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
   // Sauvegarde manuelle brouillon
   const saveDraftManual = () => {
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({...f, _savedAt: Date.now(), _step: step}));
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({...sanitizeDraft(f), _savedAt: Date.now(), _step: step}));
       setDraftSaved(true);
       setTimeout(() => setDraftSaved(false), 2500);
     } catch {}
@@ -827,7 +843,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
                           f.descriptionSAV || f.photos?.length || f.actions ||
                           f.produitsLivres?.length || f.corrChlore || f.corrPH;
         if (hasContent) {
-          localStorage.setItem(DRAFT_KEY, JSON.stringify({...f, _savedAt: Date.now(), _step: step}));
+          localStorage.setItem(DRAFT_KEY, JSON.stringify({...sanitizeDraft(f), _savedAt: Date.now(), _step: step}));
         }
       } catch {}
     }, 400);
@@ -841,7 +857,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
         const hasContent = f.clientId || f.commentaires || f.tPH || f.tChlore ||
                           f.descriptionSAV || f.photos?.length;
         if (hasContent && (!isEdit || draftRestored)) {
-          localStorage.setItem(DRAFT_KEY, JSON.stringify({...f, _savedAt: Date.now(), _step: step}));
+          localStorage.setItem(DRAFT_KEY, JSON.stringify({...sanitizeDraft(f), _savedAt: Date.now(), _step: step}));
         }
       } catch {}
     };
