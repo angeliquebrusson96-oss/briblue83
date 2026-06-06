@@ -18,7 +18,11 @@
       "Read(//c/c/Users/CE PC/Downloads/briblue/dist/assets/**)",
       "Bash(cd \"/c/Users/CE PC/Downloads/briblue\" && rm -rf dist && npm run build 2>&1 | tail -25)",
       "Bash(cd \"/c/Users/CE PC/Downloads/briblue\" && grep -n \"const save\" src/App.jsx | head -20)",
-      "Read(//c/c/Users/CE PC/Downloads/briblue/src/**)"
+      "Read(//c/c/Users/CE PC/Downloads/briblue/src/**)",
+      "Bash(git commit -m 'fix: 6 correctifs données + contrats + emails *)",
+      "Bash(npx eslint *)",
+      "Bash(git commit -m 'fix: supprime les 6 erreurs ESLint dans les fichiers API *)",
+      "Bash(git commit -m 'fix: supprime les 6 avertissements Microsoft Edge Tools dans les HTML *)"
     ]
   }
 }
