@@ -247,68 +247,115 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
     {id:"carnet",     label:"Carnet",    color:"#be185d"},   // carnet numérique client
   ];
 
+  // Dégradé hero si pas de photo
+  const heroGrad = (() => {
+    const grads = [
+      "linear-gradient(160deg,#0c1f3f 0%,#0369a1 60%,#0891b2 100%)",
+      "linear-gradient(160deg,#1e1b4b 0%,#4c1d95 60%,#7c3aed 100%)",
+      "linear-gradient(160deg,#064e3b 0%,#065f46 60%,#059669 100%)",
+      "linear-gradient(160deg,#7f1d1d 0%,#991b1b 60%,#dc2626 100%)",
+      "linear-gradient(160deg,#0c4a6e 0%,#075985 60%,#0891b2 100%)",
+    ];
+    return grads[(client.nom?.charCodeAt(0)||0) % grads.length];
+  })();
+
   return (
     <>
     <Modal title="" onClose={onClose} wide defaultFull>
       <div style={{margin:isMobile?"-18px -20px 0":"-24px -28px 0"}}>
 
-        {client.photoPiscine&&(
-          <div style={{height:140,position:"relative",overflow:"hidden",flexShrink:0}}>
-            <img src={client.photoPiscine} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
-            <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,transparent 35%,rgba(8,18,38,0.55))"}}/>
-          </div>
-        )}
+        {/* ══ HERO HEADER ══ */}
+        <div style={{position:"relative",height:isMobile?190:210,overflow:"hidden",flexShrink:0}}>
 
-        <div style={{background:"linear-gradient(135deg, rgba(34,211,238,0.25) 0%, rgba(6,182,212,0.35) 40%, rgba(99,102,241,0.28) 100%)",backdropFilter:"blur(30px) saturate(180%)",WebkitBackdropFilter:"blur(30px) saturate(180%)",padding:"22px 20px 0",position:"relative",overflow:"hidden",borderBottom:"1px solid rgba(255,255,255,0.3)"}}>
-          <div style={{position:"absolute",right:-60,top:-60,width:220,height:220,borderRadius:"50%",background:"radial-gradient(circle, rgba(34,211,238,0.35) 0%, transparent 70%)",filter:"blur(20px)",pointerEvents:"none"}}/>
-          <div style={{position:"absolute",left:-40,bottom:-40,width:140,height:140,borderRadius:"50%",background:"radial-gradient(circle, rgba(168,85,247,0.25) 0%, transparent 70%)",filter:"blur(16px)",pointerEvents:"none"}}/>
-
-          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10,marginBottom:10,position:"relative"}}>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:isMobile?20:26,fontWeight:900,color:"#0b1220",lineHeight:1.15,letterSpacing:-0.5}}>
-                {client.civilite&&<span style={{fontSize:isMobile?14:16,fontWeight:700,opacity:.65,marginRight:6}}>{client.civilite}</span>}{client.nom}
+          {/* Fond : photo ou dégradé */}
+          {client.photoPiscine
+            ? <img src={client.photoPiscine} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+            : <div style={{width:"100%",height:"100%",background:heroGrad}}>
+                {/* Orbes décoratifs */}
+                <div style={{position:"absolute",right:-40,top:-40,width:180,height:180,borderRadius:"50%",background:"rgba(255,255,255,0.07)",pointerEvents:"none"}}/>
+                <div style={{position:"absolute",left:-20,bottom:-30,width:130,height:130,borderRadius:"50%",background:"rgba(255,255,255,0.05)",pointerEvents:"none"}}/>
+                <div style={{position:"absolute",right:60,bottom:20,width:80,height:80,borderRadius:"50%",background:"rgba(255,255,255,0.06)",pointerEvents:"none"}}/>
               </div>
-              <div style={{fontSize:12,color:"rgba(11,18,32,0.65)",marginTop:4,fontWeight:600}}>
-                {[client.formule,client.bassin,client.volume?client.volume+"m³":null].filter(Boolean).join(" · ")}
+          }
+
+          {/* Dégradé de bas vers le haut (overlay) */}
+          <div style={{position:"absolute",inset:0,background:"linear-gradient(0deg, rgba(5,10,25,0.82) 0%, rgba(5,10,25,0.35) 55%, rgba(0,0,0,0.12) 100%)"}}/>
+
+          {/* Bouton fermer */}
+          <button onClick={onClose}
+            style={{position:"absolute",top:12,right:12,width:34,height:34,borderRadius:17,background:"rgba(0,0,0,0.45)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"1.5px solid rgba(255,255,255,0.25)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:10,WebkitTapHighlightColor:"transparent",transition:"background .15s"}}>
+            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+
+          {/* Badge alerte */}
+          <div style={{position:"absolute",top:12,left:14}}>
+            <span style={{fontSize:10,fontWeight:800,color:col.tx,background:col.bg,padding:"4px 11px",borderRadius:20,border:"1.5px solid "+col.tx+"55",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",boxShadow:"0 2px 8px rgba(0,0,0,0.15)"}}>
+              {col.lbl}
+            </span>
+          </div>
+
+          {/* Contenu bas : civilité + nom + sous-titre + stats */}
+          <div style={{position:"absolute",bottom:0,left:0,right:0,padding:"0 18px 14px"}}>
+
+            {/* Civilité + Nom */}
+            <div style={{marginBottom:4}}>
+              {client.civilite&&(
+                <span style={{fontSize:12,fontWeight:700,color:"rgba(255,255,255,0.7)",letterSpacing:.5,display:"block",marginBottom:2,textTransform:"uppercase"}}>
+                  {client.civilite === "M." ? "Monsieur" : client.civilite === "Mme" ? "Madame" : "Mademoiselle"}
+                </span>
+              )}
+              <div style={{fontSize:isMobile?22:28,fontWeight:900,color:"#fff",lineHeight:1.1,letterSpacing:-0.5,textShadow:"0 2px 8px rgba(0,0,0,0.5)"}}>
+                {client.nom}
+              </div>
+              <div style={{fontSize:12,color:"rgba(255,255,255,0.65)",marginTop:4,fontWeight:600,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                {client.formule&&<span>{client.formule}</span>}
+                {client.bassin&&<><span style={{opacity:.4}}>·</span><span>{client.bassin}</span></>}
+                {client.volume&&<><span style={{opacity:.4}}>·</span><span>{client.volume} m³</span></>}
+                {client.adresse&&<><span style={{opacity:.4}}>·</span><span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:140}}>{client.adresse.split(",")[0]}</span></>}
               </div>
             </div>
-            <div style={{background:"rgba(255,255,255,0.75)",color:col.tx,fontSize:11,fontWeight:800,padding:"5px 12px",borderRadius:20,flexShrink:0,border:"1px solid "+col.tx+"55",whiteSpace:"nowrap",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",boxShadow:"0 4px 12px rgba(0,0,0,0.08)"}}>{col.lbl}</div>
-          </div>
 
-          {/* Stats rapides sous le nom */}
-          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
-            {jours!==null&&(
-              <div style={{display:"inline-flex",alignItems:"center",gap:5,background:jours<=30?"rgba(217,119,6,0.15)":"rgba(255,255,255,0.55)",borderRadius:20,padding:"5px 12px",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",border:`1px solid ${jours<=30?"rgba(217,119,6,0.3)":"rgba(255,255,255,0.4)"}`}}>
-                <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={jours<=30?"#d97706":"#0891b2"} strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                <span style={{fontSize:11,fontWeight:800,color:jours<=30?"#92400e":"#0e4f6f"}}>{jours>=0?jours+" j restants":"Contrat expiré"}</span>
-              </div>
-            )}
-            {total>0&&(
-              <div style={{display:"inline-flex",alignItems:"center",gap:5,background:"rgba(255,255,255,0.55)",borderRadius:20,padding:"5px 12px",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",border:"1px solid rgba(255,255,255,0.35)"}}>
-                <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                <span style={{fontSize:11,fontWeight:800,color:"#064e3b"}}>{eff}/{total} passages</span>
-              </div>
-            )}
-            {pct>0&&(
-              <div style={{display:"inline-flex",alignItems:"center",gap:5,background:"rgba(255,255,255,0.55)",borderRadius:20,padding:"5px 12px",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",border:"1px solid rgba(255,255,255,0.35)"}}>
-                <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={pct>=80?"#059669":"#0891b2"} strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 2 A10 10 0 0 1 22 12"/></svg>
-                <span style={{fontSize:11,fontWeight:800,color:pct>=80?"#064e3b":"#0e4f6f"}}>{pct}% réalisé</span>
-              </div>
-            )}
+            {/* Barre de stats */}
+            <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
+              {total>0&&(
+                <div style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,0.15)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",borderRadius:20,padding:"4px 10px",border:"1px solid rgba(255,255,255,0.2)"}}>
+                  <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke={pct>=100?"#4ade80":"#7dd3fc"} strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span style={{fontSize:11,fontWeight:800,color:"#fff"}}>{eff}/{total}</span>
+                  <span style={{fontSize:10,color:"rgba(255,255,255,0.6)",fontWeight:600}}>passages</span>
+                </div>
+              )}
+              {pct>0&&(
+                <div style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,0.15)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",borderRadius:20,padding:"4px 10px",border:"1px solid rgba(255,255,255,0.2)"}}>
+                  <span style={{fontSize:11,fontWeight:900,color:pct>=100?"#4ade80":pct>=60?"#7dd3fc":"#fbbf24"}}>{pct}%</span>
+                  <span style={{fontSize:10,color:"rgba(255,255,255,0.6)",fontWeight:600}}>réalisé</span>
+                </div>
+              )}
+              {jours!==null&&(
+                <div style={{display:"flex",alignItems:"center",gap:4,background:jours<=30?"rgba(251,146,60,0.3)":"rgba(255,255,255,0.15)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",borderRadius:20,padding:"4px 10px",border:`1px solid ${jours<=30?"rgba(251,146,60,0.5)":"rgba(255,255,255,0.2)"}`}}>
+                  <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke={jours<=30?"#fb923c":"rgba(255,255,255,0.7)"} strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <span style={{fontSize:11,fontWeight:800,color:jours<=30?"#fb923c":"#fff"}}>{jours>=0?jours+" j":"Expiré"}</span>
+                </div>
+              )}
+              {client.prix>0&&(
+                <div style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,0.15)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",borderRadius:20,padding:"4px 10px",border:"1px solid rgba(255,255,255,0.2)"}}>
+                  <span style={{fontSize:11,fontWeight:800,color:"#fff"}}>{client.prix}€</span>
+                  <span style={{fontSize:10,color:"rgba(255,255,255,0.6)",fontWeight:600}}>/an</span>
+                </div>
+              )}
+            </div>
           </div>
-
-          <div style={{paddingBottom:4}}/>
         </div>
 
-        <div style={{background:"rgba(255,255,255,0.65)",backdropFilter:"blur(20px) saturate(180%)",WebkitBackdropFilter:"blur(20px) saturate(180%)",borderBottom:"1px solid rgba(255,255,255,0.35)",overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none",padding:"8px 10px",display:"flex",gap:6}}>
+        {/* ══ BARRE DES ONGLETS ══ */}
+        <div style={{background:"rgba(255,255,255,0.92)",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",borderBottom:"1px solid rgba(0,0,0,0.06)",overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none",padding:"10px 10px 8px",display:"flex",gap:4}}>
           {TABS.map(({id,label})=>{
             const active=tab===id;
-            const TAB_COLORS = {gestion:"#0891b2",historique:"#64748b",passages:"#0284c7",saisons:"#7c3aed",infos:"#0891b2",rdvs:"#059669",livraisons:"#f59e0b",carnet:"#be185d"};
-            const col = TAB_COLORS[id]||"#64748b";
+            const TAB_COLORS = {gestion:"#0891b2",historique:"#64748b",passages:"#7c3aed",saisons:"#0891b2",contrat:"#059669",infos:"#0284c7",rdvs:"#6d28d9",livraisons:"#d97706",carnet:"#be185d"};
+            const tcol = TAB_COLORS[id]||"#64748b";
             return (
               <button key={id} onClick={()=>setTab(id)}
-                style={{flexShrink:0,padding:active?"9px 14px":"9px 12px",borderRadius:22,border:`1.5px solid ${active?col+"55":DS.border}`,cursor:"pointer",fontWeight:active?800:600,fontSize:isMobile?11.5:12,fontFamily:"inherit",background:active?`linear-gradient(135deg,${col},${col}cc)`:"rgba(255,255,255,0.7)",color:active?"#fff":"#64748b",display:"flex",alignItems:"center",gap:5,WebkitTapHighlightColor:"transparent",transition:"all .22s",whiteSpace:"nowrap",boxShadow:active?`0 4px 14px ${col}44`:"none",letterSpacing:active?.1:0}}>
-                <TabIcon name={id} size={13} color={active?"#fff":"#94a3b8"}/>
+                style={{flexShrink:0,padding:"7px 12px",borderRadius:20,border:"none",cursor:"pointer",fontWeight:active?800:500,fontSize:isMobile?11:12,fontFamily:"inherit",background:active?tcol:"transparent",color:active?"#fff":"#64748b",display:"flex",alignItems:"center",gap:5,WebkitTapHighlightColor:"transparent",transition:"all .18s",whiteSpace:"nowrap",boxShadow:active?`0 3px 12px ${tcol}55`:"none"}}>
+                <TabIcon name={id} size={12} color={active?"#fff":"#94a3b8"}/>
                 {label}
               </button>
             );
