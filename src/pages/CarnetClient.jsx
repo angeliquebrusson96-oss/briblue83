@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect, useCallback } from "react";
 import { getDoc } from "firebase/firestore";
-import { APP_DOC } from "../lib/firebase";
+import { DOCS } from "../lib/firebase";
 import { getPH, getCL, getTemp, getResumePassage, isControleType, generateCarnetCode, calculerPassagesPrevusContrat, isPassageEffectue, isPassageDansContrat, calcMensualites, totalAnnuel } from "../utils/helpers";
 import { genererContratHTML } from "../components/FormPassage";
 import { resolvePhoto } from "../lib/photoStore";
@@ -191,25 +191,37 @@ export function CarnetPublic({ code }) {
   const loadData = useCallback(async () => {
     setRefreshing(true);
     try {
-      const snap = await getDoc(APP_DOC);
-      if (snap.exists()) {
-        const d = snap.data();
-        const c = d["bb_clients_v2"];
-        const p = d["bb_passages_v2"];
-        const l = d["bb_livraisons_v1"];
-        const v = d["bb_versements_v1"];
-        const rc = d["bb_retards_carnet_v1"];
-        const ct = d["bb_contrats_v1"];
-        setLoadedClients(c && c.length ? c : CLIENTS_INIT);
-        setLoadedPassages(p && p.length ? p : PASSAGES_INIT);
-        setLoadedLivraisons(Array.isArray(l) ? l : []);
-        setLoadedVersements(v && typeof v === "object" ? v : {});
-        setLoadedRetardsCarnet(rc && typeof rc === "object" ? rc : {});
-        setLoadedContrats(ct && typeof ct === "object" ? ct : {});
-      } else {
-        setLoadedClients(CLIENTS_INIT);
-        setLoadedPassages(PASSAGES_INIT);
-      }
+      // Lecture parallèle des nouveaux documents séparés + fallback legacy app_data
+      const [clientsSnap, passagesSnap, livraisonsSnap, contratsSnap, metaSnap, legacySnap] =
+        await Promise.all([
+          getDoc(DOCS.clients),
+          getDoc(DOCS.passages),
+          getDoc(DOCS.livraisons),
+          getDoc(DOCS.contrats),
+          getDoc(DOCS.meta),
+          getDoc(DOCS.app_data), // fallback migration
+        ]);
+
+      // Helper : lit depuis le nouveau doc ou fallback legacy
+      const field = (snap, f, legacyKey) => {
+        if (snap.exists()) { const v = snap.data()[f]; if (v !== undefined) return v; }
+        if (legacySnap.exists()) return legacySnap.data()[legacyKey];
+        return undefined;
+      };
+
+      const c  = field(clientsSnap,   "data",       "bb_clients_v2");
+      const p  = field(passagesSnap,  "data",       "bb_passages_v2");
+      const l  = field(livraisonsSnap,"data",       "bb_livraisons_v1");
+      const ct = field(contratsSnap,  "data",       "bb_contrats_v1");
+      const v  = field(metaSnap,      "versements", "bb_versements_v1");
+      const rc = field(metaSnap,      "retards",    "bb_retards_carnet_v1");
+
+      setLoadedClients(Array.isArray(c) && c.length ? c : CLIENTS_INIT);
+      setLoadedPassages(Array.isArray(p) && p.length ? p : PASSAGES_INIT);
+      setLoadedLivraisons(Array.isArray(l) ? l : []);
+      setLoadedVersements(v && typeof v === "object" ? v : {});
+      setLoadedRetardsCarnet(rc && typeof rc === "object" ? rc : {});
+      setLoadedContrats(ct && typeof ct === "object" ? ct : {});
     } catch {
       setLoadedClients(CLIENTS_INIT);
       setLoadedPassages(PASSAGES_INIT);
