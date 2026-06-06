@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useCallback } from "react";
 import { DS, Ico } from "../utils/constants";
 import { calcMensualites } from "../utils/helpers";
-import { useIsMobile, Avatar } from "../components/ui";
+import { Avatar } from "../components/ui";
 
 const MOIS_LONG = ["","Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
 
@@ -236,11 +236,23 @@ export function PageGestion({
   onOpenContrat,
 }) {
   const [tab, setTab] = useState("mensualites");
-  const isMobile = useIsMobile();
+
+
+  // Seuls les clients avec un contrat SIGNÉ (signe_complet) sont comptabilisés.
+  // Un contrat en attente (signe_client) ou non signé ne génère pas encore de mensualités.
+  const getContratStatut = useCallback((clientId) => {
+    const ct = contrats[`CT-${clientId}`]
+      || Object.values(contrats).find(c => c?.clientId === clientId);
+    return ct?.statut || "aucun";
+  }, [contrats]);
 
   const clientsAvecMensualites = useMemo(
-    () => clients.filter(c => c.prix > 0 && c.dateDebut),
-    [clients]
+    () => clients.filter(c =>
+      c.prix > 0 &&
+      c.dateDebut &&
+      getContratStatut(c.id) === "signe_complet"   // ← contrat signé obligatoire
+    ),
+    [clients, getContratStatut]
   );
 
   const clientsAvecLivraisons = useMemo(() => {
