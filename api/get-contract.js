@@ -1,3 +1,4 @@
+/* global process, Buffer */
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
@@ -7,7 +8,7 @@ if (!getApps().length) {
   let serviceAccount;
   try {
     serviceAccount = JSON.parse(sa);
-  } catch(e) {
+  } catch {
     serviceAccount = JSON.parse(Buffer.from(sa, 'base64').toString('utf8'));
   }
   initializeApp({ credential: cert(serviceAccount) });
