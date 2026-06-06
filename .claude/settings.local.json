@@ -32,7 +32,8 @@
       "Bash(grep -v \"^$\")",
       "Bash(git commit -m 'fix: photos rapports sauvegardees dans IDB immediatement \\(evite QuotaExceeded\\) *)",
       "Bash(git commit -m 'fix: mensualites gestion comptabilisees seulement si contrat signe_complet *)",
-      "Bash(git commit -m 'fix: upload Firebase Storage integre dans extractPassagePhotos *)"
+      "Bash(git commit -m 'fix: upload Firebase Storage integre dans extractPassagePhotos *)",
+      "Bash(git commit -m 'feat: mises a jour temps reel \\(onSnapshot\\) + fix photo upload *)"
     ]
   }
 }
