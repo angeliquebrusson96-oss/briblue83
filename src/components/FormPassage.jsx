@@ -221,8 +221,21 @@ export async function ouvrirContrat(client, sigPrestataire="", sigClient="") {
   setTimeout(()=>URL.revokeObjectURL(url), 5000);
 }
 
+// Verrou par clientId — empêche les doubles envois si le bouton est cliqué plusieurs fois
+const _envoisEnCours = new Set();
+
 export async function envoyerContratSignature(client) {
   if (!client?.email) { toastWarn("Aucun email renseigné pour ce client."); return; }
+  if (_envoisEnCours.has(client.id)) { toastWarn("Envoi déjà en cours, patientez…"); return; }
+  _envoisEnCours.add(client.id);
+  try {
+    await _envoyerContratSignatureInternal(client);
+  } finally {
+    _envoisEnCours.delete(client.id);
+  }
+}
+
+async function _envoyerContratSignatureInternal(client) {
   const sigLink = `${window.location.origin}/sign.html?clientId=${client.id}&contractId=CT-${client.id}`;
   const dateStr = new Date().toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"});
   const htmlEmail = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head>
