@@ -11,7 +11,14 @@ export function FormClient({ initial, clients, onSave, onClose }) {
   const [step, setStep] = useState(1);
   const [f, setF] = useState(() => {
     if (initial) return { ...initial, moisParMois: migrateMois(initial.moisParMois||initial.saisons), photoPiscine: initial.photoPiscine||"", prixPassageE: initial.prixPassageE||0, prixPassageC: initial.prixPassageC||0, notesTarifaires: initial.notesTarifaires||"" };
-    return { id:`C${String(clients.length+1).padStart(3,"0")}`, nom:"", tel:"", email:"", adresse:"", bassin:"Liner", volume:30, formule:"VAC", prix:0, prixPassageE:0, prixPassageC:0, dateDebut:TODAY, photoPiscine:"", notesTarifaires:"", dateFin:`${new Date().getFullYear()+1}-03-31`, moisParMois:{...MOIS_PAR_MOIS_DEF} };
+    // Génère l'ID en prenant le MAX existant + 1 (pas clients.length+1 qui cause des collisions
+    // quand un client est supprimé ou perdu — ex: FOULON C019 perdu → KATIA reçoit C019 aussi)
+    const maxNum = clients.reduce((max, c) => {
+      const n = parseInt((c.id || "").replace(/^C/, ""), 10);
+      return isNaN(n) ? max : Math.max(max, n);
+    }, 0);
+    const nextId = `C${String(maxNum + 1).padStart(3, "0")}`;
+    return { id:nextId, nom:"", tel:"", email:"", adresse:"", bassin:"Liner", volume:30, formule:"VAC", prix:0, prixPassageE:0, prixPassageC:0, dateDebut:TODAY, photoPiscine:"", notesTarifaires:"", dateFin:`${new Date().getFullYear()+1}-03-31`, moisParMois:{...MOIS_PAR_MOIS_DEF} };
   });
   const set = (k,v) => setF(p=>({...p,[k]:v}));
   const setMoisVal = (m,type,v) => setF(p=>({...p,moisParMois:{...p.moisParMois,[m]:{...p.moisParMois[m],[type]:Math.max(0,v)}}}));
