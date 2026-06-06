@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { save, load, flushPendingNow, IS_IOS, reconcileOnBoot } from "./lib/storage";
+import { save, load, flushPendingNow, IS_IOS, reconcileOnBoot, invalidateDocCache } from "./lib/storage";
 import { extractPassagePhotos, migratePassagePhotosToStorage, migrateAllPassagesPhotos } from "./lib/photoStore";
 import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import { auth } from "./lib/firebase";
@@ -402,18 +402,27 @@ export default function App() {
     }).catch(() => {});
   },[loggedIn, applyLocalData, runPhotoMigration]);
 
-  // ─── RETRY MIGRATION quand on repasse en ligne ───────────────────────────────
+  // ─── FIX #5 : re-synchronisation complète au retour en ligne ────────────────
+  // reconcileOnBoot est relancé pour récupérer les données Firebase manquantes
+  // (ex: FOULON créé offline, contrat KATIA signé via l'API)
   useEffect(() => {
     if (!ready) return;
     const onOnline = async () => {
       if (!auth.currentUser) {
         await signInAnonymously(auth).catch(() => {});
       }
+      // Invalider le cache Firestore pour forcer un nouveau fetch
+      invalidateDocCache();
+      // Re-reconcilier : met à jour localStorage + état React avec les données Firebase
+      reconcileOnBoot().then(() => {
+        applyLocalData();
+      }).catch(() => {});
+      // Migration photos en arrière-plan
       runPhotoMigration().catch(() => {});
     };
     window.addEventListener("online", onOnline);
     return () => window.removeEventListener("online", onOnline);
-  }, [ready, runPhotoMigration]);
+  }, [ready, runPhotoMigration, applyLocalData]);
 
   // ─── RETRY MIGRATION dès que Firebase Auth est prêt ──────────────────────────
   useEffect(() => {

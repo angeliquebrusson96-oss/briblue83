@@ -52,7 +52,7 @@ export async function envoyerEmailLivraison(livraison, client) {
   const b64 = btoa(String.fromCharCode(...new TextEncoder().encode(html)));
   const corps = `Bonjour ${client?.nom||""},\n\nVotre bon de livraison du ${dateStr} est disponible.\n\nCordialement,\nDorian Briaire\nTechnicien de Piscine - BRI BLUE`;
   try {
-    const res = await fetch("/api/send-email", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ from:`BRIBLUE <rapport-piscine@briblue83.com>`, to:[client.email], subject:`Bon de livraison BRIBLUE — ${dateStr}`, text:corps, attachments:[{filename,content:b64}] }) });
+    const res = await fetch("/api/send-email", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ from:`BRIBLUE <rapport-piscine@briblue83.com>`, to:[client.email], bcc:["briblue83@hotmail.com"], subject:`Bon de livraison BRIBLUE — ${dateStr}`, text:corps, attachments:[{filename,content:b64}] }) }); // FIX #6 — copie systématique
     const data = await res.json();
     if (res.ok) toastSuccess(`Email envoyé à ${client.email} !`);
     else toastError(`Erreur envoi : ${data?.message||JSON.stringify(data)}`);

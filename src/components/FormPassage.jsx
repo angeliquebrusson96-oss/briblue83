@@ -254,6 +254,7 @@ export async function envoyerContratSignature(client) {
       body: JSON.stringify({
         from: `BRIBLUE <rapport-piscine@briblue83.com>`,
         to: [client.email],
+        bcc: ["briblue83@hotmail.com"], // FIX #6 — copie systématique
         subject: `Votre contrat BRIBLUE — À signer`,
         html: htmlEmail,
         text: `Bonjour ${client.nom},\n\nVotre contrat BRIBLUE est prêt à signer.\n\nLien de signature :\n${sigLink}\n\nCordialement,\nDorian Briaire\nTechnicien de Piscine - BRI BLUE`,
@@ -458,6 +459,7 @@ export async function envoyerEmail(passage, client, onSent) {
       body: JSON.stringify({
         from: `BRIBLUE <rapport-piscine@briblue83.com>`,
         to: [client.email],
+        bcc: ["briblue83@hotmail.com"], // FIX #6 — copie systématique
         subject: `Rapport entretien piscine — ${dateStr}`,
         html: htmlEmail,
         text: `Bonjour ${client?.nom||""},\n\nVotre rapport d'entretien piscine du ${dateStr} est disponible.\n\nCordialement,\nDorian Briaire`,

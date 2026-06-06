@@ -208,6 +208,44 @@ export async function reconcileOnBoot() {
   } catch (e) { console.warn("[briblue] reconcile skipped:", e?.message); }
 }
 
+// ─── FIX #1 : purge des vignettes photo quand localStorage est plein ─────────
+// Les miniatures "bb_ph_*" (fallback IDB) peuvent saturer le quota (5-10 Mo).
+// On les supprime pour libérer de la place, puis on réessaie la sauvegarde.
+function purgePhotoFallbacks() {
+  try {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith("bb_ph_")) keys.push(k);
+    }
+    keys.forEach(k => { try { localStorage.removeItem(k); } catch { /* noop */ } });
+    console.warn(`[briblue] QuotaExceeded → purgé ${keys.length} vignettes photo pour libérer de l'espace.`);
+    return keys.length > 0;
+  } catch { return false; }
+}
+
+function writeLS(key, serialized) {
+  try {
+    localStorage.setItem("briblue_" + key, serialized);
+    localStorage.setItem("briblue_meta_" + key, JSON.stringify({ savedAt: Date.now() }));
+    return true;
+  } catch (e) {
+    if (e?.name === "QuotaExceededError" || e?.name === "NS_ERROR_DOM_QUOTA_REACHED") {
+      // Libérer de l'espace en purgeant les vignettes photo et réessayer une fois
+      const purged = purgePhotoFallbacks();
+      if (purged) {
+        try {
+          localStorage.setItem("briblue_" + key, serialized);
+          localStorage.setItem("briblue_meta_" + key, JSON.stringify({ savedAt: Date.now() }));
+          return true;
+        } catch { /* quota encore insuffisant après purge */ }
+      }
+    }
+    console.warn(`[briblue] localStorage plein pour "${key}" (${Math.round(serialized.length / 1024)} Ko):`, e?.name);
+    return false;
+  }
+}
+
 // ─── SAVE ────────────────────────────────────────────────────────────────────
 export async function save(key, val) {
   const serialized = JSON.stringify(val);
@@ -218,13 +256,8 @@ export async function save(key, val) {
   }
 
   // 1. Sauvegarder localement en priorité absolue
-  try {
-    localStorage.setItem("briblue_" + key, serialized);
-    localStorage.setItem("briblue_meta_" + key, JSON.stringify({ savedAt: Date.now() }));
-  } catch (e) {
-    // QuotaExceededError : localStorage plein, on continue quand même vers Firebase
-    console.warn(`[briblue] localStorage plein pour "${key}" (${Math.round(serialized.length/1024)} Ko):`, e?.name);
-  }
+  // FIX #1 — si localStorage est plein, purge les vignettes photo et réessaie
+  writeLS(key, serialized);
 
   // 2. Mettre dans la queue (protection si le réseau échoue)
   offlineQueue.pending[key] = val;
@@ -315,7 +348,12 @@ export async function load(key, fallback) {
     const snap = await fetchAppDoc();
     if (snap.exists()) {
       const allData = snap.data();
-      const remoteTime = allData["_lastSavedAt"] ? new Date(allData["_lastSavedAt"]).getTime() : 0;
+      // Préférer le timestamp par clé (mis à jour par sign-contract) plutôt que le timestamp global
+      const remoteKeyTs = allData[`_savedAt_${key}`];
+      const remoteGlobalTs = allData["_lastSavedAt"];
+      const remoteTime = remoteKeyTs
+        ? new Date(remoteKeyTs).getTime()
+        : remoteGlobalTs ? new Date(remoteGlobalTs).getTime() : 0;
       if (key in allData) {
         if (localData !== null && localTime >= remoteTime) {
           // Local identique ou plus récent → ne pas écraser
@@ -332,9 +370,18 @@ export async function load(key, fallback) {
 }
 
 // ─── EVENT LISTENERS ─────────────────────────────────────────────────────────
+// ─── FIX #5 : expose invalidation du cache pour forcer un re-fetch Firebase ──
+export function invalidateDocCache() {
+  _getDocCache = null;
+  _getDocCacheAt = 0;
+}
+
 if (typeof window !== "undefined") {
-  // Flush quand réseau revient
-  window.addEventListener("online", () => { flushOfflineQueue(); });
+  // FIX #5 — au retour en ligne : vider le cache ET flusher la queue
+  window.addEventListener("online", () => {
+    invalidateDocCache(); // force un nouveau getDoc au prochain load/reconcile
+    flushOfflineQueue();
+  });
 
   // Flush garanti quand l'app passe en arrière-plan (iOS critical)
   document.addEventListener("visibilitychange", () => {
