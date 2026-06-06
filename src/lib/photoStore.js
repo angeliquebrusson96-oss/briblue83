@@ -151,51 +151,101 @@ export async function copyPhoto(fromKey, toKey) {
 const _SINGLE = ["photoArrivee", "photoDepart"];
 const _ARRAYS = ["photos", "photosDepart"];
 
+// Timeout upload par photo dans extractPassagePhotos (8s — plus court que uploadOne)
+const EXTRACT_UPLOAD_TIMEOUT_MS = 8_000;
+
 export async function extractPassagePhotos(passage) {
   if (!passage?.id) return passage;
   const p = { ...passage };
 
+  // ── Étape 1 : IDB — synchroniser toutes les clés locales ─────────────────
+  // On enregistre la clé permanente dans IDB et on note ce qui doit être uploadé.
+  const toUpload = []; // { setVal: fn, key: string }
+
   for (const field of _SINGLE) {
     const val = p[field];
     if (!val) continue;
+
     if (val.startsWith("data:")) {
-      // Ancien flux : data: → IDB permanent
+      // Ancien flux : data: → sauvegarde IDB permanente
       const key = `${p.id}_${field}`;
       const ok = await savePhoto(key, val);
-      if (ok) p[field] = `idb:${key}`;
+      if (ok) {
+        p[field] = `idb:${key}`;
+        toUpload.push({ setVal: (url) => { p[field] = url; }, key });
+      }
     } else if (val.startsWith("idb:")) {
       const rawKey = val.slice(4);
       if (rawKey.startsWith(TMP_PREFIX)) {
-        // Nouveau flux : clé tmp → clé permanente
+        // Nouveau flux : tmp → clé permanente
         const permKey = `${p.id}_${field}`;
         const ok = await copyPhoto(rawKey, permKey);
-        if (ok) p[field] = `idb:${permKey}`;
+        if (ok) {
+          p[field] = `idb:${permKey}`;
+          toUpload.push({ setVal: (url) => { p[field] = url; }, key: permKey });
+        }
       }
-      // idb:permanent → déjà correct, ne pas toucher
+      // idb:permanent sans TMP → conserver (sera migré par migrateAllPassagesPhotos)
     }
+    // https:// → déjà sur Firebase Storage → pas toucher
   }
 
   for (const field of _ARRAYS) {
     if (!Array.isArray(p[field])) continue;
-    p[field] = await Promise.all(
-      p[field].map(async (v, i) => {
-        if (!v) return v;
-        if (v.startsWith("data:")) {
-          const key = `${p.id}_${field}_${i}`;
-          const ok = await savePhoto(key, v);
-          return ok ? `idb:${key}` : v;
-        } else if (v.startsWith("idb:")) {
-          const rawKey = v.slice(4);
-          if (rawKey.startsWith(TMP_PREFIX)) {
-            const permKey = `${p.id}_${field}_${i}`;
-            const ok = await copyPhoto(rawKey, permKey);
-            return ok ? `idb:${permKey}` : v;
+    const arr = [...p[field]];
+    for (let i = 0; i < arr.length; i++) {
+      const v = arr[i];
+      if (!v) continue;
+
+      if (v.startsWith("data:")) {
+        const key = `${p.id}_${field}_${i}`;
+        const ok = await savePhoto(key, v);
+        if (ok) {
+          arr[i] = `idb:${key}`;
+          const idx = i; // capture pour closure
+          toUpload.push({ setVal: (url) => { arr[idx] = url; }, key });
+        }
+      } else if (v.startsWith("idb:")) {
+        const rawKey = v.slice(4);
+        if (rawKey.startsWith(TMP_PREFIX)) {
+          const permKey = `${p.id}_${field}_${i}`;
+          const ok = await copyPhoto(rawKey, permKey);
+          if (ok) {
+            arr[i] = `idb:${permKey}`;
+            const idx = i;
+            toUpload.push({ setVal: (url) => { arr[idx] = url; }, key: permKey });
           }
         }
-        return v;
-      })
-    );
+      }
+    }
+    p[field] = arr;
   }
+
+  // ── Étape 2 : Firebase Storage — upload en parallèle (si connecté) ────────
+  // Les photos qui viennent d'être mises en IDB sont uploadées en parallèle.
+  // Timeout par photo : 8s. Si l'upload réussit, on remplace idb: par https://.
+  // Si échec → idb: reste → migrateAllPassagesPhotos tentera plus tard.
+  if (toUpload.length > 0 && navigator.onLine) {
+    if (!auth.currentUser) {
+      try { await (await import("firebase/auth")).signInAnonymously(auth); } catch { /* réseau indisponible */ }
+    }
+    if (auth.currentUser) {
+      await Promise.all(
+        toUpload.map(async ({ setVal, key }) => {
+          try {
+            const dataUrl = await loadPhoto(key);
+            if (!dataUrl) return;
+            const url = await Promise.race([
+              uploadOne(key, dataUrl),
+              new Promise((resolve) => setTimeout(() => resolve(null), EXTRACT_UPLOAD_TIMEOUT_MS)),
+            ]);
+            if (url) setVal(url); // ✓ Photo sur Firebase Storage → https://
+          } catch { /* upload échoué → idb: reste, migration ultérieure */ }
+        })
+      );
+    }
+  }
+
   return p;
 }
 
