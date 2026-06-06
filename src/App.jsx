@@ -312,6 +312,7 @@ export default function App() {
   const [contrats, setContrats] = useState({});
   const [versements, setVersements] = useState({});
   const [retardsCarnet, setRetardsCarnet] = useState({});
+  const [notes, setNotes] = useState([]);
   const [ready, setReady] = useState(false);
   const [ficheClient, setFicheClient] = useState(null);
   const [showFormClient, setShowFormClient] = useState(false);
@@ -352,10 +353,12 @@ export default function App() {
     const contratsData  = readLS("bb_contrats_v1",  {});
     const versementsData = readLS("bb_versements_v1", {});
     const retardsCarnetData = readLS("bb_retards_carnet_v1", {});
+    const notesData     = readLS("bb_notes_v1",     []);
     const sWithDefaults = {...Object.fromEntries(PRODUITS_DEFAUT.map(nom=>[nom,0])), ...stockData};
     const cMigrated = clientsData.map(cl => ({...cl, moisParMois: migrateMois(cl.moisParMois||cl.saisons), photoPiscine: cl.photoPiscine||"", prixPassageE: cl.prixPassageE||0, prixPassageC: cl.prixPassageC||0}));
     setClients(cMigrated); setPassages(passagesData); setLivraisons(livraisonsData);
     setRdvs(rdvsData); setStock(sWithDefaults); setContrats(contratsData); setVersements(versementsData); setRetardsCarnet(retardsCarnetData);
+    setNotes(notesData);
   }, []);
 
   // ─── SAVE CALLBACKS (déclarés avant runPhotoMigration qui en dépend) ────────────
@@ -367,6 +370,7 @@ export default function App() {
   const saveContrats  = useCallback((data) => save("bb_contrats_v1",   data), []);
   const saveVersements = useCallback((data) => save("bb_versements_v1", data), []);
   const saveRetardsCarnet = useCallback((data) => save("bb_retards_carnet_v1", data), []);
+  const saveNotes     = useCallback((data) => save("bb_notes_v1",      data), []);
 
   // ─── MIGRATION PHOTOS : lit les passages depuis LS et pousse les idb: vers Storage ──
   const runPhotoMigration = useCallback(async () => {
@@ -703,7 +707,7 @@ export default function App() {
         <>
           {page!=="dashboard"&&(<div style={{padding:"16px 16px 4px"}}><h2 style={{margin:0,fontSize:22,fontWeight:900,color:DS.dark,letterSpacing:-0.5}}>{PAGE_LABELS[page]}</h2></div>)}
           <div style={{padding:"6px 16px calc(90px + env(safe-area-inset-bottom,0px))",overflowX:"hidden"}}>
-            {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}}/>}
+            {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} notes={notes} onNotesChange={n=>{setNotes(n);saveNotes(n);}}/>}
             {page==="clients"&&<PageClients clients={clients} passages={passages} contrats={contrats} versements={versements} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onToggleVersement={handleToggleVersement} onClientClick={setFicheClient} onAdd={openAddClient}/>}
             {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddClient={openAddClient} onValider={validerPassage} onChangeStatut={updateStatutPassage}/>}
             {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
@@ -740,7 +744,7 @@ export default function App() {
           <div style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",minWidth:0}}>
             <div style={{padding:"20px 32px 80px",maxWidth:860,margin:"0 auto"}}>
               {page!=="dashboard"&&(<div style={{marginBottom:16}}><h2 style={{margin:0,fontSize:26,fontWeight:900,color:DS.dark,letterSpacing:-0.5}}>{PAGE_LABELS[page]}</h2></div>)}
-              {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}}/>}
+              {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} notes={notes} onNotesChange={n=>{setNotes(n);saveNotes(n);}}/>}
               {page==="clients"&&<PageClients clients={clients} passages={passages} contrats={contrats} versements={versements} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onToggleVersement={handleToggleVersement} onClientClick={setFicheClient} onAdd={openAddClient}/>}
               {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddClient={openAddClient} onValider={validerPassage} onChangeStatut={updateStatutPassage}/>}
               {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}

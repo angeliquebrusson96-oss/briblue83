@@ -212,11 +212,16 @@ async function uploadOne(key, dataUrl) {
 // Retourne la liste mise à jour (ou la même liste si rien n'a changé).
 // Traite les passages séquentiellement pour ne pas saturer le réseau mobile
 export async function migrateAllPassagesPhotos(passages) {
-  if (!Array.isArray(passages) || !navigator.onLine || !auth.currentUser) return passages;
+  if (!Array.isArray(passages) || !navigator.onLine) return passages;
+  // S'assurer d'avoir une session Firebase avant de commencer
+  if (!auth.currentUser) {
+    try { await signInAnonymously(auth); } catch { return passages; }
+  }
+  if (!auth.currentUser) return passages;
   let changed = false;
   const updated = [...passages];
   for (let i = 0; i < passages.length; i++) {
-    if (!navigator.onLine || !auth.currentUser) break; // arrêt si hors-ligne
+    if (!navigator.onLine || !auth.currentUser) break;
     const migrated = await migratePassagePhotosToStorage(passages[i]);
     if (migrated) { updated[i] = migrated; changed = true; }
   }
@@ -228,7 +233,12 @@ export async function migrateAllPassagesPhotos(passages) {
 // Retourne le passage avec les clés idb: remplacées par des URL https://.
 // Retourne null si rien n'a changé (pas besoin de re-sauvegarder).
 export async function migratePassagePhotosToStorage(passage) {
-  if (!passage?.id || !navigator.onLine || !auth.currentUser) return null;
+  if (!passage?.id || !navigator.onLine) return null;
+  // S'assurer d'avoir une session Firebase
+  if (!auth.currentUser) {
+    try { await signInAnonymously(auth); } catch { return null; }
+  }
+  if (!auth.currentUser) return null;
   const p = { ...passage };
   let changed = false;
 

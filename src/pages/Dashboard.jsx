@@ -62,7 +62,7 @@ const SAISON_THEMES = {
 // ─────────────────────────────────────────────────────────────────────────────
 // DASHBOARD HERO
 // ─────────────────────────────────────────────────────────────────────────────
-export function DashboardHero({ clients, passages, rdvs, saisonNow, isMobile, onAddPassage, onAddLivraison, onAddClient, onAddRdv }) { // eslint-disable-line no-unused-vars
+export function DashboardHero({ clients, passages, rdvs, saisonNow, isMobile, onAddPassage, onAddLivraison, onAddClient, onAddRdv, notes, onNotesChange }) { // eslint-disable-line no-unused-vars
   const heure = new Date().getHours();
   const salut = heure < 12 ? "Bonjour" : heure < 18 ? "Bon après-midi" : "Bonsoir";
   const dateStr = new Date().toLocaleDateString("fr", { weekday:"long", day:"2-digit", month:"long", year:"numeric" });
@@ -128,51 +128,39 @@ export function DashboardHero({ clients, passages, rdvs, saisonNow, isMobile, on
       </div>
 
       {/* ── NOTES DRAG & DROP ── */}
-      <StickyNotes/>
+      <StickyNotes notes={notes} onNotesChange={onNotesChange}/>
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// STICKY NOTES — drag & drop + auto-save localStorage
+// STICKY NOTES — drag & drop + sauvegarde Firebase via onNotesChange
 // ─────────────────────────────────────────────────────────────────────────────
 const NOTE_COLORS = ["#fef9c3","#dcfce7","#dbeafe","#fce7f3","#ede9fe","#ffedd5","#fff","#fef2f2"];
-const NOTE_KEY = "briblue_dashboard_notes";
 
-function StickyNotes() {
-  const [notes, setNotes] = useState(() => {
-    try { const s=localStorage.getItem(NOTE_KEY); return s?JSON.parse(s):[{id:"1",text:"",color:"#fef9c3"}]; }
-    catch { return [{id:"1",text:"",color:"#fef9c3"}]; }
-  });
-  const saveTimer = useRef(null);
-  const dragIdx   = useRef(null);
+// Composant contrôlé : l'état réel vit dans App.jsx → Firebase
+function StickyNotes({ notes = [], onNotesChange }) {
+  const dragIdx     = useRef(null);
   const dragOverIdx = useRef(null);
   const [dragOver, setDragOver] = useState(-1);
 
-  // Auto-save 300 ms après chaque changement
-  useEffect(() => {
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      try { localStorage.setItem(NOTE_KEY, JSON.stringify(notes)); } catch {}
-    }, 300);
-    return () => { if(saveTimer.current) clearTimeout(saveTimer.current); };
-  }, [notes]);
+  // Appelle le callback parent (qui déclenche save → Firebase)
+  const update = (fn) => onNotesChange(typeof fn === "function" ? fn(notes) : fn);
 
   const addNote = () => {
-    const colors = NOTE_COLORS;
-    const col = colors[Math.floor(Math.random()*colors.length)];
-    setNotes(p => [...p, {id:Date.now().toString(), text:"", color:col}]);
+    const col = NOTE_COLORS[Math.floor(Math.random()*NOTE_COLORS.length)];
+    update(p => [...p, {id:Date.now().toString(), text:"", color:col}]);
   };
-  const delNote  = (id) => setNotes(p => p.filter(n=>n.id!==id));
-  const editText = (id, text) => setNotes(p => p.map(n=>n.id===id?{...n,text}:n));
-  const editColor= (id, color) => setNotes(p => p.map(n=>n.id===id?{...n,color}:n));
+  const delNote   = (id)         => update(p => p.filter(n=>n.id!==id));
+  const editText  = (id, text)   => update(p => p.map(n=>n.id===id?{...n,text}:n));
+  const editColor = (id, color)  => update(p => p.map(n=>n.id===id?{...n,color}:n));
 
   const onDragStart = (i) => { dragIdx.current = i; };
   const onDragOver  = (e,i) => { e.preventDefault(); dragOverIdx.current=i; setDragOver(i); };
   const onDrop      = () => {
     const from=dragIdx.current, to=dragOverIdx.current;
     if (from!==null && to!==null && from!==to) {
-      setNotes(p => {
+      update(p => {
         const a=[...p];
         const [el]=a.splice(from,1);
         a.splice(to,0,el);
@@ -255,7 +243,7 @@ function StickyNotes() {
 // ─────────────────────────────────────────────────────────────────────────────
 // DASHBOARD
 // ─────────────────────────────────────────────────────────────────────────────
-export function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, onAddLivraison, onAddClient, onAddRdv, onEditPassage, onEditRdv }) {
+export function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPassage, onAddLivraison, onAddClient, onAddRdv, onEditPassage, onEditRdv, notes=[], onNotesChange }) {
   const isMobile = useIsMobile();
   const moisCourant = MOIS_NOW;
   const saisonNow = getSaison(moisCourant);
@@ -293,7 +281,7 @@ export function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPass
   return (
     <div>
       {/* HERO */}
-      <DashboardHero clients={clients} passages={passages} rdvs={rdvs} saisonNow={saisonNow} isMobile={isMobile} onAddPassage={onAddPassage} onAddLivraison={onAddLivraison} onAddClient={onAddClient} onAddRdv={onAddRdv}/>
+      <DashboardHero clients={clients} passages={passages} rdvs={rdvs} saisonNow={saisonNow} isMobile={isMobile} onAddPassage={onAddPassage} onAddLivraison={onAddLivraison} onAddClient={onAddClient} onAddRdv={onAddRdv} notes={notes} onNotesChange={onNotesChange}/>
 
       {/* ── PASSAGES DU MOIS ── */}
       <div className="db-s3" style={{marginBottom:14,borderRadius:18,overflow:"hidden",boxShadow:"0 2px 12px rgba(0,0,0,0.06)",border:"1px solid #e2e8f0",background:"#fff"}}>
