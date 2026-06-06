@@ -27,7 +27,8 @@
       "Bash(git commit -m 'fix: transaction Firestore atomique pour éviter les emails en double *)",
       "Bash(git commit -m 'fix: verrou anti-doublon sur envoyerContratSignature *)",
       "Bash(git commit -m 'fix: verification integrale - MERGE, queue persistante, garde-fou clients *)",
-      "Bash(git commit -m 'refactor: reorganisation complete Firebase en documents separes *)"
+      "Bash(git commit -m 'refactor: reorganisation complete Firebase en documents separes *)",
+      "Bash(git commit -m 'fix: CarnetClient lit les nouveaux documents Firebase separes *)"
     ]
   }
 }
