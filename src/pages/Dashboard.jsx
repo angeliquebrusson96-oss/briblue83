@@ -60,6 +60,199 @@ const SAISON_THEMES = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PLANNING HEBDOMADAIRE
+// ─────────────────────────────────────────────────────────────────────────────
+function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onEditRdv, onClientClick, isMobile }) {
+  const [weekOffset, setWeekOffset] = useState(0);
+  const scrollRef = useRef(null);
+
+  // Lundi de la semaine courante + décalage
+  const getMonday = (offset) => {
+    const d = new Date();
+    const day = d.getDay();
+    const monday = new Date(d);
+    monday.setDate(d.getDate() - (day === 0 ? 6 : day - 1) + offset * 7);
+    monday.setHours(0, 0, 0, 0);
+    return monday;
+  };
+
+  const monday = getMonday(weekOffset);
+  const days = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d;
+  });
+
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  // Scroll auto vers aujourd'hui sur mobile
+  useEffect(() => {
+    if (!isMobile || !scrollRef.current || weekOffset !== 0) return;
+    const idx = days.findIndex(d => d.toISOString().split("T")[0] === todayStr);
+    if (idx >= 0) scrollRef.current.scrollLeft = Math.max(0, idx * 116 - 8);
+  }, [weekOffset, isMobile]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const weekLabel = (() => {
+    const last = new Date(monday);
+    last.setDate(monday.getDate() + 5);
+    const f = d => d.toLocaleDateString("fr", { day:"2-digit", month:"short" });
+    return `${f(monday)} — ${f(last)} ${monday.getFullYear()}`;
+  })();
+
+  const getEventsForDay = (date) => {
+    const ds = date.toISOString().split("T")[0];
+    const r = (rdvs||[]).filter(r => r.date === ds).map(r => ({...r, _kind:"rdv"}));
+    const p = (passages||[]).filter(p => p.date === ds).map(p => ({...p, _kind:"passage"}));
+    return [...r, ...p].sort((a, b) => (a.heure||"").localeCompare(b.heure||""));
+  };
+
+  return (
+    <div className="db-s2" style={{marginBottom:14,borderRadius:18,overflow:"hidden",boxShadow:"0 2px 12px rgba(0,0,0,0.06)",border:"1px solid #e2e8f0",background:"#fff"}}>
+      {/* ── En-tête ── */}
+      <div style={{padding:"11px 14px 9px",background:"linear-gradient(135deg,#f0f9ff,#fff)",borderBottom:"1px solid #f1f5f9",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <div style={{width:28,height:28,borderRadius:8,background:"#e0f2fe",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.2" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </div>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>Planning semaine</div>
+            <div style={{fontSize:10,color:"#94a3b8",marginTop:1}}>{weekLabel}</div>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:4,alignItems:"center"}}>
+          <button onClick={()=>setWeekOffset(w=>w-1)}
+            style={{width:28,height:28,borderRadius:7,border:"1px solid #e2e8f0",background:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          {weekOffset !== 0 && (
+            <button onClick={()=>setWeekOffset(0)}
+              style={{height:28,padding:"0 8px",borderRadius:7,border:"1px solid #bae6fd",background:"#e0f2fe",cursor:"pointer",fontSize:10,fontWeight:700,color:"#0891b2",fontFamily:"inherit"}}>
+              Auj.
+            </button>
+          )}
+          <button onClick={()=>setWeekOffset(w=>w+1)}
+            style={{width:28,height:28,borderRadius:7,border:"1px solid #e2e8f0",background:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+      </div>
+
+      {/* ── Grille jours ── */}
+      <div ref={scrollRef} style={{
+        display:"flex",gap:5,
+        overflowX:isMobile?"auto":"hidden",
+        WebkitOverflowScrolling:"touch",
+        scrollbarWidth:"none",
+        padding:"8px",
+      }}>
+        {days.map((day) => {
+          const ds = day.toISOString().split("T")[0];
+          const isToday  = ds === todayStr;
+          const isPast   = ds < todayStr;
+          const events   = getEventsForDay(day);
+          const dayName  = day.toLocaleDateString("fr", { weekday:"short" });
+          const dayNum   = day.getDate();
+          const monthStr = day.toLocaleDateString("fr", { month:"short" });
+
+          return (
+            <div key={ds} style={{
+              minWidth:isMobile?108:undefined,flex:isMobile?"0 0 108px":1,
+              borderRadius:10,
+              background:isToday?"#f0f9ff":"#fafafa",
+              border:`1.5px solid ${isToday?"#0891b2":"#e2e8f0"}`,
+              display:"flex",flexDirection:"column",overflow:"hidden",
+            }}>
+              {/* Trait top si aujourd'hui */}
+              {isToday && <div style={{height:3,background:"linear-gradient(90deg,#0891b2,#06b6d4)"}}/>}
+
+              {/* En-tête du jour */}
+              <div style={{
+                padding:"5px 3px 3px",textAlign:"center",
+                borderBottom:`1px solid ${isToday?"#bae6fd":"#f1f5f9"}`,
+                background:isToday?"rgba(8,145,178,0.05)":"transparent",
+              }}>
+                <div style={{fontSize:8,fontWeight:700,color:isToday?"#0891b2":isPast?"#94a3b8":"#64748b",textTransform:"uppercase",letterSpacing:.3}}>
+                  {dayName}
+                </div>
+                <div style={{fontSize:19,fontWeight:900,lineHeight:1.1,color:isToday?"#0891b2":isPast?"#cbd5e1":"#0f172a"}}>
+                  {dayNum}
+                </div>
+                <div style={{fontSize:8,color:"#94a3b8",lineHeight:1}}>{monthStr}</div>
+              </div>
+
+              {/* Événements */}
+              <div style={{padding:"4px",display:"flex",flexDirection:"column",gap:3,flex:1}}>
+                {events.map((ev, j) => {
+                  const client = (clients||[]).find(c => c.id === ev.clientId);
+                  const nom = (() => {
+                    if (!client?.nom) return "?";
+                    const parts = client.nom.replace(/^(M\.|Mme|Mlle)\s*/i,"").trim().split(/\s+/);
+                    return (parts[parts.length-1]||parts[0]).slice(0,10);
+                  })();
+                  const isPassage = ev._kind === "passage";
+                  const isCtrl = isControleType(ev.type);
+                  const isSav = /sav|dépann/i.test(ev.type||"");
+
+                  const [color, bg, bord] = isPassage
+                    ? isCtrl  ? ["#0e7490","#e0f2fe","#7dd3fc"]
+                    : isSav   ? ["#ea580c","#fff7ed","#fdba74"]
+                    : ["#059669","#f0fdf4","#86efac"]
+                    : ["#7c3aed","#f5f3ff","#c4b5fd"];
+
+                  const emoji = isPassage ? (isCtrl?"💧":isSav?"🔧":"✓") : "📅";
+
+                  return (
+                    <button key={ev.id||j}
+                      onClick={()=> isPassage && client ? onClientClick(client) : (!isPassage && onEditRdv && onEditRdv(ev))}
+                      style={{
+                        width:"100%",padding:"3px 4px",borderRadius:6,
+                        background:bg,border:`1px solid ${bord}`,
+                        cursor:"pointer",fontFamily:"inherit",textAlign:"left",
+                        WebkitTapHighlightColor:"transparent",
+                        opacity:isPast&&!isPassage?.6:1,
+                      }}>
+                      <div style={{fontSize:8,color:"#64748b",marginBottom:1,display:"flex",alignItems:"center",gap:2,lineHeight:1}}>
+                        <span>{emoji}</span>
+                        {ev.heure&&<span>{ev.heure.slice(0,5)}</span>}
+                      </div>
+                      <div style={{fontSize:10,fontWeight:700,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",lineHeight:1.2}}>{nom}</div>
+                      <div style={{fontSize:8,color,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{(ev.type||"RDV").slice(0,13)}</div>
+                    </button>
+                  );
+                })}
+
+                {/* Bouton + */}
+                <button
+                  onClick={()=> onAddRdv && onAddRdv({ date:ds })}
+                  style={{
+                    width:"100%",minHeight:22,padding:"2px",borderRadius:6,
+                    background:"transparent",border:"1.5px dashed #e2e8f0",
+                    cursor:"pointer",color:"#d1d5db",fontSize:15,fontWeight:700,
+                    display:"flex",alignItems:"center",justifyContent:"center",
+                    fontFamily:"inherit",lineHeight:1,transition:"all .15s",
+                  }}>
+                  +
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Légende */}
+      <div style={{padding:"4px 12px 8px",display:"flex",gap:10,flexWrap:"wrap"}}>
+        {[["#059669","#f0fdf4","✓ Entretien"],["#0e7490","#e0f2fe","💧 Contrôle"],["#ea580c","#fff7ed","🔧 SAV"],["#7c3aed","#f5f3ff","📅 RDV"]].map(([c,bg,l])=>(
+          <div key={l} style={{display:"flex",alignItems:"center",gap:4}}>
+            <div style={{width:8,height:8,borderRadius:2,background:bg,border:`1px solid ${c}44`}}/>
+            <span style={{fontSize:9,color:"#94a3b8",fontWeight:500}}>{l}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // DASHBOARD HERO
 // ─────────────────────────────────────────────────────────────────────────────
 export function DashboardHero({ clients, passages, rdvs, saisonNow, isMobile, onAddPassage, onAddLivraison, onAddClient, onAddRdv, notes, onNotesChange }) { // eslint-disable-line no-unused-vars
@@ -281,6 +474,9 @@ export function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPass
     <div>
       {/* HERO */}
       <DashboardHero clients={clients} passages={passages} rdvs={rdvs} saisonNow={saisonNow} isMobile={isMobile} onAddPassage={onAddPassage} onAddLivraison={onAddLivraison} onAddClient={onAddClient} onAddRdv={onAddRdv} notes={notes} onNotesChange={onNotesChange}/>
+
+      {/* ── PLANNING SEMAINE ── */}
+      <PlanningHebdo clients={clients} passages={passages} rdvs={rdvs} onAddRdv={onAddRdv} onEditRdv={onEditRdv} onClientClick={onClientClick} isMobile={isMobile}/>
 
       {/* ── PASSAGES DU MOIS ── */}
       <div className="db-s3" style={{marginBottom:14,borderRadius:18,overflow:"hidden",boxShadow:"0 2px 12px rgba(0,0,0,0.06)",border:"1px solid #e2e8f0",background:"#fff"}}>
