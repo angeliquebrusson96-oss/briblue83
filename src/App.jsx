@@ -552,9 +552,21 @@ export default function App() {
   },[]);
   const handleLogout = useCallback(()=>{ try{sessionStorage.removeItem("bb_auth");}catch{ /* noop */ } setLoggedIn(false);setReady(false);setClients([]);setPassages([]);setLivraisons([]);setRdvs([]); },[]);
 
-  const saveClient = useCallback(c=>{
-    // Retirer le flag envoyerContrat des données client avant de sauvegarder
-    const { envoyerContrat, ...clientData } = c;
+  const saveClient = useCallback(async c=>{
+    const { envoyerContrat, ...clientDataRaw } = c;
+
+    // ── Upload photo piscine AVANT la sauvegarde (synchrone) ──────────────────
+    // Priorité : Firebase Storage → URL https:// accessible sur tous les appareils.
+    // Si pas de réseau ou upload échoué → on garde idb: (fonctionnel en local).
+    let clientData = clientDataRaw;
+    const photoNeedsMigration = clientData.photoPiscine &&
+      !clientData.photoPiscine.startsWith("https://") &&
+      !clientData.photoPiscine.startsWith("blob:");
+    if (photoNeedsMigration && navigator.onLine) {
+      const migrated = await migrateClientPhotoToStorage(clientData).catch(() => null);
+      if (migrated) clientData = migrated; // ← photoPiscine = "https://..."
+    }
+
     const isNew = !clients.find(x=>x.id===clientData.id);
     setClients(prev=>{ const next=prev.find(x=>x.id===clientData.id)?prev.map(x=>x.id===clientData.id?clientData:x):[...prev,clientData]; saveClients(next); return next; });
     if (!isNew) {
@@ -569,22 +581,9 @@ export default function App() {
       });
     }
     setShowFormClient(false);setEditClient(null);setFicheClient(clientData);
-    // Envoyer le contrat après création si demandé
     if (envoyerContrat && isNew) {
       setTimeout(() => envoyerContratSignature(clientData), 500);
     }
-    // ── Migration photo piscine vers Firebase Storage (arrière-plan) ──────────
-    // La photoPiscine est stockée en idb:tmp_xxx (local) au moment du save.
-    // On l'uploade vers Firebase Storage pour la rendre visible sur tous les appareils.
-    migrateClientPhotoToStorage(clientData).then(migrated => {
-      if (!migrated) return; // déjà https:// ou pas de photo
-      setClients(prev => {
-        const next = prev.map(x => x.id === migrated.id ? migrated : x);
-        saveClients(next);
-        return next;
-      });
-      setFicheClient(prev => prev?.id === migrated.id ? migrated : prev);
-    }).catch(() => {});
   },[saveClients, clients, saveContrats]);
 
   const deleteClient = useCallback(id=>{ showConfirm("Supprimer ce client et tous ses passages ?", ()=>{ setClients(prev=>{ const next=prev.filter(x=>x.id!==id); saveClients(next); return next; }); setPassages(prev=>{ const next=prev.filter(x=>x.clientId!==id); savePassages(next); return next; }); setFicheClient(null); }); },[saveClients,savePassages]);
