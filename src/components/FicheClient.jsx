@@ -235,12 +235,18 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
   const passEffectues = passC.filter(p=>isPassageDansContrat(p,client)&&isPassageEffectue(p));
   const effE = passEffectues.filter(p=>isEntretienType(p.type)).length;
   const effC = passEffectues.filter(p=>isControleType(p.type)).length;
-  const eff = passEffectues.length;
+  const effRapports = passEffectues.length;
+  // Déductions manuelles (boutons +/- du planning) — s'ajoutent aux rapports réels
+  const effManuel = Object.values(client.passagesManuel||{}).reduce((s,v)=>s+(Number(v)||0),0);
+  const eff = effRapports + effManuel;
   const jours = daysUntil(client.dateFin);
   const rest = Math.max(0,total-eff);
   const moisNow = new Date().getMonth()+1;
   const yearNow = new Date().getFullYear();
-  const passagesCeMois = passContrat.filter(p=>new Date(p.date).getMonth()+1===moisNow&&new Date(p.date).getFullYear()===yearNow).length;
+  // Passages du mois courant : rapports + déductions manuelles du mois
+  const mKeyNow = `${contractStart?contractStart.slice(0,4):yearNow}-${String(moisNow).padStart(2,"0")}`;
+  const manuelNow = (client.passagesManuel||{})[mKeyNow]||0;
+  const passagesCeMois = passContrat.filter(p=>new Date(p.date).getMonth()+1===moisNow&&new Date(p.date).getFullYear()===yearNow).length + manuelNow;
   const prevuCeMois = (getMoisVal(client.moisParMois||client.saisons||{},moisNow).entretien||0)+(getMoisVal(client.moisParMois||client.saisons||{},moisNow).controle||0);
   const restantsCeMois = Math.max(0, prevuCeMois - passagesCeMois);
   const pct = total>0?Math.round(eff/total*100):0;
@@ -841,44 +847,94 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
             });
             const mKey=`${contractStart?contractStart.slice(0,4):YEAR_NOW}-${String(m).padStart(2,"0")}`;
             const doneManuel=manuelMap[mKey]||0;
-            const doneT=passM.length+doneManuel;
+            // Rapports réels ventilés par type
+            const doneE=passM.filter(p=>isEntretienType(p.type)).length;
+            const doneC=passM.filter(p=>isControleType(p.type)).length;
+            const doneRapports=passM.length;
+            const doneT=doneRapports+doneManuel;
             const rest2=Math.max(0,planT-doneT);
+            const surplus=Math.max(0,doneT-planT);
             const sc=SAISONS_META[getSaison(m)]||SAISONS_META.ete;
             const cur=m===MOIS_NOW;
+            const isPasse=m<MOIS_NOW;
             const isSelMois=selectedMois===m;
+            const ok=planT>0&&rest2===0;
+            const enRetard=isPasse&&planT>0&&rest2>0;
             return <div key={m}>
               <div onClick={()=>passM.length>0?setSelectedMois(isSelMois?null:m):null}
-                style={{display:"flex",alignItems:"center",padding:"9px 12px",borderBottom:(!isSelMois&&i<11)?"1px solid "+DS.border:"none",background:cur?sc.bg+"88":isSelMois?sc.bg:i%2===0?"#fff":"#fafafa",cursor:passM.length>0?"pointer":"default"}}>
-                <div style={{width:3,height:20,borderRadius:2,background:sc.color,marginRight:8,flexShrink:0}}/>
-                <div style={{width:34,fontWeight:cur?800:600,fontSize:13,color:cur?sc.color:DS.mid}}>{MOIS[m]}</div>
-                <div style={{flex:1,display:"flex",gap:6,alignItems:"center"}}>
-                  {planT>0?<span style={{fontSize:13,fontWeight:700,color:doneT>=planT?DS.green:DS.blue}}>{doneT}/{planT}</span>:<span style={{fontSize:13,color:"#d1d5db"}}>—</span>}
-                  {doneManuel>0&&<span style={{fontSize:9,fontWeight:700,color:"#7c3aed",background:"#f5f3ff",padding:"1px 5px",borderRadius:4}}>{doneManuel}m</span>}
-                  {doneT>planT&&planT>0&&<span style={{fontSize:9,fontWeight:700,color:DS.blue,background:DS.blueSoft,padding:"1px 5px",borderRadius:4}}>+{doneT-planT}</span>}
+                style={{display:"flex",alignItems:"center",padding:"9px 12px",borderBottom:(!isSelMois&&i<11)?"1px solid "+DS.border:"none",background:enRetard?"#fff7ed":cur?sc.bg+"88":isSelMois?sc.bg:i%2===0?"#fff":"#fafafa",cursor:passM.length>0?"pointer":"default"}}>
+
+                {/* Indicateur couleur côté gauche */}
+                <div style={{width:3,height:22,borderRadius:2,background:enRetard?DS.orange:ok?"#22c55e":cur?sc.color:"#e2e8f0",marginRight:8,flexShrink:0}}/>
+
+                {/* Nom du mois */}
+                <div style={{width:32,fontWeight:cur?800:600,fontSize:13,color:enRetard?DS.orange:cur?sc.color:DS.mid}}>{MOIS[m]}</div>
+
+                {/* Compteurs rapports + manuel */}
+                <div style={{flex:1,display:"flex",gap:5,alignItems:"center",flexWrap:"wrap"}}>
+                  {planT===0
+                    ? <span style={{fontSize:12,color:"#d1d5db"}}>—</span>
+                    : <>
+                        {/* Entretiens */}
+                        {planE>0&&<span style={{fontSize:11,fontWeight:700,
+                          color:doneE>=planE?"#059669":"#0891b2",
+                          background:doneE>=planE?"#f0fdf4":"#eff6ff",
+                          padding:"1px 6px",borderRadius:5,whiteSpace:"nowrap"}}>
+                          🔧 {doneE}/{planE}
+                        </span>}
+                        {/* Contrôles */}
+                        {planC>0&&<span style={{fontSize:11,fontWeight:700,
+                          color:doneC>=planC?"#059669":"#0e7490",
+                          background:doneC>=planC?"#f0fdf4":"#ecfdf5",
+                          padding:"1px 6px",borderRadius:5,whiteSpace:"nowrap"}}>
+                          💧 {doneC}/{planC}
+                        </span>}
+                        {/* Badge manuel */}
+                        {doneManuel>0&&<span style={{fontSize:9,fontWeight:700,color:"#7c3aed",background:"#f5f3ff",padding:"1px 5px",borderRadius:4,border:"1px solid #ddd6fe"}}>+{doneManuel} déduit</span>}
+                        {/* Surplus */}
+                        {surplus>0&&<span style={{fontSize:9,fontWeight:700,color:DS.blue,background:DS.blueSoft,padding:"1px 5px",borderRadius:4}}>+{surplus} sup.</span>}
+                      </>
+                  }
                 </div>
-                <div style={{display:"flex",alignItems:"center",gap:6}}>
-                  {planT>0&&<div style={{fontSize:11,fontWeight:700,color:rest2>0?DS.orange:DS.green,background:rest2>0?DS.orangeSoft:DS.greenSoft,padding:"2px 8px",borderRadius:6,minWidth:46,textAlign:"center"}}>{rest2>0?rest2+" rest.":"✓"}</div>}
+
+                {/* Badge statut + boutons +/- */}
+                <div style={{display:"flex",alignItems:"center",gap:5,flexShrink:0}}>
+                  {planT>0&&(
+                    <div style={{fontSize:11,fontWeight:700,
+                      color:ok?"#059669":enRetard?DS.orange:rest2>0?DS.blue:"#94a3b8",
+                      background:ok?"#f0fdf4":enRetard?DS.orangeSoft:rest2>0?"#eff6ff":"#f8fafc",
+                      padding:"2px 8px",borderRadius:6,minWidth:50,textAlign:"center",
+                      border:`1px solid ${ok?"#bbf7d0":enRetard?"#fed7aa":rest2>0?"#bae6fd":"#e2e8f0"}`}}>
+                      {ok?"✓ Fait":rest2+" rest."}
+                    </div>
+                  )}
                   {planT>0&&onUpdateClient&&(
                     <div style={{display:"flex",alignItems:"center",gap:2}}>
-                      {doneManuel>0&&<button onClick={e=>{e.stopPropagation();const nm={...manuelMap};if(doneManuel<=1)delete nm[mKey];else nm[mKey]=doneManuel-1;onUpdateClient({...client,passagesManuel:nm});}} style={{width:24,height:24,borderRadius:6,border:"1.5px solid #c4b5fd",background:"#f5f3ff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                        <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="3" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      {doneManuel>0&&<button onClick={e=>{e.stopPropagation();const nm={...manuelMap};if(doneManuel<=1)delete nm[mKey];else nm[mKey]=doneManuel-1;onUpdateClient({...client,passagesManuel:nm});}} style={{width:22,height:22,borderRadius:5,border:"1.5px solid #c4b5fd",background:"#f5f3ff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        <svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="3" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
                       </button>}
-                      {doneManuel>0&&<span style={{fontSize:11,fontWeight:800,color:"#7c3aed",minWidth:14,textAlign:"center"}}>{doneManuel}</span>}
-                      <button onClick={e=>{e.stopPropagation();onUpdateClient({...client,passagesManuel:{...manuelMap,[mKey]:(doneManuel||0)+1}});}} style={{width:24,height:24,borderRadius:6,border:"1.5px solid "+(doneManuel>0?"#c4b5fd":DS.border),background:doneManuel>0?"#f5f3ff":"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                        <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke={doneManuel>0?"#7c3aed":DS.mid} strokeWidth="3" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      <button onClick={e=>{e.stopPropagation();onUpdateClient({...client,passagesManuel:{...manuelMap,[mKey]:(doneManuel||0)+1}});}} title="Déduire un passage manuellement"
+                        style={{width:22,height:22,borderRadius:5,border:"1.5px solid "+(doneManuel>0?"#c4b5fd":DS.border),background:doneManuel>0?"#f5f3ff":"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        <svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke={doneManuel>0?"#7c3aed":DS.mid} strokeWidth="3" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                       </button>
                     </div>
                   )}
                 </div>
               </div>
+
+              {/* Détail passages du mois */}
               {isSelMois&&passM.length>0&&(
                 <div style={{background:"rgba(255,255,255,0.45)",padding:"8px 12px",borderBottom:i<11?"1px solid "+DS.border:"none",display:"flex",flexDirection:"column",gap:6}}>
                   {passM.sort((a,b)=>new Date(b.date)-new Date(a.date)).map(p=>{
                     const phOk=p.ph>=7&&p.ph<=7.6;const clOk=p.chlore>=0.5&&p.chlore<=3;
+                    const isCtrlP=isControleType(p.type);
                     return (
                       <div key={p.id} style={{background:"rgba(255,255,255,0.55)",borderRadius:10,padding:"9px 11px",border:"1px solid #f1f5f9"}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                          <div style={{fontSize:12,fontWeight:700,color:DS.dark}}>{new Date(p.date).toLocaleDateString("fr",{day:"2-digit",month:"long"})} {p.tech&&<span style={{color:DS.mid,fontWeight:500}}>· {p.tech}</span>}</div>
+                          <div style={{display:"flex",alignItems:"center",gap:6}}>
+                            <span style={{fontSize:13}}>{isCtrlP?"💧":"🔧"}</span>
+                            <div style={{fontSize:12,fontWeight:700,color:DS.dark}}>{new Date(p.date).toLocaleDateString("fr",{day:"2-digit",month:"long"})} {p.tech&&<span style={{color:DS.mid,fontWeight:500}}>· {p.tech}</span>}</div>
+                          </div>
                           <div style={{display:"flex",gap:4}}>
                             {getPH(p)&&<span style={{fontSize:10,fontWeight:700,color:phOk?DS.green:DS.red,background:phOk?DS.greenSoft:DS.redSoft,padding:"1px 5px",borderRadius:4}}>pH {getPH(p)}</span>}
                             {getCL(p)&&<span style={{fontSize:10,fontWeight:700,color:clOk?DS.green:DS.red,background:clOk?DS.greenSoft:DS.redSoft,padding:"1px 5px",borderRadius:4}}>Cl {getCL(p)}</span>}
@@ -898,9 +954,23 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
             </div>;
           })}
           </div>
-          <div style={{display:"flex",justifyContent:"space-between",marginTop:8,padding:"8px 14px",background:"linear-gradient(135deg,#0891b2,#0e7490)",borderRadius:10,boxShadow:"0 2px 8px rgba(8,145,178,0.25)"}}>
-            <span style={{color:"rgba(255,255,255,0.7)",fontSize:12,fontWeight:600}}>Total annuel</span>
-            <span style={{color:"#fff",fontSize:12,fontWeight:800}}>🔧 {totalE} · 💧 {totalC} · {total} passages</span>
+
+          {/* Synthèse globale */}
+          <div style={{marginTop:8,borderRadius:10,overflow:"hidden",border:"1px solid rgba(8,145,178,0.2)"}}>
+            <div style={{padding:"10px 14px",background:"linear-gradient(135deg,#0891b2,#0e7490)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{color:"rgba(255,255,255,0.8)",fontSize:11,fontWeight:600}}>Bilan contrat</span>
+              <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                <span style={{color:"#fff",fontSize:12,fontWeight:800}}>🔧 {effE+effManuel}/{totalE}</span>
+                {totalC>0&&<span style={{color:"rgba(255,255,255,0.9)",fontSize:12,fontWeight:800}}>💧 {effC}/{totalC}</span>}
+                <span style={{color:eff>=total?"#4ade80":"#fbbf24",fontSize:13,fontWeight:900}}>{eff}/{total}</span>
+              </div>
+            </div>
+            {effManuel>0&&(
+              <div style={{padding:"7px 14px",background:"#f5f3ff",display:"flex",alignItems:"center",gap:6}}>
+                <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span style={{fontSize:11,color:"#4c1d95",fontWeight:600}}>{effRapports} rapport{effRapports>1?"s":""} + {effManuel} déduit{effManuel>1?"s":""} manuellement</span>
+              </div>
+            )}
           </div>
           </>;
         })()}
