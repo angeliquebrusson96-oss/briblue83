@@ -42,20 +42,26 @@ const VersementsClient = ({ client, versements, onToggleVersement, retardVisible
   const finMois = new Date(fin.getFullYear(), fin.getMonth(), 1);
   const currentMois = new Date(today.getFullYear(), today.getMonth(), 1);
 
-  while (current <= finMois && current <= currentMois) {
-    const year = current.getFullYear();
+  // Parcourt TOUTE la durée du contrat (passé + présent + futur)
+  // pour permettre de cocher les mensualités payées en avance
+  while (current <= finMois) {
+    const year  = current.getFullYear();
     const month = current.getMonth() + 1;
-    const key = `${client.id}_${year}_${String(month).padStart(2, "0")}`;
+    const key   = `${client.id}_${year}_${String(month).padStart(2, "0")}`;
     const isPaid = versements?.[key] === true;
     const isCurrentMonth = year === today.getFullYear() && month === today.getMonth() + 1;
-    const isOverdue = !isCurrentMonth && !isPaid;
+    const isFuture = current > currentMois;
+    const isOverdue = !isCurrentMonth && !isFuture && !isPaid;
     const montant = getMontantMois(year, month);
-    mensualites.push({ key, year, month, isPaid, isCurrentMonth, isOverdue, montant });
+    mensualites.push({ key, year, month, isPaid, isCurrentMonth, isFuture, isOverdue, montant });
     current = new Date(current.getFullYear(), current.getMonth() + 1, 1);
   }
 
   const overdueCount = mensualites.filter(m => m.isOverdue).length;
-  const totalDue = mensualites.filter(m => !m.isPaid).reduce((s, m) => s + m.montant, 0);
+  // Dû maintenant = mois passés + courant non payés (hors futurs)
+  const totalDue    = mensualites.filter(m => !m.isPaid && !m.isFuture).reduce((s, m) => s + m.montant, 0);
+  // Payé en avance = mois futurs déjà cochés
+  const totalAvance = mensualites.filter(m =>  m.isPaid &&  m.isFuture).reduce((s, m) => s + m.montant, 0);
   const hasRetard = overdueCount > 0;
 
   return (
@@ -69,7 +75,9 @@ const VersementsClient = ({ client, versements, onToggleVersement, retardVisible
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           {totalDue > 0
             ? <span style={{fontSize:13,fontWeight:800,color:overdueCount>0?"#dc2626":"#0369a1"}}>{fmtEur(totalDue)} dû</span>
-            : <span style={{fontSize:11,fontWeight:700,color:"#16a34a"}}>✓ À jour</span>
+            : totalAvance > 0
+              ? <span style={{fontSize:11,fontWeight:700,color:"#059669"}}>✓ À jour · <span style={{color:"#0891b2"}}>+{fmtEur(totalAvance)} avance</span></span>
+              : <span style={{fontSize:11,fontWeight:700,color:"#16a34a"}}>✓ À jour</span>
           }
           <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round"
             style={{transform:open?"rotate(180deg)":"rotate(0deg)",transition:"transform .2s",flexShrink:0}}>
@@ -97,21 +105,52 @@ const VersementsClient = ({ client, versements, onToggleVersement, retardVisible
               <div key={m.key} style={{
                 display:"flex",alignItems:"center",justifyContent:"space-between",
                 padding:"6px 10px",borderRadius:7,
-                background:m.isPaid?"#f0fdf4":m.isOverdue?"#fef2f2":m.isCurrentMonth?"#fefce8":"#f8fafc",
-                border:`1px solid ${m.isPaid?"#bbf7d0":m.isOverdue?"#fecaca":m.isCurrentMonth?"#fde047":"#e2e8f0"}`
+                background: m.isPaid && m.isFuture ? "#eff6ff"
+                  : m.isPaid              ? "#f0fdf4"
+                  : m.isOverdue           ? "#fef2f2"
+                  : m.isCurrentMonth      ? "#fefce8"
+                  : "#f8fafc",
+                border:`1px solid ${
+                  m.isPaid && m.isFuture ? "#bfdbfe"
+                  : m.isPaid              ? "#bbf7d0"
+                  : m.isOverdue           ? "#fecaca"
+                  : m.isCurrentMonth      ? "#fde047"
+                  : "#e2e8f0"}`,
+                opacity: m.isFuture && !m.isPaid ? 0.7 : 1,
               }}>
                 <div style={{display:"flex",alignItems:"center",gap:7}}>
                   <span style={{fontSize:10,fontWeight:700,color:"#475569",minWidth:28,textTransform:"uppercase"}}>{MOIS_LONG[m.month].slice(0,3)}</span>
                   <span style={{fontSize:10,color:"#94a3b8"}}>{m.year}</span>
-                  <span style={{fontSize:10,fontWeight:600,color:m.isPaid?"#15803d":m.isOverdue?"#dc2626":m.isCurrentMonth?"#a16207":"#94a3b8"}}>
-                    {m.isPaid ? "Payé" : m.isOverdue ? "Retard" : m.isCurrentMonth ? "En cours" : "À venir"}
+                  <span style={{fontSize:10,fontWeight:600,color:
+                    m.isPaid && m.isFuture ? "#0369a1"
+                    : m.isPaid              ? "#15803d"
+                    : m.isOverdue           ? "#dc2626"
+                    : m.isCurrentMonth      ? "#a16207"
+                    : "#94a3b8"
+                  }}>
+                    {m.isPaid && m.isFuture ? "✓ Avance"
+                      : m.isPaid       ? "Payé"
+                      : m.isOverdue    ? "Retard"
+                      : m.isCurrentMonth ? "En cours"
+                      : "À venir"}
                   </span>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{fontSize:12,fontWeight:700,color:m.isPaid?"#15803d":m.isOverdue?"#dc2626":"#0f172a"}}>{fmtEur(m.montant)}</span>
+                  <span style={{fontSize:12,fontWeight:700,color:
+                    m.isPaid && m.isFuture ? "#0369a1"
+                    : m.isPaid    ? "#15803d"
+                    : m.isOverdue ? "#dc2626"
+                    : "#0f172a"
+                  }}>{fmtEur(m.montant)}</span>
                   <button
                     onClick={() => onToggleVersement(m.key, !m.isPaid)}
-                    style={{width:24,height:24,borderRadius:6,border:`1.5px solid ${m.isPaid?"#16a34a":"#cbd5e1"}`,cursor:"pointer",background:m.isPaid?"#16a34a":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"}}>
+                    title={m.isFuture && !m.isPaid ? "Marquer comme payé en avance" : undefined}
+                    style={{
+                      width:24,height:24,borderRadius:6,cursor:"pointer",
+                      border:`1.5px solid ${m.isPaid && m.isFuture ? "#3b82f6" : m.isPaid ? "#16a34a" : "#cbd5e1"}`,
+                      background: m.isPaid && m.isFuture ? "#3b82f6" : m.isPaid ? "#16a34a" : "transparent",
+                      display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"
+                    }}>
                     {m.isPaid
                       ? <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
                       : <div style={{width:7,height:7,borderRadius:4,border:"2px solid #cbd5e1"}}/>
