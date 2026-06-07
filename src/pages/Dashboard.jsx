@@ -79,22 +79,27 @@ function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEdit
 
   const closeMenu = () => { setMenuDay(null); setMenuPos(null); };
 
-  // Ferme le menu desktop au clic extérieur
+  // Ferme le menu desktop au clic extérieur (phase de capture pour attraper avant les enfants)
   useEffect(() => {
     if (!menuDay || isMobile) return;
-    const close = () => closeMenu();
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
+    const close = (e) => {
+      // Ne pas fermer si on clique sur le menu lui-même
+      if (e.target.closest?.("[data-planning-menu]")) return;
+      closeMenu();
+    };
+    // Délai minimal pour éviter que le clic qui a ouvert ne referme immédiatement
+    const t = setTimeout(() => document.addEventListener("click", close, true), 50);
+    return () => { clearTimeout(t); document.removeEventListener("click", close, true); };
   }, [menuDay, isMobile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePlus = (e, ds) => {
+    // Empêche le clic de remonter vers la nav ou d'autres handlers
+    e.preventDefault();
     e.stopPropagation();
     if (menuDay === ds) { closeMenu(); return; }
     if (isMobile) {
-      // Mobile : carrousel intégré en bas du widget
       setMenuDay(ds);
     } else {
-      // Desktop : dropdown fixe
       const rect = e.currentTarget.getBoundingClientRect();
       const menuH = 240;
       const spaceBelow = window.innerHeight - rect.bottom;
@@ -266,10 +271,9 @@ function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEdit
                   );
                 })}
 
-                {/* Bouton + */}
+                {/* Bouton + — onClick uniquement (évite double déclenchement touchstart+mousedown) */}
                 <button
-                  onMouseDown={e=>handlePlus(e,ds)}
-                  onTouchStart={e=>handlePlus(e,ds)}
+                  onClick={e=>handlePlus(e,ds)}
                   style={{
                     width:"100%",minHeight:22,padding:"2px",borderRadius:6,
                     background:menuDay===ds?"#e0f2fe":"transparent",
@@ -289,7 +293,7 @@ function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEdit
 
       {/* ── Carrousel mobile — s'affiche quand un jour est sélectionné ── */}
       {isMobile && menuDay && (
-        <div style={{borderTop:"1px solid #e2e8f0",background:"#f8fafc",animation:"fadeIn .18s ease"}}>
+        <div onClick={e=>e.stopPropagation()} style={{borderTop:"1px solid #e2e8f0",background:"#f8fafc",animation:"fadeIn .18s ease"}}>
           {/* En-tête avec date + fermer */}
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px 4px"}}>
             <span style={{fontSize:11,fontWeight:700,color:"#0891b2"}}>
@@ -340,7 +344,7 @@ function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEdit
 
     {/* ── Menu desktop — dropdown fixe ── */}
     {!isMobile && menuDay && menuPos && (
-      <div onMouseDown={e=>e.stopPropagation()}
+      <div data-planning-menu onClick={e=>e.stopPropagation()}
         style={{
           position:"fixed",top:menuPos.top,left:menuPos.left,
           zIndex:99999,background:"#fff",borderRadius:12,
