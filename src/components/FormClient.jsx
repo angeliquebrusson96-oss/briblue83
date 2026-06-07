@@ -4,6 +4,7 @@ import { DS, MOIS_PAR_MOIS_DEF, MOIS, SAISONS_META } from "../utils/constants";
 import { migrateMois, getMoisVal, getSaison, totalAnnuel, calcMensualites, TODAY } from "../utils/helpers";
 import { useFormDraft, DraftBanner, Modal, PhotoPicker, FmField, FmSectionTitle, FmHeader, FmSteps } from "./ui";
 import { toastWarn } from "../styles";
+import { migrateClientPhotoToStorage } from "../lib/photoStore";
 
 // ─── AUTOCOMPLETE ADRESSE ─────────────────────────────────────────────────────
 // Utilise l'API officielle française (gratuite, sans clé, ~100ms)
@@ -205,6 +206,24 @@ export function FormClient({ initial, clients, onSave, onClose }) {
   const totalC = totalAnnuel(f.moisParMois,"controle");
   const prixCalc = totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0);
 
+  // ── Upload photo IMMÉDIAT dès la sélection ────────────────────────────────────
+  // Lance l'upload vers Firebase Storage pendant que l'utilisateur remplit le reste
+  // du formulaire, sans attendre le save final. Garantit url https:// avant la soumission.
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const handlePhotoChange = useCallback(async (v) => {
+    set("photoPiscine", v);
+    if (!v || v.startsWith("https://")) return;
+    setPhotoUploading(true);
+    try {
+      const migrated = await migrateClientPhotoToStorage({ id: f.id, photoPiscine: v });
+      if (migrated?.photoPiscine?.startsWith("https://")) {
+        set("photoPiscine", migrated.photoPiscine);
+      }
+    } catch { /* garde idb: en fallback */ }
+    finally { setPhotoUploading(false); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [f.id]);
+
   const { hasDraft, restoreDraft, discardDraft, clearDraft } = useFormDraft(
     `briblue_draft_client_${initial?.id||"new"}`, f, setF, null, null,
     () => !!(f.nom?.trim() || f.tel || f.email)
@@ -278,8 +297,15 @@ export function FormClient({ initial, clients, onSave, onClose }) {
                 </FmField>
                 <FmField label="Volume (m³)"><input value={f.volume} onChange={e=>set("volume",+e.target.value)} type="number" placeholder="30"/></FmField>
               </div>
-              <FmSectionTitle icon={<><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></>}>Photo de la piscine</FmSectionTitle>
-              <PhotoPicker value={f.photoPiscine||""} onChange={v=>set("photoPiscine",v)} compact/>
+              <FmSectionTitle icon={<><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></>}>
+                Photo de la piscine
+                {photoUploading && <span style={{marginLeft:8,fontSize:10,fontWeight:600,color:"#0891b2",display:"inline-flex",alignItems:"center",gap:4}}>
+                  <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{animation:"spin .7s linear infinite"}}><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
+                  Envoi en cours…
+                </span>}
+                {f.photoPiscine?.startsWith("https://") && <span style={{marginLeft:8,fontSize:10,fontWeight:700,color:"#059669"}}>✓ Synchronisée</span>}
+              </FmSectionTitle>
+              <PhotoPicker value={f.photoPiscine||""} onChange={handlePhotoChange} compact/>
             </div>
           )}
 
@@ -409,10 +435,15 @@ export function FormClient({ initial, clients, onSave, onClose }) {
                     </div>
                   </button>
                 )}
-                <button className="fm-save-btn" style={{background:f.envoyerContrat?"linear-gradient(135deg,#059669,#34d399)":"linear-gradient(135deg,#7c3aed,#6d28d9)"}} onClick={handleSave}>
-                  {f.envoyerContrat
-                    ? <><svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Créer et envoyer le contrat</>
-                    : <><svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg> Enregistrer le client</>
+                <button className="fm-save-btn"
+                  disabled={photoUploading}
+                  style={{background:photoUploading?"linear-gradient(135deg,#94a3b8,#64748b)":f.envoyerContrat?"linear-gradient(135deg,#059669,#34d399)":"linear-gradient(135deg,#7c3aed,#6d28d9)",cursor:photoUploading?"not-allowed":"pointer"}}
+                  onClick={handleSave}>
+                  {photoUploading
+                    ? <><svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" style={{animation:"spin .7s linear infinite"}}><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> Envoi photo en cours…</>
+                    : f.envoyerContrat
+                      ? <><svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Créer et envoyer le contrat</>
+                      : <><svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg> Enregistrer le client</>
                   }
                 </button>
               </>
