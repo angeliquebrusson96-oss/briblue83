@@ -52,18 +52,23 @@ function LoginScreen({ onLogin }) {
   };
 
   return (
-    <div style={{minHeight:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"max(24px, env(safe-area-inset-top, 24px)) 20px 24px",fontFamily:"'Inter', -apple-system, system-ui, sans-serif",position:"relative",overflow:"hidden"}}>
-      <div className="scale-in" style={{marginBottom:32,display:"flex",flexDirection:"column",alignItems:"center",gap:14,position:"relative"}}>
-        <div style={{width:90,height:90,borderRadius:28,background:"linear-gradient(135deg,#22d3ee 0%, #0891b2 50%, #6366f1 100%)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 20px 50px rgba(6,182,212,0.4), inset 0 2px 0 rgba(255,255,255,0.5)",border:"1px solid rgba(255,255,255,0.3)"}}>{Ico.wave(46,"white")}</div>
+    <div style={{minHeight:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"max(24px, env(safe-area-inset-top, 24px)) 20px 24px",fontFamily:"'Inter', -apple-system, system-ui, sans-serif",background:"#f1f5f9",position:"relative",overflow:"hidden"}}>
+      {/* Bande couleur top */}
+      <div style={{position:"fixed",top:0,left:0,right:0,height:4,background:"linear-gradient(90deg,#0891b2,#06b6d4,#8b5cf6)"}}/>
+      <div className="scale-in" style={{marginBottom:28,display:"flex",flexDirection:"column",alignItems:"center",gap:12,position:"relative"}}>
+        {/* Logo principal — carré arrondi avec triple vague */}
+        <div style={{width:84,height:84,borderRadius:24,background:"linear-gradient(145deg,#0891b2,#0369a1)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 8px 32px rgba(8,145,178,0.35)"}}>
+          {Ico.wave(44,"white")}
+        </div>
         <div style={{textAlign:"center"}}>
-          <div style={{fontWeight:900,fontSize:34,color:DS.dark,letterSpacing:-1.5,background:"linear-gradient(135deg,#0b1220,#0891b2)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text"}}>BRIBLUE</div>
-          <div style={{color:DS.mid,fontSize:12,marginTop:4,fontWeight:600,letterSpacing:0.3}}>Création · Traitement de l'eau · Installation · Dépannage</div>
+          <div style={{fontWeight:900,fontSize:32,color:"#0f172a",letterSpacing:-1.5}}>BRIBLUE</div>
+          <div style={{color:"#64748b",fontSize:11,marginTop:3,fontWeight:500,letterSpacing:0.2}}>Création · Traitement de l'eau · Installation · Dépannage</div>
         </div>
       </div>
-      <div className="fade-in glass-strong" style={{width:"100%",maxWidth:420,borderRadius:DS.radiusLg,padding:32,boxShadow:"0 30px 80px rgba(6,182,212,0.22), 0 10px 30px rgba(15,23,42,0.12), inset 0 1px 0 rgba(255,255,255,0.8)",position:"relative"}}>
-        <div style={{marginBottom:26}}>
-          <div style={{fontWeight:800,fontSize:20,color:DS.dark,letterSpacing:"-0.02em"}}>Connexion </div>
-          <div style={{color:DS.mid,fontSize:13,marginTop:4,fontWeight:500}}>Accès réservé </div>
+      <div className="fade-in" style={{width:"100%",maxWidth:400,borderRadius:18,padding:28,background:"#ffffff",boxShadow:"0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)",border:"1px solid #e2e8f0",position:"relative"}}>
+        <div style={{marginBottom:22}}>
+          <div style={{fontWeight:700,fontSize:18,color:"#0f172a",letterSpacing:"-0.02em"}}>Connexion</div>
+          <div style={{color:"#64748b",fontSize:13,marginTop:3,fontWeight:400}}>Accès réservé</div>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:16}}>
           <div>
@@ -688,54 +693,58 @@ export default function App() {
     <GlobalStyles/>
     <ToastContainer/>
     <ConfirmModal/>
-    <div style={{minHeight:"100dvh",background:"rgba(255,255,255,0.45)",fontFamily:"'Inter', -apple-system, system-ui, sans-serif",maxWidth:isMobile?640:1280,margin:"0 auto",position:"relative",display:"flex",flexDirection:"column",overflowX:"hidden",width:"100%"}}>
-      {/* HEADER — paddingTop englobe la safe area (Dynamic Island / encoche iPhone) */}
-      <div style={{background:"rgba(255,255,255,0.45)",paddingTop:isMobile?"max(10px, env(safe-area-inset-top, 0px))":"10px",paddingBottom:"10px",paddingLeft:isMobile?"14px":"28px",paddingRight:isMobile?"14px":"28px",display:"flex",alignItems:"center",gap:isMobile?8:14,position:"sticky",top:0,zIndex:50,boxShadow:"0 4px 16px rgba(6,182,212,0.15)",width:"100%",boxSizing:"border-box"}}>
-        <button onClick={()=>setPage("dashboard")} style={{background:"rgba(255,255,255,0.45)",border:"none",padding:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",width:isMobile?44:42,height:isMobile?44:42,borderRadius:14,flexShrink:0,boxShadow:DS.nmShadow}}>
-          {Ico.wave(isMobile?22:20,"#0891b2")}
+    <div style={{minHeight:"100dvh",background:"#f1f5f9",fontFamily:"'Inter', -apple-system, system-ui, sans-serif",maxWidth:isMobile?640:1280,margin:"0 auto",position:"relative",display:"flex",flexDirection:"column",overflowX:"hidden",width:"100%"}}>
+      {/* ── BANDE COULEUR TOP (signature BRIBLUE) ── */}
+      <div style={{height:4,background:"linear-gradient(90deg,#0891b2 0%,#06b6d4 45%,#8b5cf6 100%)",flexShrink:0,position:"sticky",top:0,zIndex:51}}/>
+      {/* HEADER */}
+      <div style={{background:"#ffffff",paddingTop:isMobile?"max(10px, env(safe-area-inset-top, 0px))":"10px",paddingBottom:"10px",paddingLeft:isMobile?"14px":"28px",paddingRight:isMobile?"14px":"28px",display:"flex",alignItems:"center",gap:isMobile?8:12,position:"sticky",top:4,zIndex:50,borderBottom:"1px solid #e2e8f0",width:"100%",boxSizing:"border-box"}}>
+        {/* Logo */}
+        <button onClick={()=>setPage("dashboard")} style={{background:"linear-gradient(135deg,#0891b2,#0369a1)",border:"none",padding:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",width:isMobile?40:38,height:isMobile?40:38,borderRadius:12,flexShrink:0,boxShadow:"0 2px 8px rgba(8,145,178,0.35)"}}>
+          {Ico.wave(isMobile?20:18,"white")}
         </button>
-        <div style={{width:9,height:9,borderRadius:"50%",background:online?"#34d399":"#f87171",boxShadow:online?"0 0 0 3px rgba(52,211,153,0.25)":"0 0 0 3px rgba(248,113,113,0.25)",flexShrink:0}}/>
+        {/* Indicateur online */}
+        <div style={{width:8,height:8,borderRadius:"50%",background:online?"#22c55e":"#f87171",boxShadow:online?"0 0 0 2px rgba(34,197,94,0.2)":"0 0 0 2px rgba(248,113,113,0.2)",flexShrink:0}}/>
         <div style={{flex:1}}/>
         {/* ── BOUTONS D'ACTION RAPIDE ── */}
-        <div style={{display:"flex",gap:isMobile?5:8,alignItems:"center",flexShrink:0}}>
+        <div style={{display:"flex",gap:isMobile?4:6,alignItems:"center",flexShrink:0}}>
 
           {/* Stock */}
           <button onClick={()=>setShowStock(true)} title="Stock produits"
-            style={{position:"relative",display:"flex",alignItems:"center",gap:isMobile?0:5,
+            style={{position:"relative",display:"flex",alignItems:"center",gap:5,
               justifyContent:"center",
-              padding:isMobile?"0":"0 12px",
-              width:isMobile?38:undefined,
-              height:38,borderRadius:19,
-              background:"rgba(5,150,105,0.1)",border:"1.5px solid rgba(5,150,105,0.28)",
+              padding:isMobile?"0":"0 11px",
+              width:isMobile?36:undefined,
+              height:36,borderRadius:10,
+              background:"#f0fdf4",border:"1px solid #bbf7d0",
               cursor:"pointer",flexShrink:0,fontFamily:"inherit",
-              WebkitTapHighlightColor:"transparent"}}>
-            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8V21H3V8"/><path d="M23 3H1v5h22V3z"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-            {!isMobile&&<span style={{fontSize:12,fontWeight:800,color:"#059669"}}>Stock</span>}
-            {nbStockBas>0&&<span style={{position:"absolute",top:-5,right:-5,minWidth:15,height:15,borderRadius:8,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px"}}>{nbStockBas}</span>}
+              WebkitTapHighlightColor:"transparent",transition:"all .15s"}}>
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8V21H3V8"/><path d="M23 3H1v5h22V3z"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+            {!isMobile&&<span style={{fontSize:11,fontWeight:700,color:"#059669"}}>Stock</span>}
+            {nbStockBas>0&&<span style={{position:"absolute",top:-4,right:-4,minWidth:14,height:14,borderRadius:7,background:"#ef4444",color:"#fff",fontSize:8,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px"}}>{nbStockBas}</span>}
           </button>
 
           {/* Livraison */}
           <button onClick={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} title="Nouvelle livraison"
-            style={{display:"flex",alignItems:"center",gap:isMobile?0:5,
+            style={{display:"flex",alignItems:"center",gap:5,
               justifyContent:"center",
-              padding:isMobile?"0":"0 12px",
-              width:isMobile?38:undefined,
-              height:38,borderRadius:19,
-              background:"rgba(217,119,6,0.1)",border:"1.5px solid rgba(217,119,6,0.28)",
+              padding:isMobile?"0":"0 11px",
+              width:isMobile?36:undefined,
+              height:36,borderRadius:10,
+              background:"#fff7ed",border:"1px solid #fed7aa",
               cursor:"pointer",flexShrink:0,fontFamily:"inherit",
-              WebkitTapHighlightColor:"transparent"}}>
-            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 4v4h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-            {!isMobile&&<span style={{fontSize:12,fontWeight:800,color:"#d97706"}}>Livraison</span>}
+              WebkitTapHighlightColor:"transparent",transition:"all .15s"}}>
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 4v4h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            {!isMobile&&<span style={{fontSize:11,fontWeight:700,color:"#f97316"}}>Livraison</span>}
           </button>
 
           {/* Nouveau client — desktop uniquement dans le header */}
           {!isMobile&&(
             <button onClick={openAddClient} title="Nouveau client"
-              style={{display:"flex",alignItems:"center",gap:5,padding:"0 12px",height:38,borderRadius:19,
-                background:"rgba(124,58,237,0.1)",border:"1.5px solid rgba(124,58,237,0.28)",
-                cursor:"pointer",flexShrink:0,WebkitTapHighlightColor:"transparent"}}>
-              <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="3" x2="19" y2="9"/><line x1="16" y1="6" x2="22" y2="6"/></svg>
-              <span style={{fontSize:12,fontWeight:800,color:"#7c3aed"}}>Client</span>
+              style={{display:"flex",alignItems:"center",gap:5,padding:"0 11px",height:36,borderRadius:10,
+                background:"#f5f3ff",border:"1px solid #ddd6fe",
+                cursor:"pointer",flexShrink:0,WebkitTapHighlightColor:"transparent",transition:"all .15s"}}>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="3" x2="19" y2="9"/><line x1="16" y1="6" x2="22" y2="6"/></svg>
+              <span style={{fontSize:11,fontWeight:700,color:"#7c3aed"}}>Client</span>
             </button>
           )}
 
@@ -744,23 +753,23 @@ export default function App() {
             style={{display:"flex",alignItems:"center",gap:isMobile?0:6,
               justifyContent:"center",
               padding:isMobile?"0":"0 14px",
-              width:isMobile?42:undefined,
-              height:38,borderRadius:19,
-              background:"linear-gradient(135deg,#0891b2,#06b6d4)",border:"none",
+              width:isMobile?40:undefined,
+              height:36,borderRadius:10,
+              background:"linear-gradient(135deg,#0891b2,#0369a1)",border:"none",
               cursor:"pointer",flexShrink:0,fontFamily:"inherit",
               WebkitTapHighlightColor:"transparent",
-              boxShadow:"0 4px 14px rgba(8,145,178,0.4)"}}>
-            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
-            {!isMobile&&<span style={{fontSize:12,fontWeight:900,color:"#fff"}}>Rapport</span>}
+              boxShadow:"0 2px 8px rgba(8,145,178,0.35)",transition:"all .15s"}}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+            {!isMobile&&<span style={{fontSize:11,fontWeight:800,color:"#fff"}}>Rapport</span>}
           </button>
 
           {/* Déconnexion */}
           <button onClick={handleLogout} title="Déconnexion"
-            style={{width:38,height:38,borderRadius:19,
-              background:"rgba(190,18,60,0.08)",border:"1.5px solid rgba(190,18,60,0.22)",
+            style={{width:36,height:36,borderRadius:10,
+              background:"#fff1f2",border:"1px solid #fecdd3",
               cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
-              flexShrink:0,WebkitTapHighlightColor:"transparent"}}>
-            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#be123c" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              flexShrink:0,WebkitTapHighlightColor:"transparent",transition:"all .15s"}}>
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#be123c" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           </button>
         </div>
       </div>
@@ -768,8 +777,8 @@ export default function App() {
       {/* LAYOUT PRINCIPAL */}
       {isMobile ? (
         <>
-          {page!=="dashboard"&&(<div style={{padding:"16px 16px 4px"}}><h2 style={{margin:0,fontSize:22,fontWeight:900,color:DS.dark,letterSpacing:-0.5}}>{PAGE_LABELS[page]}</h2></div>)}
-          <div style={{padding:"6px 16px calc(90px + env(safe-area-inset-bottom,0px))",overflowX:"hidden"}}>
+          {page!=="dashboard"&&(<div style={{padding:"16px 16px 4px"}}><h2 style={{margin:0,fontSize:21,fontWeight:800,color:"#0f172a",letterSpacing:-0.5}}>{PAGE_LABELS[page]}</h2></div>)}
+          <div style={{padding:"6px 14px calc(80px + env(safe-area-inset-bottom,0px))",overflowX:"hidden"}}>
             {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} notes={notes} onNotesChange={n=>{setNotes(n);saveNotes(n);}}/>}
             {page==="clients"&&<PageClients clients={clients} passages={passages} contrats={contrats} versements={versements} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onToggleVersement={handleToggleVersement} onClientClick={setFicheClient} onAdd={openAddClient}/>}
             {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddClient={openAddClient} onValider={validerPassage} onChangeStatut={updateStatutPassage}/>}
@@ -779,34 +788,34 @@ export default function App() {
         </>
       ) : (
         <div style={{display:"flex",flex:1,minHeight:0}}>
-          <div style={{width:220,flexShrink:0,background:"rgba(255,255,255,0.45)",borderRight:"1px solid "+DS.border,display:"flex",flexDirection:"column",padding:"24px 12px",gap:4,position:"sticky",top:62,height:"calc(100vh - 62px)",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
-            <div style={{padding:"12px 14px",borderRadius:16,background:"rgba(255,255,255,0.45)",boxShadow:DS.nmShadowSm,marginBottom:16}}>
-              <div style={{fontSize:9,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Aperçu</div>
-              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          <div style={{width:220,flexShrink:0,background:"#ffffff",borderRight:"1px solid #e2e8f0",display:"flex",flexDirection:"column",padding:"20px 10px",gap:2,position:"sticky",top:48,height:"calc(100vh - 48px)",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+            <div style={{padding:"10px 12px",borderRadius:12,background:"#f8fafc",border:"1px solid #e2e8f0",marginBottom:14}}>
+              <div style={{fontSize:9,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>Aperçu</div>
+              <div style={{display:"flex",flexDirection:"column",gap:5}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:11,color:DS.mid}}>Clients</span><span style={{fontSize:13,fontWeight:800,color:DS.dark}}>{clients.length}</span></div>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:11,color:DS.mid}}>Ce mois</span><span style={{fontSize:13,fontWeight:800,color:DS.blue}}>{passages.filter(p=>new Date(p.date).getMonth()+1===MOIS_NOW&&new Date(p.date).getFullYear()===YEAR_NOW).length} pass.</span></div>
                 {nbAlertes>0&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:11,color:DS.mid}}>Alertes</span><span style={{fontSize:13,fontWeight:800,color:"#ef4444"}}>{nbAlertes}</span></div>}
               </div>
             </div>
             {NAV.map(n=>(
-              <button key={n.id} onClick={()=>setPage(n.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",borderRadius:14,border:"none",cursor:"pointer",background:page===n.id?"#eef2f7":"transparent",textAlign:"left",fontFamily:"inherit",transition:"all .2s",width:"100%",boxShadow:page===n.id?DS.nmShadowSm:"none"}}>
+              <button key={n.id} onClick={()=>setPage(n.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:10,border:"none",cursor:"pointer",background:page===n.id?"#e0f2fe":"transparent",textAlign:"left",fontFamily:"inherit",transition:"background .15s",width:"100%"}}>
                 {n.icon(page===n.id)}
-                <span style={{fontSize:13,fontWeight:page===n.id?700:500,color:page===n.id?DS.blue:DS.mid}}>{n.l}</span>
-                {page===n.id&&<div style={{marginLeft:"auto",width:4,height:16,borderRadius:2,background:DS.blue}}/>}
+                <span style={{fontSize:13,fontWeight:page===n.id?700:500,color:page===n.id?DS.blue:"#475569"}}>{n.l}</span>
+                {page===n.id&&<div style={{marginLeft:"auto",width:3,height:14,borderRadius:2,background:DS.blue}}/>}
               </button>
             ))}
-            <div style={{marginTop:"auto",display:"flex",flexDirection:"column",gap:8,paddingTop:16,borderTop:"1px solid "+DS.border}}>
-              <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",borderRadius:14,border:"none",background:"rgba(255,255,255,0.45)",cursor:"pointer",fontFamily:"inherit",width:"100%",boxShadow:DS.nmShadowSm}}>
-                {Ico.clipboard(14,DS.blue)}<span style={{fontSize:12,fontWeight:600,color:DS.mid}}>Nouveau passage</span>
+            <div style={{marginTop:"auto",display:"flex",flexDirection:"column",gap:6,paddingTop:14,borderTop:"1px solid #e2e8f0"}}>
+              <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",borderRadius:10,border:"1px solid #e2e8f0",background:"#f8fafc",cursor:"pointer",fontFamily:"inherit",width:"100%"}}>
+                {Ico.clipboard(13,DS.blue)}<span style={{fontSize:12,fontWeight:600,color:"#475569"}}>Nouveau passage</span>
               </button>
-              <button onClick={openAddClient} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",borderRadius:14,border:"none",background:"rgba(255,255,255,0.45)",cursor:"pointer",fontFamily:"inherit",width:"100%",boxShadow:DS.nmShadowSm}}>
-                {Ico.userPlus(14,DS.purple)}<span style={{fontSize:12,fontWeight:600,color:DS.purple}}>Nouveau client</span>
+              <button onClick={openAddClient} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",borderRadius:10,border:"1px solid #e2e8f0",background:"#f8fafc",cursor:"pointer",fontFamily:"inherit",width:"100%"}}>
+                {Ico.userPlus(13,DS.purple)}<span style={{fontSize:12,fontWeight:600,color:DS.purple}}>Nouveau client</span>
               </button>
             </div>
           </div>
           <div style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",minWidth:0}}>
-            <div style={{padding:"20px 32px 80px",maxWidth:860,margin:"0 auto"}}>
-              {page!=="dashboard"&&(<div style={{marginBottom:16}}><h2 style={{margin:0,fontSize:26,fontWeight:900,color:DS.dark,letterSpacing:-0.5}}>{PAGE_LABELS[page]}</h2></div>)}
+            <div style={{padding:"20px 28px 80px",maxWidth:860,margin:"0 auto"}}>
+              {page!=="dashboard"&&(<div style={{marginBottom:16}}><h2 style={{margin:0,fontSize:24,fontWeight:800,color:"#0f172a",letterSpacing:-0.5}}>{PAGE_LABELS[page]}</h2></div>)}
               {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} notes={notes} onNotesChange={n=>{setNotes(n);saveNotes(n);}}/>}
               {page==="clients"&&<PageClients clients={clients} passages={passages} contrats={contrats} versements={versements} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onToggleVersement={handleToggleVersement} onClientClick={setFicheClient} onAdd={openAddClient}/>}
               {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddClient={openAddClient} onValider={validerPassage} onChangeStatut={updateStatutPassage}/>}
@@ -828,19 +837,17 @@ export default function App() {
             .nav-pill-active{animation:navSlideIn .28s cubic-bezier(.22,1,.36,1) forwards}
             .nav-bubble{animation:navBubble .32s cubic-bezier(.34,1.56,.64,1) forwards}
           `}</style>
-          <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:640,background:"rgba(228,237,246,0.96)",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",display:"flex",alignItems:"flex-end",borderTopLeftRadius:22,borderTopRightRadius:22,boxShadow:"0 -2px 0 rgba(255,255,255,0.8), 0 -16px 40px rgba(100,160,200,0.25)",zIndex:50,paddingBottom:"env(safe-area-inset-bottom,0px)",borderTop:"1.5px solid rgba(255,255,255,0.85)",overflow:"hidden"}}>
-            <div style={{position:"absolute",top:0,left:0,right:0,height:1,background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.9),transparent)",pointerEvents:"none"}}/>
+          <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:640,background:"#ffffff",display:"flex",alignItems:"flex-end",zIndex:50,paddingBottom:"env(safe-area-inset-bottom,0px)",borderTop:"1px solid #e2e8f0"}}>
             {NAV.map(n=>{
               const active = page===n.id;
               const accentColor = n.id==="rdv" ? "#818cf8" : DS.blue;
               const gradFrom = n.id==="rdv" ? "#818cf8" : "#06b6d4";
               const gradTo = n.id==="rdv" ? "#4f46e5" : "#0891b2";
               return (
-                <button key={n.id} onClick={()=>setPage(n.id)} style={{flex:1,paddingTop:8,paddingBottom:14,border:"none",cursor:"pointer",background:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:2,WebkitTapHighlightColor:"transparent",outline:"none",position:"relative",minWidth:0}}>
-                  {active && <div className="nav-pill-active" style={{position:"absolute",top:0,left:"50%",width:28,height:3,background:`linear-gradient(90deg,${gradFrom},${gradTo})`,borderRadius:"0 0 8px 8px",boxShadow:`0 2px 10px ${accentColor}99`}}/>}
-                  {active && <div className="nav-bubble" style={{position:"absolute",top:5,left:"50%",width:50,height:38,borderRadius:14,background:`linear-gradient(150deg,${accentColor}28,${accentColor}12)`,pointerEvents:"none"}}/>}
-                  <div key={active?"a":"i"} className={active?"nav-icon-active":""} style={{width:44,height:32,display:"flex",alignItems:"center",justifyContent:"center",position:"relative",zIndex:1,filter:active?`drop-shadow(0 3px 8px ${accentColor}80)`:"none",transition:"filter .25s"}}>{n.icon(active)}</div>
-                  <span style={{fontSize:active?10:9,fontWeight:active?800:500,color:active?accentColor:"#96afc0",letterSpacing:active?.3:.1,transition:"all .2s",lineHeight:1,position:"relative",zIndex:1}}>{n.l}</span>
+                <button key={n.id} onClick={()=>setPage(n.id)} style={{flex:1,paddingTop:8,paddingBottom:12,border:"none",cursor:"pointer",background:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:2,WebkitTapHighlightColor:"transparent",outline:"none",position:"relative",minWidth:0}}>
+                  {active && <div className="nav-pill-active" style={{position:"absolute",top:0,left:"50%",width:32,height:3,background:`linear-gradient(90deg,${gradFrom},${gradTo})`,borderRadius:"0 0 6px 6px"}}/>}
+                  <div style={{width:40,height:28,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:8,background:active?"#e0f2fe":"transparent",transition:"background .15s"}}>{n.icon(active)}</div>
+                  <span style={{fontSize:10,fontWeight:active?700:400,color:active?accentColor:"#94a3b8",transition:"all .15s",lineHeight:1}}>{n.l}</span>
                 </button>
               );
             })}

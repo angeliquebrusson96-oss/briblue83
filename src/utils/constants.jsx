@@ -6,18 +6,19 @@ export const BRAND_LOGO = `data:image/svg+xml;utf8,${encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" width="420" height="96" viewBox="0 0 420 96">
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#0ea5e9"/>
-      <stop offset="100%" stop-color="#0891b2"/>
+      <stop offset="0%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#0369a1"/>
     </linearGradient>
   </defs>
-  <rect width="420" height="96" rx="22" fill="white"/>
-  <g transform="translate(18 18)">
-    <rect width="60" height="60" rx="18" fill="url(#g)"/>
-    <path d="M10 24c5 6 10 6 15 0s10-6 15 0 10 6 15 0" fill="none" stroke="white" stroke-width="4" stroke-linecap="round"/>
-    <path d="M10 38c5 6 10 6 15 0s10-6 15 0 10 6 15 0" fill="none" stroke="white" stroke-width="4" stroke-linecap="round"/>
+  <rect width="420" height="96" rx="16" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+  <g transform="translate(16 16)">
+    <rect width="64" height="64" rx="16" fill="url(#g)"/>
+    <path d="M8 46c4 5 8 5 12 0s8-5 12 0 8 5 12 0 8 5 12 0" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M10 33c4 4 8 4 12 0s8-4 12 0 8 4 12 0" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-opacity="0.7"/>
+    <path d="M16 21c3 3 6 3 9 0s6-3 9 0 5 3 8 0" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-opacity="0.45"/>
   </g>
-  <text x="94" y="42" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="800" fill="#0c1222">BRIBLUE</text>
-  <text x="94" y="66" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="600" fill="#0891b2">Création - Traitement de l&apos;eau - Installation - Dépannage</text>
+  <text x="96" y="40" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="900" fill="#0f172a" letter-spacing="-0.5">BRIBLUE</text>
+  <text x="96" y="64" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="500" fill="#64748b">Création · Traitement de l&apos;eau · Installation · Dépannage</text>
 </svg>`)}`;
 
 export const LOGO_FICHE = "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%224%22%20y%3D%223%22%20width%3D%2216%22%20height%3D%2218%22%20rx%3D%222%22/%3E%3Cpolyline%20points%3D%2216%203%2016%207%2020%207%22/%3E%3Cpath%20d%3D%22M8%209l1%201%202-2%22/%3E%3Cline%20x1%3D%2213%22%20y1%3D%2210%22%20x2%3D%2217%22%20y2%3D%2210%22/%3E%3Cpath%20d%3D%22M8%2014l1%201%202-2%22/%3E%3Cline%20x1%3D%2213%22%20y1%3D%2215%22%20x2%3D%2217%22%20y2%3D%2215%22/%3E%3C/svg%3E";
@@ -74,7 +75,14 @@ export const Ico = {
   flower: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2a3 3 0 000 6M12 16a3 3 0 000 6M2 12a3 3 0 006 0M16 12a3 3 0 006 0M4.93 4.93a3 3 0 004.24 4.24M14.83 14.83a3 3 0 004.24 4.24M4.93 19.07a3 3 0 004.24-4.24M14.83 9.17a3 3 0 004.24-4.24"/></svg>,
   sun: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>,
   leaf: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round"><path d="M11 20A7 7 0 014 13c0-7 7-11 7-11s7 4 7 11a7 7 0 01-7 7z"/><line x1="11" y1="20" x2="11" y2="13"/></svg>,
-  wave: (s=28,c="white") => <svg width={s} height={s} viewBox="0 0 32 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round"><path d="M2 8c2.5 3 5 3 7.5 0S14 5 16.5 8s5 3 7.5 0"/><path d="M2 16c2.5 3 5 3 7.5 0S14 13 16.5 16s5 3 7.5 0"/></svg>,
+  // ── Logo BRIBLUE — triple vague avec perspective (eau → horizon) ──────────────
+  wave: (s=28,c="white") => (
+    <svg width={s} height={s} viewBox="0 0 32 28" fill="none" stroke={c} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 22c3.5 4.5 7 4.5 10.5 0S18 17.5 21.5 22 28 26.5 31 22" strokeWidth="3.2" strokeOpacity="1"/>
+      <path d="M3 14c3 3.5 6 3.5 9 0s6-3.5 9 0 5 3.5 8 0" strokeWidth="2.2" strokeOpacity="0.68"/>
+      <path d="M7 7c2.5 2.5 5 2.5 7.5 0s5-2.5 7.5 0" strokeWidth="1.6" strokeOpacity="0.4"/>
+    </svg>
+  ),
   cart: (s=20,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 001.95-1.57l1.65-8.42H6"/></svg>,
   truck: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 4v4h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>,
   camera: (s=18,c="currentColor") => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>,
@@ -124,28 +132,28 @@ export const STATUT_LIV = {
 // ─── DESIGN SYSTEM ────────────────────────────────────────────────────────────
 export const DS = {
   blue:       "#0891b2",
-  blueSoft:   "rgba(8,145,178,0.1)",
+  blueSoft:   "rgba(8,145,178,0.09)",
   teal:       "#0e7490",
-  tealSoft:   "rgba(14,116,144,0.1)",
+  tealSoft:   "rgba(14,116,144,0.09)",
   green:      "#059669",
-  greenSoft:  "rgba(5,150,105,0.12)",
+  greenSoft:  "rgba(5,150,105,0.1)",
   red:        "#e11d48",
-  redSoft:    "rgba(225,29,72,0.09)",
-  orange:     "#f59e0b",
-  orangeSoft: "rgba(245,158,11,0.1)",
+  redSoft:    "rgba(225,29,72,0.08)",
+  orange:     "#f97316",
+  orangeSoft: "rgba(249,115,22,0.09)",
   purple:     "#7c3aed",
-  purpleSoft: "rgba(124,58,237,0.1)",
-  dark:       "#0b1220",
+  purpleSoft: "rgba(124,58,237,0.09)",
+  dark:       "#0f172a",
   mid:        "#64748b",
-  light:      "rgba(255,255,255,0.45)",
+  light:      "#f1f5f9",
   white:      "#fff",
-  border:     "rgba(6,182,212,0.18)",
-  glass:      "rgba(255,255,255,0.55)",
+  border:     "#e2e8f0",
+  glass:      "#ffffff",
   radius:     16,
   radiusSm:   12,
-  radiusLg:   22,
-  nmShadow:   "6px 6px 14px rgba(6,182,212,0.18), -4px -4px 10px rgba(255,255,255,0.75)",
-  nmShadowSm: "3px 3px 8px rgba(6,182,212,0.14), -2px -2px 6px rgba(255,255,255,0.7)",
+  radiusLg:   20,
+  nmShadow:   "0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.05)",
+  nmShadowSm: "0 1px 2px rgba(0,0,0,0.05), 0 2px 8px rgba(0,0,0,0.04)",
 };
 
 export const AC = {

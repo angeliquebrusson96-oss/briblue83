@@ -258,10 +258,10 @@ export function PageClients({ clients, passages, contrats={}, onUpdateContrat, o
           const active = filterStat === f.key;
           return (
             <button key={f.key} onClick={()=>setFilterStat(active && f.key!=="all" ? "all" : f.key)}
-              style={{flexShrink:0,display:"flex",alignItems:"center",gap:8,padding:"10px 16px",borderRadius:16,border:"none",cursor:"pointer",fontFamily:"inherit",transition:"all .2s",WebkitTapHighlightColor:"transparent",
-                background:active ? f.grad : "rgba(255,255,255,0.55)",
-                boxShadow:active ? "0 4px 16px rgba(0,0,0,0.2)" : "0 1px 4px rgba(0,0,0,0.06)",
-                transform:active?"scale(1.04)":"scale(1)",
+              style={{flexShrink:0,display:"flex",alignItems:"center",gap:8,padding:"10px 16px",borderRadius:14,border:active?"none":"1px solid #e2e8f0",cursor:"pointer",fontFamily:"inherit",transition:"all .18s",WebkitTapHighlightColor:"transparent",
+                background:active ? f.grad : "#ffffff",
+                boxShadow:active ? "0 4px 12px rgba(0,0,0,0.15)" : "0 1px 3px rgba(0,0,0,0.05)",
+                transform:active?"scale(1.03)":"scale(1)",
               }}>
               <span style={{fontSize:16,lineHeight:1}}>{f.icon}</span>
               <div style={{textAlign:"left"}}>
@@ -280,7 +280,7 @@ export function PageClients({ clients, passages, contrats={}, onUpdateContrat, o
             {Ico.search(16,"#94a3b8")}
           </div>
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher un client…"
-            style={{width:"100%",padding:"13px 16px 13px 44px",borderRadius:16,border:"1.5px solid rgba(8,145,178,0.15)",fontSize:14,outline:"none",boxSizing:"border-box",background:"rgba(255,255,255,0.8)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",color:DS.dark,fontFamily:"inherit",boxShadow:"0 2px 12px rgba(8,145,178,0.08)",transition:"border .2s"}}/>
+            style={{width:"100%",padding:"12px 16px 12px 44px",borderRadius:12,border:"1.5px solid #e2e8f0",fontSize:14,outline:"none",boxSizing:"border-box",background:"#ffffff",color:"#0f172a",fontFamily:"inherit",transition:"border .15s",boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}}/>
           {search&&<button onClick={()=>setSearch("")} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"#94a3b8",fontSize:18,lineHeight:1,padding:4}}>×</button>}
         </div>
         <button onClick={onAdd}
@@ -329,13 +329,13 @@ export function PageClients({ clients, passages, contrats={}, onUpdateContrat, o
 
           return (
             <div key={c.id} onClick={()=>onClientClick(c)} className="fade-in"
-              style={{animationDelay:`${idx*0.04}s`,borderRadius:20,overflow:isOpen?"visible":"hidden",
-                boxShadow:"0 4px 24px rgba(0,0,0,0.09)",border:"1px solid rgba(255,255,255,0.8)",
+              style={{animationDelay:`${idx*0.04}s`,borderRadius:16,overflow:isOpen?"visible":"hidden",
+                boxShadow:"0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.05)",border:"1px solid #e2e8f0",
                 cursor:"pointer",display:"flex",flexDirection:"column",position:"relative",
                 zIndex:isOpen?999:1,background:"#fff",transition:"box-shadow .2s, transform .15s",
               }}
-              onMouseEnter={e=>{ if(!isMobile){e.currentTarget.style.boxShadow="0 8px 32px rgba(8,145,178,0.18)";e.currentTarget.style.transform="translateY(-2px)";} }}
-              onMouseLeave={e=>{ if(!isMobile){e.currentTarget.style.boxShadow="0 4px 24px rgba(0,0,0,0.09)";e.currentTarget.style.transform="translateY(0)";} }}>
+              onMouseEnter={e=>{ if(!isMobile){e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.1)";e.currentTarget.style.transform="translateY(-2px)";} }}
+              onMouseLeave={e=>{ if(!isMobile){e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.05)";e.currentTarget.style.transform="translateY(0)";} }}>
 
               {/* ── HEADER : photo ou dégradé ── */}
               <div style={{height:110,position:"relative",flexShrink:0,overflow:"hidden",borderRadius:"20px 20px 0 0"}}>
