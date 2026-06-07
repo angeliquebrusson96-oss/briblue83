@@ -783,7 +783,7 @@ export function DashboardHero({ clients, passages, rdvs, saisonNow, isMobile, on
               {salut} Dorian 👋
             </div>
             <div style={{fontSize:12,color:"rgba(255,255,255,0.6)",marginTop:3,fontWeight:400}}>
-              {rdvsToday.length > 0 ? `${rdvsToday.length} rendez-vous aujourd'hui` : "Que cette journée se passe comme tu le souhaites !"}
+              {rdvsToday.length > 0 ? `${rdvsToday.length} rendez-vous aujourd'hui` : "L'application pour reposer son esprit."}
             </div>
           </div>
 
