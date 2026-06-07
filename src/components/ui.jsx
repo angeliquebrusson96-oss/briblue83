@@ -526,13 +526,13 @@ export function PhotoPicker({ label, value, onChange, compact }) {
     const img = new Image();
     img.onload = async () => {
       URL.revokeObjectURL(objectUrl);
-      const MAX = 1024;
+      const MAX = 1600;
       const scale = Math.min(1, MAX / Math.max(img.width, img.height));
       const canvas = document.createElement("canvas");
       canvas.width = Math.round(img.width * scale);
       canvas.height = Math.round(img.height * scale);
       canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.78);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.88);
       // Sauvegarder dans IDB tout de suite → le draft ne stockera qu'une clé "idb:tmp_..."
       // au lieu du data: brut (qui fait exploser le quota localStorage)
       try {

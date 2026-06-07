@@ -306,7 +306,7 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
             <div style={{position:"absolute",left:-20,bottom:-30,width:130,height:130,borderRadius:"50%",background:"rgba(255,255,255,0.05)",pointerEvents:"none"}}/>
           </div>
           {client.photoPiscine && (
-            <PhotoImg src={client.photoPiscine} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+            <PhotoImg src={client.photoPiscine} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain",display:"block",background:"rgba(0,0,0,0.55)"}}/>
           )}
 
           {/* Dégradé de bas vers le haut (overlay) */}

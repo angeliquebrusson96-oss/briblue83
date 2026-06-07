@@ -341,7 +341,7 @@ export function PageClients({ clients, passages, contrats={}, onUpdateContrat, o
               <div style={{height:110,position:"relative",flexShrink:0,overflow:"hidden",borderRadius:"20px 20px 0 0"}}>
                 {c.photoPiscine
                   ? <>
-                      <PhotoImg src={c.photoPiscine} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+                      <PhotoImg src={c.photoPiscine} alt="" style={{width:"100%",height:"100%",objectFit:"contain",display:"block",background:"rgba(0,0,0,0.6)"}}/>
                       <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,rgba(0,0,0,0.08) 0%,rgba(0,0,0,0.55) 100%)"}}/>
                     </>
                   : <div style={{width:"100%",height:"100%",background:avatarGrad(c.nom),display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>

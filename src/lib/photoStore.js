@@ -263,14 +263,14 @@ export async function extractPassagePhotos(passage) {
   return p;
 }
 
-// ─── COMPRESSION AVANT UPLOAD (900 px, 72 % — optimisé réseau mobile) ───────
+// ─── COMPRESSION AVANT UPLOAD (1200 px, 88 % — bonne qualité) ──────────────
 function compressForUpload(dataUrl) {
   return new Promise(resolve => {
     if (!dataUrl?.startsWith("data:image/")) { resolve(dataUrl); return; }
     const img = new Image();
     img.onerror = () => resolve(dataUrl);
     img.onload = () => {
-      const MAX = 900;
+      const MAX = 1200;
       let { width, height } = img;
       if (width > MAX || height > MAX) {
         if (width >= height) { height = Math.round(height * MAX / width); width = MAX; }
@@ -279,7 +279,7 @@ function compressForUpload(dataUrl) {
       const c = document.createElement("canvas");
       c.width = width; c.height = height;
       c.getContext("2d").drawImage(img, 0, 0, width, height);
-      try { resolve(c.toDataURL("image/jpeg", 0.72)); } catch { resolve(dataUrl); }
+      try { resolve(c.toDataURL("image/jpeg", 0.88)); } catch { resolve(dataUrl); }
     };
     img.src = dataUrl;
   });
