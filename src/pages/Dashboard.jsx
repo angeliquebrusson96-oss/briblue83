@@ -62,9 +62,19 @@ const SAISON_THEMES = {
 // ─────────────────────────────────────────────────────────────────────────────
 // PLANNING HEBDOMADAIRE
 // ─────────────────────────────────────────────────────────────────────────────
-function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onEditRdv, onClientClick, isMobile }) {
+function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEditRdv, onClientClick, isMobile }) {
   const [weekOffset, setWeekOffset] = useState(0);
+  const [menuDay, setMenuDay] = useState(null); // date string du jour dont le menu est ouvert
   const scrollRef = useRef(null);
+
+  // Ferme le menu au clic extérieur
+  useEffect(() => {
+    if (!menuDay) return;
+    const close = () => setMenuDay(null);
+    document.addEventListener("mousedown", close);
+    document.addEventListener("touchstart", close);
+    return () => { document.removeEventListener("mousedown", close); document.removeEventListener("touchstart", close); };
+  }, [menuDay]);
 
   // Lundi de la semaine courante + décalage
   const getMonday = (offset) => {
@@ -221,18 +231,58 @@ function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onEditRdv, onClientC
                   );
                 })}
 
-                {/* Bouton + */}
-                <button
-                  onClick={()=> onAddRdv && onAddRdv({ date:ds })}
-                  style={{
-                    width:"100%",minHeight:22,padding:"2px",borderRadius:6,
-                    background:"transparent",border:"1.5px dashed #e2e8f0",
-                    cursor:"pointer",color:"#d1d5db",fontSize:15,fontWeight:700,
-                    display:"flex",alignItems:"center",justifyContent:"center",
-                    fontFamily:"inherit",lineHeight:1,transition:"all .15s",
-                  }}>
-                  +
-                </button>
+                {/* Bouton + avec menu type */}
+                <div style={{position:"relative"}}>
+                  <button
+                    onMouseDown={e=>{ e.stopPropagation(); setMenuDay(menuDay===ds?null:ds); }}
+                    onTouchStart={e=>{ e.stopPropagation(); setMenuDay(menuDay===ds?null:ds); }}
+                    style={{
+                      width:"100%",minHeight:22,padding:"2px",borderRadius:6,
+                      background:menuDay===ds?"#e0f2fe":"transparent",
+                      border:`1.5px dashed ${menuDay===ds?"#0891b2":"#e2e8f0"}`,
+                      cursor:"pointer",color:menuDay===ds?"#0891b2":"#d1d5db",
+                      fontSize:15,fontWeight:700,
+                      display:"flex",alignItems:"center",justifyContent:"center",
+                      fontFamily:"inherit",lineHeight:1,transition:"all .15s",
+                    }}>
+                    +
+                  </button>
+
+                  {menuDay === ds && (
+                    <div onMouseDown={e=>e.stopPropagation()} onTouchStart={e=>e.stopPropagation()}
+                      style={{
+                        position:"absolute",bottom:"calc(100% + 4px)",left:0,right:0,
+                        zIndex:500,background:"#fff",borderRadius:10,
+                        boxShadow:"0 8px 24px rgba(0,0,0,0.15)",
+                        border:"1px solid #e2e8f0",overflow:"hidden",
+                        minWidth:130,
+                      }}>
+                      {[
+                        {label:"📅 RDV",          color:"#7c3aed", action:()=>{ onAddRdv&&onAddRdv({date:ds}); setMenuDay(null); }},
+                        {label:"🔧 Entretien",     color:"#059669", action:()=>{ onAddPassage&&onAddPassage({date:ds,type:"Entretien complet"}); setMenuDay(null); }},
+                        {label:"💧 Contrôle eau",  color:"#0891b2", action:()=>{ onAddPassage&&onAddPassage({date:ds,type:"Contrôle de l'eau"}); setMenuDay(null); }},
+                        {label:"🔧 SAV",           color:"#ea580c", action:()=>{ onAddPassage&&onAddPassage({date:ds,type:"SAV"}); setMenuDay(null); }},
+                        {label:"❄️ Hivernage",     color:"#60a5fa", action:()=>{ onAddPassage&&onAddPassage({date:ds,type:"Hivernage"}); setMenuDay(null); }},
+                        {label:"🌱 Remise en svc", color:"#16a34a", action:()=>{ onAddPassage&&onAddPassage({date:ds,type:"Remise en service"}); setMenuDay(null); }},
+                      ].map(item=>(
+                        <button key={item.label}
+                          onClick={item.action}
+                          style={{
+                            width:"100%",padding:"8px 10px",border:"none",
+                            background:"#fff",cursor:"pointer",fontFamily:"inherit",
+                            textAlign:"left",fontSize:11,fontWeight:600,
+                            color:item.color,
+                            borderBottom:"1px solid #f8fafc",
+                            transition:"background .1s",
+                          }}
+                          onMouseEnter={e=>e.currentTarget.style.background="#f8fafc"}
+                          onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           );
@@ -476,7 +526,7 @@ export function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPass
       <DashboardHero clients={clients} passages={passages} rdvs={rdvs} saisonNow={saisonNow} isMobile={isMobile} onAddPassage={onAddPassage} onAddLivraison={onAddLivraison} onAddClient={onAddClient} onAddRdv={onAddRdv} notes={notes} onNotesChange={onNotesChange}/>
 
       {/* ── PLANNING SEMAINE ── */}
-      <PlanningHebdo clients={clients} passages={passages} rdvs={rdvs} onAddRdv={onAddRdv} onEditRdv={onEditRdv} onClientClick={onClientClick} isMobile={isMobile}/>
+      <PlanningHebdo clients={clients} passages={passages} rdvs={rdvs} onAddRdv={onAddRdv} onAddPassage={onAddPassage} onEditRdv={onEditRdv} onClientClick={onClientClick} isMobile={isMobile}/>
 
       {/* ── PASSAGES DU MOIS ── */}
       <div className="db-s3" style={{marginBottom:14,borderRadius:18,overflow:"hidden",boxShadow:"0 2px 12px rgba(0,0,0,0.06)",border:"1px solid #e2e8f0",background:"#fff"}}>
