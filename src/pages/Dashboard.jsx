@@ -64,17 +64,29 @@ const SAISON_THEMES = {
 // ─────────────────────────────────────────────────────────────────────────────
 function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEditRdv, onClientClick, isMobile }) {
   const [weekOffset, setWeekOffset] = useState(0);
-  const [menuDay, setMenuDay] = useState(null); // date string du jour dont le menu est ouvert
+  const [menuDay, setMenuDay] = useState(null);
+  const [menuPos, setMenuPos] = useState(null); // {top, left} en position fixe
   const scrollRef = useRef(null);
 
   // Ferme le menu au clic extérieur
   useEffect(() => {
     if (!menuDay) return;
-    const close = () => setMenuDay(null);
+    const close = () => { setMenuDay(null); setMenuPos(null); };
     document.addEventListener("mousedown", close);
     document.addEventListener("touchstart", close);
     return () => { document.removeEventListener("mousedown", close); document.removeEventListener("touchstart", close); };
   }, [menuDay]);
+
+  const openMenu = (e, ds) => {
+    e.stopPropagation();
+    if (menuDay === ds) { setMenuDay(null); setMenuPos(null); return; }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuH = 220;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const top = spaceBelow > menuH ? rect.bottom + 4 : rect.top - menuH - 4;
+    setMenuPos({ top, left: Math.min(rect.left, window.innerWidth - 160) });
+    setMenuDay(ds);
+  };
 
   // Lundi de la semaine courante + décalage
   const getMonday = (offset) => {
@@ -117,6 +129,7 @@ function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEdit
   };
 
   return (
+    <>
     <div className="db-s2" style={{marginBottom:14,borderRadius:18,overflow:"hidden",boxShadow:"0 2px 12px rgba(0,0,0,0.06)",border:"1px solid #e2e8f0",background:"#fff"}}>
       {/* ── En-tête ── */}
       <div style={{padding:"11px 14px 9px",background:"linear-gradient(135deg,#f0f9ff,#fff)",borderBottom:"1px solid #f1f5f9",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -231,58 +244,21 @@ function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEdit
                   );
                 })}
 
-                {/* Bouton + avec menu type */}
-                <div style={{position:"relative"}}>
-                  <button
-                    onMouseDown={e=>{ e.stopPropagation(); setMenuDay(menuDay===ds?null:ds); }}
-                    onTouchStart={e=>{ e.stopPropagation(); setMenuDay(menuDay===ds?null:ds); }}
-                    style={{
-                      width:"100%",minHeight:22,padding:"2px",borderRadius:6,
-                      background:menuDay===ds?"#e0f2fe":"transparent",
-                      border:`1.5px dashed ${menuDay===ds?"#0891b2":"#e2e8f0"}`,
-                      cursor:"pointer",color:menuDay===ds?"#0891b2":"#d1d5db",
-                      fontSize:15,fontWeight:700,
-                      display:"flex",alignItems:"center",justifyContent:"center",
-                      fontFamily:"inherit",lineHeight:1,transition:"all .15s",
-                    }}>
-                    +
-                  </button>
-
-                  {menuDay === ds && (
-                    <div onMouseDown={e=>e.stopPropagation()} onTouchStart={e=>e.stopPropagation()}
-                      style={{
-                        position:"absolute",bottom:"calc(100% + 4px)",left:0,right:0,
-                        zIndex:500,background:"#fff",borderRadius:10,
-                        boxShadow:"0 8px 24px rgba(0,0,0,0.15)",
-                        border:"1px solid #e2e8f0",overflow:"hidden",
-                        minWidth:130,
-                      }}>
-                      {[
-                        {label:"📅 RDV",          color:"#7c3aed", action:()=>{ onAddRdv&&onAddRdv({date:ds}); setMenuDay(null); }},
-                        {label:"🔧 Entretien",     color:"#059669", action:()=>{ onAddPassage&&onAddPassage({date:ds,type:"Entretien complet"}); setMenuDay(null); }},
-                        {label:"💧 Contrôle eau",  color:"#0891b2", action:()=>{ onAddPassage&&onAddPassage({date:ds,type:"Contrôle de l'eau"}); setMenuDay(null); }},
-                        {label:"🔧 SAV",           color:"#ea580c", action:()=>{ onAddPassage&&onAddPassage({date:ds,type:"SAV"}); setMenuDay(null); }},
-                        {label:"❄️ Hivernage",     color:"#60a5fa", action:()=>{ onAddPassage&&onAddPassage({date:ds,type:"Hivernage"}); setMenuDay(null); }},
-                        {label:"🌱 Remise en svc", color:"#16a34a", action:()=>{ onAddPassage&&onAddPassage({date:ds,type:"Remise en service"}); setMenuDay(null); }},
-                      ].map(item=>(
-                        <button key={item.label}
-                          onClick={item.action}
-                          style={{
-                            width:"100%",padding:"8px 10px",border:"none",
-                            background:"#fff",cursor:"pointer",fontFamily:"inherit",
-                            textAlign:"left",fontSize:11,fontWeight:600,
-                            color:item.color,
-                            borderBottom:"1px solid #f8fafc",
-                            transition:"background .1s",
-                          }}
-                          onMouseEnter={e=>e.currentTarget.style.background="#f8fafc"}
-                          onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                {/* Bouton + — ouvre le menu en position fixe (évite le clipping overflow) */}
+                <button
+                  onMouseDown={e=>openMenu(e,ds)}
+                  onTouchStart={e=>openMenu(e,ds)}
+                  style={{
+                    width:"100%",minHeight:22,padding:"2px",borderRadius:6,
+                    background:menuDay===ds?"#e0f2fe":"transparent",
+                    border:`1.5px dashed ${menuDay===ds?"#0891b2":"#e2e8f0"}`,
+                    cursor:"pointer",color:menuDay===ds?"#0891b2":"#d1d5db",
+                    fontSize:15,fontWeight:700,
+                    display:"flex",alignItems:"center",justifyContent:"center",
+                    fontFamily:"inherit",lineHeight:1,transition:"all .15s",
+                  }}>
+                  +
+                </button>
               </div>
             </div>
           );
@@ -299,6 +275,45 @@ function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEdit
         ))}
       </div>
     </div>
+
+    {/* ── Menu contextuel en position fixe (contourne overflow:hidden des conteneurs) ── */}
+    {menuDay && menuPos && (
+      <div onMouseDown={e=>e.stopPropagation()} onTouchStart={e=>e.stopPropagation()}
+        style={{
+          position:"fixed",top:menuPos.top,left:menuPos.left,
+          zIndex:99999,background:"#fff",borderRadius:12,
+          boxShadow:"0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08)",
+          border:"1px solid #e2e8f0",overflow:"hidden",minWidth:155,
+        }}>
+        {/* Titre */}
+        <div style={{padding:"7px 12px 5px",fontSize:9,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:.5,borderBottom:"1px solid #f1f5f9"}}>
+          Ajouter le {new Date(menuDay).toLocaleDateString("fr",{day:"2-digit",month:"short"})}
+        </div>
+        {[
+          {label:"📅 RDV",           color:"#7c3aed", action:()=>{ onAddRdv&&onAddRdv({date:menuDay}); setMenuDay(null); }},
+          {label:"🔧 Entretien",      color:"#059669", action:()=>{ onAddPassage&&onAddPassage({date:menuDay,type:"Entretien complet"}); setMenuDay(null); }},
+          {label:"💧 Contrôle eau",   color:"#0891b2", action:()=>{ onAddPassage&&onAddPassage({date:menuDay,type:"Contrôle de l'eau"}); setMenuDay(null); }},
+          {label:"🔧 SAV / Dépannage",color:"#ea580c", action:()=>{ onAddPassage&&onAddPassage({date:menuDay,type:"SAV"}); setMenuDay(null); }},
+          {label:"❄️ Hivernage",      color:"#60a5fa", action:()=>{ onAddPassage&&onAddPassage({date:menuDay,type:"Hivernage"}); setMenuDay(null); }},
+          {label:"🌱 Remise en svc",  color:"#16a34a", action:()=>{ onAddPassage&&onAddPassage({date:menuDay,type:"Remise en service"}); setMenuDay(null); }},
+        ].map((item,i,arr)=>(
+          <button key={item.label}
+            onClick={item.action}
+            style={{
+              width:"100%",padding:"9px 12px",border:"none",
+              background:"#fff",cursor:"pointer",fontFamily:"inherit",
+              textAlign:"left",fontSize:12,fontWeight:600,color:item.color,
+              borderBottom:i<arr.length-1?"1px solid #f8fafc":"none",
+              transition:"background .1s",display:"block",
+            }}
+            onMouseEnter={e=>e.currentTarget.style.background="#f8fafc"}
+            onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
+            {item.label}
+          </button>
+        ))}
+      </div>
+    )}
+    </>
   );
 }
 
