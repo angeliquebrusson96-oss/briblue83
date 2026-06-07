@@ -740,342 +740,242 @@ export function DashboardHero({ clients, passages, rdvs, saisonNow, isMobile, on
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// STICKY NOTES EXPERT — checkboxes, priorité, pin, labels, recherche, timestamps
+// STICKY NOTES — simple, beau, intuitif
 // ─────────────────────────────────────────────────────────────────────────────
-const NOTE_COLORS = ["#fef9c3","#dcfce7","#dbeafe","#fce7f3","#ede9fe","#ffedd5","#fff","#fef2f2"];
-
-const NOTE_LABELS = [
-  { id:"todo",   emoji:"✅", label:"Tâches",  color:"#7c3aed", bg:"#f5f3ff", border:"#c4b5fd" },
-  { id:"rappel", emoji:"⏰", label:"Rappel",  color:"#d97706", bg:"#fffbeb", border:"#fde68a" },
-  { id:"client", emoji:"👤", label:"Client",  color:"#0891b2", bg:"#e0f2fe", border:"#7dd3fc" },
-  { id:"info",   emoji:"💡", label:"Info",    color:"#059669", bg:"#f0fdf4", border:"#86efac" },
+// Palette : chaque entrée = { bg (fond), accent (bordure + couleur vive) }
+const NOTE_PALETTE = [
+  { bg:"#fffbeb", accent:"#f59e0b" }, // Ambre
+  { bg:"#f0fdf4", accent:"#22c55e" }, // Vert
+  { bg:"#eff6ff", accent:"#3b82f6" }, // Bleu
+  { bg:"#fdf4ff", accent:"#a855f7" }, // Violet
+  { bg:"#fff1f2", accent:"#f43f5e" }, // Rose
+  { bg:"#fff7ed", accent:"#f97316" }, // Orange
+  { bg:"#f8fafc", accent:"#64748b" }, // Ardoise
+  { bg:"#ecfdf5", accent:"#059669" }, // Émeraude
 ];
 
-const PRIORITY_LEVELS = [
-  { level:0, emoji:"⚪", label:"Normal",    stripe:null },
-  { level:1, emoji:"🔴", label:"Urgent",    stripe:"#ef4444" },
-  { level:2, emoji:"🟡", label:"Important", stripe:"#f59e0b" },
-  { level:3, emoji:"🟢", label:"Basse",     stripe:"#22c55e" },
-];
+// Rétrocompat : ancien champ "color" (bg seul) → palette la plus proche
+const LEGACY_MAP = {
+  "#fef9c3":{ bg:"#fffbeb", accent:"#f59e0b" },
+  "#dcfce7":{ bg:"#f0fdf4", accent:"#22c55e" },
+  "#dbeafe":{ bg:"#eff6ff", accent:"#3b82f6" },
+  "#fce7f3":{ bg:"#fdf4ff", accent:"#ec4899" },
+  "#ede9fe":{ bg:"#fdf4ff", accent:"#a855f7" },
+  "#ffedd5":{ bg:"#fff7ed", accent:"#f97316" },
+  "#fff"   :{ bg:"#f8fafc", accent:"#64748b" },
+  "#fef2f2":{ bg:"#fff1f2", accent:"#f43f5e" },
+};
+function notePalette(note) {
+  if (note.accent && note.bg) return { bg: note.bg, accent: note.accent };
+  return LEGACY_MAP[note.color] || NOTE_PALETTE[0];
+}
 
-function timeAgo(ts) {
+function noteTimeAgo(ts) {
   if (!ts) return null;
-  const diff = Math.floor((Date.now() - ts) / 1000);
-  if (diff < 60)    return "à l'instant";
-  if (diff < 3600)  return `il y a ${Math.floor(diff/60)} min`;
-  if (diff < 86400) return `il y a ${Math.floor(diff/3600)} h`;
-  return `il y a ${Math.floor(diff/86400)} j`;
-}
-
-function getTaskStats(text) {
-  const lines = (text || "").split("\n");
-  const total = lines.filter(l => /^- \[[ x]\]/i.test(l)).length;
-  const done  = lines.filter(l => /^- \[x\]/i.test(l)).length;
-  return { total, done };
-}
-
-function NoteBodyView({ text, onToggle }) {
-  if (!text) return <span style={{color:"#94a3b8",fontSize:13}}>Cliquez pour écrire…</span>;
-  const lines = text.split("\n");
-  return (
-    <>
-      {lines.map((line, i) => {
-        const unchecked = line.match(/^- \[ \] (.+)/);
-        const checked   = line.match(/^- \[x\] (.+)/i);
-        if (unchecked || checked) {
-          const isDone = !!checked;
-          const label  = (unchecked || checked)[1];
-          return (
-            <div key={i} onClick={e => { e.stopPropagation(); onToggle(i, isDone); }}
-              style={{display:"flex",alignItems:"flex-start",gap:8,margin:"2px 0",cursor:"pointer"}}>
-              <div style={{
-                width:15,height:15,borderRadius:4,flexShrink:0,marginTop:3,
-                border:`2px solid ${isDone?"#0891b2":"#94a3b8"}`,
-                background:isDone?"#0891b2":"transparent",
-                display:"flex",alignItems:"center",justifyContent:"center",
-                transition:"all .15s",
-              }}>
-                {isDone && <svg width={8} height={8} viewBox="0 0 12 12" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><polyline points="2 6 5 9 10 3"/></svg>}
-              </div>
-              <span style={{fontSize:13,color:isDone?"#94a3b8":"#374151",textDecoration:isDone?"line-through":"none",lineHeight:1.55,flex:1}}>{label}</span>
-            </div>
-          );
-        }
-        const parts = line.split(/\*\*([^*]+)\*\*/g);
-        return (
-          <div key={i} style={{fontSize:13,color:"#374151",lineHeight:1.75,minHeight:line?"auto":8}}>
-            {parts.map((p,j) => j%2===1 ? <strong key={j}>{p}</strong> : p)}
-          </div>
-        );
-      })}
-    </>
-  );
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60)    return "à l'instant";
+  if (s < 3600)  return `${Math.floor(s/60)} min`;
+  if (s < 86400) return `${Math.floor(s/3600)} h`;
+  return `${Math.floor(s/86400)} j`;
 }
 
 // Composant contrôlé : l'état réel vit dans App.jsx → Firebase
 function StickyNotes({ notes = [], onNotesChange }) {
-  const [editingId,  setEditingId]  = useState(null);
-  const [search,     setSearch]     = useState("");
-  const [showSearch, setShowSearch] = useState(false);
-  const [copied,     setCopied]     = useState(null);
+  const [activeId, setActiveId] = useState(null);
   const dragIdx     = useRef(null);
   const dragOverIdx = useRef(null);
-  const [dragOver,  setDragOver]    = useState(-1);
+  const [dragOver,  setDragOver] = useState(-1);
 
-  const update = (fn) => onNotesChange(typeof fn === "function" ? fn(notes) : fn);
+  const update = fn => onNotesChange(typeof fn === "function" ? fn(notes) : fn);
 
-  const addNote = (label = null) => {
-    const col = NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)];
-    const n = { id: Date.now().toString(), text: "", color: col, priority: 0, pinned: false, label, collapsed: false, updatedAt: Date.now() };
-    update(p => [...p, n]);
-    setTimeout(() => setEditingId(n.id), 60);
+  const addNote = () => {
+    const pal = NOTE_PALETTE[Math.floor(Math.random() * NOTE_PALETTE.length)];
+    const n = { id: Date.now().toString(), text: "", bg: pal.bg, accent: pal.accent, pinned: false, updatedAt: Date.now() };
+    update(p => [n, ...p]);
+    setTimeout(() => setActiveId(n.id), 50);
   };
 
-  const delNote        = (id)         => update(p => p.filter(n => n.id !== id));
-  const editText       = (id, text)   => update(p => p.map(n => n.id === id ? { ...n, text, updatedAt: Date.now() } : n));
-  const editColor      = (id, color)  => update(p => p.map(n => n.id === id ? { ...n, color } : n));
-  const setProp        = (id, k, v)   => update(p => p.map(n => n.id === id ? { ...n, [k]: v } : n));
-  const togglePin      = (id)         => update(p => p.map(n => n.id === id ? { ...n, pinned: !n.pinned } : n));
-  const cycPriority    = (id)         => update(p => p.map(n => n.id === id ? { ...n, priority: ((n.priority || 0) + 1) % 4 } : n));
-  const toggleCollapse = (id)         => update(p => p.map(n => n.id === id ? { ...n, collapsed: !n.collapsed } : n));
-  const toggleLabel    = (id, lbl)    => update(p => p.map(n => n.id === id ? { ...n, label: n.label === lbl ? null : lbl } : n));
+  const del      = id          => update(p => p.filter(n => n.id !== id));
+  const setText  = (id, text)  => update(p => p.map(n => n.id === id ? { ...n, text, updatedAt: Date.now() } : n));
+  const setPal   = (id, pal)   => update(p => p.map(n => n.id === id ? { ...n, bg: pal.bg, accent: pal.accent } : n));
+  const togglePin= id          => update(p => p.map(n => n.id === id ? { ...n, pinned: !n.pinned } : n));
 
-  const toggleCheckbox = (id, text, lineIdx, isDone) => {
-    const lines = text.split("\n");
-    lines[lineIdx] = lines[lineIdx].replace(isDone ? /^- \[x\]/i : /^- \[ \]/, isDone ? "- [ ]" : "- [x]");
-    editText(id, lines.join("\n"));
-  };
-
-  const copyNote = (id, text) => {
-    navigator.clipboard?.writeText(text).catch(() => {});
-    setCopied(id);
-    setTimeout(() => setCopied(null), 1500);
-  };
-
-  const onDragStart = (i)    => { dragIdx.current = i; };
-  const onDragOver  = (e, i) => { e.preventDefault(); dragOverIdx.current = i; setDragOver(i); };
-  const onDrop      = ()     => {
+  const onDragStart = i    => { dragIdx.current = i; };
+  const onDragOver  = (e,i)=> { e.preventDefault(); dragOverIdx.current = i; setDragOver(i); };
+  const onDrop      = ()   => {
     const from = dragIdx.current, to = dragOverIdx.current;
-    if (from !== null && to !== null && from !== to) {
+    if (from !== null && to !== null && from !== to)
       update(p => { const a=[...p]; const [el]=a.splice(from,1); a.splice(to,0,el); return a; });
-    }
     dragIdx.current = null; dragOverIdx.current = null; setDragOver(-1);
   };
 
-  // Tri : épinglées en premier, puis par date de modification
-  const sorted = [...notes].sort((a, b) => {
+  const sorted = [...notes].sort((a,b) => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-    return (b.updatedAt || 0) - (a.updatedAt || 0);
+    return (b.updatedAt||0) - (a.updatedAt||0);
   });
-  const filtered = search
-    ? sorted.filter(n => n.text?.toLowerCase().includes(search.toLowerCase()))
-    : sorted;
 
   return (
     <div className="db-s2" style={{marginBottom:14}}>
 
       {/* ── En-tête ── */}
-      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-        <span style={{fontSize:12,fontWeight:600,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".6px",flex:1}}>
-          📝 Notes
-          {notes.length > 0 && <span style={{marginLeft:6,fontSize:10,background:"#f1f5f9",color:"#64748b",borderRadius:20,padding:"1px 7px",fontWeight:600}}>{notes.length}</span>}
-        </span>
-        {/* Recherche */}
-        {notes.length > 1 && (
-          <button onClick={() => setShowSearch(s => !s)}
-            style={{width:28,height:28,borderRadius:8,border:`1px solid ${showSearch?"#0891b2":"#e2e8f0"}`,background:showSearch?"#e0f2fe":"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={showSearch?"#0891b2":"#94a3b8"} strokeWidth="2.5" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          </button>
-        )}
-        <button onClick={() => addNote()}
-          style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:20,background:"#f0f9ff",border:"1px solid #bae6fd",cursor:"pointer",fontSize:12,fontWeight:700,color:"#0891b2",fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>
-          <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Note
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>Notes</span>
+          {notes.length > 0 && (
+            <span style={{fontSize:11,fontWeight:600,color:"#94a3b8",background:"#f1f5f9",borderRadius:20,padding:"1px 8px"}}>
+              {notes.length}
+            </span>
+          )}
+        </div>
+        <button onClick={addNote} style={{
+          display:"flex",alignItems:"center",gap:6,padding:"7px 16px",borderRadius:20,
+          background:"linear-gradient(135deg,#0891b2,#0e7490)",border:"none",
+          cursor:"pointer",fontSize:12,fontWeight:700,color:"#fff",fontFamily:"inherit",
+          boxShadow:"0 2px 12px rgba(8,145,178,0.28)",WebkitTapHighlightColor:"transparent",
+        }}>
+          <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Nouvelle note
         </button>
       </div>
 
-      {/* ── Barre de recherche ── */}
-      {showSearch && notes.length > 1 && (
-        <div style={{marginBottom:8,position:"relative"}}>
-          <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round"
-            style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}>
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Rechercher dans les notes…"
-            style={{width:"100%",padding:"8px 34px 8px 30px",borderRadius:12,border:"1px solid #e2e8f0",fontSize:12,color:"#0f172a",fontFamily:"inherit",outline:"none",boxSizing:"border-box",background:"#f8fafc"}}
-          />
-          {search && (
-            <button onClick={() => setSearch("")} style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"#94a3b8",fontSize:15,lineHeight:1,padding:"0 2px"}}>✕</button>
-          )}
-        </div>
-      )}
-
       {/* ── État vide ── */}
       {notes.length === 0 && (
-        <button onClick={() => addNote()}
-          style={{width:"100%",padding:20,borderRadius:16,border:"2px dashed #e2e8f0",background:"rgba(255,255,255,0.5)",cursor:"pointer",fontSize:13,color:"#94a3b8",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-          📝 Ajouter une note
+        <button onClick={addNote} style={{
+          width:"100%",padding:"28px 20px",borderRadius:18,
+          border:"2px dashed #e2e8f0",background:"transparent",cursor:"pointer",
+          fontFamily:"inherit",display:"flex",flexDirection:"column",alignItems:"center",gap:10,
+          WebkitTapHighlightColor:"transparent",
+        }}>
+          <span style={{fontSize:36,lineHeight:1}}>📝</span>
+          <span style={{fontSize:13,color:"#94a3b8",fontWeight:500}}>Aucune note — appuyez pour créer</span>
         </button>
       )}
 
-      {/* ── Liste des notes ── */}
-      <div style={{display:"flex",flexDirection:"column",gap:8}}>
-        {filtered.map((note, i) => {
-          const isEditing  = editingId === note.id;
-          const labelInfo  = NOTE_LABELS.find(l => l.id === note.label);
-          const prioInfo   = PRIORITY_LEVELS[note.priority || 0];
-          const { total: taskTotal, done: taskDone } = getTaskStats(note.text);
+      {/* ── Cartes ── */}
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {sorted.map((note, i) => {
+          const { bg, accent } = notePalette(note);
+          const isActive = activeId === note.id;
+          const ts = noteTimeAgo(note.updatedAt);
+          const lineCount = (note.text||"").split("\n").length;
 
           return (
             <div key={note.id}
-              draggable={!isEditing}
+              draggable={!isActive}
               onDragStart={() => onDragStart(i)}
               onDragOver={e => onDragOver(e, i)}
               onDrop={onDrop}
               onDragEnd={() => { dragIdx.current=null; dragOverIdx.current=null; setDragOver(-1); }}
               style={{
-                borderRadius:16,
-                background: note.color || "#fef9c3",
-                border: `2px solid ${dragOver===i && dragIdx.current!==i ? "#0891b2" : note.pinned ? "#0891b2" : "rgba(0,0,0,0.07)"}`,
-                boxShadow: note.pinned ? "0 4px 20px rgba(8,145,178,0.15)" : "0 2px 10px rgba(0,0,0,0.07)",
-                opacity: dragIdx.current === i ? 0.45 : 1,
-                transition: "opacity .2s, border .15s, box-shadow .2s",
+                borderRadius:16,overflow:"hidden",
+                background:bg,
+                border:`1.5px solid ${dragOver===i&&dragIdx.current!==i ? "#0891b2" : accent+"44"}`,
+                boxShadow: isActive
+                  ? `0 0 0 2.5px ${accent}55, 0 8px 28px ${accent}22`
+                  : note.pinned
+                    ? `0 4px 18px ${accent}28`
+                    : "0 2px 8px rgba(0,0,0,0.06)",
+                opacity: dragIdx.current === i ? 0.4 : 1,
+                transition:"box-shadow .2s, border .15s",
               }}>
 
-              {/* Bandeau priorité */}
-              {prioInfo.stripe && (
-                <div style={{height:3,borderRadius:"16px 16px 0 0",background:prioInfo.stripe}}/>
-              )}
+              {/* Barre accent couleur */}
+              <div style={{height:4,background:`linear-gradient(90deg,${accent},${accent}88)`}}/>
 
-              {/* ── Toolbar ── */}
-              <div style={{display:"flex",alignItems:"center",padding:"7px 10px 4px",gap:3,userSelect:"none"}}>
+              {/* Zone texte — cliquable pour éditer */}
+              <div style={{position:"relative"}}>
+                <textarea
+                  value={note.text||""}
+                  onChange={e => setText(note.id, e.target.value)}
+                  onFocus={() => setActiveId(note.id)}
+                  onBlur={() => setActiveId(null)}
+                  placeholder="Écris ta note ici…"
+                  rows={isActive ? Math.max(4, lineCount+1) : Math.max(2, lineCount)}
+                  style={{
+                    width:"100%",padding:"13px 14px 8px",
+                    background:"transparent",border:"none",outline:"none",resize:"none",
+                    fontFamily:"inherit",fontSize:13.5,color:"#1e293b",lineHeight:1.8,
+                    boxSizing:"border-box",WebkitTapHighlightColor:"transparent",
+                    cursor:"text",
+                  }}
+                />
+                {/* Badge épingle */}
+                {note.pinned && (
+                  <span style={{
+                    position:"absolute",top:10,right:10,
+                    fontSize:14,opacity:.7,pointerEvents:"none",
+                  }}>📌</span>
+                )}
+              </div>
+
+              {/* ── Pied de carte ── */}
+              <div style={{
+                display:"flex",alignItems:"center",
+                padding:"4px 10px 10px",gap:6,
+              }}>
                 {/* Poignée drag */}
-                <div style={{cursor:isEditing?"default":"grab",color:"#94a3b8",fontSize:15,lineHeight:1,flexShrink:0,touchAction:"none",opacity:isEditing?.3:1}}>⠿</div>
+                <div style={{
+                  cursor:"grab",color:`${accent}88`,fontSize:14,lineHeight:1,
+                  flexShrink:0,touchAction:"none",userSelect:"none",paddingRight:2,
+                }}>⠿</div>
 
-                {/* Labels */}
-                <div style={{display:"flex",gap:2,flexShrink:0}}>
-                  {NOTE_LABELS.map(l => (
-                    <button key={l.id} onClick={() => toggleLabel(note.id, l.id)} title={l.label}
-                      style={{fontSize:11,padding:"1px 5px",borderRadius:6,background:note.label===l.id?l.bg:"transparent",border:`1px solid ${note.label===l.id?l.border:"transparent"}`,color:note.label===l.id?l.color:"#94a3b8",cursor:"pointer",fontFamily:"inherit",lineHeight:1.4,transition:"all .15s"}}>
-                      {l.emoji}
-                    </button>
+                {/* Palette couleurs (ronds vifs) */}
+                <div style={{display:"flex",gap:5,flex:1,alignItems:"center"}}>
+                  {NOTE_PALETTE.map((pal, pi) => (
+                    <button key={pi}
+                      onClick={() => setPal(note.id, pal)}
+                      title={`Couleur ${pi+1}`}
+                      style={{
+                        width:16,height:16,borderRadius:"50%",
+                        background:pal.accent,border:"none",
+                        cursor:"pointer",padding:0,flexShrink:0,
+                        outline:note.accent===pal.accent ? `3px solid ${pal.accent}` : "none",
+                        outlineOffset:2,
+                        transform:note.accent===pal.accent?"scale(1.25)":"scale(1)",
+                        transition:"transform .15s, outline .15s",
+                      }}
+                    />
                   ))}
                 </div>
 
-                <div style={{flex:1}}/>
-
-                {/* Priorité (cycle au clic) */}
-                <button onClick={() => cycPriority(note.id)} title={prioInfo.label}
-                  style={{background:"none",border:"none",cursor:"pointer",fontSize:13,lineHeight:1,padding:"0 1px",flexShrink:0,opacity:prioInfo.level===0?.35:1}}>
-                  {prioInfo.emoji}
+                {/* Épingle */}
+                <button onClick={() => togglePin(note.id)}
+                  title={note.pinned?"Désépingler":"Épingler"}
+                  style={{
+                    background:"none",border:"none",cursor:"pointer",
+                    fontSize:15,lineHeight:1,padding:"0 2px",
+                    opacity:note.pinned?1:0.25,transition:"opacity .2s",
+                    WebkitTapHighlightColor:"transparent",
+                  }}>
+                  📌
                 </button>
 
-                {/* Pin */}
-                <button onClick={() => togglePin(note.id)} title={note.pinned?"Désépingler":"Épingler"}
-                  style={{background:"none",border:"none",cursor:"pointer",lineHeight:1,padding:"0 1px",flexShrink:0}}>
-                  <svg width={13} height={13} viewBox="0 0 24 24" fill={note.pinned?"#0891b2":"none"} stroke={note.pinned?"#0891b2":"#94a3b8"} strokeWidth="2" strokeLinecap="round">
-                    <line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 00-1.11-1.79l-1.78-.9A2 2 0 0115 10.76V6h1a2 2 0 000-4H8a2 2 0 000 4h1v4.76a2 2 0 01-1.11 1.79l-1.78.9A2 2 0 005 15.24V17z"/>
-                  </svg>
-                </button>
-
-                {/* Réduire/Développer */}
-                <button onClick={() => toggleCollapse(note.id)} title={note.collapsed?"Développer":"Réduire"}
-                  style={{background:"none",border:"none",cursor:"pointer",color:"#94a3b8",lineHeight:1,padding:"0 1px",flexShrink:0,transition:"transform .2s",transform:note.collapsed?"rotate(-90deg)":"rotate(0)"}}>
-                  <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-                </button>
+                {/* Horodatage */}
+                {ts && (
+                  <span style={{fontSize:9,color:`${accent}99`,fontWeight:600,flexShrink:0,whiteSpace:"nowrap"}}>
+                    {ts}
+                  </span>
+                )}
 
                 {/* Supprimer */}
-                <button onClick={() => delNote(note.id)}
-                  style={{background:"none",border:"none",cursor:"pointer",color:"#94a3b8",fontSize:14,lineHeight:1,padding:"0 2px",flexShrink:0,WebkitTapHighlightColor:"transparent"}}>✕</button>
+                <button onClick={() => del(note.id)}
+                  style={{
+                    background:"none",border:"none",cursor:"pointer",
+                    color:"#cbd5e1",fontSize:16,lineHeight:1,
+                    padding:"0 2px",flexShrink:0,
+                    WebkitTapHighlightColor:"transparent",
+                    transition:"color .15s",
+                  }}
+                  onMouseEnter={e=>e.currentTarget.style.color="#ef4444"}
+                  onMouseLeave={e=>e.currentTarget.style.color="#cbd5e1"}
+                >✕</button>
               </div>
-
-              {/* Badge label */}
-              {labelInfo && !note.collapsed && (
-                <div style={{padding:"0 10px 4px"}}>
-                  <span style={{fontSize:10,fontWeight:700,color:labelInfo.color,background:labelInfo.bg,padding:"2px 7px",borderRadius:6,border:`1px solid ${labelInfo.border}66`}}>
-                    {labelInfo.emoji} {labelInfo.label}
-                  </span>
-                  {note.pinned && <span style={{marginLeft:5,fontSize:10,fontWeight:700,color:"#0891b2",background:"#e0f2fe",padding:"2px 7px",borderRadius:6,border:"1px solid #7dd3fc66"}}>📌 Épinglée</span>}
-                </div>
-              )}
-
-              {/* ── Corps de la note ── */}
-              {!note.collapsed ? (
-                isEditing ? (
-                  <textarea autoFocus
-                    value={note.text}
-                    onChange={e => editText(note.id, e.target.value)}
-                    onBlur={() => setEditingId(null)}
-                    placeholder={"📝 Écris ta note ici…\n\n✅ Astuce checklist :\n- [ ] Tâche à faire\n- [x] Tâche faite\n\n**texte** pour le gras"}
-                    style={{width:"100%",padding:"4px 12px 8px",background:"transparent",border:"none",outline:"none",resize:"none",fontFamily:"inherit",fontSize:13,color:"#374151",lineHeight:1.75,minHeight:80,boxSizing:"border-box",WebkitTapHighlightColor:"transparent"}}
-                  />
-                ) : (
-                  <div onClick={() => setEditingId(note.id)} style={{padding:"4px 12px 8px",minHeight:40,cursor:"text"}}>
-                    <NoteBodyView text={note.text}
-                      onToggle={(lineIdx, isDone) => toggleCheckbox(note.id, note.text, lineIdx, isDone)}
-                    />
-                  </div>
-                )
-              ) : (
-                /* Aperçu réduit (1re ligne) */
-                <div onClick={() => toggleCollapse(note.id)}
-                  style={{padding:"0 12px 8px",fontSize:12,color:"#64748b",cursor:"pointer",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                  {note.text ? note.text.split("\n")[0].replace(/^- \[[ x]\] /i,"") : <span style={{color:"#94a3b8"}}>Note vide</span>}
-                </div>
-              )}
-
-              {/* ── Pied de note ── */}
-              {!note.collapsed && (
-                <div style={{display:"flex",alignItems:"center",padding:"3px 10px 7px",gap:5}}>
-                  {/* Palette couleurs */}
-                  <div style={{display:"flex",gap:3,flex:1,flexWrap:"wrap"}}>
-                    {NOTE_COLORS.map(c => (
-                      <button key={c} onClick={() => editColor(note.id, c)}
-                        style={{width:13,height:13,borderRadius:7,background:c,border:note.color===c?"2.5px solid #0891b2":"1.5px solid rgba(0,0,0,0.12)",cursor:"pointer",padding:0,flexShrink:0,transition:"transform .15s",transform:note.color===c?"scale(1.3)":"scale(1)"}}/>
-                    ))}
-                  </div>
-
-                  {/* Compteur de tâches */}
-                  {taskTotal > 0 && (
-                    <span style={{fontSize:10,fontWeight:700,color:taskDone===taskTotal?"#059669":"#0891b2",background:taskDone===taskTotal?"#f0fdf4":"#f0f9ff",padding:"1px 7px",borderRadius:20,flexShrink:0,border:`1px solid ${taskDone===taskTotal?"#86efac":"#bae6fd"}`}}>
-                      {taskDone}/{taskTotal} ✓
-                    </span>
-                  )}
-
-                  {/* Timestamp */}
-                  {note.updatedAt && (
-                    <span style={{fontSize:9,color:"#94a3b8",flexShrink:0,whiteSpace:"nowrap"}}>{timeAgo(note.updatedAt)}</span>
-                  )}
-
-                  {/* Copier */}
-                  {note.text && (
-                    <button onClick={() => copyNote(note.id, note.text)} title="Copier le texte"
-                      style={{background:copied===note.id?"#e0f2fe":"none",border:"none",cursor:"pointer",color:copied===note.id?"#0891b2":"#94a3b8",lineHeight:1,padding:"2px 4px",borderRadius:5,flexShrink:0,transition:"all .2s"}}>
-                      {copied === note.id
-                        ? <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-                        : <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-                      }
-                    </button>
-                  )}
-                </div>
-              )}
             </div>
           );
         })}
       </div>
-
-      {/* ── Ajout rapide par catégorie ── */}
-      {notes.length > 0 && (
-        <div style={{marginTop:8,display:"flex",gap:6,flexWrap:"wrap"}}>
-          {NOTE_LABELS.map(l => (
-            <button key={l.id} onClick={() => addNote(l.id)}
-              style={{fontSize:10,padding:"4px 10px",borderRadius:20,background:l.bg,border:`1px solid ${l.border}66`,cursor:"pointer",color:l.color,fontWeight:600,fontFamily:"inherit",display:"flex",alignItems:"center",gap:4,WebkitTapHighlightColor:"transparent"}}>
-              {l.emoji} {l.label}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
