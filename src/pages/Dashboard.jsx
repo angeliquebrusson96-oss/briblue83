@@ -63,12 +63,8 @@ const SAISON_THEMES = {
 // PLANNING HEBDOMADAIRE
 // ─────────────────────────────────────────────────────────────────────────────
 const PLANNING_ACTIONS = [
-  {label:"RDV",          emoji:"📅", color:"#7c3aed", bg:"#f5f3ff", bord:"#c4b5fd", type:null,  isRdv:true},
-  {label:"Entretien",    emoji:"🔧", color:"#059669", bg:"#f0fdf4", bord:"#86efac", type:"Entretien complet"},
-  {label:"Contrôle",     emoji:"💧", color:"#0891b2", bg:"#e0f2fe", bord:"#7dd3fc", type:"Contrôle de l'eau"},
-  {label:"SAV",          emoji:"🔧", color:"#ea580c", bg:"#fff7ed", bord:"#fdba74", type:"SAV"},
-  {label:"Hivernage",    emoji:"❄️", color:"#60a5fa", bg:"#eff6ff", bord:"#bfdbfe", type:"Hivernage"},
-  {label:"Remise en svc",emoji:"🌱", color:"#16a34a", bg:"#f0fdf4", bord:"#86efac", type:"Remise en service"},
+  {label:"Rendez-vous", emoji:"📅", color:"#7c3aed", bg:"#f5f3ff", bord:"#c4b5fd", type:null, isRdv:true},
+  {label:"Rapport",     emoji:"📋", color:"#0891b2", bg:"#e0f2fe", bord:"#7dd3fc", type:null},
 ];
 
 function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEditRdv, onClientClick, isMobile }) {
