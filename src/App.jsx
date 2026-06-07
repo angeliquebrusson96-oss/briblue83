@@ -10,7 +10,7 @@ import { migrateMois, alerteClient, getEntretienMois, getControleMois, isEntreti
 import { GlobalStyles, setupPWA, sendLocalNotification, playNotifSound, toastInfo, toastError, showConfirm, ToastContainer, ConfirmModal } from "./styles";
 import { useIsMobile, useOnlineStatus, Modal, BtnPrimary, Card, Section, Avatar, Tag } from "./components/ui";
 import { FormClient } from "./components/FormClient";
-import { FormPassage, ouvrirContrat } from "./components/FormPassage";
+import { FormPassage, ouvrirContrat, envoyerContratSignature } from "./components/FormPassage";
 import { FormLivraison } from "./components/FormLivraison";
 import { FormRdv } from "./components/FormRdv";
 import { FicheClient } from "./components/FicheClient";
@@ -525,26 +525,41 @@ export default function App() {
   const handleLogout = useCallback(()=>{ try{sessionStorage.removeItem("bb_auth");}catch{ /* noop */ } setLoggedIn(false);setReady(false);setClients([]);setPassages([]);setLivraisons([]);setRdvs([]); },[]);
 
   const saveClient = useCallback(c=>{
-    setClients(prev=>{ const next=prev.find(x=>x.id===c.id)?prev.map(x=>x.id===c.id?c:x):[...prev,c]; saveClients(next); return next; });
-    const existing = clients.find(x=>x.id===c.id);
-    if (existing) {
-      const contractId = `CT-${c.id}`;
+    // Retirer le flag envoyerContrat des données client avant de sauvegarder
+    const { envoyerContrat, ...clientData } = c;
+    const isNew = !clients.find(x=>x.id===clientData.id);
+    setClients(prev=>{ const next=prev.find(x=>x.id===clientData.id)?prev.map(x=>x.id===clientData.id?clientData:x):[...prev,clientData]; saveClients(next); return next; });
+    if (!isNew) {
+      const contractId = `CT-${clientData.id}`;
       setContrats(prev=>{
         if (!prev[contractId]) return prev;
         const old = prev[contractId];
-        // Ne jamais effacer les signatures si le contrat est déjà signé (partiellement ou totalement)
-        if (old.statut === "signe_client" || old.statut === "signe_complet") {
-          return prev;
-        }
-        const next = {...prev, [contractId]: { clientId: c.id, statut: "reset", signatureClient: "", signaturePrestataire: "", signedAt: null }, "__archives__": (prev["__archives__"]||[])};
+        if (old.statut === "signe_client" || old.statut === "signe_complet") return prev;
+        const next = {...prev, [contractId]: { clientId: clientData.id, statut: "reset", signatureClient: "", signaturePrestataire: "", signedAt: null }, "__archives__": (prev["__archives__"]||[])};
         saveContrats(next);
         return next;
       });
     }
-    setShowFormClient(false);setEditClient(null);setFicheClient(c);
+    setShowFormClient(false);setEditClient(null);setFicheClient(clientData);
+    // Envoyer le contrat après création si demandé
+    if (envoyerContrat && isNew) {
+      setTimeout(() => envoyerContratSignature(clientData), 500);
+    }
   },[saveClients, clients, saveContrats]);
 
   const deleteClient = useCallback(id=>{ showConfirm("Supprimer ce client et tous ses passages ?", ()=>{ setClients(prev=>{ const next=prev.filter(x=>x.id!==id); saveClients(next); return next; }); setPassages(prev=>{ const next=prev.filter(x=>x.clientId!==id); savePassages(next); return next; }); setFicheClient(null); }); },[saveClients,savePassages]);
+
+  // Supprimer un contrat (retire l'entrée du registre des contrats)
+  const deleteContrat = useCallback((clientId) => {
+    showConfirm("Supprimer ce contrat ? Les signatures seront effacées.", () => {
+      setContrats(prev => {
+        const next = {...prev};
+        delete next[`CT-${clientId}`];
+        saveContrats(next);
+        return next;
+      });
+    });
+  }, [saveContrats]);
 
   const savePassage = useCallback(async p=>{
     const existing = passages.find(x=>x.id===p.id);
@@ -836,7 +851,7 @@ export default function App() {
       {/* MODALS */}
       {ficheClient&&(()=>{
         const latest=clients.find(c=>c.id===ficheClient.id)||ficheClient;
-        return <FicheClient client={latest} passages={passages} livraisons={livraisons.filter(l=>l.clientId===latest.id)} rdvs={rdvs} produitsStock={Object.keys(stock)} contrats={contrats} versements={versements} onToggleVersement={handleToggleVersement} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onUpdateClient={c=>{ setClients(prev=>{ const next=prev.map(x=>x.id===c.id?c:x); saveClients(next); return next; }); setFicheClient(c); }} onSaveLivraison={saveLivraison} onDeleteLivraison={deleteLivraison} onUpdateStatutLivraison={updateStatutLivraison} onClose={()=>setFicheClient(null)} onEdit={()=>{setEditClient(latest);setShowFormClient(true);setFicheClient(null);}} onDelete={()=>deleteClient(latest.id)} onDeletePassage={deletePassage} onAddPassage={()=>openAddPassageFromClient(latest.id)} onEditPassage={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddRdv={()=>{setEditRdv({clientId:latest.id});setShowFormRdv(true);}} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} onDeleteRdv={deleteRdv}/>;
+        return <FicheClient client={latest} passages={passages} livraisons={livraisons.filter(l=>l.clientId===latest.id)} rdvs={rdvs} produitsStock={Object.keys(stock)} contrats={contrats} versements={versements} onToggleVersement={handleToggleVersement} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onDeleteContrat={()=>deleteContrat(latest.id)} onUpdateClient={c=>{ setClients(prev=>{ const next=prev.map(x=>x.id===c.id?c:x); saveClients(next); return next; }); setFicheClient(c); }} onSaveLivraison={saveLivraison} onDeleteLivraison={deleteLivraison} onUpdateStatutLivraison={updateStatutLivraison} onClose={()=>setFicheClient(null)} onEdit={()=>{setEditClient(latest);setShowFormClient(true);setFicheClient(null);}} onDelete={()=>deleteClient(latest.id)} onDeletePassage={deletePassage} onAddPassage={()=>openAddPassageFromClient(latest.id)} onEditPassage={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddRdv={()=>{setEditRdv({clientId:latest.id});setShowFormRdv(true);}} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} onDeleteRdv={deleteRdv}/>;
       })()}
 
       {showFormClient&&<FormClient initial={editClient} clients={clients} onSave={saveClient} onClose={()=>{setShowFormClient(false);setEditClient(null);}}/>}

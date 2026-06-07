@@ -178,7 +178,7 @@ export function PassageDetailModal({ passage, client, onClose }) {
 }
 
 // ─── FICHE CLIENT ─────────────────────────────────────────────────────────────
-export function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[], contrats={}, versements={}, onToggleVersement, onUpdateContrat, onUpdateClient, onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onDeletePassage, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
+export function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[], contrats={}, versements={}, onToggleVersement, onUpdateContrat, onDeleteContrat, onUpdateClient, onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onDeletePassage, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
   const [tab, setTab] = useState("gestion");
   const [notesPrivees, setNotesPrivees] = useState(client.notesPrivees||"");
   const [notesSaved, setNotesSaved] = useState(false);
@@ -295,7 +295,7 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
 
           {/* Fond : photo ou dégradé */}
           {client.photoPiscine
-            ? <img src={client.photoPiscine} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+            ? <PhotoImg src={client.photoPiscine} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
             : <div style={{width:"100%",height:"100%",background:heroGrad}}>
                 {/* Orbes décoratifs */}
                 <div style={{position:"absolute",right:-40,top:-40,width:180,height:180,borderRadius:"50%",background:"rgba(255,255,255,0.07)",pointerEvents:"none"}}/>
@@ -1172,6 +1172,39 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* ── Créer un contrat (si aucun) ── */}
+            {!ct && onUpdateContrat && (
+              <div style={{background:"linear-gradient(135deg,#f0fdf4,#dcfce7)",borderRadius:14,border:"1.5px dashed #86efac",padding:"20px 18px",textAlign:"center"}}>
+                <div style={{fontSize:32,marginBottom:8}}>📋</div>
+                <div style={{fontSize:14,fontWeight:800,color:"#15803d",marginBottom:4}}>Aucun contrat</div>
+                <div style={{fontSize:12,color:"#64748b",marginBottom:14}}>Créez un contrat et envoyez-le au client pour signature</div>
+                <button onClick={()=>{ if(onUpdateContrat) onUpdateContrat("CT-"+client.id,{clientId:client.id,statut:"cree"}); }}
+                  style={{height:42,padding:"0 20px",borderRadius:12,background:"linear-gradient(135deg,#059669,#34d399)",border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit",display:"inline-flex",alignItems:"center",gap:7,boxShadow:"0 3px 12px rgba(5,150,105,0.35)",WebkitTapHighlightColor:"transparent",marginBottom:8}}>
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                  Créer le contrat
+                </button>
+                {client.email&&(
+                  <div>
+                    <button onClick={()=>{ if(onUpdateContrat) onUpdateContrat("CT-"+client.id,{clientId:client.id,statut:"cree"}); envoyerContratSignature(client); }}
+                      style={{height:42,padding:"0 20px",borderRadius:12,background:"linear-gradient(135deg,#0891b2,#06b6d4)",border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit",display:"inline-flex",alignItems:"center",gap:7,boxShadow:"0 3px 12px rgba(8,145,178,0.35)",WebkitTapHighlightColor:"transparent"}}>
+                      <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                      Créer et envoyer pour signature
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Supprimer le contrat ── */}
+            {ct && onDeleteContrat && (
+              <div style={{borderTop:"1px solid #f1f5f9",paddingTop:14}}>
+                <button onClick={onDeleteContrat}
+                  style={{width:"100%",height:40,borderRadius:11,background:"#fef2f2",border:"1.5px solid #fecaca",cursor:"pointer",fontWeight:700,fontSize:12,color:"#dc2626",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:7,WebkitTapHighlightColor:"transparent"}}>
+                  {Ico.trash(13,"#dc2626")} Supprimer ce contrat
+                </button>
               </div>
             )}
 

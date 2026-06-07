@@ -17,7 +17,7 @@ export function FormClient({ initial, clients, onSave, onClose }) {
       return isNaN(n) ? max : Math.max(max, n);
     }, 0);
     const nextId = `C${String(maxNum + 1).padStart(3, "0")}`;
-    return { id:nextId, civilite:"", nom:"", tel:"", email:"", adresse:"", bassin:"Liner", volume:30, formule:"VAC", prix:0, prixPassageE:0, prixPassageC:0, dateDebut:TODAY, photoPiscine:"", notesTarifaires:"", dateFin:`${new Date().getFullYear()+1}-03-31`, moisParMois:{...MOIS_PAR_MOIS_DEF} };
+    return { id:nextId, civilite:"", nom:"", tel:"", email:"", adresse:"", bassin:"Liner", volume:30, formule:"VAC", prix:0, prixPassageE:0, prixPassageC:0, dateDebut:TODAY, photoPiscine:"", notesTarifaires:"", dateFin:`${new Date().getFullYear()+1}-03-31`, moisParMois:{...MOIS_PAR_MOIS_DEF}, envoyerContrat:false };
   });
   const set = (k,v) => setF(p=>({...p,[k]:v}));
   const setMoisVal = (m,type,v) => setF(p=>({...p,moisParMois:{...p.moisParMois,[m]:{...p.moisParMois[m],[type]:Math.max(0,v)}}}));
@@ -213,10 +213,27 @@ export function FormClient({ initial, clients, onSave, onClose }) {
                 <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
               </button>
             ):(
-              <button className="fm-save-btn" style={{background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}} onClick={handleSave}>
-                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-                Enregistrer le client
-              </button>
+              <>
+                {/* Toggle : envoyer le contrat après création */}
+                {isNew&&(
+                  <button type="button" onClick={()=>set("envoyerContrat",!f.envoyerContrat)}
+                    style={{display:"flex",alignItems:"center",gap:12,padding:"13px 16px",borderRadius:14,border:`2px solid ${f.envoyerContrat?"#059669":"#e2e8f0"}`,background:f.envoyerContrat?"#f0fdf4":"rgba(255,255,255,0.5)",cursor:"pointer",fontFamily:"inherit",textAlign:"left",WebkitTapHighlightColor:"transparent",transition:"all .2s"}}>
+                    <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${f.envoyerContrat?"#059669":"#cbd5e1"}`,background:f.envoyerContrat?"#059669":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"}}>
+                      {f.envoyerContrat&&<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                    </div>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:700,color:f.envoyerContrat?"#15803d":"#374151"}}>Envoyer le contrat pour signature</div>
+                      <div style={{fontSize:11,color:"#64748b",marginTop:1}}>Le client recevra un email avec le lien de signature</div>
+                    </div>
+                  </button>
+                )}
+                <button className="fm-save-btn" style={{background:f.envoyerContrat?"linear-gradient(135deg,#059669,#34d399)":"linear-gradient(135deg,#7c3aed,#6d28d9)"}} onClick={handleSave}>
+                  {f.envoyerContrat
+                    ? <><svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Créer et envoyer le contrat</>
+                    : <><svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg> Enregistrer le client</>
+                  }
+                </button>
+              </>
             )}
             {step>1&&<button className="fm-cancel-btn" onClick={()=>setStep(s=>s-1)}>← Retour</button>}
             {step===1&&<button className="fm-cancel-btn" onClick={onClose}>Annuler</button>}
