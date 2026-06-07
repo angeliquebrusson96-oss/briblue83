@@ -1046,6 +1046,22 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
 
   const clientSel = clients.find(c=>c.id===f.clientId);
 
+  // Résolution de la photo piscine pour usage en CSS background-image.
+  // url(idb:...) n'est pas compris par le navigateur → résolution préalable obligatoire.
+  const [bannerPhotoUrl, setBannerPhotoUrl] = useState("");
+  useEffect(() => {
+    const src = clientSel?.photoPiscine;
+    if (!src) { setBannerPhotoUrl(""); return; }
+    if (src.startsWith("https://") || src.startsWith("data:") || src.startsWith("blob:")) {
+      setBannerPhotoUrl(src); return;
+    }
+    if (src.startsWith("idb:")) {
+      resolvePhoto(src).then(url => setBannerPhotoUrl(url || "")).catch(() => setBannerPhotoUrl(""));
+      return;
+    }
+    setBannerPhotoUrl("");
+  }, [clientSel?.photoPiscine]);
+
   return (
     <Modal title={isEdit ? "Modifier le passage" : "Rapport"} onClose={onClose} wide defaultFull>
 
@@ -1069,8 +1085,8 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
       {clientSel && (
         <div style={{margin:isMobile?"-18px -20px 20px":"-24px -28px 20px",position:"relative",overflow:"hidden",minHeight:100}}>
           {/* Fond */}
-          {clientSel.photoPiscine
-            ? <div style={{position:"absolute",inset:0,background:`url(${clientSel.photoPiscine}) center/cover`,filter:"brightness(0.28) saturate(1.2)"}}/>
+          {bannerPhotoUrl
+            ? <div style={{position:"absolute",inset:0,background:`url(${bannerPhotoUrl}) center/cover`,filter:"brightness(0.28) saturate(1.2)"}}/>
             : <div style={{position:"absolute",inset:0,background:"linear-gradient(135deg,#050d1c 0%,#0a1f44 45%,#0c3875 100%)"}}/>
           }
           {/* Cercles lumineux décoratifs */}

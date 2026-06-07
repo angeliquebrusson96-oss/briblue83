@@ -299,16 +299,15 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
         {/* ══ HERO HEADER ══ */}
         <div style={{position:"relative",height:isMobile?190:210,overflow:"hidden",flexShrink:0}}>
 
-          {/* Fond : photo ou dégradé */}
-          {client.photoPiscine
-            ? <PhotoImg src={client.photoPiscine} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
-            : <div style={{width:"100%",height:"100%",background:heroGrad}}>
-                {/* Orbes décoratifs */}
-                <div style={{position:"absolute",right:-40,top:-40,width:180,height:180,borderRadius:"50%",background:"rgba(255,255,255,0.07)",pointerEvents:"none"}}/>
-                <div style={{position:"absolute",left:-20,bottom:-30,width:130,height:130,borderRadius:"50%",background:"rgba(255,255,255,0.05)",pointerEvents:"none"}}/>
-                <div style={{position:"absolute",right:60,bottom:20,width:80,height:80,borderRadius:"50%",background:"rgba(255,255,255,0.06)",pointerEvents:"none"}}/>
-              </div>
-          }
+          {/* Fond : dégradé toujours présent + photo par-dessus si disponible.
+               Si PhotoImg retourne null (idb: introuvable), le dégradé reste visible. */}
+          <div style={{position:"absolute",inset:0,background:heroGrad}}>
+            <div style={{position:"absolute",right:-40,top:-40,width:180,height:180,borderRadius:"50%",background:"rgba(255,255,255,0.07)",pointerEvents:"none"}}/>
+            <div style={{position:"absolute",left:-20,bottom:-30,width:130,height:130,borderRadius:"50%",background:"rgba(255,255,255,0.05)",pointerEvents:"none"}}/>
+          </div>
+          {client.photoPiscine && (
+            <PhotoImg src={client.photoPiscine} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+          )}
 
           {/* Dégradé de bas vers le haut (overlay) */}
           <div style={{position:"absolute",inset:0,background:"linear-gradient(0deg, rgba(5,10,25,0.82) 0%, rgba(5,10,25,0.35) 55%, rgba(0,0,0,0.12) 100%)"}}/>

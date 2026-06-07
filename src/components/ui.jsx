@@ -130,7 +130,6 @@ export function DraftBanner({ onRestore, onDiscard }) {
 
 // ─── AVATAR ───────────────────────────────────────────────────────────────────
 export function Avatar({ nom, size=40, photo }) {
-  if (photo) return <img src={photo} alt={nom} style={{width:size,height:size,borderRadius:size*0.3,objectFit:"cover",flexShrink:0,border:"2px solid "+DS.border}}/>;
   const initials = (nom||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
   const colors = [
     "linear-gradient(135deg,#0284c7,#06b6d4)",
@@ -141,8 +140,21 @@ export function Avatar({ nom, size=40, photo }) {
     "linear-gradient(135deg,#db2777,#f472b6)"
   ];
   const bg = colors[nom?.charCodeAt(0)%colors.length] || colors[0];
+  const r = size*0.3;
+
+  if (photo) {
+    // Superposition : initiales en fond + photo par-dessus.
+    // Si la photo ne se résout pas (idb: introuvable), les initiales restent visibles.
+    return (
+      <div style={{width:size,height:size,borderRadius:r,position:"relative",flexShrink:0,overflow:"hidden",background:bg,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 8px rgba(0,0,0,0.15)"}}>
+        <span style={{color:"#fff",fontWeight:800,fontSize:size*0.35,letterSpacing:-0.5,position:"absolute"}}>{initials}</span>
+        {/* PhotoImg résout idb:/https:/data: — retourne null si introuvable → initiales visibles */}
+        <PhotoImg src={photo} alt={nom} style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover"}}/>
+      </div>
+    );
+  }
   return (
-    <div style={{width:size,height:size,borderRadius:size*0.3,background:bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"0 2px 8px rgba(0,0,0,0.15)"}}>
+    <div style={{width:size,height:size,borderRadius:r,background:bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"0 2px 8px rgba(0,0,0,0.15)"}}>
       <span style={{color:"#fff",fontWeight:800,fontSize:size*0.35,letterSpacing:-0.5}}>{initials}</span>
     </div>
   );
