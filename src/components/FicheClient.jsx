@@ -400,18 +400,86 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
         return (
           <div className="fade-in" style={{display:"flex",flexDirection:"column",gap:14}}>
 
-            {/* Alerte active */}
-            {hasAlert && (
-              <div style={{padding:"12px 16px",borderRadius:14,background:col.bg+"44",border:`1.5px solid ${col.tx}33`,display:"flex",alignItems:"center",gap:10}}>
-                <div style={{width:36,height:36,borderRadius:10,background:col.bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={col.tx} strokeWidth="2.2" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            {/* ── Alerte détaillée ── */}
+            {hasAlert && (()=>{
+              const mpmPlan = getPlanningMois(client.moisParMois || client.saisons || {});
+              const cs = client.dateDebut?.slice(0,10);
+              const ce = client.dateFin?.slice(0,10);
+
+              // Mois passés avec passages manquants (pour "orange")
+              const moisRetard = [];
+              for (let m = 1; m < moisNow; m++) {
+                const prevuM = (mpmPlan[m]?.e||0)+(mpmPlan[m]?.c||0);
+                if (!prevuM) continue;
+                const mStr = `${yearNow}-${String(m).padStart(2,"0")}-01`;
+                if (cs && mStr < cs.slice(0,8)+"01") continue;
+                if (ce && mStr > ce) continue;
+                const fait = passContrat.filter(p => {
+                  const d = new Date(p.date);
+                  return d.getMonth()+1===m && d.getFullYear()===yearNow;
+                }).length;
+                if (fait < prevuM) moisRetard.push({ m, manquants: prevuM - fait, fait, prevu: prevuM });
+              }
+              const totalManquants = moisRetard.reduce((s,r)=>s+r.manquants,0);
+
+              // Passages du mois courant encore à faire (pour "aFaire")
+              const prevuE = mpmPlan[moisNow]?.e||0;
+              const prevuC = mpmPlan[moisNow]?.c||0;
+              const faitE = passContrat.filter(p=>new Date(p.date).getMonth()+1===moisNow && new Date(p.date).getFullYear()===yearNow && isEntretienType(p.type)).length;
+              const faitC = passContrat.filter(p=>new Date(p.date).getMonth()+1===moisNow && new Date(p.date).getFullYear()===yearNow && isControleType(p.type)).length;
+              const restE = Math.max(0, prevuE-faitE);
+              const restC = Math.max(0, prevuC-faitC);
+
+              const joursStr = jours !== null ? (jours===0 ? "Aujourd'hui !" : jours===1 ? "Demain" : `Dans ${jours} j`) : null;
+              const dateFinFmt = client.dateFin ? new Date(client.dateFin).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}) : null;
+
+              // Lignes de détail selon le type d'alerte
+              const lignes = {
+                rouge: [
+                  joursStr && { icon:"⏰", txt: `Fin de contrat : ${joursStr}${dateFinFmt?` (${dateFinFmt})`:""}`, strong:true },
+                  rest>0 && { icon:"📋", txt: `${rest} passage${rest>1?"s":""} non effectué${rest>1?"s":""} sur ${total} prévus` },
+                  restantsCeMois>0 && { icon:"🔧", txt: `${restantsCeMois} à faire ce mois — ne pas oublier avant la fin` },
+                ].filter(Boolean),
+                jaune: [
+                  joursStr && { icon:"📅", txt: `Fin de contrat le ${dateFinFmt||"—"} (${joursStr})` },
+                  rest>0 && { icon:"📋", txt: `${rest} passage${rest>1?"s":""} restant${rest>1?"s":""} sur ${total} prévus` },
+                  restantsCeMois>0 && { icon:"🔧", txt: `${restantsCeMois} passage${restantsCeMois>1?"s":""} à planifier ce mois` },
+                ].filter(Boolean),
+                orange: [
+                  { icon:"⚠️", txt: `${totalManquants} passage${totalManquants>1?"s":""} en retard sur ${moisRetard.length} mois`, strong:true },
+                  ...moisRetard.slice(0,4).map(r=>({ icon:"📆", txt:`${MOIS_L[r.m]} : ${r.fait}/${r.prevu} effectué${r.fait>1?"s":""}` })),
+                  moisRetard.length>4 && { icon:"…", txt:`+ ${moisRetard.length-4} autre${moisRetard.length-4>1?"s":""} mois concerné${moisRetard.length-4>1?"s":""}` },
+                ].filter(Boolean),
+                aFaire: [
+                  { icon:"🗓️", txt:`${MOIS_L[moisNow]} : ${restantsCeMois} passage${restantsCeMois>1?"s":""} à effectuer`, strong:true },
+                  restE>0 && { icon:"🔧", txt:`${restE} entretien${restE>1?"s":""} (${faitE}/${prevuE} fait${faitE>1?"s":""})` },
+                  restC>0 && { icon:"💧", txt:`${restC} contrôle${restC>1?"s":""} (${faitC}/${prevuC} fait${faitC>1?"s":""})` },
+                  rest-restantsCeMois>0 && { icon:"📋", txt:`${rest-restantsCeMois} passage${rest-restantsCeMois>1?"s":""} restant${rest-restantsCeMois>1?"s":""} sur le reste du contrat` },
+                ].filter(Boolean),
+              };
+              const rows = lignes[al] || [];
+
+              return (
+                <div style={{borderRadius:14,overflow:"hidden",border:`1.5px solid ${col.tx}33`,background:col.bg+"55"}}>
+                  {/* En-tête */}
+                  <div style={{padding:"11px 14px",background:col.bg,borderBottom:`1px solid ${col.tx}22`,display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{width:32,height:32,borderRadius:10,background:"rgba(255,255,255,0.6)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={col.tx} strokeWidth="2.4" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    </div>
+                    <span style={{fontSize:13,fontWeight:800,color:col.tx}}>{col.lbl}</span>
+                  </div>
+                  {/* Lignes de détail */}
+                  <div style={{padding:"10px 14px",display:"flex",flexDirection:"column",gap:6}}>
+                    {rows.map((row,i)=>(
+                      <div key={i} style={{display:"flex",alignItems:"baseline",gap:8}}>
+                        <span style={{fontSize:13,flexShrink:0,lineHeight:1}}>{row.icon}</span>
+                        <span style={{fontSize:12,color:col.tx,fontWeight:row.strong?700:500,lineHeight:1.4}}>{row.txt}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div>
-                  <div style={{fontSize:13,fontWeight:800,color:col.tx}}>{col.lbl}</div>
-                  <div style={{fontSize:11,color:col.tx,opacity:.7,marginTop:1}}>Vérifier l'historique et les passages planifiés</div>
-                </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* ── Actions rapides ── */}
             <div>
