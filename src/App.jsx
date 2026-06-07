@@ -397,22 +397,26 @@ export default function App() {
       }
     }
 
-    // 2. Photos piscine clients (idb: ou data: → Firebase Storage)
-    const currentClients = readLS("bb_clients_v2", CLIENTS_INIT);
-    const clientsToMigrate = currentClients.filter(cl =>
-      cl.photoPiscine && !cl.photoPiscine.startsWith("https://")
+    // 2. Photos piscine clients (idb: → Firebase Storage ou Firestore)
+    // ⚠️  NE JAMAIS écraser la liste entière depuis readLS() : elle peut être
+    //     périmée si un client vient d'être ajouté avec le debounce Firestore en cours.
+    //     On utilise clientsRef.current (toujours à jour) et setClients(prev=>) pour
+    //     ne modifier QUE les clients migrés sans toucher aux autres.
+    const toMigrate = clientsRef.current.filter(cl =>
+      cl.photoPiscine &&
+      !cl.photoPiscine.startsWith("https://") &&
+      !cl.photoPiscine.startsWith("fsp:")
     );
-    if (clientsToMigrate.length > 0) {
-      const migratedMap = new Map();
-      for (const cl of clientsToMigrate) {
-        if (!navigator.onLine || !auth.currentUser) break;
-        const migrated = await migrateClientPhotoToStorage(cl).catch(() => null);
-        if (migrated) migratedMap.set(migrated.id, migrated);
-      }
-      if (migratedMap.size > 0) {
-        const nextClients = currentClients.map(cl => migratedMap.get(cl.id) || cl);
-        setClients(nextClients);
-        await saveClients(nextClients);
+    for (const cl of toMigrate) {
+      if (!navigator.onLine || !auth.currentUser) break;
+      const migrated = await migrateClientPhotoToStorage(cl).catch(() => null);
+      if (migrated) {
+        // Mise à jour atomique : ne modifie que CE client, préserve tous les autres
+        setClients(prev => {
+          const next = prev.map(x => x.id === migrated.id ? migrated : x);
+          saveClients(next);
+          return next;
+        });
       }
     }
   }, [savePassages, saveClients]);
