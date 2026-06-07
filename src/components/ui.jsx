@@ -161,14 +161,21 @@ export function Avatar({ nom, size=40, photo }) {
 }
 
 // ─── PHOTO IMG ────────────────────────────────────────────────────────────────
-// Résout les références "idb:..." depuis IndexedDB avant d'afficher l'image.
-// Affiche un placeholder gris si l'image idb: ne peut pas être résolue localement.
+// Résout les références spéciales avant d'afficher l'image :
+//   idb:key  → IndexedDB local
+//   fsp:id   → Firestore briblue/client_photos (fallback garanti multi-appareils)
+//   https:// → URL directe (pas de résolution)
+//   data:    → base64 directe (pas de résolution)
+// Les clés non reconnues passent par resolvePhoto pour être sûr.
+const _isDirectUrl = (s) => !s || s.startsWith("http") || s.startsWith("data:") || s.startsWith("blob:");
+
 export function PhotoImg({ src, alt="", style={} }) {
-  const isIdb = src?.startsWith("idb:");
-  const [resolved, setResolved] = useState(() => (isIdb ? null : src || ""));
+  const needsResolve = src && !_isDirectUrl(src);
+  const [resolved, setResolved] = useState(() => needsResolve ? null : (src || ""));
   useEffect(() => {
     if (!src) { setResolved(""); return; }
-    if (!src.startsWith("idb:")) { setResolved(src); return; }
+    if (_isDirectUrl(src)) { setResolved(src); return; }
+    // idb:, fsp: ou autre préfixe spécial → résolution asynchrone
     setResolved(null);
     let cancelled = false;
     resolvePhoto(src).then(v => { if (!cancelled) setResolved(v || ""); });
