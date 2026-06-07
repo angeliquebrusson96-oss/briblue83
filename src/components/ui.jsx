@@ -547,22 +547,58 @@ export function PhotoPicker({ label, value, onChange, compact }) {
         </span>
       )}
       {value ? (
-        <div style={{position:"relative",borderRadius:DS.radius,overflow:"hidden",border:"2px solid "+DS.blue,background:"#000"}}>
-          <PhotoImg src={value} alt="photo" style={{width:"100%",maxHeight:compact?120:220,objectFit:"cover",display:"block"}}/>
-          <button onClick={() => onChange("")} style={{position:"absolute",top:8,right:8,width:32,height:32,borderRadius:16,background:"rgba(0,0,0,0.6)",border:"2px solid rgba(255,255,255,0.4)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2}}>{Ico.close(14,"#fff")}</button>
-          <button onClick={() => cameraRef.current?.click()} style={{position:"absolute",bottom:8,right:8,padding:"6px 12px",borderRadius:10,background:"rgba(0,0,0,0.55)",border:"1px solid rgba(255,255,255,0.3)",cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontSize:15,fontWeight:600,color:"#fff",fontFamily:"inherit"}}>{Ico.camera(13,"#fff")} Reprendre</button>
+        /* ── Photo existante ───────────────────────────────────────────────────
+           minHeight garanti : si l'idb: ne se résout pas, PhotoImg retourne null
+           et le container s'effondrait → les boutons étaient masqués par overflow.
+           On force une hauteur plancher pour que les contrôles restent accessibles. */
+        <div style={{
+          position:"relative",borderRadius:14,overflow:"hidden",
+          border:"1.5px solid #0891b2",background:"#0f172a",
+          minHeight:compact?80:160,display:"flex",flexDirection:"column",
+        }}>
+          <PhotoImg src={value} alt="photo" style={{width:"100%",minHeight:compact?80:160,maxHeight:compact?140:240,objectFit:"cover",display:"block",flex:1}}/>
+          {/* Bouton supprimer */}
+          <button onClick={() => onChange("")}
+            style={{position:"absolute",top:8,right:8,width:30,height:30,borderRadius:15,
+              background:"rgba(0,0,0,0.65)",border:"1.5px solid rgba(255,255,255,0.35)",
+              cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:3}}>
+            {Ico.close(13,"#fff")}
+          </button>
+          {/* Boutons changer (caméra + galerie) */}
+          <div style={{position:"absolute",bottom:8,left:8,right:8,display:"flex",gap:6,zIndex:3}}>
+            <button onClick={() => cameraRef.current?.click()}
+              style={{flex:1,padding:"7px 10px",borderRadius:9,
+                background:"rgba(0,0,0,0.6)",border:"1px solid rgba(255,255,255,0.25)",
+                cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
+                gap:5,fontSize:12,fontWeight:600,color:"#fff",fontFamily:"inherit"}}>
+              {Ico.camera(13,"#fff")} Caméra
+            </button>
+            <button onClick={() => galleryRef.current?.click()}
+              style={{flex:1,padding:"7px 10px",borderRadius:9,
+                background:"rgba(8,145,178,0.75)",border:"1px solid rgba(255,255,255,0.25)",
+                cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
+                gap:5,fontSize:12,fontWeight:600,color:"#fff",fontFamily:"inherit"}}>
+              {Ico.image(13,"#fff")} Galerie
+            </button>
+          </div>
         </div>
       ) : (
         <div style={{display:"flex",gap:10}}>
-          <button onClick={() => cameraRef.current?.click()} className="btn-hover" style={{flex:1,padding:"16px 10px",borderRadius:DS.radius,border:"none",background:"rgba(255,255,255,0.45)",boxShadow:DS.nmShadow,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:8,fontFamily:"inherit"}}>
+          <button onClick={() => cameraRef.current?.click()}
+            style={{flex:1,padding:"16px 10px",borderRadius:14,border:"1.5px solid #e2e8f0",
+              background:"#f8fafc",cursor:"pointer",display:"flex",flexDirection:"column",
+              alignItems:"center",gap:8,fontFamily:"inherit",transition:"border .15s"}}>
             {Ico.camera(24,DS.blue)}
-            <span style={{fontSize:15,fontWeight:700,color:DS.blue}}>Caméra</span>
-            <span style={{fontSize:15,color:DS.mid}}>Photo directe</span>
+            <span style={{fontSize:14,fontWeight:700,color:DS.blue}}>Caméra</span>
+            <span style={{fontSize:12,color:DS.mid}}>Photo directe</span>
           </button>
-          <button onClick={() => galleryRef.current?.click()} className="btn-hover" style={{flex:1,padding:"16px 10px",borderRadius:DS.radius,border:"none",background:"rgba(255,255,255,0.45)",boxShadow:DS.nmShadow,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:8,fontFamily:"inherit"}}>
+          <button onClick={() => galleryRef.current?.click()}
+            style={{flex:1,padding:"16px 10px",borderRadius:14,border:"1.5px solid #e2e8f0",
+              background:"#f8fafc",cursor:"pointer",display:"flex",flexDirection:"column",
+              alignItems:"center",gap:8,fontFamily:"inherit",transition:"border .15s"}}>
             {Ico.image(24,DS.mid)}
-            <span style={{fontSize:15,fontWeight:700,color:DS.mid}}>Galerie</span>
-            <span style={{fontSize:15,color:"#94a3b8"}}>Depuis l'album</span>
+            <span style={{fontSize:14,fontWeight:700,color:DS.mid}}>Galerie</span>
+            <span style={{fontSize:12,color:"#94a3b8"}}>Depuis l'album</span>
           </button>
         </div>
       )}
