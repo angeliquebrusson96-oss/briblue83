@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { DS, Ico, MOIS_L } from "../utils/constants";
 import { TODAY, getSaison, getEntretienMois, getControleMois, isEntretienType, isControleType, MOIS_NOW, YEAR_NOW } from "../utils/helpers";
 import { Avatar, useIsMobile } from "../components/ui";
-import { CalendrierInteractif } from "../components/Calendrier";
+import { resolvePhoto } from "../lib/photoStore";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VDM BLAGUES — carrousel de citations pisciniste
@@ -62,6 +62,245 @@ const SAISON_THEMES = {
 // ─────────────────────────────────────────────────────────────────────────────
 // PLANNING HEBDOMADAIRE
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// CARTE CLIENTS — Leaflet + OpenStreetMap + géocodage data.gouv.fr
+// ─────────────────────────────────────────────────────────────────────────────
+const GEO_CACHE_KEY = "bb_geocache_v1";
+
+function loadGeocacheFromLS() {
+  try { return JSON.parse(localStorage.getItem(GEO_CACHE_KEY) || "{}"); } catch { return {}; }
+}
+function saveGeocacheToLS(cache) {
+  try { localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(cache)); } catch { /* quota */ }
+}
+
+async function geocodeAddress(address) {
+  if (!address?.trim()) return null;
+  const cache = loadGeocacheFromLS();
+  if (cache[address]) return cache[address];
+  try {
+    const res = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(address)}&limit=1`);
+    const data = await res.json();
+    if (data.features?.length > 0) {
+      const [lon, lat] = data.features[0].geometry.coordinates;
+      const result = { lat, lon };
+      cache[address] = result;
+      saveGeocacheToLS(cache);
+      return result;
+    }
+  } catch { /* offline ou erreur */ }
+  return null;
+}
+
+function loadLeaflet() {
+  return new Promise((resolve, reject) => {
+    if (window.L) { resolve(window.L); return; }
+    if (!document.getElementById("leaflet-css")) {
+      const link = document.createElement("link");
+      link.id = "leaflet-css"; link.rel = "stylesheet";
+      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      document.head.appendChild(link);
+    }
+    if (document.getElementById("leaflet-js")) {
+      // Script en cours de chargement
+      document.getElementById("leaflet-js").addEventListener("load", () => resolve(window.L));
+      return;
+    }
+    const script = document.createElement("script");
+    script.id = "leaflet-js";
+    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    script.onload = () => resolve(window.L);
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+
+// Couleurs d'avatar par initiale (cohérent avec le composant Avatar)
+const AVATAR_COLORS = [
+  "#0284c7","#4f46e5","#059669","#0891b2","#0891b2","#db2777"
+];
+function avatarColor(nom) {
+  return AVATAR_COLORS[(nom?.charCodeAt(0)||0) % AVATAR_COLORS.length];
+}
+
+function CarteClients({ clients, onClientClick }) {
+  const mapRef        = useRef(null);
+  const mapInstance   = useRef(null);
+  const markers       = useRef([]);
+  const [status, setStatus] = useState("init"); // "init"|"loading"|"ready"|"error"
+  const [located, setLocated] = useState(0);
+
+  const clientsWithAddr = clients.filter(c => c.adresse?.trim());
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      setStatus("loading");
+      setLocated(0);
+      try {
+        const L = await loadLeaflet();
+        if (cancelled || !mapRef.current) return;
+
+        // Initialiser la carte une seule fois
+        if (!mapInstance.current) {
+          mapInstance.current = L.map(mapRef.current, {
+            center: [43.12, 5.93], // région Toulon par défaut
+            zoom: 11,
+            zoomControl: true,
+          });
+          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution:'© <a href="https://openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>',
+            maxZoom: 19,
+          }).addTo(mapInstance.current);
+        }
+
+        // Supprimer anciens marqueurs
+        markers.current.forEach(m => m.remove());
+        markers.current = [];
+
+        const bounds = [];
+        let count = 0;
+
+        for (const client of clientsWithAddr) {
+          if (cancelled) break;
+          const pos = await geocodeAddress(client.adresse);
+          if (!pos || cancelled) continue;
+
+          const initials = (client.nom||"?").replace(/^(M\.|Mme|Mlle)\s*/i,"").trim()
+            .split(/\s+/).map(w=>w[0]).join("").slice(0,2).toUpperCase();
+          const color = avatarColor(client.nom);
+
+          // Résolution de la photo piscine (idb:, fsp:, https:, data: — toutes gérées)
+          let photoUrl = null;
+          if (client.photoPiscine) {
+            try { photoUrl = await resolvePhoto(client.photoPiscine); } catch { /* pas de photo */ }
+          }
+
+          const iconHtml = photoUrl
+            ? `<div style="
+                width:44px;height:44px;border-radius:50%;
+                border:3px solid #fff;
+                box-shadow:0 4px 14px rgba(0,0,0,0.32);
+                overflow:hidden;cursor:pointer;
+                background:${color};
+              ">
+                <img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover;display:block;" />
+              </div>`
+            : `<div style="
+                width:44px;height:44px;border-radius:50%;
+                background:${color};
+                display:flex;align-items:center;justify-content:center;
+                color:#fff;font-weight:900;font-size:13px;font-family:Inter,system-ui,sans-serif;
+                border:3px solid #fff;
+                box-shadow:0 4px 14px rgba(0,0,0,0.28);
+                cursor:pointer;user-select:none;
+              ">${initials}</div>`;
+
+          const icon = L.divIcon({
+            className:"",
+            html: iconHtml,
+            iconSize:[44,44], iconAnchor:[22,22], popupAnchor:[0,-24],
+          });
+
+          const photoPopup = photoUrl
+            ? `<div style="margin:-8px -8px 10px;border-radius:12px 12px 0 0;overflow:hidden;height:100px;background:#e0f2fe;">
+                <img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover;display:block;" />
+               </div>`
+            : "";
+
+          const marker = L.marker([pos.lat, pos.lon], { icon })
+            .addTo(mapInstance.current)
+            .bindPopup(`
+              <div style="font-family:Inter,system-ui,sans-serif;padding:2px 0;min-width:180px">
+                ${photoPopup}
+                <div style="font-weight:800;font-size:13px;color:#0f172a;margin-bottom:3px">${client.nom}</div>
+                ${client.formule?`<div style="font-size:11px;color:#0891b2;font-weight:600;margin-bottom:3px">${client.formule}</div>`:""}
+                <div style="font-size:10px;color:#64748b;margin-bottom:8px">${client.adresse}</div>
+                <span style="display:inline-block;padding:4px 12px;border-radius:20px;background:#e0f2fe;color:#0891b2;font-size:10px;font-weight:700;cursor:pointer" onclick="window.__briblueOpenClient&&window.__briblueOpenClient('${client.id}')">
+                  Voir la fiche →
+                </span>
+              </div>
+            `, { maxWidth: 240 })
+            .on("click", () => {
+              // Ouvre la fiche client via callback React
+              if (onClientClick) onClientClick(client);
+            });
+
+          markers.current.push(marker);
+          bounds.push([pos.lat, pos.lon]);
+          count++;
+          if (!cancelled) setLocated(count);
+        }
+
+        if (!cancelled && bounds.length > 0 && mapInstance.current) {
+          if (bounds.length === 1) {
+            mapInstance.current.setView(bounds[0], 14);
+          } else {
+            mapInstance.current.fitBounds(bounds, { padding:[40,40], maxZoom:14 });
+          }
+        }
+        if (!cancelled) setStatus("ready");
+      } catch {
+        if (!cancelled) setStatus("error");
+      }
+    };
+
+    run();
+    return () => { cancelled = true; };
+  }, [clients.map(c=>c.id+c.adresse).join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Nettoyage complet au démontage
+  useEffect(() => {
+    return () => {
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+      }
+    };
+  }, []);
+
+  const clientsSansAdresse = clients.filter(c => !c.adresse?.trim());
+
+  return (
+    <div className="db-s6" style={{borderRadius:18,overflow:"hidden",border:"1px solid #e2e8f0",boxShadow:"0 2px 12px rgba(0,0,0,0.06)",background:"#fff",marginBottom:14}}>
+      {/* Header */}
+      <div style={{padding:"11px 14px 9px",background:"linear-gradient(135deg,#f0f9ff,#fff)",borderBottom:"1px solid #f1f5f9",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <div style={{width:28,height:28,borderRadius:8,background:"#e0f2fe",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.2" strokeLinecap="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          </div>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>Carte clients</div>
+            <div style={{fontSize:10,color:"#94a3b8",marginTop:1}}>
+              {status==="loading" ? `${located}/${clientsWithAddr.length} localisés…`
+                : status==="ready"   ? `${located} client${located>1?"s":""} sur la carte`
+                : status==="error"   ? "Erreur de chargement"
+                : "Chargement…"}
+            </div>
+          </div>
+        </div>
+        {status==="loading"&&(
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.5" strokeLinecap="round" style={{animation:"spin .7s linear infinite",flexShrink:0}}><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
+        )}
+      </div>
+
+      {/* Carte Leaflet */}
+      <div ref={mapRef} style={{height:340,width:"100%",background:"#e8f4f8"}}/>
+
+      {/* Clients sans adresse */}
+      {clientsSansAdresse.length > 0 && (
+        <div style={{padding:"7px 12px",background:"#fffbeb",borderTop:"1px solid #fde68a",display:"flex",alignItems:"center",gap:6}}>
+          <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#b45309" strokeWidth="2.5" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/></svg>
+          <span style={{fontSize:10,color:"#92400e",fontWeight:600}}>
+            {clientsSansAdresse.length} client{clientsSansAdresse.length>1?"s":""} sans adresse : {clientsSansAdresse.slice(0,3).map(c=>c.nom.split(" ").pop()).join(", ")}{clientsSansAdresse.length>3?"…":""}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const PLANNING_ACTIONS = [
   {label:"Rendez-vous", emoji:"📅", color:"#7c3aed", bg:"#f5f3ff", bord:"#c4b5fd", type:null, isRdv:true},
   {label:"Rapport",     emoji:"📋", color:"#0891b2", bg:"#e0f2fe", bord:"#7dd3fc", type:null},
@@ -736,10 +975,8 @@ export function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPass
         </div>
       )}
 
-      {/* ── MINI CALENDRIER ── */}
-      <div className="db-s6">
-        <CalendrierInteractif passages={passages} rdvs={rdvs} clients={clients} onClientClick={onClientClick} onEditPassage={onEditPassage} onEditRdv={onEditRdv}/>
-      </div>
+      {/* ── CARTE CLIENTS ── */}
+      <CarteClients clients={clients} onClientClick={onClientClick}/>
 
 
     </div>
