@@ -465,27 +465,48 @@ function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEdit
           return (
             <div key={ds} style={{
               minWidth:isMobile?108:undefined,flex:isMobile?"0 0 108px":1,
-              borderRadius:10,
+              borderRadius:12,
               background:isToday?"#f0f9ff":"#fafafa",
-              border:`1.5px solid ${isToday?"#0891b2":"#e2e8f0"}`,
+              border:`${isToday?"2px":"1.5px"} solid ${isToday?"#0891b2":"#e2e8f0"}`,
+              boxShadow:isToday?"0 0 0 3px rgba(8,145,178,0.13), 0 6px 22px rgba(8,145,178,0.22)":"none",
               display:"flex",flexDirection:"column",overflow:"hidden",
+              position:"relative",
+              zIndex:isToday?2:1,
             }}>
-              {/* Trait top si aujourd'hui */}
-              {isToday && <div style={{height:3,background:"linear-gradient(90deg,#0891b2,#06b6d4)"}}/>}
 
-              {/* En-tête du jour */}
+              {/* ── EN-TÊTE DU JOUR ── */}
               <div style={{
-                padding:"5px 3px 3px",textAlign:"center",
-                borderBottom:`1px solid ${isToday?"#bae6fd":"#f1f5f9"}`,
-                background:isToday?"rgba(8,145,178,0.05)":"transparent",
+                padding:"7px 3px 6px",textAlign:"center",
+                borderBottom:`1px solid ${isToday?"#0284c7":"#f1f5f9"}`,
+                background:isToday
+                  ?"linear-gradient(160deg,#0891b2 0%,#0284c7 60%,#075985 100%)"
+                  :"transparent",
               }}>
-                <div style={{fontSize:8,fontWeight:700,color:isToday?"#0891b2":isPast?"#94a3b8":"#64748b",textTransform:"uppercase",letterSpacing:.3}}>
+                {/* Nom du jour */}
+                <div style={{fontSize:8,fontWeight:800,textTransform:"uppercase",letterSpacing:.6,
+                  color:isToday?"rgba(255,255,255,0.85)":isPast?"#94a3b8":"#64748b"}}>
                   {dayName}
                 </div>
-                <div style={{fontSize:19,fontWeight:900,lineHeight:1.1,color:isToday?"#0891b2":isPast?"#cbd5e1":"#0f172a"}}>
+                {/* Numéro du jour */}
+                <div style={{fontSize:isToday?24:19,fontWeight:900,lineHeight:1.05,
+                  color:isToday?"#fff":isPast?"#cbd5e1":"#0f172a"}}>
                   {dayNum}
                 </div>
-                <div style={{fontSize:8,color:"#94a3b8",lineHeight:1}}>{monthStr}</div>
+                {/* Mois */}
+                <div style={{fontSize:8,lineHeight:1,
+                  color:isToday?"rgba(255,255,255,0.7)":"#94a3b8"}}>
+                  {monthStr}
+                </div>
+                {/* Badge AUJOURD'HUI */}
+                {isToday && (
+                  <div style={{marginTop:4,display:"inline-flex",alignItems:"center",gap:3,
+                    background:"rgba(255,255,255,0.22)",borderRadius:20,padding:"2px 7px",
+                    border:"1px solid rgba(255,255,255,0.35)"}}>
+                    <div style={{width:5,height:5,borderRadius:"50%",background:"#7dd3fc",flexShrink:0}}/>
+                    <span style={{fontSize:7,fontWeight:800,color:"#fff",letterSpacing:.6,
+                      textTransform:"uppercase"}}>Auj.</span>
+                  </div>
+                )}
               </div>
 
               {/* Événements */}
