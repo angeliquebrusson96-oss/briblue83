@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { DS, MOIS_PAR_MOIS_DEF, MOIS, SAISONS_META } from "../utils/constants";
 import { migrateMois, getMoisVal, getSaison, totalAnnuel, calcMensualites, TODAY } from "../utils/helpers";
 import { useFormDraft, DraftBanner, Modal, PhotoPicker, FmField, FmSectionTitle, FmHeader, FmSteps } from "./ui";
-import { toastWarn } from "../styles";
+import { toastWarn, toastSuccess, toastError } from "../styles";
 import { migrateClientPhotoToStorage } from "../lib/photoStore";
 
 // ─── AUTOCOMPLETE ADRESSE ─────────────────────────────────────────────────────
@@ -212,15 +212,23 @@ export function FormClient({ initial, clients, onSave, onClose }) {
   const [photoUploading, setPhotoUploading] = useState(false);
   const handlePhotoChange = useCallback(async (v) => {
     set("photoPiscine", v);
-    if (!v || v.startsWith("https://")) return;
+    if (!v || v.startsWith("https://") || v.startsWith("fsp:")) return;
     setPhotoUploading(true);
     try {
       const migrated = await migrateClientPhotoToStorage({ id: f.id, photoPiscine: v });
-      if (migrated?.photoPiscine?.startsWith("https://")) {
+      if (migrated?.photoPiscine) {
         set("photoPiscine", migrated.photoPiscine);
+        const isCloud = migrated.photoPiscine.startsWith("https://") || migrated.photoPiscine.startsWith("fsp:");
+        if (isCloud) toastSuccess("✅ Photo synchronisée — visible sur tous les appareils");
+      } else {
+        // Pas de réseau ou tout a échoué → reste en idb: (local seulement)
+        toastError("⚠️ Photo sauvée localement uniquement (pas de réseau ?)");
       }
-    } catch { /* garde idb: en fallback */ }
-    finally { setPhotoUploading(false); }
+    } catch(e) {
+      toastError("❌ Erreur lors de l'envoi de la photo");
+    } finally {
+      setPhotoUploading(false);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [f.id]);
 

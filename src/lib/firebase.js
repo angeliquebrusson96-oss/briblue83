@@ -23,11 +23,12 @@ export const storage = getStorage(firebaseApp);
 // Avant : tout dans briblue/app_data (un seul document illisible, limite 1 Mo)
 // Après : un document par type, lisible dans la console Firebase
 export const DOCS = {
-  clients:    doc(db, "briblue", "clients"),    // { data: [...clients] }
-  passages:   doc(db, "briblue", "passages"),   // { data: [...passages] }
-  rdvs:       doc(db, "briblue", "rdvs"),       // { data: [...rdvs] }
-  livraisons: doc(db, "briblue", "livraisons"), // { data: [...livraisons] }
-  contrats:   doc(db, "briblue", "contrats"),   // { data: {...contrats} }
+  clients:       doc(db, "briblue", "clients"),       // { data: [...clients] }
+  passages:      doc(db, "briblue", "passages"),      // { data: [...passages] }
+  rdvs:          doc(db, "briblue", "rdvs"),          // { data: [...rdvs] }
+  livraisons:    doc(db, "briblue", "livraisons"),    // { data: [...livraisons] }
+  contrats:      doc(db, "briblue", "contrats"),      // { data: {...contrats} }
+  client_photos: doc(db, "briblue", "client_photos"), // { [clientId]: "data:..." } — fallback photos piscine
   stock:      doc(db, "briblue", "stock"),      // { data: {...stock} }
   meta:       doc(db, "briblue", "meta"),       // { notes, versements, retards }
   // Legacy — conservé pour la migration automatique au 1er démarrage

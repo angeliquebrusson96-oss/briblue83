@@ -4,13 +4,15 @@
 //   → appelé après la sauvegarde, sans bloquer l'interface.
 //   → remplace les idb:keys par des URL https:// accessibles sur tous les appareils.
 // Flux de LECTURE (resolvePhoto / PhotoImg) :
-//   https:// → URL directe (multi-appareil)
-//   idb:key  → IDB, puis fallback localStorage (400 px — survit à la purge iOS)
-//   data:    → base64 direct
+//   https://  → URL directe (multi-appareil)
+//   idb:key   → IDB, puis fallback localStorage (400 px — survit à la purge iOS)
+//   data:     → base64 direct
+//   fsp:id    → Firestore briblue/client_photos[id] (fallback garanti pour photos piscine)
 
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { getDoc, setDoc } from "firebase/firestore";
 import { signInAnonymously } from "firebase/auth";
-import { storage, auth } from "./firebase";
+import { storage, auth, DOCS } from "./firebase";
 
 // ─── INDEXEDDB ───────────────────────────────────────────────────────────────
 const DB_NAME    = "briblue_photos";
@@ -110,6 +112,18 @@ export async function loadPhoto(key) {
 export async function resolvePhoto(value) {
   if (!value) return "";
   if (value.startsWith("idb:")) return loadPhoto(value.slice(4));
+  // fsp:clientId → photo stockée dans Firestore briblue/client_photos
+  if (value.startsWith("fsp:")) {
+    const clientId = value.slice(4);
+    const cacheKey = `__fsp_${clientId}`;
+    if (_cache.has(cacheKey)) return _cache.get(cacheKey);
+    try {
+      const snap = await getDoc(DOCS.client_photos);
+      const photoData = snap.exists() ? (snap.data()[clientId] || "") : "";
+      if (photoData) _cache.set(cacheKey, photoData);
+      return photoData;
+    } catch { return ""; }
+  }
   return value;
 }
 
@@ -366,37 +380,66 @@ export async function migratePassagePhotosToStorage(passage) {
 }
 
 // ─── MIGRATION PHOTO PISCINE CLIENT ──────────────────────────────────────────
-// Même logique que migratePassagePhotosToStorage mais pour client.photoPiscine.
-// La photo est stockée en idb:tmp_xxx (local) au moment du save ; cette fonction
-// l'uploade vers Firebase Storage et retourne le client avec une URL https://.
-// Appelée en arrière-plan juste après saveClient — non bloquante.
-// Retourne le client mis à jour, ou null si rien n'a changé.
+// Deux tentatives dans l'ordre :
+//   1. Firebase Storage → URL https:// (qualité 900px, multi-appareils)
+//   2. Firestore briblue/client_photos → URL fsp:id (300px, garanti)
+// Retourne le client mis à jour avec la nouvelle photoPiscine, ou null si offline/déjà ok.
 export async function migrateClientPhotoToStorage(client) {
-  if (!client?.id || !navigator.onLine) return null;
+  if (!client?.id) return null;
   const val = client.photoPiscine;
-  // Rien à migrer si vide ou déjà sur Firebase Storage
-  if (!val || val.startsWith("https://")) return null;
+  // Déjà en cloud → rien à faire
+  if (!val || val.startsWith("https://") || val.startsWith("fsp:")) return null;
 
-  if (!auth.currentUser) {
-    try { await signInAnonymously(auth); } catch { return null; }
-  }
-  if (!auth.currentUser) return null;
-
+  // Récupérer le dataUrl depuis IDB/cache/fallback
   let dataUrl = null;
-  const storageKey = `client_${client.id}_photoPiscine`;
-
   if (val.startsWith("idb:")) {
     dataUrl = await loadPhoto(val.slice(4));
   } else if (val.startsWith("data:")) {
-    // Sauvegarder en IDB d'abord pour cohérence
-    await savePhoto(storageKey, val);
     dataUrl = val;
   }
-
   if (!dataUrl) return null;
 
-  const url = await uploadOne(storageKey, dataUrl);
-  if (!url) return null;
+  if (navigator.onLine) {
+    // ── Tentative 1 : Firebase Storage ───────────────────────────────────────
+    if (!auth.currentUser) {
+      try { await signInAnonymously(auth); } catch { /* noop */ }
+    }
+    if (auth.currentUser) {
+      const storageKey = `client_${client.id}_photoPiscine`;
+      const url = await uploadOne(storageKey, dataUrl).catch(() => null);
+      if (url) return { ...client, photoPiscine: url };
+    }
 
-  return { ...client, photoPiscine: url };
+    // ── Tentative 2 : Firestore (fallback garanti) ────────────────────────────
+    // Compression agressive (300px, 65%) → ~15-25 Ko en base64 (largement sous 1 Mo/doc)
+    try {
+      const small = await new Promise(resolve => {
+        const img = new Image();
+        img.onerror = () => resolve(dataUrl);
+        img.onload = () => {
+          const MAX = 300;
+          let { width, height } = img;
+          if (width > MAX || height > MAX) {
+            if (width >= height) { height = Math.round(height * MAX / width); width = MAX; }
+            else                 { width  = Math.round(width  * MAX / height); height = MAX; }
+          }
+          const c = document.createElement("canvas");
+          c.width = width; c.height = height;
+          c.getContext("2d").drawImage(img, 0, 0, width, height);
+          try   { resolve(c.toDataURL("image/jpeg", 0.65)); }
+          catch { resolve(dataUrl); }
+        };
+        img.src = dataUrl;
+      });
+
+      await setDoc(DOCS.client_photos, { [client.id]: small }, { merge: true });
+      // Invalider le cache pour forcer un re-fetch
+      _cache.delete(`__fsp_${client.id}`);
+      // Pré-charger dans le cache pour affichage immédiat
+      _cache.set(`__fsp_${client.id}`, small);
+      return { ...client, photoPiscine: `fsp:${client.id}` };
+    } catch { /* noop */ }
+  }
+
+  return null; // offline ou tout a échoué
 }
