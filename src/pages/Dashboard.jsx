@@ -185,10 +185,13 @@ function CarteClients({ clients, onClientClick }) {
             try { photoUrl = await resolvePhoto(client.photoPiscine); } catch { /* pas de photo */ }
           }
 
-          // Nom court (nom de famille, max 12 car., majuscules)
-          const shortName = (client.nom || "?")
-            .replace(/^(M\.|Mme|Mlle)\s*/i, "").trim()
-            .split(/\s+/).pop().slice(0, 12).toUpperCase();
+          // Nom de famille uniquement — utilise nomFamille si disponible (nouveau format),
+          // sinon extrait le 1er mot après suppression de la civilité (ancien format)
+          const shortName = (
+            client.nomFamille ||
+            (client.nom || "?").replace(/^(M\.|Mme|Mlle)\s*/i, "").trim().split(/\s+/)[0] ||
+            "?"
+          ).slice(0, 12).toUpperCase();
 
           // Contenu intérieur du cercle
           const circleInner = photoUrl

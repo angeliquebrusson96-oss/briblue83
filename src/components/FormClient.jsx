@@ -186,25 +186,53 @@ function AddressAutocomplete({ value, onChange }) {
   );
 }
 
+// ── Extraction nom de famille / prénom depuis l'ancien format "Mme DUPONT Marie"
+function extractNomFamille(c) {
+  if (c.nomFamille) return c.nomFamille;
+  return (c.nom || "").replace(/^(M\.|Mme|Mlle)\s*/i, "").trim().split(/\s+/)[0] || "";
+}
+function extractPrenom(c) {
+  if (c.prenom) return c.prenom;
+  const stripped = (c.nom || "").replace(/^(M\.|Mme|Mlle)\s*/i, "").trim();
+  return stripped.split(/\s+/).slice(1).join(" ") || "";
+}
+
 export function FormClient({ initial, clients, onSave, onClose }) {
   const isNew = !initial?.id;
   const [step, setStep] = useState(1);
   const [f, setF] = useState(() => {
-    if (initial) return { ...initial, moisParMois: migrateMois(initial.moisParMois||initial.saisons), photoPiscine: initial.photoPiscine||"", prixPassageE: initial.prixPassageE||0, prixPassageC: initial.prixPassageC||0, notesTarifaires: initial.notesTarifaires||"" };
-    // Génère l'ID en prenant le MAX existant + 1 (pas clients.length+1 qui cause des collisions
-    // quand un client est supprimé ou perdu — ex: FOULON C019 perdu → KATIA reçoit C019 aussi)
+    if (initial) {
+      // Édition : décompose le nom stocké en nomFamille + prenom
+      const nomFamille = extractNomFamille(initial);
+      const prenom     = extractPrenom(initial);
+      return {
+        ...initial,
+        nom:            nomFamille,   // champ "Nom de famille" dans le formulaire
+        prenom,                       // champ "Prénom"
+        nomFamille,                   // stocké séparément
+        moisParMois:    migrateMois(initial.moisParMois||initial.saisons),
+        photoPiscine:   initial.photoPiscine||"",
+        prixPassageE:   initial.prixPassageE||0,
+        prixPassageC:   initial.prixPassageC||0,
+        notesTarifaires:initial.notesTarifaires||"",
+      };
+    }
+    // Nouveau client
     const maxNum = clients.reduce((max, c) => {
       const n = parseInt((c.id || "").replace(/^C/, ""), 10);
       return isNaN(n) ? max : Math.max(max, n);
     }, 0);
     const nextId = `C${String(maxNum + 1).padStart(3, "0")}`;
-    return { id:nextId, civilite:"", nom:"", tel:"", email:"", adresse:"", bassin:"Liner", volume:30, formule:"VAC", prix:0, prixPassageE:0, prixPassageC:0, dateDebut:TODAY, photoPiscine:"", notesTarifaires:"", dateFin:`${new Date().getFullYear()+1}-03-31`, moisParMois:{...MOIS_PAR_MOIS_DEF}, envoyerContrat:false };
+    return { id:nextId, civilite:"", nom:"", prenom:"", nomFamille:"", tel:"", email:"", adresse:"", bassin:"Liner", volume:30, formule:"VAC", prix:0, prixPassageE:0, prixPassageC:0, dateDebut:TODAY, photoPiscine:"", notesTarifaires:"", dateFin:`${new Date().getFullYear()+1}-03-31`, moisParMois:{...MOIS_PAR_MOIS_DEF}, envoyerContrat:false };
   });
   const set = (k,v) => setF(p=>({...p,[k]:v}));
   const setMoisVal = (m,type,v) => setF(p=>({...p,moisParMois:{...p.moisParMois,[m]:{...p.moisParMois[m],[type]:Math.max(0,v)}}}));
   const totalE = totalAnnuel(f.moisParMois,"entretien");
   const totalC = totalAnnuel(f.moisParMois,"controle");
   const prixCalc = totalE*(f.prixPassageE||0)+totalC*(f.prixPassageC||0);
+
+  // Nom d'affichage complet = Civilité + Prénom + NOM DE FAMILLE
+  const nomAffiche = [f.civilite, (f.prenom||"").trim(), (f.nom||"").trim()].filter(Boolean).join(" ") || "…";
 
   // ── Upload photo IMMÉDIAT dès la sélection ────────────────────────────────────
   // Lance l'upload vers Firebase Storage pendant que l'utilisateur remplit le reste
@@ -234,20 +262,23 @@ export function FormClient({ initial, clients, onSave, onClose }) {
 
   const { hasDraft, restoreDraft, discardDraft, clearDraft } = useFormDraft(
     `briblue_draft_client_${initial?.id||"new"}`, f, setF, null, null,
-    () => !!(f.nom?.trim() || f.tel || f.email)
+    () => !!(f.nom?.trim() || f.prenom?.trim() || f.tel || f.email)
   );
 
   const STEPS = ["Infos", "Contrat", "Planning", "Tarif"];
 
   const handleSave = () => {
-    if(!f.nom.trim()){ toastWarn("Nom du client requis"); return; }
-    clearDraft(); onSave({...f, prix:prixCalc});
+    if (!f.nom.trim()) { toastWarn("Nom de famille requis"); return; }
+    const nomFamille = f.nom.trim().toUpperCase();
+    const nomComplet = [f.civilite, (f.prenom||"").trim(), nomFamille].filter(Boolean).join(" ");
+    clearDraft();
+    onSave({ ...f, nom: nomComplet, nomFamille, prenom: (f.prenom||"").trim(), prix: prixCalc });
   };
 
   return (
     <Modal title="" onClose={onClose} wide noHeader>
       <div>
-        <FmHeader title={isNew?"Nouveau client":`Modifier — ${f.nom||"..."}`} subtitle="Informations et contrat" color="#7c3aed" onClose={onClose}/>
+        <FmHeader title={isNew?"Nouveau client":`Modifier — ${nomAffiche}`} subtitle="Informations et contrat" color="#7c3aed" onClose={onClose}/>
         <FmSteps steps={STEPS} current={step} color="#7c3aed"/>
         {hasDraft&&!initial?.id&&<div style={{margin:"10px 20px 0"}}><DraftBanner onRestore={restoreDraft} onDiscard={discardDraft}/></div>}
 
@@ -285,9 +316,23 @@ export function FormClient({ initial, clients, onSave, onClose }) {
                 </div>
               </FmField>
 
-              <FmField label="Nom complet *">
-                <input value={f.nom} onChange={e=>set("nom",e.target.value)} placeholder="Ex : Dupont Marie"/>
-              </FmField>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <FmField label="Nom de famille *">
+                  <input
+                    value={f.nom}
+                    onChange={e => set("nom", e.target.value.toUpperCase())}
+                    placeholder="Ex : DUPONT"
+                    style={{textTransform:"uppercase",fontWeight:700}}
+                  />
+                </FmField>
+                <FmField label="Prénom">
+                  <input
+                    value={f.prenom||""}
+                    onChange={e => set("prenom", e.target.value)}
+                    placeholder="Ex : Marie"
+                  />
+                </FmField>
+              </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                 <FmField label="Téléphone"><input value={f.tel} onChange={e=>set("tel",e.target.value)} type="tel" placeholder="06 ..."/></FmField>
                 <FmField label="Email"><input value={f.email} onChange={e=>set("email",e.target.value)} type="email" placeholder="@"/></FmField>
@@ -391,7 +436,7 @@ export function FormClient({ initial, clients, onSave, onClose }) {
               <FmSectionTitle>Récapitulatif</FmSectionTitle>
               {/* Info card */}
               <div style={{background:"#f8fafc",borderRadius:14,padding:"14px 16px",border:"1px solid #e2e8f0"}}>
-                {[["Client",f.nom||"—"],["Formule",f.formule],["Bassin",`${f.bassin}${f.volume?" · "+f.volume+"m³":""}`],["Période",`${f.dateDebut||"—"} → ${f.dateFin||"—"}`],["Total passages",`${totalE} entretiens + ${totalC} contrôles`]].map(([l,v])=>(
+                {[["Client", nomAffiche],["Formule",f.formule],["Bassin",`${f.bassin}${f.volume?" · "+f.volume+"m³":""}`],["Période",`${f.dateDebut||"—"} → ${f.dateFin||"—"}`],["Total passages",`${totalE} entretiens + ${totalC} contrôles`]].map(([l,v])=>(
                   <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #f1f5f9",fontSize:13}}>
                     <span style={{color:"#64748b"}}>{l}</span>
                     <span style={{fontWeight:600,color:"#0f172a"}}>{v}</span>
