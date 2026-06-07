@@ -6,36 +6,84 @@ import { Avatar, useIsMobile } from "../components/ui";
 import { resolvePhoto } from "../lib/photoStore";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// VDM BLAGUES — carrousel de citations pisciniste
+// CITATIONS DU JOUR — une par jour, déterministe (change à minuit)
 // ─────────────────────────────────────────────────────────────────────────────
-const VDM_BLAGUES = [
-  "Aujourd'hui, un client m'appelle en panique : « L'eau de la piscine est devenue verte du jour au lendemain ! » Il m'a fallu 10 minutes pour comprendre qu'il avait balancé tout son gazon tondu dedans pour « faire naturel ». VDM",
-  "Aujourd'hui, en nettoyant le filtre d'une piscine, j'ai sorti : 3 petites culottes, un dentier, un porte-monnaie avec 40€ dedans et une anguille. Je ne sais toujours pas pour l'anguille. VDM",
-  "Aujourd'hui, j'explique depuis 20 minutes à un client comment ajouter du chlore. À la fin, il me dit : « Ah mais moi je mets du sel de cuisine, c'est pareil non ? » Non. Non c'est pas pareil. VDM",
-  "Aujourd'hui, une cliente m'appelle pour me dire que sa piscine « sent bizarre ». J'arrive, je teste l'eau : pH 9,2, chlore à 0. Elle avait versé 5L de vinaigre blanc pour « désinfecter naturellement ». VDM",
-  "Aujourd'hui, un client m'a demandé pourquoi l'eau de sa piscine avait tourné rose. Il avait mis ses filles jouer dans la piscine avec leurs nouvelles chaussures en tissu rose fluo. Toute la journée. VDM",
-  "Aujourd'hui, un client m'appelle furieux : « Votre traitement choc ne marche pas ! » Il avait jeté le sachet entier avec l'emballage plastique. Le chlore était encore dedans. VDM",
-  "Aujourd'hui, j'arrive chez un client dont la pompe est « en panne ». Elle était juste débranchée. Il m'a quand même facturé le déplacement. C'est moi le pisciniste mais c'est lui qui me facture. VDM",
-  "Aujourd'hui, une cliente me demande de tester son eau car « elle pique les yeux ». pH parfait, chlore parfait. Je lui demande depuis quand. « Depuis que j'ai mis du shampoing dedans pour que ça mousse mieux. » VDM",
-  "Aujourd'hui, un client me montre fièrement sa « installation de traitement UV ». C'est une lampe UV pour les ongles posée sur le bord de la piscine. Elle n'est même pas branchée. VDM",
-  "Aujourd'hui, un client m'explique que son eau est propre parce qu'il y a mis un gros bouquet de lavande. L'eau est violette. Les algues, elles, s'en foutent de la lavande. VDM",
-  "Aujourd'hui, en faisant l'analyse d'eau d'un client, je lui annonce que son taux de chlore est à zéro. Sa réponse : « Normal, j'ai mis du rosé à la place, c'est moins agressif pour la peau. » VDM",
-  "Aujourd'hui, une cliente m'appelle : « Mon robot piscine ne revient plus à sa base. » Je demande où est la base. « Ben dans le salon, là où je le range. » VDM",
-  "Aujourd'hui, j'explique à un client comment lire son testeur. Il me dit qu'il est daltonien. Il teste l'eau depuis 3 ans seul. Son pH n'a jamais dépassé 6,5. VDM",
-  "Aujourd'hui, un client veut savoir si sa piscine peut attraper la grippe. Sa piscine est verte depuis août. Il pense que c'est « une infection saisonnière ». VDM",
-  "Aujourd'hui, un client m'a demandé si je pouvais faire une remise parce qu'il a « une petite piscine ». 12 mètres sur 6. Il la considère petite parce qu'il a vu des photos de Monaco. VDM",
+const CITATIONS = [
+  "Une journée sans piscine, c'est comme un plongeon sans eau.",
+  "Gardez votre calme et laissez le filtre travailler.",
+  "Les problèmes flottent moins bien que les bouées.",
+  "La vie est meilleure en maillot de bain.",
+  "Ici, on traite l'eau mieux que certains traitent leurs plantes.",
+  "Une piscine propre est une piscine qui fait des jaloux.",
+  "Le bonheur est à quelques brasses d'ici.",
+  "Souriez, votre piscine vous regarde.",
+  "Aujourd'hui : 100 % de chances de se mouiller.",
+  "Votre piscine mérite mieux qu'un simple coup d'épuisette.",
+  "La météo idéale commence dans votre jardin.",
+  "Votre piscine réclame un peu d'attention (et moins de feuilles).",
+  "Le pH fait des siennes, à vous de jouer !",
+  "Votre eau a soif d'équilibre.",
+  "Mission du jour : rendre l'eau cristalline.",
+  "Une minute d'entretien vaut mille plongeons.",
+  "Le bonheur est une eau limpide.",
+  "Chaque vague commence par une goutte.",
+  "Les meilleures idées arrivent souvent au bord de l'eau.",
+  "Une piscine entretenue, c'est des vacances toute l'année.",
+  "Là où l'eau est claire, l'esprit l'est aussi.",
+  "Derrière chaque piscine parfaite se cache quelqu'un qui a testé le pH.",
+  "Les héros portent parfois des bandelettes d'analyse.",
+  "Une algue aujourd'hui, dix demain.",
+  "Le chlore ne dort jamais.",
+  "La guerre contre les feuilles mortes continue.",
+  "Nous transformons les piscines vertes en souvenirs gênants.",
+  "Votre piscine mérite mieux qu'un « on verra demain ».",
+  "Plus de baignade, moins de bricolage.",
+  "Les algues détestent cette application.",
+  "Parce que l'eau verte n'est pas une fonctionnalité.",
+  "Une piscine verte est juste une mission qui s'ignore.",
+  "Derrière chaque eau cristalline se cache un technicien fatigué.",
+  "Le chlore règle beaucoup de problèmes. Les autres demandent un devis.",
+  "Aujourd'hui encore, quelqu'un dira : « Hier elle était parfaite. »",
+  "Une fuite ne disparaît jamais toute seule.",
+  "Une analyse vaut mieux qu'une supposition.",
+  "Chaque bassin raconte une histoire. Certaines font peur.",
+  "Le secret d'une belle piscine ? La régularité.",
+  "Une intervention préventive vaut deux dépannages.",
+  "L'eau ne ment jamais, les tests non plus.",
+  "Si c'est vert, ce n'est probablement pas un effet décoratif.",
+  "Votre mission : sauver une piscine avant l'arrivée des invités.",
+  "Les algues travaillent aussi le week-end.",
+  "Le pH n'a pas lu le manuel.",
+  "Encore une piscine qui jure n'avoir rien changé.",
+  "Un bon technicien voit ce que l'eau essaie de lui dire.",
+  "L'excellence se mesure en ppm.",
+  "Chaque bassin mérite son moment de gloire.",
+  "Une eau équilibrée, un client heureux.",
+  "Faire disparaître les problèmes avant qu'ils ne flottent à la surface.",
+  "Le filtre tourne, tout va bien.",
+  "Pas de panique, vérifie d'abord le panier du skimmer.",
+  "80 % des pannes commencent par « Je n'ai touché à rien. »",
+  "Le meilleur produit reste un bon diagnostic.",
+  "Une journée sans dépannage ? Suspect.",
+  "Aujourd'hui : objectif eau cristalline.",
+  "Une minute d'entretien vaut des heures de baignade.",
+  "Les héros ne portent pas tous une cape, certains portent une trousse d'analyse.",
+  "La perfection se cache souvent derrière un bon contre-lavage.",
+  "Chaque intervention est une occasion de rendre l'été meilleur.",
+  "Le soleil chauffe l'eau. Le technicien crée la sérénité.",
+  "Une piscine parfaite ne se remarque pas. Son entretien non plus.",
+  "L'art du pisciniste : anticiper avant que le problème n'apparaisse.",
+  "L'eau claire est le reflet d'un travail bien fait.",
+  "Chaque contrôle aujourd'hui évite une urgence demain.",
 ];
 
-// Mélange Fisher-Yates — ordre différent à chaque rechargement
-function shuffleArray(arr) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-const VDM_SHUFFLED = shuffleArray(VDM_BLAGUES);
+// Sélection déterministe : change chaque jour à minuit (heure locale)
+const CITATION_DU_JOUR = (() => {
+  const now  = new Date();
+  const debut = new Date(now.getFullYear(), 0, 0);
+  const jourAnnee = Math.floor((now - debut) / 86400000);
+  return CITATIONS[(now.getFullYear() * 1000 + jourAnnee) % CITATIONS.length];
+})();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SAISON THEMES
@@ -730,12 +778,34 @@ export function DashboardHero({ clients, passages, rdvs, saisonNow, isMobile, on
           </div>
 
           {/* Salutation */}
-          <div style={{marginBottom:16}}>
+          <div style={{marginBottom:14}}>
             <div style={{fontSize:22,fontWeight:800,color:"#fff",lineHeight:1.2,letterSpacing:"-0.4px"}}>
               {salut} Dorian 👋
             </div>
             <div style={{fontSize:12,color:"rgba(255,255,255,0.6)",marginTop:3,fontWeight:400}}>
               {rdvsToday.length > 0 ? `${rdvsToday.length} rendez-vous aujourd'hui` : "Que cette journée se passe comme tu le souhaites !"}
+            </div>
+          </div>
+
+          {/* Citation du jour */}
+          <div style={{
+            padding:"10px 14px",
+            borderRadius:12,
+            background:"rgba(255,255,255,0.10)",
+            border:"1px solid rgba(255,255,255,0.15)",
+            backdropFilter:"blur(6px)",
+            WebkitBackdropFilter:"blur(6px)",
+          }}>
+            <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:5}}>
+              <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round">
+                <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
+              </svg>
+              <span style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.45)",textTransform:"uppercase",letterSpacing:1}}>
+                Citation du jour
+              </span>
+            </div>
+            <div style={{fontSize:12.5,color:"rgba(255,255,255,0.88)",fontStyle:"italic",lineHeight:1.55}}>
+              «&nbsp;{CITATION_DU_JOUR}&nbsp;»
             </div>
           </div>
 
