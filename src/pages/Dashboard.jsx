@@ -376,10 +376,10 @@ function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEdit
     closeMenu();
   };
 
-  // Lundi de la semaine courante + décalage
+  // Lundi de la semaine contenant aujourd'hui + décalage
   const getMonday = (offset) => {
     const d = new Date();
-    const day = d.getDay();
+    const day = d.getDay(); // 0=dim, 1=lun … 6=sam
     const monday = new Date(d);
     monday.setDate(d.getDate() - (day === 0 ? 6 : day - 1) + offset * 7);
     monday.setHours(0, 0, 0, 0);
@@ -387,7 +387,8 @@ function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEdit
   };
 
   const monday = getMonday(weekOffset);
-  const days = Array.from({ length: 6 }, (_, i) => {
+  // 7 jours : lundi → dimanche (dimanche inclus pour ne jamais "rater" un jour)
+  const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
     return d;
@@ -395,18 +396,24 @@ function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEdit
 
   const todayStr = new Date().toISOString().split("T")[0];
 
-  // Scroll auto vers aujourd'hui sur mobile
+  // Scroll auto : centre le jour actuel dans la vue (mobile et desktop scrollable)
   useEffect(() => {
-    if (!isMobile || !scrollRef.current || weekOffset !== 0) return;
+    if (!scrollRef.current) return;
     const idx = days.findIndex(d => d.toISOString().split("T")[0] === todayStr);
-    if (idx >= 0) scrollRef.current.scrollLeft = Math.max(0, idx * 116 - 8);
-  }, [weekOffset, isMobile]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (idx < 0) return;
+    // Largeur réelle d'une colonne (min-width + gap)
+    const colW = isMobile ? 113 : scrollRef.current.scrollWidth / 7;
+    const containerW = scrollRef.current.offsetWidth;
+    const scrollLeft = Math.max(0, idx * colW - containerW / 2 + colW / 2);
+    scrollRef.current.scrollLeft = scrollLeft;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekOffset, isMobile]);
 
   const weekLabel = (() => {
     const last = new Date(monday);
-    last.setDate(monday.getDate() + 5);
-    const f = d => d.toLocaleDateString("fr", { day:"2-digit", month:"short" });
-    return `${f(monday)} — ${f(last)} ${monday.getFullYear()}`;
+    last.setDate(monday.getDate() + 6); // +6 pour inclure le dimanche
+    const fmt = d => d.toLocaleDateString("fr", { day:"2-digit", month:"short" });
+    return `${fmt(monday)} — ${fmt(last)} ${monday.getFullYear()}`;
   })();
 
   const getEventsForDay = (date) => {
@@ -448,12 +455,13 @@ function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEdit
         </div>
       </div>
 
-      {/* ── Grille jours ── */}
+      {/* ── Grille jours — 7 jours lun→dim, scroll centré sur aujourd'hui ── */}
       <div ref={scrollRef} style={{
         display:"flex",gap:5,
-        overflowX:isMobile?"auto":"hidden",
+        overflowX:"auto",
         WebkitOverflowScrolling:"touch",
         scrollbarWidth:"none",
+        msOverflowStyle:"none",
         padding:"8px",
       }}>
         {days.map((day) => {
@@ -467,7 +475,8 @@ function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEdit
 
           return (
             <div key={ds} style={{
-              minWidth:isMobile?108:undefined,flex:isMobile?"0 0 108px":1,
+              minWidth:isMobile?105:100,flex:"0 0 auto",
+              width:isMobile?105:"calc(14.28% - 5px)",
               borderRadius:12,
               background:isToday?"#f0f9ff":"#fafafa",
               border:`${isToday?"2px":"1.5px"} solid ${isToday?"#0891b2":"#e2e8f0"}`,
