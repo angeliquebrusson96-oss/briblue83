@@ -62,30 +62,52 @@ const SAISON_THEMES = {
 // ─────────────────────────────────────────────────────────────────────────────
 // PLANNING HEBDOMADAIRE
 // ─────────────────────────────────────────────────────────────────────────────
+const PLANNING_ACTIONS = [
+  {label:"RDV",          emoji:"📅", color:"#7c3aed", bg:"#f5f3ff", bord:"#c4b5fd", type:null,  isRdv:true},
+  {label:"Entretien",    emoji:"🔧", color:"#059669", bg:"#f0fdf4", bord:"#86efac", type:"Entretien complet"},
+  {label:"Contrôle",     emoji:"💧", color:"#0891b2", bg:"#e0f2fe", bord:"#7dd3fc", type:"Contrôle de l'eau"},
+  {label:"SAV",          emoji:"🔧", color:"#ea580c", bg:"#fff7ed", bord:"#fdba74", type:"SAV"},
+  {label:"Hivernage",    emoji:"❄️", color:"#60a5fa", bg:"#eff6ff", bord:"#bfdbfe", type:"Hivernage"},
+  {label:"Remise en svc",emoji:"🌱", color:"#16a34a", bg:"#f0fdf4", bord:"#86efac", type:"Remise en service"},
+];
+
 function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEditRdv, onClientClick, isMobile }) {
   const [weekOffset, setWeekOffset] = useState(0);
   const [menuDay, setMenuDay] = useState(null);
-  const [menuPos, setMenuPos] = useState(null); // {top, left} en position fixe
+  const [menuPos, setMenuPos] = useState(null); // desktop uniquement
   const scrollRef = useRef(null);
 
-  // Ferme le menu au clic extérieur
-  useEffect(() => {
-    if (!menuDay) return;
-    const close = () => { setMenuDay(null); setMenuPos(null); };
-    document.addEventListener("mousedown", close);
-    document.addEventListener("touchstart", close);
-    return () => { document.removeEventListener("mousedown", close); document.removeEventListener("touchstart", close); };
-  }, [menuDay]);
+  const closeMenu = () => { setMenuDay(null); setMenuPos(null); };
 
-  const openMenu = (e, ds) => {
+  // Ferme le menu desktop au clic extérieur
+  useEffect(() => {
+    if (!menuDay || isMobile) return;
+    const close = () => closeMenu();
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [menuDay, isMobile]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handlePlus = (e, ds) => {
     e.stopPropagation();
-    if (menuDay === ds) { setMenuDay(null); setMenuPos(null); return; }
-    const rect = e.currentTarget.getBoundingClientRect();
-    const menuH = 220;
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const top = spaceBelow > menuH ? rect.bottom + 4 : rect.top - menuH - 4;
-    setMenuPos({ top, left: Math.min(rect.left, window.innerWidth - 160) });
-    setMenuDay(ds);
+    if (menuDay === ds) { closeMenu(); return; }
+    if (isMobile) {
+      // Mobile : carrousel intégré en bas du widget
+      setMenuDay(ds);
+    } else {
+      // Desktop : dropdown fixe
+      const rect = e.currentTarget.getBoundingClientRect();
+      const menuH = 240;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const top = spaceBelow > menuH ? rect.bottom + 4 : rect.top - menuH - 4;
+      setMenuPos({ top, left: Math.min(rect.left, window.innerWidth - 160) });
+      setMenuDay(ds);
+    }
+  };
+
+  const doAction = (action) => {
+    if (action.isRdv) { onAddRdv&&onAddRdv({date:menuDay}); }
+    else              { onAddPassage&&onAddPassage({date:menuDay,type:action.type}); }
+    closeMenu();
   };
 
   // Lundi de la semaine courante + décalage
@@ -244,10 +266,10 @@ function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEdit
                   );
                 })}
 
-                {/* Bouton + — ouvre le menu en position fixe (évite le clipping overflow) */}
+                {/* Bouton + */}
                 <button
-                  onMouseDown={e=>openMenu(e,ds)}
-                  onTouchStart={e=>openMenu(e,ds)}
+                  onMouseDown={e=>handlePlus(e,ds)}
+                  onTouchStart={e=>handlePlus(e,ds)}
                   style={{
                     width:"100%",minHeight:22,padding:"2px",borderRadius:6,
                     background:menuDay===ds?"#e0f2fe":"transparent",
@@ -265,50 +287,82 @@ function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEdit
         })}
       </div>
 
-      {/* Légende */}
-      <div style={{padding:"4px 12px 8px",display:"flex",gap:10,flexWrap:"wrap"}}>
-        {[["#059669","#f0fdf4","✓ Entretien"],["#0e7490","#e0f2fe","💧 Contrôle"],["#ea580c","#fff7ed","🔧 SAV"],["#7c3aed","#f5f3ff","📅 RDV"]].map(([c,bg,l])=>(
-          <div key={l} style={{display:"flex",alignItems:"center",gap:4}}>
-            <div style={{width:8,height:8,borderRadius:2,background:bg,border:`1px solid ${c}44`}}/>
-            <span style={{fontSize:9,color:"#94a3b8",fontWeight:500}}>{l}</span>
+      {/* ── Carrousel mobile — s'affiche quand un jour est sélectionné ── */}
+      {isMobile && menuDay && (
+        <div style={{borderTop:"1px solid #e2e8f0",background:"#f8fafc",animation:"fadeIn .18s ease"}}>
+          {/* En-tête avec date + fermer */}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px 4px"}}>
+            <span style={{fontSize:11,fontWeight:700,color:"#0891b2"}}>
+              + {new Date(menuDay).toLocaleDateString("fr",{weekday:"long",day:"2-digit",month:"long"})}
+            </span>
+            <button onClick={closeMenu}
+              style={{width:22,height:22,borderRadius:11,background:"#e2e8f0",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
           </div>
-        ))}
-      </div>
+          {/* Chips horizontales scrollables */}
+          <div style={{display:"flex",gap:8,overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none",padding:"6px 12px 12px"}}>
+            {PLANNING_ACTIONS.map(action=>(
+              <button key={action.label}
+                onClick={()=>doAction(action)}
+                style={{
+                  flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:4,
+                  padding:"10px 14px",borderRadius:14,
+                  background:action.bg,border:`1.5px solid ${action.bord}`,
+                  cursor:"pointer",fontFamily:"inherit",
+                  WebkitTapHighlightColor:"transparent",
+                  boxShadow:`0 2px 8px ${action.color}22`,
+                  transition:"transform .1s",
+                  minWidth:72,
+                }}
+                onTouchStart={e=>e.currentTarget.style.transform="scale(0.94)"}
+                onTouchEnd={e=>e.currentTarget.style.transform="scale(1)"}>
+                <span style={{fontSize:22,lineHeight:1}}>{action.emoji}</span>
+                <span style={{fontSize:10,fontWeight:700,color:action.color,whiteSpace:"nowrap"}}>{action.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Légende */}
+      {(!isMobile || !menuDay) && (
+        <div style={{padding:"4px 12px 8px",display:"flex",gap:10,flexWrap:"wrap"}}>
+          {[["#059669","#f0fdf4","✓ Entretien"],["#0e7490","#e0f2fe","💧 Contrôle"],["#ea580c","#fff7ed","🔧 SAV"],["#7c3aed","#f5f3ff","📅 RDV"]].map(([c,bg,l])=>(
+            <div key={l} style={{display:"flex",alignItems:"center",gap:4}}>
+              <div style={{width:8,height:8,borderRadius:2,background:bg,border:`1px solid ${c}44`}}/>
+              <span style={{fontSize:9,color:"#94a3b8",fontWeight:500}}>{l}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
 
-    {/* ── Menu contextuel en position fixe (contourne overflow:hidden des conteneurs) ── */}
-    {menuDay && menuPos && (
-      <div onMouseDown={e=>e.stopPropagation()} onTouchStart={e=>e.stopPropagation()}
+    {/* ── Menu desktop — dropdown fixe ── */}
+    {!isMobile && menuDay && menuPos && (
+      <div onMouseDown={e=>e.stopPropagation()}
         style={{
           position:"fixed",top:menuPos.top,left:menuPos.left,
           zIndex:99999,background:"#fff",borderRadius:12,
           boxShadow:"0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08)",
-          border:"1px solid #e2e8f0",overflow:"hidden",minWidth:155,
+          border:"1px solid #e2e8f0",overflow:"hidden",minWidth:160,
         }}>
-        {/* Titre */}
         <div style={{padding:"7px 12px 5px",fontSize:9,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:.5,borderBottom:"1px solid #f1f5f9"}}>
-          Ajouter le {new Date(menuDay).toLocaleDateString("fr",{day:"2-digit",month:"short"})}
+          {new Date(menuDay).toLocaleDateString("fr",{weekday:"long",day:"2-digit",month:"short"})}
         </div>
-        {[
-          {label:"📅 RDV",           color:"#7c3aed", action:()=>{ onAddRdv&&onAddRdv({date:menuDay}); setMenuDay(null); }},
-          {label:"🔧 Entretien",      color:"#059669", action:()=>{ onAddPassage&&onAddPassage({date:menuDay,type:"Entretien complet"}); setMenuDay(null); }},
-          {label:"💧 Contrôle eau",   color:"#0891b2", action:()=>{ onAddPassage&&onAddPassage({date:menuDay,type:"Contrôle de l'eau"}); setMenuDay(null); }},
-          {label:"🔧 SAV / Dépannage",color:"#ea580c", action:()=>{ onAddPassage&&onAddPassage({date:menuDay,type:"SAV"}); setMenuDay(null); }},
-          {label:"❄️ Hivernage",      color:"#60a5fa", action:()=>{ onAddPassage&&onAddPassage({date:menuDay,type:"Hivernage"}); setMenuDay(null); }},
-          {label:"🌱 Remise en svc",  color:"#16a34a", action:()=>{ onAddPassage&&onAddPassage({date:menuDay,type:"Remise en service"}); setMenuDay(null); }},
-        ].map((item,i,arr)=>(
-          <button key={item.label}
-            onClick={item.action}
+        {PLANNING_ACTIONS.map((action,i,arr)=>(
+          <button key={action.label}
+            onClick={()=>doAction(action)}
             style={{
               width:"100%",padding:"9px 12px",border:"none",
               background:"#fff",cursor:"pointer",fontFamily:"inherit",
-              textAlign:"left",fontSize:12,fontWeight:600,color:item.color,
+              textAlign:"left",fontSize:12,fontWeight:600,color:action.color,
               borderBottom:i<arr.length-1?"1px solid #f8fafc":"none",
-              transition:"background .1s",display:"block",
+              transition:"background .1s",display:"flex",alignItems:"center",gap:7,
             }}
             onMouseEnter={e=>e.currentTarget.style.background="#f8fafc"}
             onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
-            {item.label}
+            <span>{action.emoji}</span><span>{action.label}</span>
           </button>
         ))}
       </div>
