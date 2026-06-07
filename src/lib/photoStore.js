@@ -364,3 +364,39 @@ export async function migratePassagePhotosToStorage(passage) {
   }
   return changed ? p : null;
 }
+
+// ─── MIGRATION PHOTO PISCINE CLIENT ──────────────────────────────────────────
+// Même logique que migratePassagePhotosToStorage mais pour client.photoPiscine.
+// La photo est stockée en idb:tmp_xxx (local) au moment du save ; cette fonction
+// l'uploade vers Firebase Storage et retourne le client avec une URL https://.
+// Appelée en arrière-plan juste après saveClient — non bloquante.
+// Retourne le client mis à jour, ou null si rien n'a changé.
+export async function migrateClientPhotoToStorage(client) {
+  if (!client?.id || !navigator.onLine) return null;
+  const val = client.photoPiscine;
+  // Rien à migrer si vide ou déjà sur Firebase Storage
+  if (!val || val.startsWith("https://")) return null;
+
+  if (!auth.currentUser) {
+    try { await signInAnonymously(auth); } catch { return null; }
+  }
+  if (!auth.currentUser) return null;
+
+  let dataUrl = null;
+  const storageKey = `client_${client.id}_photoPiscine`;
+
+  if (val.startsWith("idb:")) {
+    dataUrl = await loadPhoto(val.slice(4));
+  } else if (val.startsWith("data:")) {
+    // Sauvegarder en IDB d'abord pour cohérence
+    await savePhoto(storageKey, val);
+    dataUrl = val;
+  }
+
+  if (!dataUrl) return null;
+
+  const url = await uploadOne(storageKey, dataUrl);
+  if (!url) return null;
+
+  return { ...client, photoPiscine: url };
+}

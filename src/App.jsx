@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { save, flushPendingNow, IS_IOS, reconcileOnBoot, invalidateDocCache, subscribeToRealtime } from "./lib/storage";
-import { extractPassagePhotos, migratePassagePhotosToStorage, migrateAllPassagesPhotos } from "./lib/photoStore";
+import { extractPassagePhotos, migratePassagePhotosToStorage, migrateAllPassagesPhotos, migrateClientPhotoToStorage } from "./lib/photoStore";
 import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import { auth } from "./lib/firebase";
 
@@ -379,20 +379,43 @@ export default function App() {
   const saveRetardsCarnet = useCallback((data) => save("bb_retards_carnet_v1", data), []);
   const saveNotes     = useCallback((data) => save("bb_notes_v1",      data), []);
 
-  // ─── MIGRATION PHOTOS : lit les passages depuis LS et pousse les idb: vers Storage ──
+  // ─── MIGRATION PHOTOS passages + clients ─────────────────────────────────────
+  // Pousse les clés idb: locales vers Firebase Storage → URL https:// multi-appareils
   const runPhotoMigration = useCallback(async () => {
     if (!navigator.onLine || !auth.currentUser) return;
+
+    // 1. Passages
     const current = readLS("bb_passages_v2", PASSAGES_INIT);
-    if (!current.some(p =>
+    if (current.some(p =>
       ["photoArrivee","photoDepart"].some(f => p[f]?.startsWith("idb:")) ||
       ["photos","photosDepart"].some(f => Array.isArray(p[f]) && p[f].some(v => v?.startsWith("idb:")))
-    )) return; // rien à migrer
-    const updated = await migrateAllPassagesPhotos(current);
-    if (updated !== current) {
-      setPassages(updated);
-      await savePassages(updated);
+    )) {
+      const updated = await migrateAllPassagesPhotos(current);
+      if (updated !== current) {
+        setPassages(updated);
+        await savePassages(updated);
+      }
     }
-  }, [savePassages]);
+
+    // 2. Photos piscine clients (idb: ou data: → Firebase Storage)
+    const currentClients = readLS("bb_clients_v2", CLIENTS_INIT);
+    const clientsToMigrate = currentClients.filter(cl =>
+      cl.photoPiscine && !cl.photoPiscine.startsWith("https://")
+    );
+    if (clientsToMigrate.length > 0) {
+      const migratedMap = new Map();
+      for (const cl of clientsToMigrate) {
+        if (!navigator.onLine || !auth.currentUser) break;
+        const migrated = await migrateClientPhotoToStorage(cl).catch(() => null);
+        if (migrated) migratedMap.set(migrated.id, migrated);
+      }
+      if (migratedMap.size > 0) {
+        const nextClients = currentClients.map(cl => migratedMap.get(cl.id) || cl);
+        setClients(nextClients);
+        await saveClients(nextClients);
+      }
+    }
+  }, [savePassages, saveClients]);
 
   useEffect(()=>{
     if(!loggedIn || _BB_BOOT_DONE) return;
@@ -550,6 +573,18 @@ export default function App() {
     if (envoyerContrat && isNew) {
       setTimeout(() => envoyerContratSignature(clientData), 500);
     }
+    // ── Migration photo piscine vers Firebase Storage (arrière-plan) ──────────
+    // La photoPiscine est stockée en idb:tmp_xxx (local) au moment du save.
+    // On l'uploade vers Firebase Storage pour la rendre visible sur tous les appareils.
+    migrateClientPhotoToStorage(clientData).then(migrated => {
+      if (!migrated) return; // déjà https:// ou pas de photo
+      setClients(prev => {
+        const next = prev.map(x => x.id === migrated.id ? migrated : x);
+        saveClients(next);
+        return next;
+      });
+      setFicheClient(prev => prev?.id === migrated.id ? migrated : prev);
+    }).catch(() => {});
   },[saveClients, clients, saveContrats]);
 
   const deleteClient = useCallback(id=>{ showConfirm("Supprimer ce client et tous ses passages ?", ()=>{ setClients(prev=>{ const next=prev.filter(x=>x.id!==id); saveClients(next); return next; }); setPassages(prev=>{ const next=prev.filter(x=>x.clientId!==id); savePassages(next); return next; }); setFicheClient(null); }); },[saveClients,savePassages]);
