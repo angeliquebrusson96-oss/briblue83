@@ -10,7 +10,7 @@
 //   fsp:id    → Firestore briblue/client_photos[id] (fallback garanti pour photos piscine)
 
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { getDoc, setDoc } from "firebase/firestore";
+import { getDoc } from "firebase/firestore";
 import { signInAnonymously } from "firebase/auth";
 import { storage, auth, DOCS } from "./firebase";
 
@@ -380,12 +380,11 @@ export async function migratePassagePhotosToStorage(passage) {
 }
 
 // ─── MIGRATION PHOTO PISCINE CLIENT ──────────────────────────────────────────
-// Deux tentatives dans l'ordre :
-//   1. Firebase Storage → URL https:// (qualité 900px, multi-appareils)
-//   2. Firestore briblue/client_photos → URL fsp:id (300px, garanti)
-// Retourne le client mis à jour avec la nouvelle photoPiscine, ou null si offline/déjà ok.
+// Tente d'uploader la photo vers Firebase Storage → URL https:// multi-appareils.
+// Si offline ou upload échoué → retourne null (photo reste en idb: local).
+// Les valeurs fsp: existantes sont traitées via resolvePhoto (lecture Firestore).
 export async function migrateClientPhotoToStorage(client) {
-  if (!client?.id) return null;
+  if (!client?.id || !navigator.onLine) return null;
   const val = client.photoPiscine;
   // Déjà en cloud → rien à faire
   if (!val || val.startsWith("https://") || val.startsWith("fsp:")) return null;
@@ -399,47 +398,14 @@ export async function migrateClientPhotoToStorage(client) {
   }
   if (!dataUrl) return null;
 
-  if (navigator.onLine) {
-    // ── Tentative 1 : Firebase Storage ───────────────────────────────────────
-    if (!auth.currentUser) {
-      try { await signInAnonymously(auth); } catch { /* noop */ }
-    }
-    if (auth.currentUser) {
-      const storageKey = `client_${client.id}_photoPiscine`;
-      const url = await uploadOne(storageKey, dataUrl).catch(() => null);
-      if (url) return { ...client, photoPiscine: url };
-    }
-
-    // ── Tentative 2 : Firestore (fallback garanti) ────────────────────────────
-    // Compression agressive (300px, 65%) → ~15-25 Ko en base64 (largement sous 1 Mo/doc)
-    try {
-      const small = await new Promise(resolve => {
-        const img = new Image();
-        img.onerror = () => resolve(dataUrl);
-        img.onload = () => {
-          const MAX = 300;
-          let { width, height } = img;
-          if (width > MAX || height > MAX) {
-            if (width >= height) { height = Math.round(height * MAX / width); width = MAX; }
-            else                 { width  = Math.round(width  * MAX / height); height = MAX; }
-          }
-          const c = document.createElement("canvas");
-          c.width = width; c.height = height;
-          c.getContext("2d").drawImage(img, 0, 0, width, height);
-          try   { resolve(c.toDataURL("image/jpeg", 0.65)); }
-          catch { resolve(dataUrl); }
-        };
-        img.src = dataUrl;
-      });
-
-      await setDoc(DOCS.client_photos, { [client.id]: small }, { merge: true });
-      // Invalider le cache pour forcer un re-fetch
-      _cache.delete(`__fsp_${client.id}`);
-      // Pré-charger dans le cache pour affichage immédiat
-      _cache.set(`__fsp_${client.id}`, small);
-      return { ...client, photoPiscine: `fsp:${client.id}` };
-    } catch { /* noop */ }
+  if (!auth.currentUser) {
+    try { await signInAnonymously(auth); } catch { return null; }
   }
+  if (!auth.currentUser) return null;
 
-  return null; // offline ou tout a échoué
+  const storageKey = `client_${client.id}_photoPiscine`;
+  const url = await uploadOne(storageKey, dataUrl).catch(() => null);
+  if (!url) return null;
+
+  return { ...client, photoPiscine: url };
 }
