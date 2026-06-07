@@ -1,9 +1,189 @@
 // @ts-nocheck
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { DS, MOIS_PAR_MOIS_DEF, MOIS, SAISONS_META } from "../utils/constants";
 import { migrateMois, getMoisVal, getSaison, totalAnnuel, calcMensualites, TODAY } from "../utils/helpers";
 import { useFormDraft, DraftBanner, Modal, PhotoPicker, FmField, FmSectionTitle, FmHeader, FmSteps } from "./ui";
 import { toastWarn } from "../styles";
+
+// ─── AUTOCOMPLETE ADRESSE ─────────────────────────────────────────────────────
+// Utilise l'API officielle française (gratuite, sans clé, ~100ms)
+// https://api-adresse.data.gouv.fr
+function AddressAutocomplete({ value, onChange }) {
+  const [suggestions, setSuggestions] = useState([]);
+  const [open, setOpen]               = useState(false);
+  const [loading, setLoading]         = useState(false);
+  const [focusedIdx, setFocusedIdx]   = useState(-1);
+  const debounceRef = useRef(null);
+  const wrapRef     = useRef(null);
+  const inputRef    = useRef(null);
+
+  const fetchSuggestions = useCallback(async (q) => {
+    setLoading(true);
+    try {
+      const url = `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(q)}&limit=6&autocomplete=1`;
+      const res  = await fetch(url, { signal: AbortSignal.timeout(4000) });
+      const json = await res.json();
+      setSuggestions(json.features || []);
+      setOpen(true);
+    } catch {
+      setSuggestions([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleChange = (e) => {
+    const v = e.target.value;
+    onChange(v);
+    setFocusedIdx(-1);
+    clearTimeout(debounceRef.current);
+    if (v.trim().length < 3) { setSuggestions([]); setOpen(false); return; }
+    debounceRef.current = setTimeout(() => fetchSuggestions(v), 280);
+  };
+
+  const handleSelect = (feat) => {
+    onChange(feat.properties.label);
+    setSuggestions([]);
+    setOpen(false);
+    setFocusedIdx(-1);
+  };
+
+  const handleKeyDown = (e) => {
+    if (!open || suggestions.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setFocusedIdx(i => Math.min(i + 1, suggestions.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setFocusedIdx(i => Math.max(i - 1, 0));
+    } else if (e.key === "Enter" && focusedIdx >= 0) {
+      e.preventDefault();
+      handleSelect(suggestions[focusedIdx]);
+    } else if (e.key === "Escape") {
+      setOpen(false); setFocusedIdx(-1);
+    }
+  };
+
+  // Fermer si clic extérieur
+  useEffect(() => {
+    const handler = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+        setOpen(false); setFocusedIdx(-1);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Highlight du texte saisi dans la suggestion
+  const highlight = (text, query) => {
+    if (!query?.trim()) return text;
+    const idx = text.toLowerCase().indexOf(query.trim().toLowerCase().slice(0,10));
+    if (idx < 0) return text;
+    return (
+      <>
+        {text.slice(0, idx)}
+        <strong style={{color:"#0891b2",fontWeight:800}}>{text.slice(idx, idx + query.length)}</strong>
+        {text.slice(idx + query.length)}
+      </>
+    );
+  };
+
+  return (
+    <div ref={wrapRef} style={{position:"relative"}}>
+      <div style={{position:"relative"}}>
+        <input
+          ref={inputRef}
+          value={value}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          onFocus={() => suggestions.length > 0 && setOpen(true)}
+          placeholder="Ex : 12 rue de la Paix, Toulon"
+          autoComplete="off"
+        />
+        {/* Icône loupe ou spinner */}
+        <div style={{
+          position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",
+          pointerEvents:"none",display:"flex",alignItems:"center",gap:4
+        }}>
+          {loading
+            ? <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.5" strokeLinecap="round" style={{animation:"spin .7s linear infinite"}}><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
+            : value?.length >= 3
+              ? <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              : null
+          }
+        </div>
+      </div>
+
+      {/* Dropdown suggestions */}
+      {open && suggestions.length > 0 && (
+        <div style={{
+          position:"absolute",top:"calc(100% + 4px)",left:0,right:0,zIndex:9999,
+          background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,
+          boxShadow:"0 8px 24px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)",
+          overflow:"hidden",maxHeight:300,overflowY:"auto",
+        }}>
+          {suggestions.map((feat, i) => {
+            const p = feat.properties;
+            const isActive = focusedIdx === i;
+            return (
+              <button
+                key={p.id || i}
+                onMouseDown={(e) => { e.preventDefault(); handleSelect(feat); }}
+                onMouseEnter={() => setFocusedIdx(i)}
+                style={{
+                  display:"flex",alignItems:"center",gap:10,width:"100%",
+                  padding:"10px 14px",border:"none",cursor:"pointer",fontFamily:"inherit",
+                  textAlign:"left",transition:"background .1s",
+                  background:isActive?"#f0f9ff":"#fff",
+                  borderBottom:i < suggestions.length-1?"1px solid #f8fafc":"none",
+                }}>
+                {/* Icône pin */}
+                <div style={{
+                  width:28,height:28,borderRadius:8,flexShrink:0,
+                  background:isActive?"#0891b2":"#f1f5f9",
+                  display:"flex",alignItems:"center",justifyContent:"center",
+                  transition:"background .1s",
+                }}>
+                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none"
+                    stroke={isActive?"#fff":"#64748b"} strokeWidth="2.2" strokeLinecap="round">
+                    <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/>
+                    <circle cx="12" cy="10" r="3"/>
+                  </svg>
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:"#0f172a",
+                    overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    {highlight(p.name || p.label, value)}
+                  </div>
+                  <div style={{fontSize:11,color:"#64748b",marginTop:1}}>
+                    {p.postcode} {p.city}
+                    {p.context && <span style={{color:"#94a3b8"}}> · {p.context.split(",").pop()?.trim()}</span>}
+                  </div>
+                </div>
+                {/* Badge type */}
+                {p.type === "housenumber" && (
+                  <span style={{fontSize:9,fontWeight:700,color:"#059669",
+                    background:"#f0fdf4",border:"1px solid #bbf7d0",
+                    borderRadius:5,padding:"1px 5px",flexShrink:0,whiteSpace:"nowrap"}}>
+                    Précis
+                  </span>
+                )}
+              </button>
+            );
+          })}
+          {/* Mention légale API */}
+          <div style={{padding:"6px 14px",background:"#f8fafc",
+            fontSize:9,color:"#cbd5e1",borderTop:"1px solid #f1f5f9",
+            display:"flex",alignItems:"center",gap:4}}>
+            <svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Adresses France — data.gouv.fr
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function FormClient({ initial, clients, onSave, onClose }) {
   const isNew = !initial?.id;
@@ -85,7 +265,9 @@ export function FormClient({ initial, clients, onSave, onClose }) {
                 <FmField label="Téléphone"><input value={f.tel} onChange={e=>set("tel",e.target.value)} type="tel" placeholder="06 ..."/></FmField>
                 <FmField label="Email"><input value={f.email} onChange={e=>set("email",e.target.value)} type="email" placeholder="@"/></FmField>
               </div>
-              <FmField label="Adresse"><input value={f.adresse} onChange={e=>set("adresse",e.target.value)} placeholder="Rue, Ville"/></FmField>
+              <FmField label="Adresse">
+                <AddressAutocomplete value={f.adresse} onChange={v=>set("adresse",v)}/>
+              </FmField>
 
               <FmSectionTitle icon={<><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 12h20"/></>}>Piscine</FmSectionTitle>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
