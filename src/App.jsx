@@ -21,6 +21,7 @@ import { PageRdv } from "./pages/PageRdv";
 import { CarnetPublic } from "./pages/CarnetClient";
 import { PageDocuments } from "./pages/PageDocuments";
 import { PageGestion } from "./pages/PageGestion";
+import { PageParametres } from "./pages/PageParametres";
 
 // Protection module-level contre double-load iOS
 let _BB_BOOT_DONE = false;
@@ -307,6 +308,12 @@ export default function App() {
   const [loggedIn, setLoggedIn] = useState(false);
   const { online } = useOnlineStatus();
   const [page, setPage] = useState("dashboard");
+  const [modeExpert, setModeExpert] = useState(() => readLS("expert_mode", false));
+
+  const toggleExpert = (val) => {
+    setModeExpert(val);
+    try { localStorage.setItem("briblue_expert_mode", JSON.stringify(val)); } catch { /* noop */ }
+  };
   const [clients, setClients] = useState([]);
   const [passages, setPassages] = useState([]);
   const [livraisons, setLivraisons] = useState([]);
@@ -722,9 +729,10 @@ export default function App() {
     { id:"interventions", l:"Rapports",     icon:(a)=><IconFiche size={22} color={a?DS.blue:"#94a3b8"}/> },
     { id:"rdv",           l:"Rendez-vous",  icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#818cf8":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="12" cy="15" r="2.5" fill={a?"#818cf8":"none"}/></svg> },
     { id:"gestion",       l:"Gestion",      icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#7c3aed":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/><line x1="14" y1="15" x2="18" y2="15"/></svg> },
+    { id:"parametres",    l:"Paramètres",   icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?"#0f172a":"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg> },
   ];
 
-  const PAGE_LABELS = { dashboard:`Bonjour Dorian 👋`, clients:"Clients", passages:"Rapports", interventions:"Rapports", rdv:"Rendez-vous", gestion:"Gestion" };
+  const PAGE_LABELS = { dashboard:`Bonjour Dorian 👋`, clients:"Clients", passages:"Rapports", interventions:"Rapports", rdv:"Rendez-vous", gestion:"Gestion", parametres:"Paramètres" };
 
   return (
     <>
@@ -822,6 +830,7 @@ export default function App() {
             {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddClient={openAddClient} onValider={validerPassage} onChangeStatut={updateStatutPassage}/>}
             {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
             {page==="gestion"&&<PageGestion clients={clients} versements={versements} onToggleVersement={handleToggleVersement} livraisons={livraisons} onUpdateStatutLivraison={updateStatutLivraison} retardsCarnet={retardsCarnet} onToggleRetardCarnet={handleToggleRetardCarnet} contrats={contrats} onOpenContrat={(client,contrat)=>ouvrirContrat(client,contrat?.signaturePrestataire||"",contrat?.signatureClient||"")}/>}
+            {page==="parametres"&&<PageParametres modeExpert={modeExpert} onToggleExpert={toggleExpert} clients={clients} passages={passages} rdvs={rdvs} onLogout={handleLogout}/>}
           </div>
         </>
       ) : (
@@ -859,6 +868,7 @@ export default function App() {
               {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddClient={openAddClient} onValider={validerPassage} onChangeStatut={updateStatutPassage}/>}
               {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
               {page==="gestion"&&<PageGestion clients={clients} versements={versements} onToggleVersement={handleToggleVersement} livraisons={livraisons} onUpdateStatutLivraison={updateStatutLivraison} retardsCarnet={retardsCarnet} onToggleRetardCarnet={handleToggleRetardCarnet} contrats={contrats} onOpenContrat={(client,contrat)=>ouvrirContrat(client,contrat?.signaturePrestataire||"",contrat?.signatureClient||"")}/>}
+              {page==="parametres"&&<PageParametres modeExpert={modeExpert} onToggleExpert={toggleExpert} clients={clients} passages={passages} rdvs={rdvs} onLogout={handleLogout}/>}
             </div>
           </div>
         </div>
