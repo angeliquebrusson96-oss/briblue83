@@ -858,10 +858,242 @@ function noteTimeAgo(ts) {
   return `${Math.floor(s/86400)} j`;
 }
 
-// ── Helpers to-do list ──────────────────────────────────────────────────────
-const _noteDs = d => [d.getFullYear(), String(d.getMonth()+1).padStart(2,"0"), String(d.getDate()).padStart(2,"0")].join("-");
+// ── To-do list : helpers ─────────────────────────────────────────────────────
+const _ds = d => [d.getFullYear(), String(d.getMonth()+1).padStart(2,"0"), String(d.getDate()).padStart(2,"0")].join("-");
+const _uid = () => Math.random().toString(36).slice(2,9);
 
-// Supprime les items cochés depuis plus de 7 jours
+// Migration : ancien format texte → nouveau format tasks[]
+function migrateToTasks(note) {
+  if (Array.isArray(note.tasks)) return note; // déjà migré
+  const lines = (note.text || "").split("\n").filter(l => l.trim());
+  const tasks = lines.map(line => {
+    const uc = /^- \[ \] ?(.*)/.exec(line);
+    const ch = /^- \[x(:\d{4}-\d{2}-\d{2})?\] ?(.*)/.exec(line);
+    if (uc) return { id: _uid(), text: uc[1].trim(), done: false, doneAt: null };
+    if (ch) return { id: _uid(), text: (ch[2]||"").trim(), done: true, doneAt: ch[1]?.slice(1)||null };
+    return { id: _uid(), text: line.trim(), done: false, doneAt: null };
+  }).filter(t => t.text);
+  return { ...note, title: note.title || "Notes", tasks, text: undefined };
+}
+
+// Nettoyer les tâches cochées depuis +7 jours
+function cleanDone(tasks = []) {
+  const now = new Date();
+  return tasks.filter(t => {
+    if (!t.done || !t.doneAt) return true;
+    return Math.floor((now - new Date(t.doneAt)) / 86400000) < 7;
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TODO CARD — une liste de tâches
+// ─────────────────────────────────────────────────────────────────────────────
+function TodoCard({ list, isMobile, onUpdate, onDelete }) {
+  const { accent } = notePalette(list);
+  const [newTask,    setNewTask]    = useState("");
+  const [editTitle,  setEditTitle]  = useState(false);
+  const [titleDraft, setTitleDraft] = useState(list.title || "Ma liste");
+  const inputRef = useRef(null);
+
+  const tasks = list.tasks || [];
+  const todo  = tasks.filter(t => !t.done);
+  const done  = tasks.filter(t => t.done);
+
+  const upd = patch => onUpdate({ ...list, ...patch, updatedAt: Date.now() });
+
+  const addTask = () => {
+    const txt = newTask.trim();
+    if (!txt) return;
+    upd({ tasks: [...tasks, { id: _uid(), text: txt, done: false, doneAt: null }] });
+    setNewTask("");
+    setTimeout(() => inputRef.current?.focus(), 20);
+  };
+
+  const toggleTask = id => {
+    const today = _ds(new Date());
+    upd({ tasks: tasks.map(t =>
+      t.id === id ? { ...t, done: !t.done, doneAt: !t.done ? today : null } : t
+    )});
+  };
+
+  const delTask = id => upd({ tasks: tasks.filter(t => t.id !== id) });
+  const setPal  = pal => upd({ bg: pal.bg, accent: pal.accent });
+
+  const fs = isMobile ? 13 : 14;
+
+  return (
+    <div style={{
+      borderRadius:18, overflow:"hidden", background:"#fff",
+      border:`1px solid ${accent}28`,
+      boxShadow:"0 2px 14px rgba(0,0,0,0.07)",
+      marginBottom: isMobile ? 10 : 12,
+    }}>
+      {/* ── En-tête ── */}
+      <div style={{
+        display:"flex", alignItems:"center", gap:9,
+        padding: isMobile ? "11px 13px 9px" : "13px 16px 11px",
+        background:`${accent}12`,
+        borderBottom:`1px solid ${accent}20`,
+      }}>
+        <div style={{
+          width:11, height:11, borderRadius:"50%",
+          background:accent, flexShrink:0,
+          boxShadow:`0 2px 5px ${accent}66`,
+        }}/>
+        {editTitle ? (
+          <input autoFocus value={titleDraft}
+            onChange={e => setTitleDraft(e.target.value)}
+            onBlur={() => { upd({ title: titleDraft.trim()||"Ma liste" }); setEditTitle(false); }}
+            onKeyDown={e => { if (e.key==="Enter") { upd({ title: titleDraft.trim()||"Ma liste" }); setEditTitle(false); } }}
+            style={{ flex:1, border:"none", background:"transparent", outline:"none",
+              fontFamily:"inherit", fontSize:fs, fontWeight:700, color:"#0f172a",
+              borderBottom:`2px solid ${accent}` }}
+          />
+        ) : (
+          <span onClick={() => { setTitleDraft(list.title||"Ma liste"); setEditTitle(true); }}
+            style={{ flex:1, fontSize:fs, fontWeight:700, color:"#0f172a", cursor:"text" }}>
+            {list.title || "Ma liste"}
+          </span>
+        )}
+        {tasks.length > 0 && (
+          <span style={{ fontSize:10, fontWeight:700, color:accent,
+            background:`${accent}18`, borderRadius:20, padding:"2px 8px", flexShrink:0 }}>
+            {done.length}/{tasks.length}
+          </span>
+        )}
+        <button onClick={() => upd({ pinned: !list.pinned })}
+          style={{ background:"none", border:"none", cursor:"pointer",
+            fontSize:12, lineHeight:1, padding:"0 2px",
+            opacity:list.pinned?1:0.22, WebkitTapHighlightColor:"transparent" }}>📌</button>
+        <button onClick={onDelete}
+          style={{ background:"none", border:"none", cursor:"pointer",
+            color:"#d1d5db", fontSize:15, lineHeight:1, padding:"0 2px",
+            WebkitTapHighlightColor:"transparent", transition:"color .15s" }}
+          onMouseEnter={e=>e.currentTarget.style.color="#ef4444"}
+          onMouseLeave={e=>e.currentTarget.style.color="#d1d5db"}>✕</button>
+      </div>
+
+      {/* ── Tâches à faire ── */}
+      <div>
+        {todo.map(t => (
+          <div key={t.id} style={{
+            display:"flex", alignItems:"center", gap:10,
+            padding: isMobile ? "8px 13px" : "10px 16px",
+            borderBottom:`1px solid ${accent}0f`,
+          }}>
+            <div onClick={() => toggleTask(t.id)} style={{
+              width:20, height:20, borderRadius:6, flexShrink:0, cursor:"pointer",
+              border:`2px solid ${accent}66`, background:"transparent",
+              transition:"all .15s", WebkitTapHighlightColor:"transparent",
+            }}/>
+            <span style={{ flex:1, fontSize:fs, color:"#1e293b", lineHeight:1.4 }}>{t.text}</span>
+            <button onClick={() => delTask(t.id)}
+              style={{ background:"none", border:"none", cursor:"pointer",
+                color:"#e2e8f0", fontSize:13, lineHeight:1, padding:"0 2px",
+                WebkitTapHighlightColor:"transparent", flexShrink:0 }}
+              onMouseEnter={e=>e.currentTarget.style.color="#ef4444"}
+              onMouseLeave={e=>e.currentTarget.style.color="#e2e8f0"}>✕</button>
+          </div>
+        ))}
+
+        {/* ── Champ ajout ── */}
+        <div style={{
+          display:"flex", alignItems:"center", gap:10,
+          padding: isMobile ? "8px 13px 10px" : "9px 16px 12px",
+        }}>
+          <div style={{
+            width:20, height:20, borderRadius:6, flexShrink:0,
+            border:`2px dashed ${accent}44`,
+            display:"flex", alignItems:"center", justifyContent:"center",
+          }}>
+            <svg width={9} height={9} viewBox="0 0 12 12" fill="none"
+              stroke={accent} strokeWidth="2.5" strokeLinecap="round">
+              <line x1="6" y1="2" x2="6" y2="10"/><line x1="2" y1="6" x2="10" y2="6"/>
+            </svg>
+          </div>
+          <input ref={inputRef} value={newTask}
+            onChange={e => setNewTask(e.target.value)}
+            onKeyDown={e => e.key==="Enter" && addTask()}
+            placeholder="Ajouter une tâche…"
+            style={{ flex:1, border:"none", background:"transparent", outline:"none",
+              fontFamily:"inherit", fontSize:fs, color:"#1e293b",
+              WebkitTapHighlightColor:"transparent" }}
+          />
+          {newTask.trim() && (
+            <button onClick={addTask} style={{
+              background:accent, border:"none", cursor:"pointer", color:"#fff",
+              fontSize:11, fontWeight:700, padding:"4px 10px",
+              borderRadius:20, fontFamily:"inherit",
+              WebkitTapHighlightColor:"transparent", flexShrink:0 }}>OK</button>
+          )}
+        </div>
+
+        {/* ── Tâches faites ── */}
+        {done.length > 0 && (
+          <div style={{
+            borderTop:`1px solid ${accent}15`,
+            background:`${accent}07`,
+            padding: isMobile ? "3px 0 6px" : "4px 0 8px",
+          }}>
+            <div style={{ fontSize:10, fontWeight:600, color:`${accent}88`,
+              padding: isMobile ? "3px 13px 2px" : "4px 16px 2px",
+              textTransform:"uppercase", letterSpacing:.5 }}>
+              Fait ({done.length})
+            </div>
+            {done.map(t => (
+              <div key={t.id} style={{
+                display:"flex", alignItems:"center", gap:10,
+                padding: isMobile ? "6px 13px" : "7px 16px",
+              }}>
+                <div onClick={() => toggleTask(t.id)} style={{
+                  width:20, height:20, borderRadius:6, flexShrink:0, cursor:"pointer",
+                  background:accent, border:`2px solid ${accent}`,
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                  WebkitTapHighlightColor:"transparent",
+                }}>
+                  <svg width={10} height={10} viewBox="0 0 12 12" fill="none"
+                    stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                    <polyline points="2 6 5 9 10 3"/>
+                  </svg>
+                </div>
+                <span style={{ flex:1, fontSize:fs-1, color:"#94a3b8",
+                  textDecoration:"line-through", lineHeight:1.4 }}>{t.text}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Palette couleurs ── */}
+      <div style={{
+        display:"flex", gap:isMobile?5:6, alignItems:"center",
+        padding: isMobile ? "6px 13px 10px" : "7px 16px 11px",
+        borderTop:`1px solid ${accent}12`,
+      }}>
+        <span style={{ fontSize:9, color:"#94a3b8", fontWeight:600,
+          textTransform:"uppercase", letterSpacing:.5, marginRight:2 }}>Couleur</span>
+        {NOTE_PALETTE.map((pal, pi) => (
+          <button key={pi} onClick={() => setPal(pal)} style={{
+            width:isMobile?13:15, height:isMobile?13:15, borderRadius:"50%",
+            background:pal.accent, border:"none", cursor:"pointer",
+            padding:0, flexShrink:0,
+            outline: list.accent===pal.accent ? `2.5px solid ${pal.accent}` : "none",
+            outlineOffset:2,
+            transform: list.accent===pal.accent ? "scale(1.3)" : "scale(1)",
+            transition:"transform .15s",
+          }}/>
+        ))}
+        {!isMobile && list.updatedAt && (
+          <span style={{ marginLeft:"auto", fontSize:9, color:"#94a3b8" }}>
+            {noteTimeAgo(list.updatedAt)}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// DEAD CODE — kept only to avoid parse errors, replaced by TodoCard above
 function cleanOldChecked(text) {
   if (!text) return text;
   const now = new Date();
@@ -939,214 +1171,89 @@ function ChecklistView({ text, onToggle, onEdit, isMobile }) {
   );
 }
 
-// ── Composant contrôlé : l'état réel vit dans App.jsx → Firebase ─────────────
+// ── Composant principal — liste de listes ────────────────────────────────────
 function StickyNotes({ notes = [], onNotesChange }) {
-  const isMobile    = useIsMobile();
-  const [activeId, setActiveId] = useState(null);
-  const dragIdx     = useRef(null);
-  const dragOverIdx = useRef(null);
-  const [dragOver,  setDragOver] = useState(-1);
-
+  const isMobile = useIsMobile();
   const update = fn => onNotesChange(typeof fn === "function" ? fn(notes) : fn);
 
-  // Nettoyage auto au montage : supprime les items cochés depuis +7 jours
+  // Migration + nettoyage J+7 au montage
   useEffect(() => {
-    const dirty = notes.filter(n => {
-      const cleaned = cleanOldChecked(n.text);
-      return cleaned !== n.text;
+    let changed = false;
+    const next = notes.map(n => {
+      const m = migrateToTasks(n);
+      const c = { ...m, tasks: cleanDone(m.tasks || []) };
+      if (JSON.stringify(c) !== JSON.stringify(n)) changed = true;
+      return c;
     });
-    if (dirty.length > 0) {
-      update(prev => prev.map(n => {
-        const cleaned = cleanOldChecked(n.text);
-        return cleaned !== n.text ? { ...n, text: cleaned, updatedAt: Date.now() } : n;
-      }));
-    }
+    if (changed) update(() => next);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const addNote = () => {
-    const pal = NOTE_PALETTE[Math.floor(Math.random() * NOTE_PALETTE.length)];
-    const n = { id: Date.now().toString(), text: "", bg: pal.bg, accent: pal.accent, pinned: false, updatedAt: Date.now() };
-    update(p => [n, ...p]);
-    setTimeout(() => setActiveId(n.id), 50);
-  };
-
-  const del       = id         => update(p => p.filter(n => n.id !== id));
-  const setText   = (id, text) => update(p => p.map(n => n.id === id ? { ...n, text, updatedAt: Date.now() } : n));
-  const setPal    = (id, pal)  => update(p => p.map(n => n.id === id ? { ...n, bg: pal.bg, accent: pal.accent } : n));
-  const togglePin = id         => update(p => p.map(n => n.id === id ? { ...n, pinned: !n.pinned } : n));
-  const toggleChk = (id, text, lineIdx) => setText(id, toggleCheckLine(text, lineIdx));
-
-  const onDragStart = i     => { dragIdx.current = i; };
-  const onDragOver  = (e,i) => { e.preventDefault(); dragOverIdx.current = i; setDragOver(i); };
-  const onDrop      = ()    => {
-    const from = dragIdx.current, to = dragOverIdx.current;
-    if (from !== null && to !== null && from !== to)
-      update(p => { const a=[...p]; const [el]=a.splice(from,1); a.splice(to,0,el); return a; });
-    dragIdx.current = null; dragOverIdx.current = null; setDragOver(-1);
-  };
-
-  const sorted = [...notes].sort((a,b) => {
+  const lists = [...notes].map(migrateToTasks).sort((a, b) => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
     return (b.updatedAt||0) - (a.updatedAt||0);
   });
 
-  // Tailles adaptées mobile/desktop
-  const sz = isMobile
-    ? { header:11, badge:10, btn:11, btnPad:"5px 12px", dotW:13, footPad:"3px 8px 7px", cardGap:7, textFs:12 }
-    : { header:13, badge:11, btn:12, btnPad:"7px 16px", dotW:16, footPad:"4px 10px 10px", cardGap:10, textFs:13.5 };
+  const addList = () => {
+    const pal = NOTE_PALETTE[Math.floor(Math.random() * NOTE_PALETTE.length)];
+    update(p => [{
+      id: Date.now().toString(),
+      title: "Nouvelle liste",
+      bg: pal.bg, accent: pal.accent,
+      pinned: false, updatedAt: Date.now(),
+      tasks: [],
+    }, ...p]);
+  };
 
   return (
     <div className="db-s2" style={{marginBottom:14}}>
-
       {/* ── En-tête ── */}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:isMobile?8:10}}>
         <div style={{display:"flex",alignItems:"center",gap:7}}>
-          <span style={{fontSize:sz.header,fontWeight:700,color:"#0f172a"}}>Notes</span>
-          {notes.length > 0 && (
-            <span style={{fontSize:sz.badge,fontWeight:600,color:"#94a3b8",background:"#f1f5f9",borderRadius:20,padding:"1px 7px"}}>
-              {notes.length}
+          <span style={{fontSize:isMobile?12:13,fontWeight:700,color:"#0f172a"}}>Mes listes</span>
+          {lists.length > 0 && (
+            <span style={{fontSize:10,fontWeight:600,color:"#94a3b8",background:"#f1f5f9",borderRadius:20,padding:"1px 7px"}}>
+              {lists.length}
             </span>
           )}
         </div>
-        <button onClick={addNote} style={{
-          display:"flex",alignItems:"center",gap:5,padding:sz.btnPad,borderRadius:20,
+        <button onClick={addList} style={{
+          display:"flex",alignItems:"center",gap:5,
+          padding:isMobile?"6px 12px":"7px 16px",borderRadius:20,
           background:"linear-gradient(135deg,#0891b2,#0e7490)",border:"none",
-          cursor:"pointer",fontSize:sz.btn,fontWeight:700,color:"#fff",fontFamily:"inherit",
-          boxShadow:"0 2px 10px rgba(8,145,178,0.28)",WebkitTapHighlightColor:"transparent",
+          cursor:"pointer",fontSize:isMobile?11:12,fontWeight:700,color:"#fff",
+          fontFamily:"inherit",boxShadow:"0 2px 10px rgba(8,145,178,0.28)",
+          WebkitTapHighlightColor:"transparent",
         }}>
           <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
-          Note
+          Nouvelle liste
         </button>
       </div>
 
       {/* ── État vide ── */}
-      {notes.length === 0 && (
-        <button onClick={addNote} style={{
-          width:"100%",padding:isMobile?"18px 16px":"28px 20px",borderRadius:16,
+      {lists.length === 0 && (
+        <button onClick={addList} style={{
+          width:"100%",padding:isMobile?"20px 16px":"28px 20px",borderRadius:16,
           border:"2px dashed #e2e8f0",background:"transparent",cursor:"pointer",
           fontFamily:"inherit",display:"flex",flexDirection:"column",alignItems:"center",gap:8,
           WebkitTapHighlightColor:"transparent",
         }}>
-          <span style={{fontSize:isMobile?26:36,lineHeight:1}}>📝</span>
-          <span style={{fontSize:isMobile?11:13,color:"#94a3b8",fontWeight:500}}>Aucune note — appuyez pour créer</span>
+          <span style={{fontSize:isMobile?28:36,lineHeight:1}}>✅</span>
+          <span style={{fontSize:isMobile?12:13,color:"#94a3b8",fontWeight:500}}>
+            Créer votre première liste de tâches
+          </span>
         </button>
       )}
 
-      {/* ── Cartes ── */}
-      <div style={{display:"flex",flexDirection:"column",gap:sz.cardGap}}>
-        {sorted.map((note, i) => {
-          const { bg, accent } = notePalette(note);
-          const isActive  = activeId === note.id;
-          const ts        = noteTimeAgo(note.updatedAt);
-          const isTodo    = hasChecklist(note.text);
-          const lineCount = (note.text||"").split("\n").length;
-
-          return (
-            <div key={note.id}
-              draggable={!isActive}
-              onDragStart={() => onDragStart(i)}
-              onDragOver={e => onDragOver(e, i)}
-              onDrop={onDrop}
-              onDragEnd={() => { dragIdx.current=null; dragOverIdx.current=null; setDragOver(-1); }}
-              style={{
-                borderRadius:14,overflow:"hidden",
-                background:bg,
-                border:`1.5px solid ${dragOver===i&&dragIdx.current!==i?"#0891b2":accent+"44"}`,
-                boxShadow: isActive
-                  ? `0 0 0 2px ${accent}55, 0 6px 20px ${accent}22`
-                  : note.pinned ? `0 3px 14px ${accent}28` : "0 1px 6px rgba(0,0,0,0.06)",
-                opacity: dragIdx.current === i ? 0.4 : 1,
-                transition:"box-shadow .2s, border .15s",
-              }}>
-
-              {/* Barre accent */}
-              <div style={{height:3,background:`linear-gradient(90deg,${accent},${accent}88)`}}/>
-
-              {/* Corps : checklist ou textarea */}
-              {!isActive && isTodo ? (
-                // Vue to-do list (non édition)
-                <ChecklistView
-                  text={note.text}
-                  isMobile={isMobile}
-                  onToggle={lineIdx => toggleChk(note.id, note.text, lineIdx)}
-                  onEdit={() => setActiveId(note.id)}
-                />
-              ) : (
-                // Édition textarea
-                <div style={{position:"relative"}}>
-                  <textarea
-                    value={note.text||""}
-                    onChange={e => setText(note.id, e.target.value)}
-                    onFocus={() => setActiveId(note.id)}
-                    onBlur={() => setActiveId(null)}
-                    placeholder={"📝 Note libre…\n\n☑ To-do : commence une ligne par  - [ ] Tâche"}
-                    rows={isActive ? Math.max(3, lineCount+1) : Math.max(2, lineCount)}
-                    autoFocus={isActive && !note.text}
-                    style={{
-                      width:"100%",
-                      padding:isMobile?"10px 12px 6px":"13px 14px 8px",
-                      background:"transparent",border:"none",outline:"none",resize:"none",
-                      fontFamily:"inherit",fontSize:sz.textFs,color:"#1e293b",
-                      lineHeight:1.75,boxSizing:"border-box",
-                      WebkitTapHighlightColor:"transparent",cursor:"text",
-                    }}
-                  />
-                  {note.pinned && (
-                    <span style={{position:"absolute",top:8,right:8,fontSize:12,opacity:.6,pointerEvents:"none"}}>📌</span>
-                  )}
-                </div>
-              )}
-
-              {/* ── Pied ── */}
-              <div style={{display:"flex",alignItems:"center",padding:sz.footPad,gap:5}}>
-                {/* Poignée */}
-                <div style={{cursor:"grab",color:`${accent}88`,fontSize:13,lineHeight:1,
-                  flexShrink:0,touchAction:"none",userSelect:"none",paddingRight:2}}>⠿</div>
-
-                {/* Palette */}
-                <div style={{display:"flex",gap:isMobile?4:5,flex:1,alignItems:"center"}}>
-                  {NOTE_PALETTE.map((pal, pi) => (
-                    <button key={pi} onClick={() => setPal(note.id, pal)}
-                      style={{
-                        width:sz.dotW,height:sz.dotW,borderRadius:"50%",
-                        background:pal.accent,border:"none",cursor:"pointer",padding:0,flexShrink:0,
-                        outline:note.accent===pal.accent?`2.5px solid ${pal.accent}`:"none",
-                        outlineOffset:2,
-                        transform:note.accent===pal.accent?"scale(1.3)":"scale(1)",
-                        transition:"transform .15s",
-                      }}/>
-                  ))}
-                </div>
-
-                {/* Épingle */}
-                <button onClick={() => togglePin(note.id)}
-                  style={{background:"none",border:"none",cursor:"pointer",
-                    fontSize:isMobile?13:15,lineHeight:1,padding:"0 1px",
-                    opacity:note.pinned?1:0.22,transition:"opacity .2s",
-                    WebkitTapHighlightColor:"transparent"}}>📌</button>
-
-                {/* Timestamp */}
-                {ts && !isMobile && (
-                  <span style={{fontSize:9,color:`${accent}99`,fontWeight:600,flexShrink:0,whiteSpace:"nowrap"}}>{ts}</span>
-                )}
-
-                {/* Supprimer */}
-                <button onClick={() => del(note.id)}
-                  style={{background:"none",border:"none",cursor:"pointer",
-                    color:"#d1d5db",fontSize:isMobile?14:16,lineHeight:1,
-                    padding:"0 2px",flexShrink:0,
-                    WebkitTapHighlightColor:"transparent",transition:"color .15s"}}
-                  onMouseEnter={e=>e.currentTarget.style.color="#ef4444"}
-                  onMouseLeave={e=>e.currentTarget.style.color="#d1d5db"}
-                >✕</button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {/* ── Listes ── */}
+      {lists.map(list => (
+        <TodoCard key={list.id} list={list} isMobile={isMobile}
+          onUpdate={updated => update(p => p.map(n => n.id===updated.id ? updated : n))}
+          onDelete={() => update(p => p.filter(n => n.id!==list.id))}
+        />
+      ))}
     </div>
   );
 }
