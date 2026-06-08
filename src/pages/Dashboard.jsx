@@ -183,13 +183,16 @@ function formuleColor(formule) {
 }
 
 function CarteClients({ clients, onClientClick, passages = [] }) {
-  const mapRef        = useRef(null);
-  const mapInstance   = useRef(null);
-  const markers       = useRef([]);
-  const boundsRef     = useRef([]);
+  const mapRef         = useRef(null);
+  const mapInstance    = useRef(null);
+  const markers        = useRef([]);
+  const boundsRef      = useRef([]);
+  const markersDataRef = useRef([]); // { marker, clientId, formule, isToday, latlng }
+  const panelSnaps     = useRef({});  // { [clientId]: snapshot }
   const [status,  setStatus]  = useState("init");
   const [located, setLocated] = useState(0);
   const [panel,   setPanel]   = useState(null);
+  const [filter,  setFilter]  = useState("tous");
 
   const clientsWithAddr = clients.filter(c => c.adresse?.trim());
   const todayStr = new Date().toISOString().split("T")[0];
@@ -251,6 +254,7 @@ function CarteClients({ clients, onClientClick, passages = [] }) {
 
         markers.current.forEach(m => m.remove());
         markers.current = [];
+        markersDataRef.current = [];
         boundsRef.current = [];
         let count = 0;
 
@@ -342,6 +346,8 @@ function CarteClients({ clients, onClientClick, passages = [] }) {
             .on("click", () => setPanel(clientSnapshot));
 
           markers.current.push(marker);
+          markersDataRef.current.push({ marker, clientId: client.id, formule: client.formule || "", isToday, latlng: [pos.lat, pos.lon] });
+          panelSnaps.current[client.id] = clientSnapshot;
           boundsRef.current.push([pos.lat, pos.lon]);
           count++;
           if (!cancelled) setLocated(count);
@@ -363,6 +369,29 @@ function CarteClients({ clients, onClientClick, passages = [] }) {
     run();
     return () => { cancelled = true; };
   }, [clients.map(c=>c.id+c.adresse).join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Filtrage : affiche/masque les marqueurs sans re-géocoder ──
+  useEffect(() => {
+    if (status !== "ready" || !mapInstance.current) return;
+    const visible = [];
+    markersDataRef.current.forEach(({ marker, formule, isToday, latlng }) => {
+      let show = true;
+      if (filter === "aujourd'hui") show = isToday;
+      else if (filter !== "tous")   show = formule === filter;
+      if (show) {
+        if (!mapInstance.current.hasLayer(marker)) marker.addTo(mapInstance.current);
+        visible.push(latlng);
+      } else {
+        if (mapInstance.current.hasLayer(marker)) marker.remove();
+      }
+    });
+    // Recentrer sur les marqueurs visibles
+    if (visible.length === 1) {
+      mapInstance.current.setView(visible[0], 14);
+    } else if (visible.length > 1) {
+      mapInstance.current.fitBounds(visible, { padding:[40,40], maxZoom:14 });
+    }
+  }, [filter, status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     return () => {
@@ -424,6 +453,40 @@ function CarteClients({ clients, onClientClick, passages = [] }) {
             <div style={{height:"100%",width:`${pct}%`,background:"linear-gradient(90deg,#0891b2,#06b6d4)",borderRadius:99,transition:"width .3s ease"}}/>
           </div>
         )}
+
+        {/* ── Chips de filtre ── */}
+        {status==="ready" && located > 0 && (() => {
+          const formules = [...new Set(clients.filter(c=>c.adresse?.trim()).map(c=>c.formule).filter(Boolean))].sort();
+          const chips = [
+            { key:"tous",       label:"Tous",          color:"#64748b" },
+            ...(clientsToday.size > 0 ? [{ key:"aujourd'hui", label:"Aujourd'hui", color:"#16a34a" }] : []),
+            ...formules.map(f => ({ key:f, label:f, color:formuleColor(f) })),
+          ];
+          return (
+            <div style={{display:"flex",gap:5,flexWrap:"nowrap",overflowX:"auto",scrollbarWidth:"none",paddingTop:8,paddingBottom:2,marginTop:4}}>
+              {chips.map(({ key, label, color }) => {
+                const active = filter === key;
+                return (
+                  <button key={key} onClick={() => setFilter(key)}
+                    style={{
+                      flexShrink:0,
+                      padding:"3px 10px",
+                      borderRadius:20,
+                      border:`1.5px solid ${active ? color : "#e2e8f0"}`,
+                      background:active ? color : "#fff",
+                      color:active ? "#fff" : "#64748b",
+                      fontSize:10, fontWeight:active ? 700 : 500,
+                      cursor:"pointer", fontFamily:"inherit",
+                      transition:"all .12s",
+                      WebkitTapHighlightColor:"transparent",
+                    }}>
+                    {key==="aujourd'hui" ? "✓ " : ""}{label}
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Carte Leaflet — plus haute */}
