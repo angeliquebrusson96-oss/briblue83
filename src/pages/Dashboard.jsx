@@ -180,6 +180,15 @@ function CarteClients({ clients, onClientClick }) {
 
   const clientsWithAddr = clients.filter(c => c.adresse?.trim());
 
+  // Gestionnaire global pour le bouton "Afficher la fiche" dans les popups Leaflet
+  useEffect(() => {
+    window.__briblueOpenClient = (clientId) => {
+      const client = clients.find(c => c.id === clientId);
+      if (client && onClientClick) onClientClick(client);
+    };
+    return () => { delete window.__briblueOpenClient; };
+  }, [clients, onClientClick]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     let cancelled = false;
 
@@ -275,14 +284,14 @@ function CarteClients({ clients, onClientClick }) {
             popupAnchor: [0, -52],
           });
 
-          // Tooltip survol (photo + résumé, sans clic)
+          // ── Tooltip au survol (aperçu rapide, sans navigation) ──
           const tooltipHtml = `
             <div style="background:#fff;border-radius:14px;overflow:hidden;
               box-shadow:0 8px 28px rgba(0,0,0,0.2);border:1px solid #e2e8f0;
               min-width:160px;font-family:Inter,system-ui,sans-serif;">
               ${photoUrl
                 ? `<div style="height:80px;overflow:hidden;background:#e0f2fe;">
-                    <img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover;display:block;" /></div>`
+                    <img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover;display:block;"/></div>`
                 : `<div style="height:36px;background:${color};display:flex;align-items:center;justify-content:center;">
                     <span style="color:#fff;font-weight:900;font-size:18px;">${initials}</span></div>`
               }
@@ -290,16 +299,41 @@ function CarteClients({ clients, onClientClick }) {
                 <div style="font-weight:800;font-size:12px;color:#0f172a;margin-bottom:2px">${client.nom}</div>
                 ${client.formule ? `<div style="font-size:10px;color:#0891b2;font-weight:600;margin-bottom:2px">${client.formule}</div>` : ""}
                 <div style="font-size:9px;color:#94a3b8">${client.adresse.split(",").slice(-1)[0]?.trim() || client.adresse}</div>
-                <div style="margin-top:6px;font-size:9px;color:#0891b2;font-weight:600">Cliquer pour ouvrir la fiche →</div>
+                <div style="margin-top:5px;font-size:9px;color:#64748b">Cliquer pour voir les détails</div>
               </div>
+            </div>`;
+
+          // ── Popup au clic — bouton explicite pour ouvrir la fiche ──
+          const popupHtml = `
+            <div style="font-family:Inter,system-ui,sans-serif;min-width:190px;padding:2px 0">
+              ${photoUrl
+                ? `<div style="margin:-8px -8px 10px;border-radius:10px 10px 0 0;overflow:hidden;height:88px;">
+                    <img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover;display:block;"/></div>`
+                : `<div style="margin:-8px -8px 10px;border-radius:10px 10px 0 0;height:44px;background:${color};display:flex;align-items:center;justify-content:center;">
+                    <span style="color:#fff;font-weight:900;font-size:22px;">${initials}</span></div>`
+              }
+              <div style="font-weight:800;font-size:13px;color:#0f172a;margin-bottom:3px">${client.nom}</div>
+              ${client.formule ? `<div style="font-size:11px;color:#0891b2;font-weight:600;margin-bottom:3px">${client.formule}</div>` : ""}
+              <div style="font-size:10px;color:#94a3b8;margin-bottom:10px">${client.adresse}</div>
+              <button
+                onclick="window.__briblueOpenClient&&window.__briblueOpenClient('${client.id}')"
+                style="
+                  width:100%;padding:9px 12px;
+                  background:linear-gradient(135deg,#0891b2,#0e7490);
+                  color:#fff;border:none;border-radius:10px;
+                  font-size:12px;font-weight:700;cursor:pointer;
+                  font-family:Inter,system-ui,sans-serif;
+                  display:flex;align-items:center;justify-content:center;gap:6px;
+                ">
+                📋 Afficher le client
+              </button>
             </div>`;
 
           const marker = L.marker([pos.lat, pos.lon], { icon })
             .addTo(mapInstance.current)
             .bindTooltip(tooltipHtml, { permanent:false, direction:"top", className:"bb-tip", offset:[0,-56], opacity:1 })
-            .on("click", () => {
-              if (onClientClick) onClientClick(client);
-            });
+            .bindPopup(popupHtml, { maxWidth:250, offset:[0,-10] });
+          // ⚠️ Pas de .on("click") direct — seul le bouton "Afficher le client" navigue
 
           markers.current.push(marker);
           bounds.push([pos.lat, pos.lon]);
@@ -1182,16 +1216,23 @@ function StickyNotes({ notes = [], onNotesChange }) {
   const isMobile = useIsMobile();
   const update = fn => onNotesChange(typeof fn === "function" ? fn(notes) : fn);
 
-  // Migration + nettoyage J+7 au montage
+  // Migration + nettoyage J+7 — uniquement si notes existent ET contiennent de l'ancien format
   useEffect(() => {
-    let changed = false;
+    if (!notes.length) return; // rien à faire
+    // Vérifie s'il y a vraiment quelque chose à migrer ou nettoyer
+    const needsMigration = notes.some(n => !Array.isArray(n.tasks));
+    const needsClean     = notes.some(n =>
+      Array.isArray(n.tasks) && n.tasks.some(t =>
+        t.done && t.doneAt && Math.floor((Date.now() - new Date(t.doneAt)) / 86400000) >= 7
+      )
+    );
+    if (!needsMigration && !needsClean) return; // rien à faire, on ne touche pas à Firebase
+
     const next = notes.map(n => {
       const m = migrateToTasks(n);
-      const c = { ...m, tasks: cleanDone(m.tasks || []) };
-      if (JSON.stringify(c) !== JSON.stringify(n)) changed = true;
-      return c;
+      return { ...m, tasks: cleanDone(m.tasks || []) };
     });
-    if (changed) update(() => next);
+    update(() => next);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
