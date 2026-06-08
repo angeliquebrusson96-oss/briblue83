@@ -858,14 +858,111 @@ function noteTimeAgo(ts) {
   return `${Math.floor(s/86400)} j`;
 }
 
-// Composant contrôlé : l'état réel vit dans App.jsx → Firebase
+// ── Helpers to-do list ──────────────────────────────────────────────────────
+const _noteDs = d => [d.getFullYear(), String(d.getMonth()+1).padStart(2,"0"), String(d.getDate()).padStart(2,"0")].join("-");
+
+// Supprime les items cochés depuis plus de 7 jours
+function cleanOldChecked(text) {
+  if (!text) return text;
+  const now = new Date();
+  return text.split("\n").filter(line => {
+    const m = line.match(/^- \[x:(\d{4}-\d{2}-\d{2})\]/);
+    if (!m) return true;
+    return Math.floor((now - new Date(m[1])) / 86400000) < 7;
+  }).join("\n");
+}
+
+// Coche / décoche une ligne, enregistre la date
+function toggleCheckLine(text, idx) {
+  const lines = text.split("\n");
+  const l = lines[idx];
+  if (/^- \[ \]/.test(l)) {
+    lines[idx] = l.replace(/^- \[ \]/, `- [x:${_noteDs(new Date())}]`);
+  } else if (/^- \[x(:\d{4}-\d{2}-\d{2})?\]/.test(l)) {
+    lines[idx] = l.replace(/^- \[x(:\d{4}-\d{2}-\d{2})?\]/, "- [ ]");
+  }
+  return lines.join("\n");
+}
+
+// Détecte si la note contient au moins un item to-do
+function hasChecklist(text) {
+  return /^- \[[ x]/m.test(text || "");
+}
+
+// Rendu checklist : barré + checkbox
+function ChecklistView({ text, onToggle, onEdit, isMobile }) {
+  const fs = isMobile ? 12 : 13;
+  return (
+    <div style={{padding:"10px 12px 6px",cursor:"text"}} onClick={onEdit}>
+      {(text||"").split("\n").map((line, i) => {
+        const unchecked = /^- \[ \] ?(.*)/.exec(line);
+        const checked   = /^- \[x(:\d{4}-\d{2}-\d{2})?\] ?(.*)/.exec(line);
+        if (unchecked || checked) {
+          const done  = !!checked;
+          const label = (unchecked ? unchecked[1] : checked[2] || "").trim();
+          return (
+            <div key={i}
+              onClick={e => { e.stopPropagation(); onToggle(i); }}
+              style={{display:"flex",alignItems:"flex-start",gap:8,padding:"3px 0",cursor:"pointer"}}>
+              {/* Case à cocher */}
+              <div style={{
+                width:16,height:16,borderRadius:4,flexShrink:0,marginTop:2,
+                border:`2px solid ${done?"#0891b2":"#9ca3af"}`,
+                background:done?"#0891b2":"transparent",
+                display:"flex",alignItems:"center",justifyContent:"center",
+                transition:"all .15s",
+              }}>
+                {done && (
+                  <svg width={9} height={9} viewBox="0 0 12 12" fill="none"
+                    stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                    <polyline points="2 6 5 9 10 3"/>
+                  </svg>
+                )}
+              </div>
+              {/* Texte barré si coché */}
+              <span style={{
+                fontSize:fs, lineHeight:1.55, flex:1,
+                color: done ? "#9ca3af" : "#1e293b",
+                textDecoration: done ? "line-through" : "none",
+                fontStyle: done ? "italic" : "normal",
+              }}>
+                {label || <span style={{color:"#d1d5db"}}>Tâche…</span>}
+              </span>
+            </div>
+          );
+        }
+        // Ligne texte normale
+        if (!line.trim()) return <div key={i} style={{height:4}}/>;
+        return <div key={i} style={{fontSize:fs,color:"#374151",lineHeight:1.7,padding:"1px 0"}}>{line}</div>;
+      })}
+    </div>
+  );
+}
+
+// ── Composant contrôlé : l'état réel vit dans App.jsx → Firebase ─────────────
 function StickyNotes({ notes = [], onNotesChange }) {
+  const isMobile    = useIsMobile();
   const [activeId, setActiveId] = useState(null);
   const dragIdx     = useRef(null);
   const dragOverIdx = useRef(null);
   const [dragOver,  setDragOver] = useState(-1);
 
   const update = fn => onNotesChange(typeof fn === "function" ? fn(notes) : fn);
+
+  // Nettoyage auto au montage : supprime les items cochés depuis +7 jours
+  useEffect(() => {
+    const dirty = notes.filter(n => {
+      const cleaned = cleanOldChecked(n.text);
+      return cleaned !== n.text;
+    });
+    if (dirty.length > 0) {
+      update(prev => prev.map(n => {
+        const cleaned = cleanOldChecked(n.text);
+        return cleaned !== n.text ? { ...n, text: cleaned, updatedAt: Date.now() } : n;
+      }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const addNote = () => {
     const pal = NOTE_PALETTE[Math.floor(Math.random() * NOTE_PALETTE.length)];
@@ -874,14 +971,15 @@ function StickyNotes({ notes = [], onNotesChange }) {
     setTimeout(() => setActiveId(n.id), 50);
   };
 
-  const del      = id          => update(p => p.filter(n => n.id !== id));
-  const setText  = (id, text)  => update(p => p.map(n => n.id === id ? { ...n, text, updatedAt: Date.now() } : n));
-  const setPal   = (id, pal)   => update(p => p.map(n => n.id === id ? { ...n, bg: pal.bg, accent: pal.accent } : n));
-  const togglePin= id          => update(p => p.map(n => n.id === id ? { ...n, pinned: !n.pinned } : n));
+  const del       = id         => update(p => p.filter(n => n.id !== id));
+  const setText   = (id, text) => update(p => p.map(n => n.id === id ? { ...n, text, updatedAt: Date.now() } : n));
+  const setPal    = (id, pal)  => update(p => p.map(n => n.id === id ? { ...n, bg: pal.bg, accent: pal.accent } : n));
+  const togglePin = id         => update(p => p.map(n => n.id === id ? { ...n, pinned: !n.pinned } : n));
+  const toggleChk = (id, text, lineIdx) => setText(id, toggleCheckLine(text, lineIdx));
 
-  const onDragStart = i    => { dragIdx.current = i; };
-  const onDragOver  = (e,i)=> { e.preventDefault(); dragOverIdx.current = i; setDragOver(i); };
-  const onDrop      = ()   => {
+  const onDragStart = i     => { dragIdx.current = i; };
+  const onDragOver  = (e,i) => { e.preventDefault(); dragOverIdx.current = i; setDragOver(i); };
+  const onDrop      = ()    => {
     const from = dragIdx.current, to = dragOverIdx.current;
     if (from !== null && to !== null && from !== to)
       update(p => { const a=[...p]; const [el]=a.splice(from,1); a.splice(to,0,el); return a; });
@@ -893,51 +991,57 @@ function StickyNotes({ notes = [], onNotesChange }) {
     return (b.updatedAt||0) - (a.updatedAt||0);
   });
 
+  // Tailles adaptées mobile/desktop
+  const sz = isMobile
+    ? { header:11, badge:10, btn:11, btnPad:"5px 12px", dotW:13, footPad:"3px 8px 7px", cardGap:7, textFs:12 }
+    : { header:13, badge:11, btn:12, btnPad:"7px 16px", dotW:16, footPad:"4px 10px 10px", cardGap:10, textFs:13.5 };
+
   return (
     <div className="db-s2" style={{marginBottom:14}}>
 
       {/* ── En-tête ── */}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <span style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>Notes</span>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:7}}>
+          <span style={{fontSize:sz.header,fontWeight:700,color:"#0f172a"}}>Notes</span>
           {notes.length > 0 && (
-            <span style={{fontSize:11,fontWeight:600,color:"#94a3b8",background:"#f1f5f9",borderRadius:20,padding:"1px 8px"}}>
+            <span style={{fontSize:sz.badge,fontWeight:600,color:"#94a3b8",background:"#f1f5f9",borderRadius:20,padding:"1px 7px"}}>
               {notes.length}
             </span>
           )}
         </div>
         <button onClick={addNote} style={{
-          display:"flex",alignItems:"center",gap:6,padding:"7px 16px",borderRadius:20,
+          display:"flex",alignItems:"center",gap:5,padding:sz.btnPad,borderRadius:20,
           background:"linear-gradient(135deg,#0891b2,#0e7490)",border:"none",
-          cursor:"pointer",fontSize:12,fontWeight:700,color:"#fff",fontFamily:"inherit",
-          boxShadow:"0 2px 12px rgba(8,145,178,0.28)",WebkitTapHighlightColor:"transparent",
+          cursor:"pointer",fontSize:sz.btn,fontWeight:700,color:"#fff",fontFamily:"inherit",
+          boxShadow:"0 2px 10px rgba(8,145,178,0.28)",WebkitTapHighlightColor:"transparent",
         }}>
-          <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+          <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
-          Nouvelle note
+          Note
         </button>
       </div>
 
       {/* ── État vide ── */}
       {notes.length === 0 && (
         <button onClick={addNote} style={{
-          width:"100%",padding:"28px 20px",borderRadius:18,
+          width:"100%",padding:isMobile?"18px 16px":"28px 20px",borderRadius:16,
           border:"2px dashed #e2e8f0",background:"transparent",cursor:"pointer",
-          fontFamily:"inherit",display:"flex",flexDirection:"column",alignItems:"center",gap:10,
+          fontFamily:"inherit",display:"flex",flexDirection:"column",alignItems:"center",gap:8,
           WebkitTapHighlightColor:"transparent",
         }}>
-          <span style={{fontSize:36,lineHeight:1}}>📝</span>
-          <span style={{fontSize:13,color:"#94a3b8",fontWeight:500}}>Aucune note — appuyez pour créer</span>
+          <span style={{fontSize:isMobile?26:36,lineHeight:1}}>📝</span>
+          <span style={{fontSize:isMobile?11:13,color:"#94a3b8",fontWeight:500}}>Aucune note — appuyez pour créer</span>
         </button>
       )}
 
       {/* ── Cartes ── */}
-      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+      <div style={{display:"flex",flexDirection:"column",gap:sz.cardGap}}>
         {sorted.map((note, i) => {
           const { bg, accent } = notePalette(note);
-          const isActive = activeId === note.id;
-          const ts = noteTimeAgo(note.updatedAt);
+          const isActive  = activeId === note.id;
+          const ts        = noteTimeAgo(note.updatedAt);
+          const isTodo    = hasChecklist(note.text);
           const lineCount = (note.text||"").split("\n").length;
 
           return (
@@ -948,107 +1052,95 @@ function StickyNotes({ notes = [], onNotesChange }) {
               onDrop={onDrop}
               onDragEnd={() => { dragIdx.current=null; dragOverIdx.current=null; setDragOver(-1); }}
               style={{
-                borderRadius:16,overflow:"hidden",
+                borderRadius:14,overflow:"hidden",
                 background:bg,
-                border:`1.5px solid ${dragOver===i&&dragIdx.current!==i ? "#0891b2" : accent+"44"}`,
+                border:`1.5px solid ${dragOver===i&&dragIdx.current!==i?"#0891b2":accent+"44"}`,
                 boxShadow: isActive
-                  ? `0 0 0 2.5px ${accent}55, 0 8px 28px ${accent}22`
-                  : note.pinned
-                    ? `0 4px 18px ${accent}28`
-                    : "0 2px 8px rgba(0,0,0,0.06)",
+                  ? `0 0 0 2px ${accent}55, 0 6px 20px ${accent}22`
+                  : note.pinned ? `0 3px 14px ${accent}28` : "0 1px 6px rgba(0,0,0,0.06)",
                 opacity: dragIdx.current === i ? 0.4 : 1,
                 transition:"box-shadow .2s, border .15s",
               }}>
 
-              {/* Barre accent couleur */}
-              <div style={{height:4,background:`linear-gradient(90deg,${accent},${accent}88)`}}/>
+              {/* Barre accent */}
+              <div style={{height:3,background:`linear-gradient(90deg,${accent},${accent}88)`}}/>
 
-              {/* Zone texte — cliquable pour éditer */}
-              <div style={{position:"relative"}}>
-                <textarea
-                  value={note.text||""}
-                  onChange={e => setText(note.id, e.target.value)}
-                  onFocus={() => setActiveId(note.id)}
-                  onBlur={() => setActiveId(null)}
-                  placeholder="Écris ta note ici…"
-                  rows={isActive ? Math.max(4, lineCount+1) : Math.max(2, lineCount)}
-                  style={{
-                    width:"100%",padding:"13px 14px 8px",
-                    background:"transparent",border:"none",outline:"none",resize:"none",
-                    fontFamily:"inherit",fontSize:13.5,color:"#1e293b",lineHeight:1.8,
-                    boxSizing:"border-box",WebkitTapHighlightColor:"transparent",
-                    cursor:"text",
-                  }}
+              {/* Corps : checklist ou textarea */}
+              {!isActive && isTodo ? (
+                // Vue to-do list (non édition)
+                <ChecklistView
+                  text={note.text}
+                  isMobile={isMobile}
+                  onToggle={lineIdx => toggleChk(note.id, note.text, lineIdx)}
+                  onEdit={() => setActiveId(note.id)}
                 />
-                {/* Badge épingle */}
-                {note.pinned && (
-                  <span style={{
-                    position:"absolute",top:10,right:10,
-                    fontSize:14,opacity:.7,pointerEvents:"none",
-                  }}>📌</span>
-                )}
-              </div>
+              ) : (
+                // Édition textarea
+                <div style={{position:"relative"}}>
+                  <textarea
+                    value={note.text||""}
+                    onChange={e => setText(note.id, e.target.value)}
+                    onFocus={() => setActiveId(note.id)}
+                    onBlur={() => setActiveId(null)}
+                    placeholder={"📝 Note libre…\n\n☑ To-do : commence une ligne par  - [ ] Tâche"}
+                    rows={isActive ? Math.max(3, lineCount+1) : Math.max(2, lineCount)}
+                    autoFocus={isActive && !note.text}
+                    style={{
+                      width:"100%",
+                      padding:isMobile?"10px 12px 6px":"13px 14px 8px",
+                      background:"transparent",border:"none",outline:"none",resize:"none",
+                      fontFamily:"inherit",fontSize:sz.textFs,color:"#1e293b",
+                      lineHeight:1.75,boxSizing:"border-box",
+                      WebkitTapHighlightColor:"transparent",cursor:"text",
+                    }}
+                  />
+                  {note.pinned && (
+                    <span style={{position:"absolute",top:8,right:8,fontSize:12,opacity:.6,pointerEvents:"none"}}>📌</span>
+                  )}
+                </div>
+              )}
 
-              {/* ── Pied de carte ── */}
-              <div style={{
-                display:"flex",alignItems:"center",
-                padding:"4px 10px 10px",gap:6,
-              }}>
-                {/* Poignée drag */}
-                <div style={{
-                  cursor:"grab",color:`${accent}88`,fontSize:14,lineHeight:1,
-                  flexShrink:0,touchAction:"none",userSelect:"none",paddingRight:2,
-                }}>⠿</div>
+              {/* ── Pied ── */}
+              <div style={{display:"flex",alignItems:"center",padding:sz.footPad,gap:5}}>
+                {/* Poignée */}
+                <div style={{cursor:"grab",color:`${accent}88`,fontSize:13,lineHeight:1,
+                  flexShrink:0,touchAction:"none",userSelect:"none",paddingRight:2}}>⠿</div>
 
-                {/* Palette couleurs (ronds vifs) */}
-                <div style={{display:"flex",gap:5,flex:1,alignItems:"center"}}>
+                {/* Palette */}
+                <div style={{display:"flex",gap:isMobile?4:5,flex:1,alignItems:"center"}}>
                   {NOTE_PALETTE.map((pal, pi) => (
-                    <button key={pi}
-                      onClick={() => setPal(note.id, pal)}
-                      title={`Couleur ${pi+1}`}
+                    <button key={pi} onClick={() => setPal(note.id, pal)}
                       style={{
-                        width:16,height:16,borderRadius:"50%",
-                        background:pal.accent,border:"none",
-                        cursor:"pointer",padding:0,flexShrink:0,
-                        outline:note.accent===pal.accent ? `3px solid ${pal.accent}` : "none",
+                        width:sz.dotW,height:sz.dotW,borderRadius:"50%",
+                        background:pal.accent,border:"none",cursor:"pointer",padding:0,flexShrink:0,
+                        outline:note.accent===pal.accent?`2.5px solid ${pal.accent}`:"none",
                         outlineOffset:2,
-                        transform:note.accent===pal.accent?"scale(1.25)":"scale(1)",
-                        transition:"transform .15s, outline .15s",
-                      }}
-                    />
+                        transform:note.accent===pal.accent?"scale(1.3)":"scale(1)",
+                        transition:"transform .15s",
+                      }}/>
                   ))}
                 </div>
 
                 {/* Épingle */}
                 <button onClick={() => togglePin(note.id)}
-                  title={note.pinned?"Désépingler":"Épingler"}
-                  style={{
-                    background:"none",border:"none",cursor:"pointer",
-                    fontSize:15,lineHeight:1,padding:"0 2px",
-                    opacity:note.pinned?1:0.25,transition:"opacity .2s",
-                    WebkitTapHighlightColor:"transparent",
-                  }}>
-                  📌
-                </button>
+                  style={{background:"none",border:"none",cursor:"pointer",
+                    fontSize:isMobile?13:15,lineHeight:1,padding:"0 1px",
+                    opacity:note.pinned?1:0.22,transition:"opacity .2s",
+                    WebkitTapHighlightColor:"transparent"}}>📌</button>
 
-                {/* Horodatage */}
-                {ts && (
-                  <span style={{fontSize:9,color:`${accent}99`,fontWeight:600,flexShrink:0,whiteSpace:"nowrap"}}>
-                    {ts}
-                  </span>
+                {/* Timestamp */}
+                {ts && !isMobile && (
+                  <span style={{fontSize:9,color:`${accent}99`,fontWeight:600,flexShrink:0,whiteSpace:"nowrap"}}>{ts}</span>
                 )}
 
                 {/* Supprimer */}
                 <button onClick={() => del(note.id)}
-                  style={{
-                    background:"none",border:"none",cursor:"pointer",
-                    color:"#cbd5e1",fontSize:16,lineHeight:1,
+                  style={{background:"none",border:"none",cursor:"pointer",
+                    color:"#d1d5db",fontSize:isMobile?14:16,lineHeight:1,
                     padding:"0 2px",flexShrink:0,
-                    WebkitTapHighlightColor:"transparent",
-                    transition:"color .15s",
-                  }}
+                    WebkitTapHighlightColor:"transparent",transition:"color .15s"}}
                   onMouseEnter={e=>e.currentTarget.style.color="#ef4444"}
-                  onMouseLeave={e=>e.currentTarget.style.color="#cbd5e1"}
+                  onMouseLeave={e=>e.currentTarget.style.color="#d1d5db"}
                 >✕</button>
               </div>
             </div>
