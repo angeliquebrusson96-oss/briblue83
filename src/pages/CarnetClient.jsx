@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { getDoc } from "firebase/firestore";
 import { DOCS } from "../lib/firebase";
-import { getPH, getCL, getTemp, getResumePassage, isControleType, generateCarnetCode, calculerPassagesPrevusContrat, isPassageEffectue, isPassageDansContrat, calcMensualites, totalAnnuel } from "../utils/helpers";
+import { getPH, getCL, getTemp, getResumePassage, isControleType, generateCarnetCode, calculerPassagesPrevusContrat, isPassageEffectue, isPassageDansContrat, calcMensualites, totalAnnuel, finMoisExclu } from "../utils/helpers";
 import { genererContratHTML } from "../components/FormPassage";
 import { resolvePhoto } from "../lib/photoStore";
 import { PhotoImg } from "../components/ui";
@@ -528,9 +528,10 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
     const fin   = client.dateFin ? new Date(client.dateFin) : new Date(debut.getFullYear()+1, debut.getMonth(), debut.getDate());
     const dus = [];
     let cur = new Date(debut.getFullYear(), debut.getMonth(), 1);
-    const finMois = new Date(fin.getFullYear(), fin.getMonth(), 1);
+    const finMoisBorne = finMoisExclu(client.dateFin)
+      || new Date(debut.getFullYear() + 1, debut.getMonth(), 1);
     const curMois = new Date(today.getFullYear(), today.getMonth(), 1);
-    while (cur <= finMois && cur <= curMois) {
+    while (cur < finMoisBorne && cur <= curMois) {
       const y = cur.getFullYear(), m = cur.getMonth()+1;
       if (!versements[versKey(y,m)]) dus.push({ year:y, month:m, montant: getMensualite(y, m) });
       cur = new Date(cur.getFullYear(), cur.getMonth()+1, 1);

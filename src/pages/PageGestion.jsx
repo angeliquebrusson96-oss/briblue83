@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useState, useMemo, useCallback } from "react";
 import { DS, Ico } from "../utils/constants";
-import { calcMensualites } from "../utils/helpers";
+import { calcMensualites, finMoisExclu } from "../utils/helpers";
 import { Avatar } from "../components/ui";
 
 const MOIS_LONG = ["","Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
@@ -39,12 +39,15 @@ const VersementsClient = ({ client, versements, onToggleVersement, retardVisible
 
   const mensualites = [];
   let current = new Date(debut.getFullYear(), debut.getMonth(), 1);
-  const finMois = new Date(fin.getFullYear(), fin.getMonth(), 1);
+  // Borne exclusive : fin + 1 jour → premier jour du mois suivant la fin
+  // Corrige le bug "13 mois pour 12" quand dateFin = dateDebut + 1 an jour pour jour
+  const finMoisBorne = finMoisExclu(client.dateFin)
+    || new Date(debut.getFullYear() + 1, debut.getMonth(), 1);
   const currentMois = new Date(today.getFullYear(), today.getMonth(), 1);
 
   // Parcourt TOUTE la durée du contrat (passé + présent + futur)
   // pour permettre de cocher les mensualités payées en avance
-  while (current <= finMois) {
+  while (current < finMoisBorne) {
     const year  = current.getFullYear();
     const month = current.getMonth() + 1;
     const key   = `${client.id}_${year}_${String(month).padStart(2, "0")}`;
@@ -310,9 +313,10 @@ export function PageGestion({
         ? new Date(c.dateFin)
         : new Date(debut.getFullYear() + 1, debut.getMonth(), debut.getDate());
       let cur = new Date(debut.getFullYear(), debut.getMonth(), 1);
-      const finMois = new Date(fin.getFullYear(), fin.getMonth(), 1);
+      const finMoisBorne2 = finMoisExclu(c.dateFin)
+        || new Date(debut.getFullYear() + 1, debut.getMonth(), 1);
       const curMois = new Date(today.getFullYear(), today.getMonth(), 1);
-      while (cur <= finMois && cur <= curMois) {
+      while (cur < finMoisBorne2 && cur <= curMois) {
         const y = cur.getFullYear(), m = cur.getMonth() + 1;
         const key = `${c.id}_${y}_${String(m).padStart(2, "0")}`;
         const isCurrentMonth = y === today.getFullYear() && m === today.getMonth() + 1;

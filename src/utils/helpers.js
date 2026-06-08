@@ -174,6 +174,27 @@ export function uid() { return crypto.randomUUID(); }
  *
  * Retourne { m1, m11, estRond, total }
  */
+// ─── BORNE EXCLUSIVE FIN DE CONTRAT ──────────────────────────────────────────
+/**
+ * finMoisExclu(dateFinStr)
+ * Retourne le premier jour du premier mois NON facturé (borne exclusive).
+ * Gère les deux conventions :
+ *   - dateFin = dernier jour inclus  (ex: "2027-04-30" → mai 2027 exclut)
+ *   - dateFin = date anniversaire    (ex: "2027-03-01" → mars 2027 exclu)
+ * Méthode : fin + 1 jour → premier jour de son mois → borne exclusive.
+ *
+ * Exemples :
+ *   "2027-03-01" → fin+1 = 02/03 → mars 2027  → dernier mois inclus = fév 2027
+ *   "2027-04-30" → fin+1 = 01/05 → mai 2027   → dernier mois inclus = avr 2027
+ *   "2026-09-29" → fin+1 = 30/09 → sept 2026  → dernier mois inclus = août 2026
+ */
+export function finMoisExclu(dateFinStr) {
+  if (!dateFinStr) return null;
+  const fin  = new Date(dateFinStr);
+  const next = new Date(fin.getFullYear(), fin.getMonth(), fin.getDate() + 1);
+  return new Date(next.getFullYear(), next.getMonth(), 1);
+}
+
 export function calcMensualites(prixAnnuel) {
   if (!prixAnnuel || prixAnnuel <= 0) return { m1: 0, m11: 0, estRond: true, total: 0 };
   const base = Math.floor(prixAnnuel / 12 * 100) / 100;

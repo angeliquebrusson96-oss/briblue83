@@ -115,6 +115,7 @@ const STOCK_CATS = [
 const CAT_COLORS = { traitement:"#0891b2", entretien:"#059669", matériel:"#7c3aed" };
 
 function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta, onAddProduit, onDeleteProduit }) {
+  const isMobile = useIsMobile();
   const [search,      setSearch]      = useState("");
   const [catFilter,   setCatFilter]   = useState("tous");
   const [editingQty,  setEditingQty]  = useState(null);
@@ -168,8 +169,9 @@ function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta,
     setNewNom(""); setShowAddForm(false);
   };
 
-  return (
-    <Modal title="" onClose={onClose} wide>
+  // ── Contenu partagé desktop + mobile ──────────────────────────────────────
+  const inner = (
+    <>
       {/* ── Header ── */}
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
         <div style={{width:40,height:40,borderRadius:12,background:"linear-gradient(135deg,#0891b2,#0e7490)",
@@ -285,7 +287,7 @@ function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta,
       </div>
 
       {/* ── Liste produits ── */}
-      <div style={{display:"flex",flexDirection:"column",gap:7,maxHeight:480,overflowY:"auto",paddingRight:2}}>
+      <div style={{display:"flex",flexDirection:"column",gap:7}}>
         {filtered.length === 0 && (
           <div style={{textAlign:"center",padding:"32px 20px",color:"#94a3b8",fontSize:13}}>
             {search ? `Aucun résultat pour "${search}"` : "Aucun produit dans cette catégorie"}
@@ -465,6 +467,58 @@ function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta,
           );
         })}
       </div>
+    </>
+  );
+
+  // ── Mobile : plein écran overlay ───────────────────────────────────────────
+  if (isMobile) {
+    return (
+      <div style={{
+        position:"fixed", inset:0, zIndex:300,
+        background:"#f8fafc",
+        display:"flex", flexDirection:"column",
+        overflowY:"auto",
+        WebkitOverflowScrolling:"touch",
+        paddingTop:"max(env(safe-area-inset-top,0px),0px)",
+        paddingBottom:"max(env(safe-area-inset-bottom,0px),16px)",
+      }}>
+        {/* Barre nav mobile */}
+        <div style={{
+          position:"sticky", top:0, zIndex:10,
+          background:"#fff",
+          borderBottom:"1px solid #e2e8f0",
+          display:"flex", alignItems:"center", gap:10,
+          padding:"12px 16px",
+          boxShadow:"0 2px 8px rgba(0,0,0,0.06)",
+        }}>
+          <button onClick={onClose}
+            style={{width:36,height:36,borderRadius:10,border:"1.5px solid #e2e8f0",
+              background:"#fff",cursor:"pointer",display:"flex",alignItems:"center",
+              justifyContent:"center",flexShrink:0,WebkitTapHighlightColor:"transparent"}}>
+            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2.5" strokeLinecap="round">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+          </button>
+          <div style={{flex:1}}>
+            <div style={{fontSize:15,fontWeight:800,color:"#0f172a"}}>Stock produits</div>
+            <div style={{fontSize:10,color:"#64748b"}}>
+              {Object.keys(stock).length} produits
+              {(() => { const b = Object.keys(stock).filter(p=>(stock[p]??0)<=getMeta(p).seuil).length; return b>0?<span style={{color:"#dc2626",fontWeight:700}}> · ⚠️ {b}</span>:null; })()}
+            </div>
+          </div>
+        </div>
+        {/* Corps scrollable */}
+        <div style={{padding:"14px 16px"}}>
+          {inner}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Desktop : modal classique ────────────────────────────────────────────────
+  return (
+    <Modal title="Stock produits" onClose={onClose} wide>
+      {inner}
     </Modal>
   );
 }
