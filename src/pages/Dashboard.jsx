@@ -175,19 +175,12 @@ function CarteClients({ clients, onClientClick }) {
   const mapRef        = useRef(null);
   const mapInstance   = useRef(null);
   const markers       = useRef([]);
-  const [status, setStatus] = useState("init"); // "init"|"loading"|"ready"|"error"
+  const [status,  setStatus]  = useState("init");
   const [located, setLocated] = useState(0);
+  // Panel React affiché sur la carte quand on clique un marqueur
+  const [panel, setPanel] = useState(null); // { client, photoUrl, color, initials }
 
   const clientsWithAddr = clients.filter(c => c.adresse?.trim());
-
-  // Gestionnaire global pour le bouton "Afficher la fiche" dans les popups Leaflet
-  useEffect(() => {
-    window.__briblueOpenClient = (clientId) => {
-      const client = clients.find(c => c.id === clientId);
-      if (client && onClientClick) onClientClick(client);
-    };
-    return () => { delete window.__briblueOpenClient; };
-  }, [clients, onClientClick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     let cancelled = false;
@@ -284,7 +277,7 @@ function CarteClients({ clients, onClientClick }) {
             popupAnchor: [0, -52],
           });
 
-          // ── Tooltip au survol (aperçu rapide, sans navigation) ──
+          // Tooltip survol (Leaflet tooltip natif — aperçu uniquement)
           const tooltipHtml = `
             <div style="background:#fff;border-radius:14px;overflow:hidden;
               box-shadow:0 8px 28px rgba(0,0,0,0.2);border:1px solid #e2e8f0;
@@ -299,41 +292,15 @@ function CarteClients({ clients, onClientClick }) {
                 <div style="font-weight:800;font-size:12px;color:#0f172a;margin-bottom:2px">${client.nom}</div>
                 ${client.formule ? `<div style="font-size:10px;color:#0891b2;font-weight:600;margin-bottom:2px">${client.formule}</div>` : ""}
                 <div style="font-size:9px;color:#94a3b8">${client.adresse.split(",").slice(-1)[0]?.trim() || client.adresse}</div>
-                <div style="margin-top:5px;font-size:9px;color:#64748b">Cliquer pour voir les détails</div>
               </div>
             </div>`;
 
-          // ── Popup au clic — bouton explicite pour ouvrir la fiche ──
-          const popupHtml = `
-            <div style="font-family:Inter,system-ui,sans-serif;min-width:190px;padding:2px 0">
-              ${photoUrl
-                ? `<div style="margin:-8px -8px 10px;border-radius:10px 10px 0 0;overflow:hidden;height:88px;">
-                    <img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover;display:block;"/></div>`
-                : `<div style="margin:-8px -8px 10px;border-radius:10px 10px 0 0;height:44px;background:${color};display:flex;align-items:center;justify-content:center;">
-                    <span style="color:#fff;font-weight:900;font-size:22px;">${initials}</span></div>`
-              }
-              <div style="font-weight:800;font-size:13px;color:#0f172a;margin-bottom:3px">${client.nom}</div>
-              ${client.formule ? `<div style="font-size:11px;color:#0891b2;font-weight:600;margin-bottom:3px">${client.formule}</div>` : ""}
-              <div style="font-size:10px;color:#94a3b8;margin-bottom:10px">${client.adresse}</div>
-              <button
-                onclick="window.__briblueOpenClient&&window.__briblueOpenClient('${client.id}')"
-                style="
-                  width:100%;padding:9px 12px;
-                  background:linear-gradient(135deg,#0891b2,#0e7490);
-                  color:#fff;border:none;border-radius:10px;
-                  font-size:12px;font-weight:700;cursor:pointer;
-                  font-family:Inter,system-ui,sans-serif;
-                  display:flex;align-items:center;justify-content:center;gap:6px;
-                ">
-                📋 Afficher le client
-              </button>
-            </div>`;
-
+          // Clic → panel React (PAS de popup Leaflet ni de navigation directe)
+          const clientSnapshot = { client, photoUrl, color, initials };
           const marker = L.marker([pos.lat, pos.lon], { icon })
             .addTo(mapInstance.current)
             .bindTooltip(tooltipHtml, { permanent:false, direction:"top", className:"bb-tip", offset:[0,-56], opacity:1 })
-            .bindPopup(popupHtml, { maxWidth:250, offset:[0,-10] });
-          // ⚠️ Pas de .on("click") direct — seul le bouton "Afficher le client" navigue
+            .on("click", () => setPanel(clientSnapshot));
 
           markers.current.push(marker);
           bounds.push([pos.lat, pos.lon]);
@@ -371,7 +338,7 @@ function CarteClients({ clients, onClientClick }) {
   const clientsSansAdresse = clients.filter(c => !c.adresse?.trim());
 
   return (
-    <div className="db-s6" style={{borderRadius:18,overflow:"hidden",border:"1px solid #e2e8f0",boxShadow:"0 2px 12px rgba(0,0,0,0.06)",background:"#fff",marginBottom:14}}>
+    <div className="db-s6" style={{borderRadius:18,overflow:"hidden",border:"1px solid #e2e8f0",boxShadow:"0 2px 12px rgba(0,0,0,0.06)",background:"#fff",marginBottom:14,position:"relative"}}>
       {/* Header */}
       <div style={{padding:"11px 14px 9px",background:"linear-gradient(135deg,#f0f9ff,#fff)",borderBottom:"1px solid #f1f5f9",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -396,8 +363,89 @@ function CarteClients({ clients, onClientClick }) {
       {/* Carte Leaflet */}
       <div ref={mapRef} style={{height:340,width:"100%",background:"#e8f4f8"}}/>
 
+      {/* ── PANEL CLIENT — s'affiche sur la carte au clic d'un marqueur ── */}
+      {panel && (
+        <div style={{
+          position:"absolute", bottom:0, left:0, right:0, zIndex:2000,
+          background:"#fff",
+          borderRadius:"18px 18px 0 0",
+          boxShadow:"0 -8px 32px rgba(0,0,0,0.18)",
+          animation:"fadeIn .18s ease",
+        }}>
+          {/* Poignée */}
+          <div style={{display:"flex",justifyContent:"center",padding:"10px 0 0"}}>
+            <div style={{width:36,height:4,borderRadius:2,background:"#e2e8f0"}}/>
+          </div>
+
+          <div style={{display:"flex",alignItems:"flex-start",gap:14,padding:"12px 16px 6px"}}>
+            {/* Photo ou avatar */}
+            <div style={{width:56,height:56,borderRadius:14,overflow:"hidden",flexShrink:0,
+              background:panel.color,border:"2px solid #e2e8f0",
+              display:"flex",alignItems:"center",justifyContent:"center"}}>
+              {panel.photoUrl
+                ? <img src={panel.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+                : <span style={{color:"#fff",fontWeight:900,fontSize:20}}>{panel.initials}</span>
+              }
+            </div>
+
+            {/* Infos client */}
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:15,fontWeight:800,color:"#0f172a",lineHeight:1.2,marginBottom:3}}>
+                {panel.client.nom}
+              </div>
+              {panel.client.formule && (
+                <div style={{fontSize:11,fontWeight:600,color:"#0891b2",marginBottom:3}}>
+                  {panel.client.formule}
+                </div>
+              )}
+              {panel.client.adresse && (
+                <div style={{fontSize:11,color:"#94a3b8",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                  📍 {panel.client.adresse}
+                </div>
+              )}
+            </div>
+
+            {/* Fermer */}
+            <button onClick={() => setPanel(null)}
+              style={{width:28,height:28,borderRadius:14,background:"#f1f5f9",border:"none",
+                cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+
+          {/* Bouton Afficher le client */}
+          <div style={{padding:"10px 16px 16px"}}>
+            <button
+              onClick={() => { onClientClick(panel.client); setPanel(null); }}
+              style={{
+                width:"100%",padding:"12px",
+                background:"linear-gradient(135deg,#0891b2,#0e7490)",
+                color:"#fff",border:"none",borderRadius:14,
+                fontSize:13,fontWeight:700,cursor:"pointer",
+                fontFamily:"inherit",
+                display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+                boxShadow:"0 4px 14px rgba(8,145,178,0.3)",
+                WebkitTapHighlightColor:"transparent",
+              }}>
+              <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round">
+                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+              </svg>
+              Afficher le client
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Overlay sombre derrière le panel (clic pour fermer) */}
+      {panel && (
+        <div onClick={() => setPanel(null)}
+          style={{position:"absolute",inset:0,zIndex:1999,background:"rgba(0,0,0,0.12)"}}/>
+      )}
+
       {/* Clients sans adresse */}
-      {clientsSansAdresse.length > 0 && (
+      {clientsSansAdresse.length > 0 && !panel && (
         <div style={{padding:"7px 12px",background:"#fffbeb",borderTop:"1px solid #fde68a",display:"flex",alignItems:"center",gap:6}}>
           <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#b45309" strokeWidth="2.5" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/></svg>
           <span style={{fontSize:10,color:"#92400e",fontWeight:600}}>
