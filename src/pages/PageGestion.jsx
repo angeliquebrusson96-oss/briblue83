@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useState, useMemo, useCallback } from "react";
 import { DS, Ico } from "../utils/constants";
-import { calcMensualites, finMoisExclu } from "../utils/helpers";
+import { calcMensualites, finMoisExclu, getNMoisContrat } from "../utils/helpers";
 import { Avatar } from "../components/ui";
 
 const MOIS_LONG = ["","Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
@@ -21,8 +21,9 @@ const VersementsClient = ({ client, versements, onToggleVersement, retardVisible
   const [open, setOpen] = useState(false);
   if (!client.prix || !client.dateDebut) return null;
 
-  // Mensualités exactes au centime — mois 1 = solde ajusté, mois 2-12 = base
-  const { m1: mensualite1, m11: mensualiteBase } = calcMensualites(client.prix);
+  // Mensualités exactes au centime — durée réelle du contrat (12, 6, 3 mois ou autre)
+  const nMoisContrat = getNMoisContrat(client);
+  const { m1: mensualite1, m11: mensualiteBase } = calcMensualites(client.prix, nMoisContrat);
   const fmtEur = (v) => v % 1 === 0 ? `${v}€` : `${v.toFixed(2).replace(".", ",")}€`;
 
   const today = new Date();
@@ -306,7 +307,7 @@ export function PageGestion({
   const totalMensualitesDu = useMemo(() => {
     const today = new Date();
     return clientsAvecMensualites.reduce((sum, c) => {
-      const { m1: men1, m11: menBase } = calcMensualites(c.prix);
+      const { m1: men1, m11: menBase } = calcMensualites(c.prix, getNMoisContrat(c));
       const debut = new Date(c.dateDebut);
       const debutY = debut.getFullYear(), debutM = debut.getMonth()+1;
       const fin = c.dateFin

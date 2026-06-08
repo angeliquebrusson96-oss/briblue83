@@ -224,11 +224,21 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
   const openEditContrat = () => {
     const debut = client.dateDebut || "";
     const fin   = client.dateFin   || "";
+    const preset = detectDuree(debut, fin);
+    // Détecte le nombre de mois si "Autre" (ni 12, 6, ni 3)
+    const customMois = (() => {
+      if (!debut || !fin) return "";
+      const d = new Date(debut), f = new Date(fin);
+      const nxt = new Date(f.getFullYear(), f.getMonth(), f.getDate()+1);
+      const n = (nxt.getFullYear()-d.getFullYear())*12 + (nxt.getMonth()-d.getMonth());
+      return (preset === "custom" && n > 0) ? String(n) : "";
+    })();
     setEditContratData({
       formule:         client.formule || "VAC",
       dateDebut:       debut,
       dateFin:         fin,
-      dureePreset:     detectDuree(debut, fin),   // "12" | "6" | "3" | "custom"
+      dureePreset:     preset,       // "12" | "6" | "3" | "custom"
+      dureeCustom:     customMois,   // uniquement si custom
       prixPassageE:    client.prixPassageE || 0,
       prixPassageC:    client.prixPassageC || 0,
       notesTarifaires: client.notesTarifaires || "",
@@ -239,7 +249,7 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
   const saveEditContrat = () => {
     if (!editContratData || !onUpdateClient) return;
     // eslint-disable-next-line no-unused-vars
-    const { dureePreset, ...dataToSave } = editContratData; // dureePreset = état UI, ne pas persister
+    const { dureePreset, dureeCustom, ...dataToSave } = editContratData; // champs UI, ne pas persister
     const tE = Object.values(dataToSave.moisParMois||{}).reduce((s,v)=>s+(v.entretien||0),0);
     const tC = Object.values(dataToSave.moisParMois||{}).reduce((s,v)=>s+(v.controle||0),0);
     const prix = tE*(dataToSave.prixPassageE||0)+tC*(dataToSave.prixPassageC||0);
@@ -262,14 +272,16 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
     }));
   };
 
-  // Quand dateDebut change : recalcule dateFin si une durée prédéfinie est active
+  // Quand dateDebut change : recalcule dateFin si une durée est active
   const changeDebut = (val) => {
     setEditContratData(prev => {
       const dur = DUREES_CONTRAT.find(d => d.key === prev.dureePreset);
+      const nCustom = parseInt(prev.dureeCustom, 10);
+      const nMois = dur?.mois || (prev.dureePreset === "custom" && nCustom > 0 ? nCustom : null);
       return {
         ...prev,
         dateDebut: val,
-        dateFin: dur?.mois && val ? computeDateFin(val, dur.mois) : prev.dateFin,
+        dateFin: nMois && val ? computeDateFin(val, nMois) : prev.dateFin,
       };
     });
   };
@@ -1160,7 +1172,7 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
                   {/* Formule + Durée + Dates */}
                   <div>
                     <div style={{fontSize:11,fontWeight:800,color:"#7c3aed",textTransform:"uppercase",letterSpacing:.6,marginBottom:10}}>📋 Contrat</div>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr",gap:12}}>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr",gap:10}}>
 
                       {/* Formule */}
                       <div>
@@ -1170,51 +1182,48 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
                         </select>
                       </div>
 
-                      {/* ── Durée du contrat ── */}
+                      {/* ── Durée : menu déroulant ── */}
                       <div>
-                        <label style={labelStyle}>Durée</label>
-                        <div style={{display:"flex",gap:7,flexWrap:"wrap",marginTop:2}}>
-                          {DUREES_CONTRAT.map(d => {
-                            const active = editContratData.dureePreset === d.key;
-                            return (
-                              <button key={d.key}
-                                onClick={() => applyDureePreset(d.key)}
-                                style={{
-                                  display:"flex",flexDirection:"column",alignItems:"center",
-                                  padding:"7px 14px",borderRadius:12,cursor:"pointer",
-                                  fontFamily:"inherit",border:`2px solid ${active ? d.color : "#e2e8f0"}`,
-                                  background:active ? d.color : "#fff",
-                                  transition:"all .15s",WebkitTapHighlightColor:"transparent",
-                                  boxShadow:active ? `0 4px 12px ${d.color}44` : "none",
-                                }}>
-                                <span style={{fontSize:12,fontWeight:800,color:active?"#fff":"#0f172a",lineHeight:1.2}}>
-                                  {d.label}
-                                </span>
-                                <span style={{fontSize:10,fontWeight:500,color:active?"rgba(255,255,255,0.8)":"#94a3b8",marginTop:2}}>
-                                  {d.sub}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
+                        <label style={labelStyle}>Durée du contrat</label>
+                        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                          <select
+                            value={["12","6","3"].includes(editContratData.dureePreset) ? editContratData.dureePreset : "custom"}
+                            onChange={e => applyDureePreset(e.target.value)}
+                            style={{...inputStyle, flex:1}}>
+                            <option value="12">Annuel — 12 mois</option>
+                            <option value="6">Semestriel — 6 mois</option>
+                            <option value="3">Trimestriel — 3 mois</option>
+                            <option value="custom">Autre…</option>
+                          </select>
 
-                        {/* Récap durée sélectionnée */}
-                        {editContratData.dureePreset && editContratData.dureePreset !== "custom" && editContratData.dateDebut && editContratData.dateFin && (() => {
-                          const dur = DUREES_CONTRAT.find(d => d.key === editContratData.dureePreset);
-                          return (
-                            <div style={{marginTop:8,padding:"7px 12px",borderRadius:9,
-                              background:`${dur.color}12`,border:`1px solid ${dur.color}33`,
-                              fontSize:11,color:dur.color,fontWeight:600,
-                              display:"flex",alignItems:"center",gap:6}}>
-                              <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                                <rect x="3" y="4" width="18" height="18" rx="2"/>
-                                <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
-                                <line x1="3" y1="10" x2="21" y2="10"/>
-                              </svg>
-                              Contrat {dur.label.toLowerCase()} : {new Date(editContratData.dateDebut).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})} → {new Date(editContratData.dateFin).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})}
+                          {/* Champ libre affiché uniquement si "Autre" */}
+                          {!["12","6","3"].includes(editContratData.dureePreset) && (
+                            <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+                              <input
+                                type="number" min="1" max="60"
+                                placeholder="N"
+                                value={editContratData.dureeCustom || ""}
+                                onChange={e => {
+                                  const n = parseInt(e.target.value, 10);
+                                  setEditContratData(prev => ({
+                                    ...prev,
+                                    dureeCustom: e.target.value,
+                                    dureePreset: "custom",
+                                    dateFin: (n > 0 && prev.dateDebut) ? computeDateFin(prev.dateDebut, n) : prev.dateFin,
+                                  }));
+                                }}
+                                style={{
+                                  width:60, padding:"9px 6px",
+                                  borderRadius:10, border:"1.5px solid #c4b5fd",
+                                  fontSize:14, fontWeight:800, textAlign:"center",
+                                  outline:"none", color:"#7c3aed",
+                                  background:"#f5f3ff", fontFamily:"inherit",
+                                }}
+                              />
+                              <span style={{fontSize:12,fontWeight:600,color:"#64748b",flexShrink:0}}>mois</span>
                             </div>
-                          );
-                        })()}
+                          )}
+                        </div>
                       </div>
 
                       {/* Dates début / fin */}
@@ -1228,23 +1237,56 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
                         <div>
                           <label style={{...labelStyle,display:"flex",alignItems:"center",gap:5}}>
                             Fin
-                            {editContratData.dureePreset && editContratData.dureePreset !== "custom" && (
-                              <span style={{fontSize:9,fontWeight:700,color:"#7c3aed",background:"#f5f3ff",borderRadius:20,padding:"1px 6px",border:"1px solid #c4b5fd"}}>
-                                auto
-                              </span>
+                            {editContratData.dureePreset !== "custom" && editContratData.dateFin && (
+                              <span style={{fontSize:9,fontWeight:700,color:"#7c3aed",
+                                background:"#ede9fe",borderRadius:20,padding:"1px 6px",
+                                border:"1px solid #c4b5fd"}}>auto</span>
                             )}
                           </label>
                           <input type="date" value={editContratData.dateFin}
-                            onChange={e => {
-                              setEditContratData(p => ({...p, dateFin:e.target.value, dureePreset:"custom"}));
-                            }}
+                            onChange={e => setEditContratData(p => ({
+                              ...p, dateFin:e.target.value, dureePreset:"custom", dureeCustom:""
+                            }))}
                             style={{
                               ...inputStyle,
-                              background: editContratData.dureePreset && editContratData.dureePreset !== "custom"
-                                ? "#f5f3ff" : (inputStyle.background||"#fff"),
+                              background: editContratData.dureePreset !== "custom" ? "#f5f3ff" : "#fff",
+                              borderColor: editContratData.dureePreset !== "custom" ? "#c4b5fd" : "#e2e8f0",
                             }}/>
                         </div>
                       </div>
+
+                      {/* Récap période + mensualité */}
+                      {editContratData.dateDebut && editContratData.dateFin && (() => {
+                        const d = new Date(editContratData.dateDebut);
+                        const f = new Date(editContratData.dateFin);
+                        const nxt = new Date(f.getFullYear(), f.getMonth(), f.getDate()+1);
+                        const n = (nxt.getFullYear()-d.getFullYear())*12 + (nxt.getMonth()-d.getMonth());
+                        if (n <= 0) return null;
+                        const fmt = dt => dt.toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"});
+                        const tE = Object.values(editContratData.moisParMois||{}).reduce((s,v)=>s+(v.entretien||0),0);
+                        const tC = Object.values(editContratData.moisParMois||{}).reduce((s,v)=>s+(v.controle||0),0);
+                        const prix = tE*(editContratData.prixPassageE||0)+tC*(editContratData.prixPassageC||0) || 0;
+                        const men = prix > 0 ? (prix / n).toFixed(2).replace(".", ",") : null;
+                        return (
+                          <div style={{padding:"9px 12px",borderRadius:10,
+                            background:"#f5f3ff",border:"1px solid #e9d5ff",
+                            fontSize:11,color:"#7c3aed",fontWeight:600}}>
+                            <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:men?4:0}}>
+                              <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                                <rect x="3" y="4" width="18" height="18" rx="2"/>
+                                <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+                                <line x1="3" y1="10" x2="21" y2="10"/>
+                              </svg>
+                              {n} mois · {fmt(d)} → {fmt(f)}
+                            </div>
+                            {men && (
+                              <div style={{fontSize:11,color:"#059669",fontWeight:700,paddingLeft:19}}>
+                                📅 Échéancier : {n} × {men}€/mois
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
 

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { getDoc } from "firebase/firestore";
 import { DOCS } from "../lib/firebase";
-import { getPH, getCL, getTemp, getResumePassage, isControleType, generateCarnetCode, calculerPassagesPrevusContrat, isPassageEffectue, isPassageDansContrat, calcMensualites, totalAnnuel, finMoisExclu } from "../utils/helpers";
+import { getPH, getCL, getTemp, getResumePassage, isControleType, generateCarnetCode, calculerPassagesPrevusContrat, isPassageEffectue, isPassageDansContrat, calcMensualites, totalAnnuel, finMoisExclu, getNMoisContrat } from "../utils/helpers";
 import { genererContratHTML } from "../components/FormPassage";
 import { resolvePhoto } from "../lib/photoStore";
 import { PhotoImg } from "../components/ui";
@@ -511,7 +511,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
   const prixAnnuel = totalAnnuel(client.moisParMois||client.saisons,"entretien") * (client.prixPassageE||0)
                    + totalAnnuel(client.moisParMois||client.saisons,"controle")  * (client.prixPassageC||0)
                    || client.prix || 0;
-  const { m1: mensualiteSolde, m11: mensualiteBase } = calcMensualites(prixAnnuel);
+  const { m1: mensualiteSolde, m11: mensualiteBase } = calcMensualites(prixAnnuel, getNMoisContrat(client));
 
   // Mois de solde = 1er mois du contrat (1er prélèvement = ajustement)
   const debutDate = client.dateDebut ? new Date(client.dateDebut) : null;

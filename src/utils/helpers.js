@@ -195,13 +195,36 @@ export function finMoisExclu(dateFinStr) {
   return new Date(next.getFullYear(), next.getMonth(), 1);
 }
 
-export function calcMensualites(prixAnnuel) {
-  if (!prixAnnuel || prixAnnuel <= 0) return { m1: 0, m11: 0, estRond: true, total: 0 };
-  const base = Math.floor(prixAnnuel / 12 * 100) / 100;
-  const somme11 = Math.round(base * 11 * 100) / 100;
-  const m1 = Math.round((prixAnnuel - somme11) * 100) / 100;
+/**
+ * getNMoisContrat(client) — nombre de mois réels du contrat d'après dateDebut/dateFin.
+ * Utilise finMoisExclu pour être cohérent avec le calcul des boucles de versements.
+ * Retourne 12 par défaut si les dates sont absentes.
+ */
+export function getNMoisContrat(client) {
+  if (!client?.dateDebut || !client?.dateFin) return 12;
+  const debut = new Date(client.dateDebut);
+  const borne = finMoisExclu(client.dateFin);
+  if (!borne) return 12;
+  const n = (borne.getFullYear() - debut.getFullYear()) * 12 + (borne.getMonth() - debut.getMonth());
+  return Math.max(1, n);
+}
+
+/**
+ * calcMensualites(prixTotal, nMois?)
+ * Divise prixTotal en nMois mensualités égales (arrondi au centime, le 1er mois absorbe l'écart).
+ * nMois = 12 par défaut (rétrocompatible).
+ * Retourne { m1, m11, estRond, total, nMois }
+ *   m1  = 1er mois (ajustement d'arrondi)
+ *   m11 = mensualité de base (mois 2 à N)
+ */
+export function calcMensualites(prixTotal, nMois = 12) {
+  if (!prixTotal || prixTotal <= 0) return { m1: 0, m11: 0, estRond: true, total: 0, nMois };
+  const n    = Math.max(1, Math.round(nMois));
+  const base = Math.floor(prixTotal / n * 100) / 100;
+  const sommeN1 = Math.round(base * (n - 1) * 100) / 100;
+  const m1 = Math.round((prixTotal - sommeN1) * 100) / 100;
   const estRond = m1 === base;
-  return { m1, m11: base, estRond, total: prixAnnuel };
+  return { m1, m11: base, estRond, total: prixTotal, nMois: n };
 }
 
 // ─── RAPPORT STATUS ──────────────────────────────────────────────────────────
