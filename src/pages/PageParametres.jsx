@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect } from "react";
 import { flushPendingNow } from "../lib/storage";
+import { playChimeMorning, playAlertRdv, playNotifSound, sendLocalNotification } from "../styles";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TOGGLE — interrupteur simple
@@ -135,6 +136,45 @@ export function PageParametres({
   const [exportMsg,  setExportMsg]  = useState("");
   const [cacheMsg,   setCacheMsg]   = useState("");
   const [cacheSize,  setCacheSize]  = useState("…");
+
+  // ── État notifications ──
+  const ls = (k, def) => { try { const v = localStorage.getItem(k); return v === null ? def : JSON.parse(v); } catch { return def; } };
+  const setLs = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+
+  const [notifEnabled, setNotifEnabledRaw] = useState(() => ls("briblue_notif_enabled", true));
+  const [morningOn,    setMorningOnRaw]    = useState(() => ls("briblue_notif_morning",  true));
+  const [rdvOn,        setRdvOnRaw]        = useState(() => ls("briblue_notif_rdv",      true));
+  const [permission,   setPermission]      = useState(() => typeof Notification !== "undefined" ? Notification.permission : "default");
+  const [testMsg,      setTestMsg]         = useState("");
+
+  const setNotifEnabled = v => { setNotifEnabledRaw(v); setLs("briblue_notif_enabled", v); };
+  const setMorningOn    = v => { setMorningOnRaw(v);    setLs("briblue_notif_morning",  v); };
+  const setRdvOn        = v => { setRdvOnRaw(v);        setLs("briblue_notif_rdv",      v); };
+
+  // Demander la permission navigateur
+  const demanderPermission = async () => {
+    if (!("Notification" in window)) { setTestMsg("❌ Notifications non supportées"); return; }
+    const p = await Notification.requestPermission();
+    setPermission(p);
+    if (p === "granted") { setTestMsg("✅ Permission accordée !"); }
+    else if (p === "denied") { setTestMsg("❌ Bloquées — autorisez dans les réglages du navigateur"); }
+    setTimeout(() => setTestMsg(""), 4000);
+  };
+
+  // Tester le son
+  const testerSon = (type = "morning") => {
+    if (type === "morning")  { playChimeMorning(); setTestMsg("🎵 Carillon matinal"); }
+    if (type === "rdv")      { playAlertRdv();     setTestMsg("🔔 Sonnerie RDV"); }
+    if (type === "notif")    { playNotifSound();   setTestMsg("🔈 Son notification"); }
+    setTimeout(() => setTestMsg(""), 2500);
+    // Envoyer une notif test si permission ok
+    if (permission === "granted" && type === "morning") {
+      sendLocalNotification("☀️ BRIBLUE — Test", "Voici à quoi ressemble le briefing matinal.", { tag:"briblue-test" });
+    }
+    if (permission === "granted" && type === "rdv") {
+      sendLocalNotification("📅 BRIBLUE — Test RDV", "Rappel : RDV dans 15 min — Test client", { tag:"briblue-test-rdv", requireInteraction:false });
+    }
+  };
 
   // ── Taille du cache local ──
   useEffect(() => {
@@ -319,6 +359,100 @@ export function PageParametres({
       )}
 
       {/* ── DONNÉES ── */}
+      {/* ── NOTIFICATIONS ── */}
+      <Bloc titre="Notifications" emoji="🔔">
+
+        {/* Activer/Désactiver globalement */}
+        <Ligne
+          icone={<svg width={17} height={17} viewBox="0 0 24 24" fill="none"
+            stroke={notifEnabled?"#0891b2":"#94a3b8"} strokeWidth="2" strokeLinecap="round">
+            <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>
+          </svg>}
+          label="Notifications activées"
+          detail={notifEnabled ? "Les alertes sont actives" : "Toutes les notifications sont désactivées"}
+          right={<Toggle on={notifEnabled} onToggle={setNotifEnabled}/>}
+          onClick={() => setNotifEnabled(!notifEnabled)}
+        />
+
+        {/* Permission navigateur */}
+        <Ligne
+          icone={<svg width={17} height={17} viewBox="0 0 24 24" fill="none"
+            stroke={permission==="granted"?"#059669":permission==="denied"?"#dc2626":"#d97706"}
+            strokeWidth="2" strokeLinecap="round">
+            {permission==="granted"
+              ? <><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></>
+              : permission==="denied"
+                ? <><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></>
+                : <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>
+            }
+          </svg>}
+          label={permission==="granted"?"Permission accordée ✅":permission==="denied"?"Permission refusée ❌":"Autoriser les notifications"}
+          detail={
+            permission==="granted" ? "Le navigateur peut afficher des alertes"
+            : permission==="denied" ? "Activez dans Réglages > Notifications > BRIBLUE"
+            : "Cliquez pour autoriser les notifications du navigateur"
+          }
+          onClick={permission !== "granted" ? demanderPermission : undefined}
+          right={testMsg && permission==="granted" ? <span style={{fontSize:10,color:"#0891b2",fontWeight:600}}>{testMsg}</span> : null}
+        />
+
+        {notifEnabled && (
+          <>
+            {/* Briefing matinal */}
+            <Ligne
+              icone={<span style={{fontSize:17}}>☀️</span>}
+              label="Briefing matinal — 8h00"
+              detail="Résumé des RDVs et passages du jour au réveil"
+              right={<Toggle on={morningOn} onToggle={setMorningOn}/>}
+              onClick={() => setMorningOn(!morningOn)}
+            />
+
+            {/* Rappels RDV */}
+            <Ligne
+              icone={<span style={{fontSize:17}}>📅</span>}
+              label="Rappels rendez-vous"
+              detail="Alerte 15 min et 5 min avant chaque RDV"
+              right={<Toggle on={rdvOn} onToggle={setRdvOn}/>}
+              onClick={() => setRdvOn(!rdvOn)}
+              sep={false}
+            />
+          </>
+        )}
+
+        {/* Barre de test sons */}
+        <div style={{
+          padding:"10px 14px 12px",
+          borderTop:"1px solid #f1f5f9",
+          background:"#f8fafc",
+        }}>
+          <div style={{fontSize:10,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>
+            Tester les sons
+          </div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {[
+              { label:"☀️ Briefing", type:"morning" },
+              { label:"📅 RDV",      type:"rdv"     },
+              { label:"🔈 Notif",    type:"notif"   },
+            ].map(({ label, type }) => (
+              <button key={type} onClick={() => testerSon(type)} style={{
+                padding:"6px 14px", borderRadius:20, border:"1.5px solid #e2e8f0",
+                background:"#fff", cursor:"pointer", fontFamily:"inherit",
+                fontSize:11, fontWeight:600, color:"#374151",
+                WebkitTapHighlightColor:"transparent",
+                transition:"background .1s",
+              }}
+              onMouseEnter={e=>e.currentTarget.style.background="#f0f9ff"}
+              onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
+                {label}
+              </button>
+            ))}
+          </div>
+          {testMsg && (
+            <div style={{marginTop:8,fontSize:11,fontWeight:600,color:"#0891b2"}}>{testMsg}</div>
+          )}
+        </div>
+      </Bloc>
+
       <Bloc titre="Données" emoji="💾">
         <Ligne
           icone={<svg width={17} height={17} viewBox="0 0 24 24" fill="none"

@@ -7,7 +7,7 @@ import { auth } from "./lib/firebase";
 
 import { DS, Ico, IconFiche, CLIENTS_INIT, PASSAGES_INIT, PRODUITS_DEFAUT, MOIS, AC } from "./utils/constants";
 import { migrateMois, alerteClient, getEntretienMois, getControleMois, isEntretienType, isControleType, TODAY, MOIS_NOW, YEAR_NOW, totalAnnuel, getMoisVal, daysUntil } from "./utils/helpers";
-import { GlobalStyles, setupPWA, sendLocalNotification, playNotifSound, toastInfo, toastError, showConfirm, ToastContainer, ConfirmModal } from "./styles";
+import { GlobalStyles, setupPWA, sendLocalNotification, playNotifSound, playChimeMorning, playAlertRdv, toastInfo, toastError, showConfirm, ToastContainer, ConfirmModal } from "./styles";
 import { useIsMobile, useOnlineStatus, Modal, BtnPrimary, Card, Section, Avatar, Tag } from "./components/ui";
 import { FormClient } from "./components/FormClient";
 import { FormPassage, ouvrirContrat, envoyerContratSignature } from "./components/FormPassage";
@@ -554,6 +554,82 @@ export default function App() {
     }
     prevTaskCount.current=currentTasks;
   },[clients,passages,ready]);
+
+  // ── SCHEDULER NOTIFICATIONS ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!ready) return;
+    const notifOn    = localStorage.getItem("briblue_notif_enabled")  !== "false";
+    const morningOn  = localStorage.getItem("briblue_notif_morning")  !== "false";
+    const rdvOn      = localStorage.getItem("briblue_notif_rdv")      !== "false";
+    if (!notifOn) return;
+
+    const timers = [];
+    const now = new Date();
+    const todayStr = [now.getFullYear(), String(now.getMonth()+1).padStart(2,"0"), String(now.getDate()).padStart(2,"0")].join("-");
+
+    // ── Briefing matinal à 8h00 ──
+    if (morningOn) {
+      const lastBriefing = localStorage.getItem("briblue_last_briefing");
+      const sendBriefing = () => {
+        const rdvsAujourd = rdvs.filter(r => r.date === todayStr);
+        const passagesAujourd = passages.filter(p => p.date === todayStr && !p.ok);
+        const msgs = [];
+        if (rdvsAujourd.length)   msgs.push(`${rdvsAujourd.length} RDV`);
+        if (passagesAujourd.length) msgs.push(`${passagesAujourd.length} passage${passagesAujourd.length>1?"s":""} à effectuer`);
+        const body = msgs.length ? msgs.join(" · ") : "Aucun événement prévu — bonne journée !";
+        playChimeMorning();
+        sendLocalNotification("☀️ Bonjour Dorian ! — BRIBLUE", body, { tag:"briblue-morning", requireInteraction:false });
+        localStorage.setItem("briblue_last_briefing", todayStr);
+      };
+
+      if (lastBriefing !== todayStr) {
+        const brief = new Date(); brief.setHours(8, 0, 0, 0);
+        const delay = brief - now;
+        if (delay > 0) {
+          timers.push(setTimeout(sendBriefing, delay)); // programmé à 8h
+        } else if (now.getHours() >= 8) {
+          sendBriefing(); // déjà passé 8h, envoyer maintenant (une fois par jour)
+        }
+      }
+    }
+
+    // ── Rappels RDV 15 min avant ──
+    if (rdvOn) {
+      rdvs.filter(r => r.date === todayStr && r.heure).forEach(rdv => {
+        const [h, m] = rdv.heure.split(":").map(Number);
+        const rdvTime = new Date(); rdvTime.setHours(h, m, 0, 0);
+        const reminderTime = new Date(rdvTime.getTime() - 15 * 60 * 1000);
+        const delay = reminderTime - now;
+        if (delay > 0 && delay < 12 * 3600 * 1000) {
+          const client = clients.find(c => c.id === rdv.clientId);
+          timers.push(setTimeout(() => {
+            playAlertRdv();
+            sendLocalNotification(
+              `📅 RDV dans 15 min`,
+              `${rdv.heure} · ${rdv.type}${client ? " — " + client.nom : ""}`,
+              { tag:"briblue-rdv-"+rdv.id, requireInteraction:true }
+            );
+          }, delay));
+        }
+        // 2e rappel : 5 min avant (vibration + bip)
+        const delay5 = new Date(rdvTime.getTime() - 5 * 60 * 1000) - now;
+        if (delay5 > 0 && delay5 < 12 * 3600 * 1000) {
+          const client = clients.find(c => c.id === rdv.clientId);
+          timers.push(setTimeout(() => {
+            playAlertRdv();
+            sendLocalNotification(
+              `⚠️ RDV dans 5 min !`,
+              `${rdv.heure} · ${rdv.type}${client ? " — " + client.nom : ""}`,
+              { tag:"briblue-rdv5-"+rdv.id, requireInteraction:true, vibrate:[200,100,200] }
+            );
+          }, delay5));
+        }
+      });
+    }
+
+    return () => timers.forEach(clearTimeout);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, rdvs.map(r=>r.id+r.heure+r.date).join(",")]);
 
   const handleLogin = useCallback(()=>{
     try{sessionStorage.setItem("bb_auth","1");}catch{ /* noop */ }

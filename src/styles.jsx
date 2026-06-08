@@ -10,6 +10,7 @@ function getAudioCtx() {
   return _audioCtx;
 }
 
+// Son de base (contrats, tâches)
 export function playNotifSound() {
   try {
     const ctx = getAudioCtx();
@@ -23,6 +24,50 @@ export function playNotifSound() {
     gain.gain.setValueAtTime(0.3, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
     osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.4);
+  } catch {}
+}
+
+// Carillon doux — briefing matinal
+export function playChimeMorning() {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume().catch(()=>{});
+    // Notes : Do Mi Sol Mi — accord majeur ascendant puis descendant
+    [523.25, 659.25, 783.99, 659.25].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.18;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.22, t + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+      osc.start(t); osc.stop(t + 0.55);
+    });
+  } catch {}
+}
+
+// Sonnerie urgente — rappel RDV imminent (double bip montant)
+export function playAlertRdv() {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume().catch(()=>{});
+    [0, 0.35].forEach(offset => {
+      [880, 1100, 1320].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = "square";
+        osc.frequency.value = freq;
+        const t = ctx.currentTime + offset + i * 0.07;
+        gain.gain.setValueAtTime(0.12, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+        osc.start(t); osc.stop(t + 0.12);
+      });
+    });
   } catch {}
 }
 
