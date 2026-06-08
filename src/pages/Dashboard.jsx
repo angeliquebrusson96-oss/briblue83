@@ -363,76 +363,62 @@ function CarteClients({ clients, onClientClick }) {
       {/* Carte Leaflet */}
       <div ref={mapRef} style={{height:340,width:"100%",background:"#e8f4f8"}}/>
 
-      {/* ── PANEL CLIENT — s'affiche sur la carte au clic d'un marqueur ── */}
+      {/* ── PANEL CLIENT compact ── */}
       {panel && (
         <div style={{
           position:"absolute", bottom:0, left:0, right:0, zIndex:2000,
           background:"#fff",
-          borderRadius:"18px 18px 0 0",
-          boxShadow:"0 -8px 32px rgba(0,0,0,0.18)",
-          animation:"fadeIn .18s ease",
+          borderRadius:"14px 14px 0 0",
+          boxShadow:"0 -4px 20px rgba(0,0,0,0.15)",
+          animation:"fadeIn .15s ease",
+          padding:"8px 12px 12px",
         }}>
-          {/* Poignée */}
-          <div style={{display:"flex",justifyContent:"center",padding:"10px 0 0"}}>
-            <div style={{width:36,height:4,borderRadius:2,background:"#e2e8f0"}}/>
+          {/* Poignée fine */}
+          <div style={{display:"flex",justifyContent:"center",marginBottom:8}}>
+            <div style={{width:28,height:3,borderRadius:2,background:"#e2e8f0"}}/>
           </div>
 
-          <div style={{display:"flex",alignItems:"flex-start",gap:14,padding:"12px 16px 6px"}}>
-            {/* Photo ou avatar */}
-            <div style={{width:56,height:56,borderRadius:14,overflow:"hidden",flexShrink:0,
-              background:panel.color,border:"2px solid #e2e8f0",
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            {/* Avatar compact */}
+            <div style={{width:40,height:40,borderRadius:10,overflow:"hidden",flexShrink:0,
+              background:panel.color,
               display:"flex",alignItems:"center",justifyContent:"center"}}>
               {panel.photoUrl
-                ? <img src={panel.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
-                : <span style={{color:"#fff",fontWeight:900,fontSize:20}}>{panel.initials}</span>
+                ? <img src={panel.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                : <span style={{color:"#fff",fontWeight:900,fontSize:15}}>{panel.initials}</span>
               }
             </div>
 
-            {/* Infos client */}
+            {/* Nom + formule sur une ligne */}
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:15,fontWeight:800,color:"#0f172a",lineHeight:1.2,marginBottom:3}}>
+              <div style={{fontSize:13,fontWeight:800,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                 {panel.client.nom}
               </div>
               {panel.client.formule && (
-                <div style={{fontSize:11,fontWeight:600,color:"#0891b2",marginBottom:3}}>
-                  {panel.client.formule}
-                </div>
-              )}
-              {panel.client.adresse && (
-                <div style={{fontSize:11,color:"#94a3b8",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                  📍 {panel.client.adresse}
-                </div>
+                <div style={{fontSize:10,color:"#0891b2",fontWeight:600}}>{panel.client.formule}</div>
               )}
             </div>
 
-            {/* Fermer */}
-            <button onClick={() => setPanel(null)}
-              style={{width:28,height:28,borderRadius:14,background:"#f1f5f9",border:"none",
-                cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </button>
-          </div>
-
-          {/* Bouton Afficher le client */}
-          <div style={{padding:"10px 16px 16px"}}>
-            <button
-              onClick={() => { onClientClick(panel.client); setPanel(null); }}
+            {/* Bouton ouvrir */}
+            <button onClick={() => { onClientClick(panel.client); setPanel(null); }}
               style={{
-                width:"100%",padding:"12px",
+                padding:"7px 14px",
                 background:"linear-gradient(135deg,#0891b2,#0e7490)",
-                color:"#fff",border:"none",borderRadius:14,
-                fontSize:13,fontWeight:700,cursor:"pointer",
-                fontFamily:"inherit",
-                display:"flex",alignItems:"center",justifyContent:"center",gap:8,
-                boxShadow:"0 4px 14px rgba(8,145,178,0.3)",
+                color:"#fff",border:"none",borderRadius:20,
+                fontSize:11,fontWeight:700,cursor:"pointer",
+                fontFamily:"inherit",flexShrink:0,
                 WebkitTapHighlightColor:"transparent",
               }}>
-              <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round">
-                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+              Ouvrir
+            </button>
+
+            {/* Fermer */}
+            <button onClick={() => setPanel(null)}
+              style={{width:24,height:24,borderRadius:12,background:"#f1f5f9",border:"none",
+                cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
               </svg>
-              Afficher le client
             </button>
           </div>
         </div>
