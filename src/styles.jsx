@@ -10,8 +10,8 @@ function getAudioCtx() {
   return _audioCtx;
 }
 
-// Son de base (contrats, tâches)
-export function playNotifSound() {
+// Son de base (contrats, tâches) — vol : 0.0–1.0
+export function playNotifSound(vol = 1.0) {
   try {
     const ctx = getAudioCtx();
     if (!ctx) return;
@@ -21,14 +21,14 @@ export function playNotifSound() {
     osc.frequency.setValueAtTime(880, ctx.currentTime);
     osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
     osc.frequency.setValueAtTime(880, ctx.currentTime + 0.2);
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+    gain.gain.setValueAtTime(0.3 * Math.max(0, Math.min(1, vol)), ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
     osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.4);
   } catch {}
 }
 
-// Carillon doux — briefing matinal
-export function playChimeMorning() {
+// Carillon doux — briefing matinal — vol : 0.0–1.0
+export function playChimeMorning(vol = 1.0) {
   try {
     const ctx = getAudioCtx();
     if (!ctx) return;
@@ -41,16 +41,17 @@ export function playChimeMorning() {
       osc.type = "sine";
       osc.frequency.value = freq;
       const t = ctx.currentTime + i * 0.18;
+      const v = 0.22 * Math.max(0, Math.min(1, vol));
       gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.22, t + 0.03);
+      gain.gain.linearRampToValueAtTime(v, t + 0.03);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
       osc.start(t); osc.stop(t + 0.55);
     });
   } catch {}
 }
 
-// Sonnerie urgente — rappel RDV imminent (double bip montant)
-export function playAlertRdv() {
+// Sonnerie urgente — rappel RDV imminent (double bip montant) — vol : 0.0–1.0
+export function playAlertRdv(vol = 1.0) {
   try {
     const ctx = getAudioCtx();
     if (!ctx) return;
@@ -63,12 +64,84 @@ export function playAlertRdv() {
         osc.type = "square";
         osc.frequency.value = freq;
         const t = ctx.currentTime + offset + i * 0.07;
-        gain.gain.setValueAtTime(0.12, t);
+        gain.gain.setValueAtTime(0.12 * Math.max(0, Math.min(1, vol)), t);
         gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
         osc.start(t); osc.stop(t + 0.12);
       });
     });
   } catch {}
+}
+
+// ── Son unique discret — double bip doux (usage : notifications générales) ──
+export function playDoubleBip(vol = 1.0) {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume().catch(()=>{});
+    [0, 0.22].forEach(offset => {
+      const osc = ctx.createOscillator(); const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = "sine"; osc.frequency.value = 1047; // Do5
+      const t = ctx.currentTime + offset;
+      gain.gain.setValueAtTime(0.18 * Math.max(0, Math.min(1, vol)), t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+      osc.start(t); osc.stop(t + 0.2);
+    });
+  } catch {}
+}
+
+// ── Sonnerie "eau" — 4 notes descendantes douces ──
+export function playWaterDrop(vol = 1.0) {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume().catch(()=>{});
+    [1200, 900, 700, 500].forEach((freq, i) => {
+      const osc = ctx.createOscillator(); const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = "sine"; osc.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.14;
+      const v = 0.2 * Math.max(0, Math.min(1, vol));
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(v, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+      osc.start(t); osc.stop(t + 0.32);
+    });
+  } catch {}
+}
+
+// ── Durées approximatives (ms) de chaque son ──
+export const SOUND_TYPES = [
+  { key: "chime",  label: "☀️ Carillon",  emoji: "☀️", dur: 1150 },
+  { key: "alert",  label: "🔔 Alerte",    emoji: "🔔", dur: 900  },
+  { key: "notif",  label: "🔈 Bip court", emoji: "🔈", dur: 450  },
+  { key: "double", label: "💧 Double bip",emoji: "💧", dur: 500  },
+  { key: "water",  label: "🌊 Eau",       emoji: "🌊", dur: 700  },
+  { key: "none",   label: "🔇 Aucun",     emoji: "🔇", dur: 0    },
+];
+
+const SOUND_FNS = {
+  chime:  playChimeMorning,
+  alert:  playAlertRdv,
+  notif:  playNotifSound,
+  double: playDoubleBip,
+  water:  playWaterDrop,
+  none:   () => {},
+};
+
+// ── Fonction unifiée : playSound(type, repeat, vol) ──────────────────────────
+// type   : "chime" | "alert" | "notif" | "double" | "water" | "none"
+// repeat : 1–5 (nombre de fois que le son joue)
+// vol    : 0.0–1.0
+export function playSound(type = "notif", repeat = 1, vol = 1.0) {
+  if (!type || type === "none") return;
+  const fn  = SOUND_FNS[type] || playNotifSound;
+  const dur = (SOUND_TYPES.find(s => s.key === type)?.dur ?? 600) + 120;
+  const n   = Math.max(1, Math.min(5, repeat));
+  for (let i = 0; i < n; i++) {
+    if (i === 0) fn(vol);
+    else setTimeout(() => fn(vol), i * dur);
+  }
 }
 
 // ─── PWA SETUP ────────────────────────────────────────────────────────────────

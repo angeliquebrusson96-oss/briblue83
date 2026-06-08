@@ -1,7 +1,7 @@
 // @ts-nocheck
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { flushPendingNow } from "../lib/storage";
-import { playChimeMorning, playAlertRdv, playNotifSound, sendLocalNotification } from "../styles";
+import { playChimeMorning, playAlertRdv, playNotifSound, playSound, SOUND_TYPES, sendLocalNotification } from "../styles";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TOGGLE — interrupteur simple
@@ -125,6 +125,139 @@ function Bloc({ titre, emoji, children }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SÉLECTEUR DE SON — chips horizontales
+// ─────────────────────────────────────────────────────────────────────────────
+function SonSelector({ label, value, onChange }) {
+  return (
+    <div style={{padding:"4px 16px 10px",background:"#fafafa",borderTop:"1px solid #f1f5f9"}}>
+      <div style={{fontSize:10,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:.5,marginBottom:7}}>{label}</div>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+        {SOUND_TYPES.map(s => {
+          const active = value === s.key;
+          return (
+            <button key={s.key} onClick={() => onChange(s.key)}
+              style={{
+                padding:"5px 11px",borderRadius:20,fontFamily:"inherit",cursor:"pointer",
+                fontSize:11,fontWeight:active?700:500,
+                background:active?"#0891b2":"#fff",
+                color:active?"#fff":"#374151",
+                border:`1.5px solid ${active?"#0891b2":"#e2e8f0"}`,
+                WebkitTapHighlightColor:"transparent",
+                transition:"all .12s",
+              }}>
+              {s.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SÉLECTEUR DE RÉPÉTITIONS
+// ─────────────────────────────────────────────────────────────────────────────
+function RepeatSelector({ label, value, onChange, options = [1,2,3] }) {
+  return (
+    <div style={{padding:"4px 16px 10px",background:"#fafafa",borderTop:"1px solid #f1f5f9"}}>
+      <div style={{fontSize:10,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:.5,marginBottom:7}}>{label}</div>
+      <div style={{display:"flex",gap:6}}>
+        {options.map(n => {
+          const active = value === n;
+          return (
+            <button key={n} onClick={() => onChange(n)}
+              style={{
+                minWidth:42,padding:"5px 10px",borderRadius:10,fontFamily:"inherit",cursor:"pointer",
+                fontSize:12,fontWeight:active?800:500,
+                background:active?"linear-gradient(135deg,#0891b2,#0e7490)":"#fff",
+                color:active?"#fff":"#374151",
+                border:`1.5px solid ${active?"#0891b2":"#e2e8f0"}`,
+                boxShadow:active?"0 2px 8px rgba(8,145,178,0.3)":"none",
+                WebkitTapHighlightColor:"transparent",
+                transition:"all .12s",
+              }}>
+              {n}×
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SÉLECTEUR DE DÉLAIS RDV — multi-choix
+// ─────────────────────────────────────────────────────────────────────────────
+const DELAYS_OPTIONS = [
+  { val:5,  label:"5 min"  },
+  { val:10, label:"10 min" },
+  { val:15, label:"15 min" },
+  { val:30, label:"30 min" },
+  { val:60, label:"1 h"    },
+];
+function DelaiSelector({ value, onChange }) {
+  const toggle = d => {
+    if (value.includes(d)) onChange(value.filter(x => x !== d));
+    else onChange([...value, d].sort((a,b)=>b-a)); // décroissant : 15, 5
+  };
+  return (
+    <div style={{padding:"4px 16px 10px",background:"#fafafa",borderTop:"1px solid #f1f5f9"}}>
+      <div style={{fontSize:10,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:.5,marginBottom:7}}>
+        Délais avant le RDV
+      </div>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+        {DELAYS_OPTIONS.map(({ val, label }) => {
+          const active = value.includes(val);
+          return (
+            <button key={val} onClick={() => toggle(val)}
+              style={{
+                padding:"5px 12px",borderRadius:20,fontFamily:"inherit",cursor:"pointer",
+                fontSize:11,fontWeight:active?700:500,
+                background:active?"#7c3aed":"#fff",
+                color:active?"#fff":"#374151",
+                border:`1.5px solid ${active?"#7c3aed":"#e2e8f0"}`,
+                WebkitTapHighlightColor:"transparent",
+                transition:"all .12s",
+              }}>
+              {active && <span style={{marginRight:4}}>✓</span>}{label}
+            </button>
+          );
+        })}
+      </div>
+      {value.length === 0 && (
+        <div style={{fontSize:10,color:"#f97316",marginTop:5}}>⚠ Sélectionnez au moins un délai</div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BOUTON TEST
+// ─────────────────────────────────────────────────────────────────────────────
+function BoutonTest({ label, onClick }) {
+  return (
+    <div style={{padding:"6px 16px 10px",background:"#fafafa",borderTop:"1px solid #f1f5f9"}}>
+      <button onClick={onClick}
+        style={{
+          padding:"7px 16px",borderRadius:20,border:"1.5px solid #e0f2fe",
+          background:"#fff",cursor:"pointer",fontFamily:"inherit",
+          fontSize:11,fontWeight:600,color:"#0891b2",
+          display:"flex",alignItems:"center",gap:7,
+          WebkitTapHighlightColor:"transparent",
+          transition:"background .1s",
+        }}
+        onMouseEnter={e=>e.currentTarget.style.background="#f0f9ff"}
+        onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
+        <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.5" strokeLinecap="round">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>
+        {label}
+      </button>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // PAGE PARAMÈTRES
 // ─────────────────────────────────────────────────────────────────────────────
 export function PageParametres({
@@ -137,43 +270,92 @@ export function PageParametres({
   const [cacheMsg,   setCacheMsg]   = useState("");
   const [cacheSize,  setCacheSize]  = useState("…");
 
+  // ── Helpers localStorage ──
+  const ls    = (k, def) => { try { const v = localStorage.getItem(k); return v === null ? def : JSON.parse(v); } catch { return def; } };
+  const setLs = (k, v)   => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+  const mkSet = (key, setter) => v => { setter(v); setLs(key, v); };
+
   // ── État notifications ──
-  const ls = (k, def) => { try { const v = localStorage.getItem(k); return v === null ? def : JSON.parse(v); } catch { return def; } };
-  const setLs = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+  const [notifEnabled,   setNotifEnabledRaw]   = useState(() => ls("briblue_notif_enabled",     true));
+  const [morningOn,      setMorningOnRaw]       = useState(() => ls("briblue_notif_morning",     true));
+  const [rdvOn,          setRdvOnRaw]           = useState(() => ls("briblue_notif_rdv",         true));
+  const [permission,     setPermission]         = useState(() => typeof Notification !== "undefined" ? Notification.permission : "default");
+  const [testMsg,        setTestMsg]            = useState("");
 
-  const [notifEnabled, setNotifEnabledRaw] = useState(() => ls("briblue_notif_enabled", true));
-  const [morningOn,    setMorningOnRaw]    = useState(() => ls("briblue_notif_morning",  true));
-  const [rdvOn,        setRdvOnRaw]        = useState(() => ls("briblue_notif_rdv",      true));
-  const [permission,   setPermission]      = useState(() => typeof Notification !== "undefined" ? Notification.permission : "default");
-  const [testMsg,      setTestMsg]         = useState("");
+  // Nouveaux réglages fins
+  const [volume,         setVolumeRaw]          = useState(() => ls("briblue_notif_volume",      0.7));   // 0.0–1.0
+  const [morningHeure,   setMorningHeureRaw]    = useState(() => ls("briblue_notif_morning_h",   "08:00"));
+  const [morningSon,     setMorningSonRaw]       = useState(() => ls("briblue_notif_son_morning", "chime"));
+  const [morningRepeat,  setMorningRepeatRaw]   = useState(() => ls("briblue_notif_rep_morning", 1));
+  const [rdvDelays,      setRdvDelaysRaw]       = useState(() => ls("briblue_notif_rdv_delays",  [15, 5]));  // minutes avant
+  const [rdvSon,         setRdvSonRaw]          = useState(() => ls("briblue_notif_son_rdv",     "alert"));
+  const [rdvRepeat,      setRdvRepeatRaw]       = useState(() => ls("briblue_notif_rep_rdv",     2));
+  const [notifSon,       setNotifSonRaw]        = useState(() => ls("briblue_notif_son_notif",   "notif"));
+  const [notifRepeat,    setNotifRepeatRaw]     = useState(() => ls("briblue_notif_rep_notif",   1));
 
-  const setNotifEnabled = v => { setNotifEnabledRaw(v); setLs("briblue_notif_enabled", v); };
-  const setMorningOn    = v => { setMorningOnRaw(v);    setLs("briblue_notif_morning",  v); };
-  const setRdvOn        = v => { setRdvOnRaw(v);        setLs("briblue_notif_rdv",      v); };
+  const setNotifEnabled  = mkSet("briblue_notif_enabled",     setNotifEnabledRaw);
+  const setMorningOn     = mkSet("briblue_notif_morning",     setMorningOnRaw);
+  const setRdvOn         = mkSet("briblue_notif_rdv",         setRdvOnRaw);
+  const setVolume        = mkSet("briblue_notif_volume",      setVolumeRaw);
+  const setMorningHeure  = mkSet("briblue_notif_morning_h",   setMorningHeureRaw);
+  const setMorningSon    = mkSet("briblue_notif_son_morning", setMorningSonRaw);
+  const setMorningRepeat = mkSet("briblue_notif_rep_morning", setMorningRepeatRaw);
+  const setRdvDelays     = mkSet("briblue_notif_rdv_delays",  setRdvDelaysRaw);
+  const setRdvSon        = mkSet("briblue_notif_son_rdv",     setRdvSonRaw);
+  const setRdvRepeat     = mkSet("briblue_notif_rep_rdv",     setRdvRepeatRaw);
+  const setNotifSon      = mkSet("briblue_notif_son_notif",   setNotifSonRaw);
+  const setNotifRepeat   = mkSet("briblue_notif_rep_notif",   setNotifRepeatRaw);
 
-  // Demander la permission navigateur
-  const demanderPermission = async () => {
-    if (!("Notification" in window)) { setTestMsg("❌ Notifications non supportées"); return; }
-    const p = await Notification.requestPermission();
-    setPermission(p);
-    if (p === "granted") { setTestMsg("✅ Permission accordée !"); }
-    else if (p === "denied") { setTestMsg("❌ Bloquées — autorisez dans les réglages du navigateur"); }
-    setTimeout(() => setTestMsg(""), 4000);
+  const testMsgTimerRef = useRef(null);
+  const showTest = (msg) => {
+    setTestMsg(msg);
+    clearTimeout(testMsgTimerRef.current);
+    testMsgTimerRef.current = setTimeout(() => setTestMsg(""), 3000);
   };
 
-  // Tester le son
-  const testerSon = (type = "morning") => {
-    if (type === "morning")  { playChimeMorning(); setTestMsg("🎵 Carillon matinal"); }
-    if (type === "rdv")      { playAlertRdv();     setTestMsg("🔔 Sonnerie RDV"); }
-    if (type === "notif")    { playNotifSound();   setTestMsg("🔈 Son notification"); }
-    setTimeout(() => setTestMsg(""), 2500);
-    // Envoyer une notif test si permission ok
-    if (permission === "granted" && type === "morning") {
-      sendLocalNotification("☀️ BRIBLUE — Test", "Voici à quoi ressemble le briefing matinal.", { tag:"briblue-test" });
+  // ── Demander la permission navigateur ──
+  const demanderPermission = async () => {
+    if (!("Notification" in window)) { showTest("❌ Notifications non supportées"); return; }
+    const p = await Notification.requestPermission();
+    setPermission(p);
+    if (p === "granted") showTest("✅ Permission accordée !");
+    else if (p === "denied") showTest("❌ Bloquées — autorisez dans les réglages");
+  };
+
+  // ── Tester un son directement ──
+  const testerSon = (type, repeat = 1) => {
+    playSound(type, repeat, volume);
+    const label = SOUND_TYPES.find(s => s.key === type)?.label || type;
+    showTest(`${label} × ${repeat}`);
+  };
+
+  // ── Tester une notification complète ──
+  const testerNotif = (cat) => {
+    if (cat === "morning") {
+      playSound(morningSon, morningRepeat, volume);
+      if (permission === "granted")
+        sendLocalNotification("☀️ BRIBLUE — Test briefing", "Voici à quoi ressemble le briefing matinal.", { tag:"briblue-test" });
+      showTest("☀️ Briefing envoyé");
     }
-    if (permission === "granted" && type === "rdv") {
-      sendLocalNotification("📅 BRIBLUE — Test RDV", "Rappel : RDV dans 15 min — Test client", { tag:"briblue-test-rdv", requireInteraction:false });
+    if (cat === "rdv") {
+      playSound(rdvSon, rdvRepeat, volume);
+      if (permission === "granted")
+        sendLocalNotification("📅 BRIBLUE — Test RDV", `Rappel ${rdvDelays[0]||15} min · Client test`, { tag:"briblue-test-rdv", requireInteraction:false });
+      showTest("📅 Test RDV envoyé");
     }
+    if (cat === "notif") {
+      playSound(notifSon, notifRepeat, volume);
+      if (permission === "granted")
+        sendLocalNotification("🔔 BRIBLUE — Test notif", "Nouvelle tâche ou événement.", { tag:"briblue-test-notif" });
+      showTest("🔔 Notif test envoyée");
+    }
+  };
+
+  // ── Tester le son (rétrocompat) ──
+  const testerSonLegacy = (type = "morning") => {
+    if (type === "morning")  { playChimeMorning(volume); showTest("🎵 Carillon"); }
+    if (type === "rdv")      { playAlertRdv(volume);     showTest("🔔 Alerte RDV"); }
+    if (type === "notif")    { playNotifSound(volume);   showTest("🔈 Bip"); }
   };
 
   // ── Taille du cache local ──
@@ -358,23 +540,22 @@ export function PageParametres({
         </Bloc>
       )}
 
-      {/* ── DONNÉES ── */}
       {/* ── NOTIFICATIONS ── */}
       <Bloc titre="Notifications" emoji="🔔">
 
-        {/* Activer/Désactiver globalement */}
+        {/* ── Master toggle ── */}
         <Ligne
           icone={<svg width={17} height={17} viewBox="0 0 24 24" fill="none"
             stroke={notifEnabled?"#0891b2":"#94a3b8"} strokeWidth="2" strokeLinecap="round">
             <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>
           </svg>}
           label="Notifications activées"
-          detail={notifEnabled ? "Les alertes sont actives" : "Toutes les notifications sont désactivées"}
+          detail={notifEnabled ? "Alertes sonores et visuelles actives" : "Toutes les notifications sont désactivées"}
           right={<Toggle on={notifEnabled} onToggle={setNotifEnabled}/>}
           onClick={() => setNotifEnabled(!notifEnabled)}
         />
 
-        {/* Permission navigateur */}
+        {/* ── Permission navigateur ── */}
         <Ligne
           icone={<svg width={17} height={17} viewBox="0 0 24 24" fill="none"
             stroke={permission==="granted"?"#059669":permission==="denied"?"#dc2626":"#d97706"}
@@ -388,69 +569,199 @@ export function PageParametres({
           </svg>}
           label={permission==="granted"?"Permission accordée ✅":permission==="denied"?"Permission refusée ❌":"Autoriser les notifications"}
           detail={
-            permission==="granted" ? "Le navigateur peut afficher des alertes"
+            permission==="granted" ? "Le navigateur peut afficher des alertes système"
             : permission==="denied" ? "Activez dans Réglages > Notifications > BRIBLUE"
-            : "Cliquez pour autoriser les notifications du navigateur"
+            : "Appuyez pour autoriser les alertes navigateur"
           }
           onClick={permission !== "granted" ? demanderPermission : undefined}
-          right={testMsg && permission==="granted" ? <span style={{fontSize:10,color:"#0891b2",fontWeight:600}}>{testMsg}</span> : null}
         />
 
-        {notifEnabled && (
-          <>
-            {/* Briefing matinal */}
-            <Ligne
-              icone={<span style={{fontSize:17}}>☀️</span>}
-              label="Briefing matinal — 8h00"
-              detail="Résumé des RDVs et passages du jour au réveil"
-              right={<Toggle on={morningOn} onToggle={setMorningOn}/>}
-              onClick={() => setMorningOn(!morningOn)}
-            />
+        {notifEnabled && (<>
 
-            {/* Rappels RDV */}
-            <Ligne
-              icone={<span style={{fontSize:17}}>📅</span>}
-              label="Rappels rendez-vous"
-              detail="Alerte 15 min et 5 min avant chaque RDV"
-              right={<Toggle on={rdvOn} onToggle={setRdvOn}/>}
-              onClick={() => setRdvOn(!rdvOn)}
-              sep={false}
-            />
-          </>
-        )}
-
-        {/* Barre de test sons */}
-        <div style={{
-          padding:"10px 14px 12px",
-          borderTop:"1px solid #f1f5f9",
-          background:"#f8fafc",
-        }}>
-          <div style={{fontSize:10,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>
-            Tester les sons
-          </div>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            {[
-              { label:"☀️ Briefing", type:"morning" },
-              { label:"📅 RDV",      type:"rdv"     },
-              { label:"🔈 Notif",    type:"notif"   },
-            ].map(({ label, type }) => (
-              <button key={type} onClick={() => testerSon(type)} style={{
-                padding:"6px 14px", borderRadius:20, border:"1.5px solid #e2e8f0",
-                background:"#fff", cursor:"pointer", fontFamily:"inherit",
-                fontSize:11, fontWeight:600, color:"#374151",
-                WebkitTapHighlightColor:"transparent",
-                transition:"background .1s",
-              }}
-              onMouseEnter={e=>e.currentTarget.style.background="#f0f9ff"}
-              onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
-                {label}
+          {/* ────────────────── VOLUME ────────────────── */}
+          <div style={{padding:"12px 16px 10px",borderBottom:"1px solid #f1f5f9"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+              <div style={{width:36,height:36,borderRadius:10,flexShrink:0,
+                background:"#f0f9ff",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                <svg width={17} height={17} viewBox="0 0 24 24" fill="none"
+                  stroke="#0891b2" strokeWidth="2" strokeLinecap="round">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                  {volume > 0.5 && <path d="M19.07 4.93a10 10 0 010 14.14"/>}
+                  {volume > 0    && <path d="M15.54 8.46a5 5 0 010 7.07"/>}
+                </svg>
+              </div>
+              <div style={{flex:1}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+                  <span style={{fontSize:14,fontWeight:600,color:"#0f172a"}}>Volume</span>
+                  <span style={{fontSize:13,fontWeight:700,color:"#0891b2"}}>{Math.round(volume*100)} %</span>
+                </div>
+                <div style={{position:"relative",height:28,display:"flex",alignItems:"center"}}>
+                  {/* Piste colorée */}
+                  <div style={{
+                    position:"absolute",left:0,right:0,height:6,borderRadius:3,
+                    background:`linear-gradient(90deg,#0891b2 ${volume*100}%,#e2e8f0 ${volume*100}%)`,
+                  }}/>
+                  <input type="range" min={0} max={1} step={0.05}
+                    value={volume}
+                    onChange={e => setVolume(parseFloat(e.target.value))}
+                    style={{
+                      width:"100%",appearance:"none",WebkitAppearance:"none",
+                      background:"transparent",outline:"none",
+                      cursor:"pointer",position:"relative",zIndex:1,margin:0,padding:0,
+                    }}
+                  />
+                </div>
+              </div>
+              <button onClick={() => testerSon(notifSon, notifRepeat)}
+                style={{flexShrink:0,width:34,height:34,borderRadius:9,border:"1.5px solid #e0f2fe",
+                  background:"#f0f9ff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
+                  WebkitTapHighlightColor:"transparent"}}>
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.2" strokeLinecap="round">
+                  <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
               </button>
-            ))}
+            </div>
           </div>
-          {testMsg && (
-            <div style={{marginTop:8,fontSize:11,fontWeight:600,color:"#0891b2"}}>{testMsg}</div>
-          )}
-        </div>
+
+          {/* ────────────────── BRIEFING MATINAL ────────────────── */}
+          <div style={{borderBottom:"1px solid #f1f5f9"}}>
+            {/* Toggle + heure */}
+            <div style={{padding:"12px 16px 8px",display:"flex",alignItems:"center",gap:13}}>
+              <div style={{width:36,height:36,borderRadius:10,flexShrink:0,
+                background:morningOn?"#fffbeb":"#f8fafc",
+                display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>
+                ☀️
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:14,fontWeight:600,color:"#0f172a"}}>Briefing matinal</div>
+                <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>Résumé RDVs + passages à l'heure choisie</div>
+              </div>
+              <input
+                type="time"
+                value={morningHeure}
+                onChange={e => setMorningHeure(e.target.value)}
+                disabled={!morningOn}
+                style={{
+                  fontSize:13,fontWeight:700,color:morningOn?"#0891b2":"#cbd5e1",
+                  border:"1.5px solid",borderColor:morningOn?"#bae6fd":"#e2e8f0",
+                  borderRadius:8,padding:"4px 8px",background:morningOn?"#f0f9ff":"#f8fafc",
+                  outline:"none",fontFamily:"inherit",cursor:morningOn?"pointer":"not-allowed",
+                  WebkitAppearance:"none",marginRight:6,
+                }}
+              />
+              <Toggle on={morningOn} onToggle={setMorningOn}/>
+            </div>
+
+            {morningOn && (<>
+              {/* Sélecteur de son */}
+              <SonSelector
+                label="Son du briefing"
+                value={morningSon}
+                onChange={setMorningSon}
+              />
+              {/* Répétitions */}
+              <RepeatSelector
+                label="Répétitions"
+                value={morningRepeat}
+                onChange={setMorningRepeat}
+                options={[1,2,3]}
+              />
+              {/* Bouton test */}
+              <BoutonTest
+                label="Tester le briefing"
+                onClick={() => testerNotif("morning")}
+              />
+            </>)}
+          </div>
+
+          {/* ────────────────── RAPPELS RDV ────────────────── */}
+          <div style={{borderBottom:"1px solid #f1f5f9"}}>
+            {/* Toggle */}
+            <div style={{padding:"12px 16px 8px",display:"flex",alignItems:"center",gap:13}}>
+              <div style={{width:36,height:36,borderRadius:10,flexShrink:0,
+                background:rdvOn?"#f5f3ff":"#f8fafc",
+                display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>
+                📅
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:14,fontWeight:600,color:"#0f172a"}}>Rappels rendez-vous</div>
+                <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>Alerte X minutes avant chaque RDV</div>
+              </div>
+              <Toggle on={rdvOn} onToggle={setRdvOn}/>
+            </div>
+
+            {rdvOn && (<>
+              {/* Délais */}
+              <DelaiSelector
+                value={rdvDelays}
+                onChange={setRdvDelays}
+              />
+              {/* Son */}
+              <SonSelector
+                label="Son du rappel"
+                value={rdvSon}
+                onChange={setRdvSon}
+              />
+              {/* Répétitions */}
+              <RepeatSelector
+                label="Répétitions"
+                value={rdvRepeat}
+                onChange={setRdvRepeat}
+                options={[1,2,3,5]}
+              />
+              {/* Bouton test */}
+              <BoutonTest
+                label="Tester le rappel RDV"
+                onClick={() => testerNotif("rdv")}
+              />
+            </>)}
+          </div>
+
+          {/* ────────────────── NOTIFICATIONS GÉNÉRALES ────────────────── */}
+          <div>
+            <div style={{padding:"12px 16px 8px",display:"flex",alignItems:"center",gap:13}}>
+              <div style={{width:36,height:36,borderRadius:10,flexShrink:0,
+                background:"#f0fdf4",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>
+                🔔
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:14,fontWeight:600,color:"#0f172a"}}>Notifications générales</div>
+                <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>Nouvelles tâches, signatures de contrats…</div>
+              </div>
+            </div>
+            <SonSelector
+              label="Son"
+              value={notifSon}
+              onChange={setNotifSon}
+            />
+            <RepeatSelector
+              label="Répétitions"
+              value={notifRepeat}
+              onChange={setNotifRepeat}
+              options={[1,2,3]}
+            />
+            <BoutonTest
+              label="Tester la notification"
+              onClick={() => testerNotif("notif")}
+            />
+          </div>
+
+        </>)}
+
+        {/* Feedback test */}
+        {testMsg && (
+          <div style={{
+            margin:"0 12px 12px",padding:"9px 14px",
+            borderRadius:10,background:"#f0f9ff",border:"1px solid #bae6fd",
+            fontSize:12,fontWeight:600,color:"#0891b2",
+            display:"flex",alignItems:"center",gap:7,
+          }}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.5" strokeLinecap="round">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            {testMsg}
+          </div>
+        )}
       </Bloc>
 
       <Bloc titre="Données" emoji="💾">
