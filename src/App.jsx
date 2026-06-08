@@ -5,7 +5,7 @@ import { extractPassagePhotos, migratePassagePhotosToStorage, migrateAllPassages
 import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import { auth } from "./lib/firebase";
 
-import { DS, Ico, IconFiche, CLIENTS_INIT, PASSAGES_INIT, PRODUITS_DEFAUT, MOIS, AC } from "./utils/constants";
+import { DS, Ico, IconFiche, CLIENTS_INIT, PASSAGES_INIT, PRODUITS_DEFAUT, PRODUITS_META_DEFAUT, MOIS, AC } from "./utils/constants";
 import { migrateMois, alerteClient, getEntretienMois, getControleMois, isEntretienType, isControleType, TODAY, MOIS_NOW, YEAR_NOW, totalAnnuel, getMoisVal, daysUntil } from "./utils/helpers";
 import { GlobalStyles, setupPWA, sendLocalNotification, playNotifSound, playChimeMorning, playAlertRdv, playSound, toastInfo, toastError, showConfirm, ToastContainer, ConfirmModal } from "./styles";
 import { useIsMobile, useOnlineStatus, Modal, BtnPrimary, Card, Section, Avatar, Tag } from "./components/ui";
@@ -101,46 +101,369 @@ function LoginScreen({ onLogin }) {
   );
 }
 
-function ModalStock({ stock, onClose, onUpdateStock, onAddProduit, onDeleteProduit }) {
-  const [newProduit, setNewProduit] = useState("");
-  const produitsListe = Object.keys(stock);
+// ─────────────────────────────────────────────────────────────────────────────
+// STOCK PRODUITS — redesign complet
+// ─────────────────────────────────────────────────────────────────────────────
+const STOCK_UNITES    = ["unité","flacon","sac","carton","L","kg","boîte"];
+const STOCK_CATS = [
+  { key:"tous",       label:"Tous",       color:"#64748b", bg:"#f1f5f9" },
+  { key:"bas",        label:"⚠️ Bas",      color:"#dc2626", bg:"#fee2e2" },
+  { key:"traitement", label:"Traitement", color:"#0891b2", bg:"#e0f2fe" },
+  { key:"entretien",  label:"Entretien",  color:"#059669", bg:"#dcfce7" },
+  { key:"matériel",   label:"Matériel",   color:"#7c3aed", bg:"#ede9fe" },
+];
+const CAT_COLORS = { traitement:"#0891b2", entretien:"#059669", matériel:"#7c3aed" };
+
+function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta, onAddProduit, onDeleteProduit }) {
+  const [search,      setSearch]      = useState("");
+  const [catFilter,   setCatFilter]   = useState("tous");
+  const [editingQty,  setEditingQty]  = useState(null);
+  const [qtyDraft,    setQtyDraft]    = useState("");
+  const [expandedProd,setExpandedProd]= useState(null);
+  const [newNom,      setNewNom]      = useState("");
+  const [newUnite,    setNewUnite]    = useState("flacon");
+  const [newCat,      setNewCat]      = useState("traitement");
+  const [showAddForm, setShowAddForm] = useState(false);
+  const qtyInputRef = useRef(null);
+
+  const getMeta = (nom) => ({
+    unite: "unité", seuil: 2, categorie: "traitement",
+    ...(PRODUITS_META_DEFAUT[nom] || {}),
+    ...(stockMeta[nom] || {}),
+  });
+  const setMeta = (nom, patch) => onUpdateMeta(nom, { ...getMeta(nom), ...patch });
+
+  const produits = Object.keys(stock);
+  const basCount = produits.filter(p => (stock[p]??0) <= getMeta(p).seuil).length;
+
+  const filtered = [...produits]
+    .filter(p => {
+      if (search && !p.toLowerCase().includes(search.toLowerCase())) return false;
+      if (catFilter === "bas")    return (stock[p]??0) <= getMeta(p).seuil;
+      if (catFilter !== "tous")   return getMeta(p).categorie === catFilter;
+      return true;
+    })
+    .sort((a, b) => {
+      const aLow = (stock[a]??0) <= getMeta(a).seuil;
+      const bLow = (stock[b]??0) <= getMeta(b).seuil;
+      if (aLow !== bLow) return aLow ? -1 : 1;
+      return a.localeCompare(b, "fr");
+    });
+
+  const startQtyEdit = (nom) => {
+    setEditingQty(nom);
+    setQtyDraft(String(stock[nom] ?? 0));
+    setTimeout(() => qtyInputRef.current?.focus(), 30);
+  };
+  const saveQty = (nom) => {
+    const n = parseInt(qtyDraft, 10);
+    if (!isNaN(n) && n >= 0) onUpdateStock(nom, n);
+    setEditingQty(null);
+  };
+
+  const handleAdd = () => {
+    if (!newNom.trim()) return;
+    onAddProduit(newNom.trim());
+    onUpdateMeta(newNom.trim(), { unite: newUnite, seuil: 2, categorie: newCat });
+    setNewNom(""); setShowAddForm(false);
+  };
+
   return (
-    <Modal title="Stock produits" onClose={onClose} wide>
-      <Section title="Ajouter un produit personnalisé">
-        <div style={{display:"flex",gap:8,flexWrap:"wrap",width:"100%"}}>
-          <input value={newProduit} onChange={e=>setNewProduit(e.target.value)} placeholder="Nom du produit..."
-            onKeyDown={e=>e.key==="Enter"&&newProduit.trim()&&(onAddProduit(newProduit.trim()),setNewProduit(""))}
-            style={{flex:"1 1 140px",minWidth:0,width:"100%",padding:"11px 14px",borderRadius:DS.radiusSm,border:"none",fontSize:14,outline:"none",fontFamily:"inherit",color:DS.dark,boxSizing:"border-box",boxShadow:"inset 3px 3px 6px rgba(6,182,212,0.15), inset -2px -2px 5px rgba(255,255,255,0.8)"}}/>
-          <BtnPrimary onClick={()=>{if(newProduit.trim()){onAddProduit(newProduit.trim());setNewProduit("");}}} icon={Ico.plus(14,"#fff")} bg={DS.blue} style={{flexShrink:0,whiteSpace:"nowrap"}}>Ajouter</BtnPrimary>
+    <Modal title="" onClose={onClose} wide>
+      {/* ── Header ── */}
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+        <div style={{width:40,height:40,borderRadius:12,background:"linear-gradient(135deg,#0891b2,#0e7490)",
+          display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+          <svg width={19} height={19} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
+            <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+          </svg>
         </div>
-      </Section>
-      <Section title="Quantités en stock">
-        <div style={{display:"flex",flexDirection:"column",gap:6}}>
-          {produitsListe.map(p=>{
-            const qty = stock[p] ?? 0;
-            const low = qty <= 2;
-            return (
-              <div key={p} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:DS.radiusSm,background:"rgba(255,255,255,0.45)",border:"none",boxShadow:low?"inset 2px 2px 5px rgba(239,68,68,0.15), inset -1px -1px 3px rgba(255,255,255,0.7)":"inset 2px 2px 5px rgba(6,182,212,0.15), inset -1px -1px 3px rgba(255,255,255,0.7)"}}>
-                <div style={{flex:1}}>
-                  <span style={{fontSize:13,fontWeight:600,color:DS.dark}}>{p}</span>
-                  {low&&<span style={{marginLeft:8,fontSize:10,fontWeight:700,color:DS.red}}>⚠️ Stock bas</span>}
+        <div style={{flex:1}}>
+          <div style={{fontSize:17,fontWeight:800,color:"#0f172a"}}>Stock produits</div>
+          <div style={{fontSize:11,color:"#64748b",marginTop:1}}>
+            {produits.length} produit{produits.length>1?"s":""}
+            {basCount > 0 && <span style={{marginLeft:8,color:"#dc2626",fontWeight:700}}>· ⚠️ {basCount} en rupture</span>}
+          </div>
+        </div>
+        <button onClick={()=>setShowAddForm(s=>!s)}
+          style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",
+            borderRadius:20,background:"linear-gradient(135deg,#0891b2,#0e7490)",
+            border:"none",cursor:"pointer",color:"#fff",fontSize:12,fontWeight:700,
+            fontFamily:"inherit",boxShadow:"0 2px 8px rgba(8,145,178,0.3)",
+            WebkitTapHighlightColor:"transparent"}}>
+          <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Ajouter
+        </button>
+      </div>
+
+      {/* ── Formulaire ajout ── */}
+      {showAddForm && (
+        <div style={{marginBottom:12,padding:"12px 14px",borderRadius:14,
+          background:"#f0f9ff",border:"1.5px solid #bae6fd"}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#0891b2",textTransform:"uppercase",letterSpacing:.5,marginBottom:10}}>
+            Nouveau produit
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <input value={newNom} onChange={e=>setNewNom(e.target.value)}
+              placeholder="Nom du produit…" autoFocus
+              onKeyDown={e=>e.key==="Enter"&&handleAdd()}
+              style={{padding:"9px 12px",borderRadius:9,border:"1.5px solid #e2e8f0",
+                fontSize:13,outline:"none",fontFamily:"inherit",color:"#0f172a",background:"#fff"}}/>
+            <div style={{display:"flex",gap:8}}>
+              <select value={newUnite} onChange={e=>setNewUnite(e.target.value)}
+                style={{flex:1,padding:"8px 10px",borderRadius:9,border:"1.5px solid #e2e8f0",
+                  fontSize:12,fontFamily:"inherit",background:"#fff",color:"#374151",outline:"none"}}>
+                {STOCK_UNITES.map(u=><option key={u}>{u}</option>)}
+              </select>
+              <select value={newCat} onChange={e=>setNewCat(e.target.value)}
+                style={{flex:1,padding:"8px 10px",borderRadius:9,border:"1.5px solid #e2e8f0",
+                  fontSize:12,fontFamily:"inherit",background:"#fff",color:"#374151",outline:"none"}}>
+                {STOCK_CATS.filter(c=>c.key!=="tous"&&c.key!=="bas").map(c=><option key={c.key} value={c.key}>{c.label}</option>)}
+              </select>
+            </div>
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+              <button onClick={()=>setShowAddForm(false)}
+                style={{padding:"7px 14px",borderRadius:20,border:"1.5px solid #e2e8f0",
+                  background:"#fff",cursor:"pointer",fontSize:12,color:"#64748b",fontFamily:"inherit"}}>
+                Annuler
+              </button>
+              <button onClick={handleAdd} disabled={!newNom.trim()}
+                style={{padding:"7px 16px",borderRadius:20,border:"none",
+                  background:newNom.trim()?"#0891b2":"#e2e8f0",color:newNom.trim()?"#fff":"#94a3b8",
+                  cursor:newNom.trim()?"pointer":"default",fontSize:12,fontWeight:700,fontFamily:"inherit"}}>
+                Créer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Recherche ── */}
+      <div style={{position:"relative",marginBottom:10}}>
+        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round"
+          style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)"}}>
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input value={search} onChange={e=>setSearch(e.target.value)}
+          placeholder="Rechercher un produit…"
+          style={{width:"100%",padding:"9px 12px 9px 33px",borderRadius:10,
+            border:"1.5px solid #e2e8f0",fontSize:13,outline:"none",
+            fontFamily:"inherit",background:"#fafafa",boxSizing:"border-box",color:"#0f172a"}}/>
+        {search && (
+          <button onClick={()=>setSearch("")}
+            style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",
+              background:"none",border:"none",cursor:"pointer",color:"#94a3b8",fontSize:14,lineHeight:1}}>✕</button>
+        )}
+      </div>
+
+      {/* ── Filtres catégorie ── */}
+      <div style={{display:"flex",gap:6,flexWrap:"nowrap",overflowX:"auto",scrollbarWidth:"none",marginBottom:14,paddingBottom:2}}>
+        {STOCK_CATS.map(c => {
+          const active = catFilter === c.key;
+          const count  = c.key==="tous" ? produits.length
+            : c.key==="bas" ? basCount
+            : produits.filter(p=>getMeta(p).categorie===c.key).length;
+          return (
+            <button key={c.key} onClick={()=>setCatFilter(c.key)}
+              style={{
+                flexShrink:0,padding:"5px 12px",borderRadius:20,
+                border:`1.5px solid ${active?c.color:"#e2e8f0"}`,
+                background:active?c.bg:"#fff",
+                color:active?c.color:"#64748b",
+                fontSize:11,fontWeight:active?700:500,
+                cursor:"pointer",fontFamily:"inherit",
+                WebkitTapHighlightColor:"transparent",
+                transition:"all .12s",
+              }}>
+              {c.label} {count > 0 && <span style={{marginLeft:3,opacity:.7}}>({count})</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Liste produits ── */}
+      <div style={{display:"flex",flexDirection:"column",gap:7,maxHeight:480,overflowY:"auto",paddingRight:2}}>
+        {filtered.length === 0 && (
+          <div style={{textAlign:"center",padding:"32px 20px",color:"#94a3b8",fontSize:13}}>
+            {search ? `Aucun résultat pour "${search}"` : "Aucun produit dans cette catégorie"}
+          </div>
+        )}
+        {filtered.map(nom => {
+          const qty    = stock[nom] ?? 0;
+          const meta   = getMeta(nom);
+          const isLow  = qty <= meta.seuil;
+          const pct    = meta.seuil > 0 ? Math.min(100, (qty / (meta.seuil * 3)) * 100) : 100;
+          const catC   = CAT_COLORS[meta.categorie] || "#64748b";
+          const isExp  = expandedProd === nom;
+
+          return (
+            <div key={nom} style={{
+              borderRadius:14,
+              border:`1.5px solid ${isLow?"#fca5a5":isExp?"#bae6fd":"#e2e8f0"}`,
+              background:isLow?"#fff5f5":isExp?"#f0f9ff":"#fff",
+              overflow:"hidden",
+              transition:"border-color .15s",
+            }}>
+              {/* ── Ligne principale ── */}
+              <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px"}}>
+
+                {/* Dot catégorie */}
+                <div style={{width:10,height:10,borderRadius:"50%",
+                  background:catC,flexShrink:0,
+                  boxShadow:`0 0 0 2px ${catC}33`}}/>
+
+                {/* Nom */}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:"#0f172a",
+                    overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    {nom}
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginTop:3}}>
+                    {/* Mini barre stock */}
+                    <div style={{width:44,height:4,background:"#e2e8f0",borderRadius:2,overflow:"hidden",flexShrink:0}}>
+                      <div style={{
+                        height:"100%",width:`${pct}%`,borderRadius:2,
+                        background:isLow?"#ef4444":qty<meta.seuil*2?"#f59e0b":"#22c55e",
+                        transition:"width .3s",
+                      }}/>
+                    </div>
+                    <span style={{fontSize:9,color:isLow?"#dc2626":"#94a3b8",fontWeight:isLow?700:400}}>
+                      {isLow?"⚠️ stock bas":meta.unite}
+                    </span>
+                  </div>
                 </div>
-                <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <button onClick={()=>onUpdateStock(p, Math.max(0, qty-1))} style={{width:28,height:28,borderRadius:8,border:"none",background:"rgba(255,255,255,0.45)",boxShadow:"3px 3px 6px rgba(6,182,212,0.15), -2px -2px 4px rgba(255,255,255,0.8)",cursor:"pointer",fontSize:16,fontWeight:700,color:DS.mid,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
-                  <span style={{fontSize:16,fontWeight:900,color:low?DS.red:DS.dark,minWidth:28,textAlign:"center"}}>{qty}</span>
-                  <button onClick={()=>onUpdateStock(p, qty+1)} style={{width:28,height:28,borderRadius:8,border:"none",background:"rgba(255,255,255,0.45)",boxShadow:"3px 3px 6px rgba(6,182,212,0.15), -2px -2px 4px rgba(255,255,255,0.8)",cursor:"pointer",fontSize:16,fontWeight:700,color:DS.blue,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+
+                {/* Stepper quantité */}
+                <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+                  <button onClick={()=>onUpdateStock(nom, Math.max(0, qty-1))}
+                    style={{width:30,height:30,borderRadius:9,border:"1.5px solid #e2e8f0",
+                      background:"#fff",cursor:"pointer",fontSize:18,fontWeight:700,
+                      color:"#64748b",display:"flex",alignItems:"center",justifyContent:"center",
+                      WebkitTapHighlightColor:"transparent"}}>−</button>
+
+                  {editingQty === nom ? (
+                    <input ref={qtyInputRef} value={qtyDraft}
+                      onChange={e=>setQtyDraft(e.target.value.replace(/[^0-9]/g,""))}
+                      onBlur={()=>saveQty(nom)}
+                      onKeyDown={e=>{if(e.key==="Enter")saveQty(nom);if(e.key==="Escape")setEditingQty(null);}}
+                      style={{width:40,textAlign:"center",border:"1.5px solid #0891b2",
+                        borderRadius:8,padding:"4px",fontSize:15,fontWeight:900,
+                        color:"#0891b2",outline:"none",fontFamily:"inherit",background:"#f0f9ff"}}/>
+                  ) : (
+                    <span onClick={()=>startQtyEdit(nom)}
+                      style={{
+                        minWidth:36,textAlign:"center",fontSize:17,fontWeight:900,
+                        color:isLow?"#dc2626":"#0f172a",cursor:"text",
+                        padding:"2px 4px",borderRadius:6,
+                        border:"1.5px solid transparent",
+                        transition:"border-color .15s",
+                      }}
+                      onMouseEnter={e=>e.currentTarget.style.borderColor="#bae6fd"}
+                      onMouseLeave={e=>e.currentTarget.style.borderColor="transparent"}>
+                      {qty}
+                    </span>
+                  )}
+
+                  <button onClick={()=>onUpdateStock(nom, qty+1)}
+                    style={{width:30,height:30,borderRadius:9,border:"1.5px solid #bae6fd",
+                      background:"#f0f9ff",cursor:"pointer",fontSize:18,fontWeight:700,
+                      color:"#0891b2",display:"flex",alignItems:"center",justifyContent:"center",
+                      WebkitTapHighlightColor:"transparent"}}>+</button>
                 </div>
-                {!PRODUITS_DEFAUT.includes(p) && (
-                  <button onClick={()=>showConfirm(`Supprimer "${p}" du stock ?`,()=>onDeleteProduit(p))} style={{width:28,height:28,borderRadius:8,background:DS.redSoft,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{Ico.trash(12,DS.red)}</button>
-                )}
+
+                {/* Bouton expand */}
+                <button onClick={()=>setExpandedProd(isExp?null:nom)}
+                  style={{width:28,height:28,borderRadius:8,border:"1.5px solid #e2e8f0",
+                    background:"#fafafa",cursor:"pointer",display:"flex",alignItems:"center",
+                    justifyContent:"center",flexShrink:0,WebkitTapHighlightColor:"transparent"}}>
+                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none"
+                    stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round"
+                    style={{transform:isExp?"rotate(180deg)":"none",transition:"transform .2s"}}>
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </button>
               </div>
-            );
-          })}
-        </div>
-      </Section>
-      <div style={{padding:"12px 16px",background:"#0891b2",borderRadius:DS.radiusSm,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <span style={{color:"rgba(255,255,255,0.7)",fontSize:12,fontWeight:600}}>Produits en stock bas (≤2)</span>
-        <span style={{color:"#fda4af",fontSize:16,fontWeight:900}}>{Object.values(stock).filter(q=>q<=2).length}</span>
+
+              {/* ── Panneau étendu ── */}
+              {isExp && (
+                <div style={{borderTop:"1px solid #e2e8f0",padding:"12px 14px",
+                  background:"#f8fafc",display:"flex",flexDirection:"column",gap:10}}>
+
+                  {/* Unité */}
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <span style={{fontSize:11,color:"#64748b",fontWeight:600,width:64,flexShrink:0}}>Unité</span>
+                    <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                      {STOCK_UNITES.map(u=>(
+                        <button key={u} onClick={()=>setMeta(nom,{unite:u})}
+                          style={{padding:"3px 9px",borderRadius:20,fontSize:10,fontWeight:meta.unite===u?700:400,
+                            border:`1.5px solid ${meta.unite===u?"#0891b2":"#e2e8f0"}`,
+                            background:meta.unite===u?"#e0f2fe":"#fff",
+                            color:meta.unite===u?"#0891b2":"#64748b",
+                            cursor:"pointer",fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>
+                          {u}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Catégorie */}
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <span style={{fontSize:11,color:"#64748b",fontWeight:600,width:64,flexShrink:0}}>Catégorie</span>
+                    <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                      {STOCK_CATS.filter(c=>c.key!=="tous"&&c.key!=="bas").map(c=>(
+                        <button key={c.key} onClick={()=>setMeta(nom,{categorie:c.key})}
+                          style={{padding:"3px 9px",borderRadius:20,fontSize:10,fontWeight:meta.categorie===c.key?700:400,
+                            border:`1.5px solid ${meta.categorie===c.key?c.color:"#e2e8f0"}`,
+                            background:meta.categorie===c.key?c.bg:"#fff",
+                            color:meta.categorie===c.key?c.color:"#64748b",
+                            cursor:"pointer",fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>
+                          {c.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Seuil d'alerte */}
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <span style={{fontSize:11,color:"#64748b",fontWeight:600,width:64,flexShrink:0}}>Alerte ≤</span>
+                    <div style={{display:"flex",gap:5}}>
+                      {[0,1,2,3,5,10].map(v=>(
+                        <button key={v} onClick={()=>setMeta(nom,{seuil:v})}
+                          style={{width:32,height:28,borderRadius:8,fontSize:11,fontWeight:meta.seuil===v?800:400,
+                            border:`1.5px solid ${meta.seuil===v?"#dc2626":"#e2e8f0"}`,
+                            background:meta.seuil===v?"#fee2e2":"#fff",
+                            color:meta.seuil===v?"#dc2626":"#64748b",
+                            cursor:"pointer",fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>
+                          {v}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Supprimer */}
+                  {!PRODUITS_DEFAUT.includes(nom) && (
+                    <div style={{display:"flex",justifyContent:"flex-end",paddingTop:4}}>
+                      <button onClick={()=>showConfirm(`Supprimer "${nom}" du stock ?`,()=>onDeleteProduit(nom))}
+                        style={{display:"flex",alignItems:"center",gap:6,padding:"6px 14px",
+                          borderRadius:20,border:"1.5px solid #fca5a5",background:"#fff5f5",
+                          color:"#dc2626",cursor:"pointer",fontSize:11,fontWeight:600,fontFamily:"inherit",
+                          WebkitTapHighlightColor:"transparent"}}>
+                        <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+                          <path d="M10 11v6M14 11v6"/>
+                        </svg>
+                        Supprimer
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </Modal>
   );
@@ -319,6 +642,7 @@ export default function App() {
   const [livraisons, setLivraisons] = useState([]);
   const [rdvs, setRdvs] = useState([]);
   const [stock, setStock] = useState({});
+  const [stockMeta, setStockMeta] = useState({});
   const [showStock, setShowStock] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [contrats, setContrats] = useState({});
@@ -364,6 +688,7 @@ export default function App() {
     const livraisonsData = readLS("bb_livraisons_v1", []);
     const rdvsData      = readLS("bb_rdvs_v1",      []);
     const stockData     = readLS("bb_stock_v1",     {});
+    const stockMetaData = readLS("bb_stock_meta_v1", {});
     const contratsData  = readLS("bb_contrats_v1",  {});
     const versementsData = readLS("bb_versements_v1", {});
     const retardsCarnetData = readLS("bb_retards_carnet_v1", {});
@@ -371,7 +696,7 @@ export default function App() {
     const sWithDefaults = {...Object.fromEntries(PRODUITS_DEFAUT.map(nom=>[nom,0])), ...stockData};
     const cMigrated = clientsData.map(cl => ({...cl, moisParMois: migrateMois(cl.moisParMois||cl.saisons), photoPiscine: cl.photoPiscine||"", prixPassageE: cl.prixPassageE||0, prixPassageC: cl.prixPassageC||0}));
     setClients(cMigrated); setPassages(passagesData); setLivraisons(livraisonsData);
-    setRdvs(rdvsData); setStock(sWithDefaults); setContrats(contratsData); setVersements(versementsData); setRetardsCarnet(retardsCarnetData);
+    setRdvs(rdvsData); setStock(sWithDefaults); setStockMeta(stockMetaData); setContrats(contratsData); setVersements(versementsData); setRetardsCarnet(retardsCarnetData);
     setNotes(notesData);
   }, []);
 
@@ -381,6 +706,7 @@ export default function App() {
   const saveLivraisonsList = useCallback((data) => save("bb_livraisons_v1", data), []);
   const saveRdvsList  = useCallback((data) => save("bb_rdvs_v1",       data), []);
   const saveStock     = useCallback((data) => save("bb_stock_v1",      data), []);
+  const saveStockMeta = useCallback((data) => save("bb_stock_meta_v1", data), []);
   const saveContrats  = useCallback((data) => save("bb_contrats_v1",   data), []);
   const saveVersements = useCallback((data) => save("bb_versements_v1", data), []);
   const saveRetardsCarnet = useCallback((data) => save("bb_retards_carnet_v1", data), []);
@@ -756,6 +1082,7 @@ export default function App() {
   const updateStock = useCallback((produit, qty) => { setStock(prev=>{ const next={...prev,[produit]:qty}; saveStock(next); return next; }); },[saveStock]);
   const addProduitStock = useCallback((nom) => { setStock(prev=>{ const next={...prev,[nom]:prev[nom]??0}; saveStock(next); return next; }); },[saveStock]);
   const deleteProduitStock = useCallback((nom) => { setStock(prev=>{ const n={...prev}; delete n[nom]; saveStock(n); return n; }); },[saveStock]);
+  const updateStockMeta = useCallback((nom, meta) => { setStockMeta(prev=>{ const next={...prev,[nom]:meta}; saveStockMeta(next); return next; }); },[saveStockMeta]);
   const nbStockBas = useMemo(()=>Object.values(stock).filter(q=>q<=2).length,[stock]);
 
   const handleImport = useCallback((newClients, newPassages) => {
@@ -996,7 +1323,7 @@ export default function App() {
       {showFormLivraison&&<FormLivraison clientId={defaultLivraisonClientId} clients={clients} produitsStock={Object.keys(stock)} onSave={l=>{saveLivraison(l);setShowFormLivraison(false);}} onClose={()=>setShowFormLivraison(false)}/>}
       {showFormRdv&&<FormRdv initial={editRdv} clients={clients} onSave={saveRdv} onClose={()=>{setShowFormRdv(false);setEditRdv(null);}}/>}
       {showImport&&<ModalImportConnecteam clients={clients} onImport={handleImport} onClose={()=>setShowImport(false)}/>}
-      {showStock&&<ModalStock stock={stock} onClose={()=>setShowStock(false)} onUpdateStock={updateStock} onAddProduit={addProduitStock} onDeleteProduit={deleteProduitStock}/>}
+      {showStock&&<ModalStock stock={stock} stockMeta={stockMeta} onClose={()=>setShowStock(false)} onUpdateStock={updateStock} onUpdateMeta={updateStockMeta} onAddProduit={addProduitStock} onDeleteProduit={deleteProduitStock}/>}
 
       {showModalAlertes&&(()=>{
         const alertes = clients.filter(c=>alerteClient(c,passages)!=="ok"&&!dismissedAlertes.includes(c.id));

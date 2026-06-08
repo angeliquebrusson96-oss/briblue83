@@ -123,6 +123,28 @@ export const PASSAGES_INIT = [
 
 export const PRODUITS_DEFAUT = ["Chlore lent Galet","PH minus","PH +","Flocculant","Anti-calcaire","Anti-Algues","Anti-Phosphate","Éponge Magique","Filtre à cartouche","Tac+","Chlore granule","Hypochlorite","Hypochlorite stick","Anti-Algues moutarde","Sac de sel","Waterlily","Oxygène actif","Détartrant cellule"];
 
+// Métadonnées par défaut pour chaque produit : unité, seuil d'alerte, catégorie
+export const PRODUITS_META_DEFAUT = {
+  "Chlore lent Galet":    { unite:"sac",    seuil:2, categorie:"traitement" },
+  "PH minus":             { unite:"flacon", seuil:2, categorie:"traitement" },
+  "PH +":                 { unite:"flacon", seuil:2, categorie:"traitement" },
+  "Flocculant":           { unite:"flacon", seuil:2, categorie:"traitement" },
+  "Anti-calcaire":        { unite:"flacon", seuil:2, categorie:"traitement" },
+  "Anti-Algues":          { unite:"flacon", seuil:2, categorie:"traitement" },
+  "Anti-Phosphate":       { unite:"flacon", seuil:1, categorie:"traitement" },
+  "Éponge Magique":       { unite:"unité",  seuil:3, categorie:"entretien"  },
+  "Filtre à cartouche":   { unite:"unité",  seuil:2, categorie:"entretien"  },
+  "Tac+":                 { unite:"flacon", seuil:2, categorie:"traitement" },
+  "Chlore granule":       { unite:"sac",    seuil:2, categorie:"traitement" },
+  "Hypochlorite":         { unite:"flacon", seuil:2, categorie:"traitement" },
+  "Hypochlorite stick":   { unite:"sac",    seuil:2, categorie:"traitement" },
+  "Anti-Algues moutarde": { unite:"flacon", seuil:2, categorie:"traitement" },
+  "Sac de sel":           { unite:"sac",    seuil:3, categorie:"traitement" },
+  "Waterlily":            { unite:"flacon", seuil:1, categorie:"traitement" },
+  "Oxygène actif":        { unite:"flacon", seuil:2, categorie:"traitement" },
+  "Détartrant cellule":   { unite:"flacon", seuil:2, categorie:"entretien"  },
+};
+
 export const STATUT_LIV = {
   aFacturer: { label:"À facturer", color:"#0369a1", bg:"#f0f9ff" },
   facture:   { label:"Facturé",    color:"#0284c7", bg:"#e0f2fe" },

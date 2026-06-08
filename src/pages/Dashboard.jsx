@@ -1096,7 +1096,10 @@ function TodoCard({ list, isMobile, onUpdate, onDelete }) {
   const [newTask,    setNewTask]    = useState("");
   const [editTitle,  setEditTitle]  = useState(false);
   const [titleDraft, setTitleDraft] = useState(list.title || "Ma liste");
-  const inputRef = useRef(null);
+  const [editingId,  setEditingId]  = useState(null);
+  const [editDraft,  setEditDraft]  = useState("");
+  const inputRef    = useRef(null);
+  const editInputRef = useRef(null);
 
   const tasks = list.tasks || [];
   const todo  = tasks.filter(t => !t.done);
@@ -1113,6 +1116,7 @@ function TodoCard({ list, isMobile, onUpdate, onDelete }) {
   };
 
   const toggleTask = id => {
+    if (editingId === id) return; // ne pas cocher si on est en train d'éditer
     const today = _ds(new Date());
     upd({ tasks: tasks.map(t =>
       t.id === id ? { ...t, done: !t.done, doneAt: !t.done ? today : null } : t
@@ -1121,6 +1125,21 @@ function TodoCard({ list, isMobile, onUpdate, onDelete }) {
 
   const delTask = id => upd({ tasks: tasks.filter(t => t.id !== id) });
   const setPal  = pal => upd({ bg: pal.bg, accent: pal.accent });
+
+  // ── Édition inline ──
+  const startEdit = (t) => {
+    setEditingId(t.id);
+    setEditDraft(t.text);
+    setTimeout(() => editInputRef.current?.focus(), 30);
+  };
+  const saveEdit = (id) => {
+    const txt = editDraft.trim();
+    if (txt) upd({ tasks: tasks.map(t => t.id === id ? { ...t, text: txt } : t) });
+    else     upd({ tasks: tasks.filter(t => t.id !== id) }); // vide → supprime
+    setEditingId(null);
+    setEditDraft("");
+  };
+  const cancelEdit = () => { setEditingId(null); setEditDraft(""); };
 
   const fs = isMobile ? 13 : 14;
 
@@ -1183,19 +1202,54 @@ function TodoCard({ list, isMobile, onUpdate, onDelete }) {
             display:"flex", alignItems:"center", gap:10,
             padding: isMobile ? "8px 13px" : "10px 16px",
             borderBottom:`1px solid ${accent}0f`,
+            background: editingId===t.id ? `${accent}08` : "transparent",
+            transition:"background .15s",
           }}>
             <div onClick={() => toggleTask(t.id)} style={{
               width:20, height:20, borderRadius:6, flexShrink:0, cursor:"pointer",
               border:`2px solid ${accent}66`, background:"transparent",
               transition:"all .15s", WebkitTapHighlightColor:"transparent",
             }}/>
-            <span style={{ flex:1, fontSize:fs, color:"#1e293b", lineHeight:1.4 }}>{t.text}</span>
-            <button onClick={() => delTask(t.id)}
-              style={{ background:"none", border:"none", cursor:"pointer",
-                color:"#e2e8f0", fontSize:13, lineHeight:1, padding:"0 2px",
-                WebkitTapHighlightColor:"transparent", flexShrink:0 }}
-              onMouseEnter={e=>e.currentTarget.style.color="#ef4444"}
-              onMouseLeave={e=>e.currentTarget.style.color="#e2e8f0"}>✕</button>
+            {editingId === t.id ? (
+              <input
+                ref={editInputRef}
+                value={editDraft}
+                onChange={e => setEditDraft(e.target.value)}
+                onBlur={() => saveEdit(t.id)}
+                onKeyDown={e => {
+                  if (e.key === "Enter")  { e.preventDefault(); saveEdit(t.id); }
+                  if (e.key === "Escape") { cancelEdit(); }
+                }}
+                style={{
+                  flex:1, border:"none", background:"transparent", outline:"none",
+                  fontFamily:"inherit", fontSize:fs, color:"#0f172a",
+                  borderBottom:`2px solid ${accent}`,
+                  padding:"0 0 2px", lineHeight:1.4,
+                  WebkitTapHighlightColor:"transparent",
+                }}
+              />
+            ) : (
+              <span
+                onClick={() => startEdit(t)}
+                style={{ flex:1, fontSize:fs, color:"#1e293b", lineHeight:1.4, cursor:"text" }}>
+                {t.text}
+              </span>
+            )}
+            {editingId === t.id ? (
+              <button onClick={cancelEdit}
+                style={{ background:"none", border:"none", cursor:"pointer",
+                  color:"#94a3b8", fontSize:11, fontWeight:600, padding:"0 4px",
+                  WebkitTapHighlightColor:"transparent", flexShrink:0 }}>
+                Annuler
+              </button>
+            ) : (
+              <button onClick={() => delTask(t.id)}
+                style={{ background:"none", border:"none", cursor:"pointer",
+                  color:"#e2e8f0", fontSize:13, lineHeight:1, padding:"0 2px",
+                  WebkitTapHighlightColor:"transparent", flexShrink:0 }}
+                onMouseEnter={e=>e.currentTarget.style.color="#ef4444"}
+                onMouseLeave={e=>e.currentTarget.style.color="#e2e8f0"}>✕</button>
+            )}
           </div>
         ))}
 
@@ -1247,6 +1301,7 @@ function TodoCard({ list, isMobile, onUpdate, onDelete }) {
               <div key={t.id} style={{
                 display:"flex", alignItems:"center", gap:10,
                 padding: isMobile ? "6px 13px" : "7px 16px",
+                background: editingId===t.id ? `${accent}08` : "transparent",
               }}>
                 <div onClick={() => toggleTask(t.id)} style={{
                   width:20, height:20, borderRadius:6, flexShrink:0, cursor:"pointer",
@@ -1259,8 +1314,32 @@ function TodoCard({ list, isMobile, onUpdate, onDelete }) {
                     <polyline points="2 6 5 9 10 3"/>
                   </svg>
                 </div>
-                <span style={{ flex:1, fontSize:fs-1, color:"#94a3b8",
-                  textDecoration:"line-through", lineHeight:1.4 }}>{t.text}</span>
+                {editingId === t.id ? (
+                  <input
+                    ref={editInputRef}
+                    value={editDraft}
+                    onChange={e => setEditDraft(e.target.value)}
+                    onBlur={() => saveEdit(t.id)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter")  { e.preventDefault(); saveEdit(t.id); }
+                      if (e.key === "Escape") { cancelEdit(); }
+                    }}
+                    style={{
+                      flex:1, border:"none", background:"transparent", outline:"none",
+                      fontFamily:"inherit", fontSize:fs-1, color:"#64748b",
+                      borderBottom:`2px solid ${accent}`,
+                      padding:"0 0 2px", lineHeight:1.4,
+                      WebkitTapHighlightColor:"transparent",
+                    }}
+                  />
+                ) : (
+                  <span
+                    onClick={() => startEdit(t)}
+                    style={{ flex:1, fontSize:fs-1, color:"#94a3b8",
+                      textDecoration:"line-through", lineHeight:1.4, cursor:"text" }}>
+                    {t.text}
+                  </span>
+                )}
               </div>
             ))}
           </div>
