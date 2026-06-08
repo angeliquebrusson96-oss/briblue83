@@ -17,6 +17,37 @@ import { FormLivraison, envoyerEmailLivraison } from "./FormLivraison";
 // These are passed in as props or imported lazily. For now import from FormPassage.
 import { ouvrirRapport, envoyerEmail, ouvrirContrat, envoyerContratSignature } from "./FormPassage";
 
+// ─── DURÉE CONTRAT ────────────────────────────────────────────────────────────
+const DUREES_CONTRAT = [
+  { key:"12", label:"Annuel",      sub:"12 mois", mois:12, color:"#7c3aed" },
+  { key:"6",  label:"Semestriel",  sub:"6 mois",  mois:6,  color:"#0891b2" },
+  { key:"3",  label:"Trimestriel", sub:"3 mois",  mois:3,  color:"#059669" },
+  { key:"custom", label:"Autre",   sub:"libre",   mois:null, color:"#64748b" },
+];
+
+function computeDateFin(dateDebutStr, nMois) {
+  if (!dateDebutStr || !nMois) return "";
+  const d = new Date(dateDebutStr);
+  const result = new Date(d.getFullYear(), d.getMonth() + nMois, d.getDate());
+  // Si le jour déborde (ex : 31 jan + 1 mois → fév), on prend le dernier jour du mois cible
+  if (result.getDate() !== d.getDate()) {
+    return new Date(d.getFullYear(), d.getMonth() + nMois + 1, 0).toISOString().slice(0, 10);
+  }
+  return result.toISOString().slice(0, 10);
+}
+
+function detectDuree(dateDebutStr, dateFinStr) {
+  if (!dateDebutStr || !dateFinStr) return "12"; // annuel par défaut
+  const debut = new Date(dateDebutStr), fin = new Date(dateFinStr);
+  // Borne exclusive (fin+1 jour) → nombre de mois réels
+  const next = new Date(fin.getFullYear(), fin.getMonth(), fin.getDate() + 1);
+  const months = (next.getFullYear() - debut.getFullYear()) * 12 + (next.getMonth() - debut.getMonth());
+  if (months === 12) return "12";
+  if (months === 6)  return "6";
+  if (months === 3)  return "3";
+  return "custom";
+}
+
 // ─── PASSAGE DETAIL MODAL ────────────────────────────────────────────────────
 export function PassageDetailModal({ passage, client, onClose }) {
   const isMobile = useIsMobile();
@@ -191,28 +222,57 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
   const [editContrat, setEditContrat] = useState(false);
   const [editContratData, setEditContratData] = useState(null);
   const openEditContrat = () => {
+    const debut = client.dateDebut || "";
+    const fin   = client.dateFin   || "";
     setEditContratData({
-      formule:      client.formule || "VAC",
-      dateDebut:    client.dateDebut || "",
-      dateFin:      client.dateFin || "",
-      prixPassageE: client.prixPassageE || 0,
-      prixPassageC: client.prixPassageC || 0,
+      formule:         client.formule || "VAC",
+      dateDebut:       debut,
+      dateFin:         fin,
+      dureePreset:     detectDuree(debut, fin),   // "12" | "6" | "3" | "custom"
+      prixPassageE:    client.prixPassageE || 0,
+      prixPassageC:    client.prixPassageC || 0,
       notesTarifaires: client.notesTarifaires || "",
-      moisParMois:  JSON.parse(JSON.stringify(client.moisParMois || {})),
+      moisParMois:     JSON.parse(JSON.stringify(client.moisParMois || {})),
     });
     setEditContrat(true);
   };
   const saveEditContrat = () => {
     if (!editContratData || !onUpdateClient) return;
-    const tE = Object.values(editContratData.moisParMois||{}).reduce((s,v)=>s+(v.entretien||0),0);
-    const tC = Object.values(editContratData.moisParMois||{}).reduce((s,v)=>s+(v.controle||0),0);
-    const prix = tE*(editContratData.prixPassageE||0)+tC*(editContratData.prixPassageC||0);
-    onUpdateClient({...client, ...editContratData, prix});
+    // eslint-disable-next-line no-unused-vars
+    const { dureePreset, ...dataToSave } = editContratData; // dureePreset = état UI, ne pas persister
+    const tE = Object.values(dataToSave.moisParMois||{}).reduce((s,v)=>s+(v.entretien||0),0);
+    const tC = Object.values(dataToSave.moisParMois||{}).reduce((s,v)=>s+(v.controle||0),0);
+    const prix = tE*(dataToSave.prixPassageE||0)+tC*(dataToSave.prixPassageC||0);
+    onUpdateClient({...client, ...dataToSave, prix});
     setEditContrat(false);
     setEditContratData(null);
   };
   const setECD = (k,v) => setEditContratData(p=>({...p,[k]:v}));
   const setECDMois = (m,type,v) => setEditContratData(p=>({...p,moisParMois:{...p.moisParMois,[m]:{...p.moisParMois[m],[type]:Math.max(0,parseInt(v)||0)}}}));
+
+  // Applique une durée prédéfinie : met à jour dureePreset + recalcule dateFin si dateDebut renseignée
+  const applyDureePreset = (key) => {
+    const dur = DUREES_CONTRAT.find(d => d.key === key);
+    setEditContratData(prev => ({
+      ...prev,
+      dureePreset: key,
+      dateFin: dur?.mois && prev.dateDebut
+        ? computeDateFin(prev.dateDebut, dur.mois)
+        : prev.dateFin,
+    }));
+  };
+
+  // Quand dateDebut change : recalcule dateFin si une durée prédéfinie est active
+  const changeDebut = (val) => {
+    setEditContratData(prev => {
+      const dur = DUREES_CONTRAT.find(d => d.key === prev.dureePreset);
+      return {
+        ...prev,
+        dateDebut: val,
+        dateFin: dur?.mois && val ? computeDateFin(val, dur.mois) : prev.dateFin,
+      };
+    });
+  };
   const [editLiv, setEditLiv] = useState(null);
   const [selectedMois, setSelectedMois] = useState(null);
   const [expandedEv, setExpandedEv] = useState(null);
@@ -1097,24 +1157,92 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
 
                 <div style={{padding:"16px",display:"flex",flexDirection:"column",gap:14}}>
 
-                  {/* Formule + Dates */}
+                  {/* Formule + Durée + Dates */}
                   <div>
                     <div style={{fontSize:11,fontWeight:800,color:"#7c3aed",textTransform:"uppercase",letterSpacing:.6,marginBottom:10}}>📋 Contrat</div>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr",gap:10}}>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr",gap:12}}>
+
+                      {/* Formule */}
                       <div>
                         <label style={labelStyle}>Formule</label>
                         <select value={editContratData.formule} onChange={e=>setECD("formule",e.target.value)} style={inputStyle}>
-                          {["VAC","VAC+","PREMIUM","SAV","Autre"].map(o=><option key={o}>{o}</option>)}
+                          {["VAC","VAC+","Confort","Confort+","PREMIUM","SAV","Autre"].map(o=><option key={o}>{o}</option>)}
                         </select>
                       </div>
+
+                      {/* ── Durée du contrat ── */}
+                      <div>
+                        <label style={labelStyle}>Durée</label>
+                        <div style={{display:"flex",gap:7,flexWrap:"wrap",marginTop:2}}>
+                          {DUREES_CONTRAT.map(d => {
+                            const active = editContratData.dureePreset === d.key;
+                            return (
+                              <button key={d.key}
+                                onClick={() => applyDureePreset(d.key)}
+                                style={{
+                                  display:"flex",flexDirection:"column",alignItems:"center",
+                                  padding:"7px 14px",borderRadius:12,cursor:"pointer",
+                                  fontFamily:"inherit",border:`2px solid ${active ? d.color : "#e2e8f0"}`,
+                                  background:active ? d.color : "#fff",
+                                  transition:"all .15s",WebkitTapHighlightColor:"transparent",
+                                  boxShadow:active ? `0 4px 12px ${d.color}44` : "none",
+                                }}>
+                                <span style={{fontSize:12,fontWeight:800,color:active?"#fff":"#0f172a",lineHeight:1.2}}>
+                                  {d.label}
+                                </span>
+                                <span style={{fontSize:10,fontWeight:500,color:active?"rgba(255,255,255,0.8)":"#94a3b8",marginTop:2}}>
+                                  {d.sub}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Récap durée sélectionnée */}
+                        {editContratData.dureePreset && editContratData.dureePreset !== "custom" && editContratData.dateDebut && editContratData.dateFin && (() => {
+                          const dur = DUREES_CONTRAT.find(d => d.key === editContratData.dureePreset);
+                          return (
+                            <div style={{marginTop:8,padding:"7px 12px",borderRadius:9,
+                              background:`${dur.color}12`,border:`1px solid ${dur.color}33`,
+                              fontSize:11,color:dur.color,fontWeight:600,
+                              display:"flex",alignItems:"center",gap:6}}>
+                              <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                                <rect x="3" y="4" width="18" height="18" rx="2"/>
+                                <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+                                <line x1="3" y1="10" x2="21" y2="10"/>
+                              </svg>
+                              Contrat {dur.label.toLowerCase()} : {new Date(editContratData.dateDebut).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})} → {new Date(editContratData.dateFin).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"})}
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                      {/* Dates début / fin */}
                       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                         <div>
                           <label style={labelStyle}>Début</label>
-                          <input type="date" value={editContratData.dateDebut} onChange={e=>setECD("dateDebut",e.target.value)} style={inputStyle}/>
+                          <input type="date" value={editContratData.dateDebut}
+                            onChange={e => changeDebut(e.target.value)}
+                            style={inputStyle}/>
                         </div>
                         <div>
-                          <label style={labelStyle}>Fin</label>
-                          <input type="date" value={editContratData.dateFin} onChange={e=>setECD("dateFin",e.target.value)} style={inputStyle}/>
+                          <label style={{...labelStyle,display:"flex",alignItems:"center",gap:5}}>
+                            Fin
+                            {editContratData.dureePreset && editContratData.dureePreset !== "custom" && (
+                              <span style={{fontSize:9,fontWeight:700,color:"#7c3aed",background:"#f5f3ff",borderRadius:20,padding:"1px 6px",border:"1px solid #c4b5fd"}}>
+                                auto
+                              </span>
+                            )}
+                          </label>
+                          <input type="date" value={editContratData.dateFin}
+                            onChange={e => {
+                              setEditContratData(p => ({...p, dateFin:e.target.value, dureePreset:"custom"}));
+                            }}
+                            style={{
+                              ...inputStyle,
+                              background: editContratData.dureePreset && editContratData.dureePreset !== "custom"
+                                ? "#f5f3ff" : (inputStyle.background||"#fff"),
+                            }}/>
                         </div>
                       </div>
                     </div>
