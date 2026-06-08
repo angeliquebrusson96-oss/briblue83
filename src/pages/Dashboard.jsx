@@ -171,16 +171,40 @@ function avatarColor(nom) {
   return AVATAR_COLORS[(nom?.charCodeAt(0)||0) % AVATAR_COLORS.length];
 }
 
-function CarteClients({ clients, onClientClick }) {
+// Couleurs par formule contrat
+const FORMULE_COLORS = {
+  "VAC":      "#0891b2",
+  "VAC+":     "#06b6d4",
+  "Confort":  "#7c3aed",
+  "Confort+": "#4f46e5",
+};
+function formuleColor(formule) {
+  return FORMULE_COLORS[formule] || "#64748b";
+}
+
+function CarteClients({ clients, onClientClick, passages = [] }) {
   const mapRef        = useRef(null);
   const mapInstance   = useRef(null);
   const markers       = useRef([]);
+  const boundsRef     = useRef([]);
   const [status,  setStatus]  = useState("init");
   const [located, setLocated] = useState(0);
-  // Panel React affiché sur la carte quand on clique un marqueur
-  const [panel, setPanel] = useState(null); // { client, photoUrl, color, initials }
+  const [panel,   setPanel]   = useState(null);
 
   const clientsWithAddr = clients.filter(c => c.adresse?.trim());
+  const todayStr = new Date().toISOString().split("T")[0];
+  // Clients ayant un passage prévu aujourd'hui
+  const clientsToday = new Set((passages||[]).filter(p => p.date === todayStr).map(p => p.clientId));
+
+  // Recentrer sur tous les marqueurs
+  const recentrer = () => {
+    if (!mapInstance.current || !boundsRef.current.length) return;
+    if (boundsRef.current.length === 1) {
+      mapInstance.current.setView(boundsRef.current[0], 14);
+    } else {
+      mapInstance.current.fitBounds(boundsRef.current, { padding:[40,40], maxZoom:14 });
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -192,32 +216,42 @@ function CarteClients({ clients, onClientClick }) {
         const L = await loadLeaflet();
         if (cancelled || !mapRef.current) return;
 
-        // Initialiser la carte une seule fois
         if (!mapInstance.current) {
           mapInstance.current = L.map(mapRef.current, {
-            center: [43.12, 5.93], // région Toulon par défaut
+            center: [43.12, 5.93],
             zoom: 11,
-            zoomControl: true,
+            zoomControl: false, // repositionné en bas à droite
           });
-          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            attribution:'© <a href="https://openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>',
+
+          // Tuiles CartoDB Positron — propres, modernes, lisibles
+          L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+            attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com">CARTO</a>',
             maxZoom: 19,
+            subdomains: "abcd",
           }).addTo(mapInstance.current);
 
-          // CSS tooltip survol personnalisé (injecté une seule fois)
+          // Contrôles repositionnés
+          L.control.zoom({ position: "bottomright" }).addTo(mapInstance.current);
+          L.control.scale({ imperial: false, position: "bottomleft", maxWidth: 80 }).addTo(mapInstance.current);
+
+          // CSS tooltip + styles carte
           if (!document.getElementById("bb-map-css")) {
             const s = document.createElement("style");
             s.id = "bb-map-css";
-            s.textContent = `.leaflet-tooltip.bb-tip{background:transparent!important;border:none!important;box-shadow:none!important;padding:0!important}.leaflet-tooltip.bb-tip::before{display:none!important}`;
+            s.textContent = [
+              `.leaflet-tooltip.bb-tip{background:transparent!important;border:none!important;box-shadow:none!important;padding:0!important}`,
+              `.leaflet-tooltip.bb-tip::before{display:none!important}`,
+              `.leaflet-control-zoom a{font-size:14px!important;line-height:28px!important;width:28px!important;height:28px!important;border-radius:8px!important;box-shadow:0 2px 8px rgba(0,0,0,0.12)!important}`,
+              `.leaflet-control-zoom{border:none!important;box-shadow:none!important}`,
+              `@keyframes bb-ping{0%{transform:scale(1);opacity:1}80%{transform:scale(2.2);opacity:0}100%{transform:scale(2.2);opacity:0}}`,
+            ].join("");
             document.head.appendChild(s);
           }
         }
 
-        // Supprimer anciens marqueurs
         markers.current.forEach(m => m.remove());
         markers.current = [];
-
-        const bounds = [];
+        boundsRef.current = [];
         let count = 0;
 
         for (const client of clientsWithAddr) {
@@ -227,92 +261,97 @@ function CarteClients({ clients, onClientClick }) {
 
           const initials = (client.nom||"?").replace(/^(M\.|Mme|Mlle)\s*/i,"").trim()
             .split(/\s+/).map(w=>w[0]).join("").slice(0,2).toUpperCase();
-          const color = avatarColor(client.nom);
 
-          // Résolution de la photo piscine (idb:, fsp:, https:, data: — toutes gérées)
+          // Couleur selon formule (pas selon initiale)
+          const color = formuleColor(client.formule) || avatarColor(client.nom);
+          const isToday = clientsToday.has(client.id);
+
           let photoUrl = null;
           if (client.photoPiscine) {
-            try { photoUrl = await resolvePhoto(client.photoPiscine); } catch { /* pas de photo */ }
+            try { photoUrl = await resolvePhoto(client.photoPiscine); } catch { /* offline */ }
           }
 
-          // Nom de famille uniquement — utilise nomFamille si disponible (nouveau format),
-          // sinon extrait le 1er mot après suppression de la civilité (ancien format)
           const shortName = (
             client.nomFamille ||
             (client.nom || "?").replace(/^(M\.|Mme|Mlle)\s*/i, "").trim().split(/\s+/)[0] ||
             "?"
           ).slice(0, 12).toUpperCase();
 
-          // Contenu intérieur du cercle
+          // ── Marqueur : pin avec photo + nom + badge "aujourd'hui" ──
           const circleInner = photoUrl
-            ? `<img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover;display:block;" />`
+            ? `<img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:50%;"/>`
             : `<span style="color:#fff;font-weight:900;font-size:13px;font-family:Inter,system-ui,sans-serif;">${initials}</span>`;
 
-          // Icône : étiquette nom arrondie au-dessus + cercle photo
+          const todayBadge = isToday
+            ? `<div style="position:absolute;top:-3px;right:-3px;width:12px;height:12px;border-radius:50%;background:#22c55e;border:2px solid #fff;box-shadow:0 0 0 2px rgba(34,197,94,0.4)"></div>`
+            : "";
+
           const iconHtml = `
-            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;user-select:none;">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;user-select:none;">
               <div style="
-                background:rgba(15,23,42,0.72);color:#fff;
-                font-size:9px;font-weight:800;letter-spacing:.4px;
+                background:${color};color:#fff;
+                font-size:8.5px;font-weight:800;letter-spacing:.5px;
                 padding:2px 8px;border-radius:20px;
-                white-space:nowrap;max-width:100px;overflow:hidden;text-overflow:ellipsis;
+                white-space:nowrap;max-width:96px;overflow:hidden;text-overflow:ellipsis;
                 font-family:Inter,system-ui,sans-serif;
-                backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-                box-shadow:0 2px 8px rgba(0,0,0,0.28);
+                box-shadow:0 2px 6px ${color}66;
               ">${shortName}</div>
-              <div style="
-                width:44px;height:44px;border-radius:50%;
-                background:${color};border:3px solid #fff;
-                box-shadow:0 4px 14px rgba(0,0,0,0.32);
-                overflow:hidden;display:flex;align-items:center;justify-content:center;
-              ">${circleInner}</div>
+              <div style="position:relative;width:46px;height:46px;">
+                <div style="
+                  width:46px;height:46px;border-radius:50%;
+                  background:${color};border:3px solid #fff;
+                  box-shadow:0 4px 16px ${color}55, 0 2px 6px rgba(0,0,0,0.2);
+                  overflow:hidden;display:flex;align-items:center;justify-content:center;
+                ">${circleInner}</div>
+                ${todayBadge}
+              </div>
+              <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid ${color};margin-top:-2px;filter:drop-shadow(0 2px 2px rgba(0,0,0,0.15))"></div>
             </div>`;
 
-          // Anchor : centre du cercle = 55px depuis gauche, 43px depuis haut (label≈18+gap3+demi-cercle22)
           const icon = L.divIcon({
             className: "",
             html: iconHtml,
-            iconSize: [110, 68],
-            iconAnchor: [55, 43],
-            popupAnchor: [0, -52],
+            iconSize: [100, 78],
+            iconAnchor: [50, 78], // pointe du triangle = point géographique
+            popupAnchor: [0, -80],
           });
 
-          // Tooltip survol (Leaflet tooltip natif — aperçu uniquement)
+          // Tooltip survol
           const tooltipHtml = `
             <div style="background:#fff;border-radius:14px;overflow:hidden;
-              box-shadow:0 8px 28px rgba(0,0,0,0.2);border:1px solid #e2e8f0;
-              min-width:160px;font-family:Inter,system-ui,sans-serif;">
+              box-shadow:0 8px 28px rgba(0,0,0,0.18);border:1px solid #e2e8f0;
+              min-width:170px;font-family:Inter,system-ui,sans-serif;">
               ${photoUrl
-                ? `<div style="height:80px;overflow:hidden;background:#e0f2fe;">
+                ? `<div style="height:82px;overflow:hidden;">
                     <img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover;display:block;"/></div>`
-                : `<div style="height:36px;background:${color};display:flex;align-items:center;justify-content:center;">
-                    <span style="color:#fff;font-weight:900;font-size:18px;">${initials}</span></div>`
+                : `<div style="height:40px;background:linear-gradient(135deg,${color},${color}cc);display:flex;align-items:center;justify-content:center;">
+                    <span style="color:#fff;font-weight:900;font-size:20px;">${initials}</span></div>`
               }
-              <div style="padding:8px 11px 9px">
-                <div style="font-weight:800;font-size:12px;color:#0f172a;margin-bottom:2px">${client.nom}</div>
-                ${client.formule ? `<div style="font-size:10px;color:#0891b2;font-weight:600;margin-bottom:2px">${client.formule}</div>` : ""}
-                <div style="font-size:9px;color:#94a3b8">${client.adresse.split(",").slice(-1)[0]?.trim() || client.adresse}</div>
+              <div style="padding:9px 12px 10px">
+                <div style="font-weight:800;font-size:12.5px;color:#0f172a;margin-bottom:3px">${client.nom}</div>
+                ${client.formule ? `<span style="display:inline-block;font-size:9.5px;font-weight:700;color:${color};background:${color}18;padding:1px 7px;border-radius:20px;margin-bottom:3px">${client.formule}</span>` : ""}
+                <div style="font-size:9px;color:#94a3b8;margin-top:2px">${client.adresse.split(",").slice(-2).join(",").trim()}</div>
+                ${isToday ? `<div style="margin-top:5px;font-size:9px;font-weight:700;color:#16a34a;background:#f0fdf4;padding:2px 7px;border-radius:20px;display:inline-block">✓ Intervention aujourd'hui</div>` : ""}
               </div>
             </div>`;
 
-          // Clic → panel React (PAS de popup Leaflet ni de navigation directe)
           const clientSnapshot = { client, photoUrl, color, initials };
           const marker = L.marker([pos.lat, pos.lon], { icon })
             .addTo(mapInstance.current)
-            .bindTooltip(tooltipHtml, { permanent:false, direction:"top", className:"bb-tip", offset:[0,-56], opacity:1 })
+            .bindTooltip(tooltipHtml, { permanent:false, direction:"top", className:"bb-tip", offset:[0,-62], opacity:1 })
             .on("click", () => setPanel(clientSnapshot));
 
           markers.current.push(marker);
-          bounds.push([pos.lat, pos.lon]);
+          boundsRef.current.push([pos.lat, pos.lon]);
           count++;
           if (!cancelled) setLocated(count);
         }
 
-        if (!cancelled && bounds.length > 0 && mapInstance.current) {
-          if (bounds.length === 1) {
-            mapInstance.current.setView(bounds[0], 14);
+        if (!cancelled && boundsRef.current.length > 0 && mapInstance.current) {
+          if (boundsRef.current.length === 1) {
+            mapInstance.current.setView(boundsRef.current[0], 14);
           } else {
-            mapInstance.current.fitBounds(bounds, { padding:[40,40], maxZoom:14 });
+            mapInstance.current.fitBounds(boundsRef.current, { padding:[48,48], maxZoom:14 });
           }
         }
         if (!cancelled) setStatus("ready");
@@ -325,43 +364,70 @@ function CarteClients({ clients, onClientClick }) {
     return () => { cancelled = true; };
   }, [clients.map(c=>c.id+c.adresse).join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Nettoyage complet au démontage
   useEffect(() => {
     return () => {
-      if (mapInstance.current) {
-        mapInstance.current.remove();
-        mapInstance.current = null;
-      }
+      if (mapInstance.current) { mapInstance.current.remove(); mapInstance.current = null; }
     };
   }, []);
 
   const clientsSansAdresse = clients.filter(c => !c.adresse?.trim());
+  const pct = clientsWithAddr.length > 0 ? Math.round(located / clientsWithAddr.length * 100) : 0;
 
   return (
-    <div className="db-s6" style={{borderRadius:18,overflow:"hidden",border:"1px solid #e2e8f0",boxShadow:"0 2px 12px rgba(0,0,0,0.06)",background:"#fff",marginBottom:14,position:"relative"}}>
-      {/* Header */}
-      <div style={{padding:"11px 14px 9px",background:"linear-gradient(135deg,#f0f9ff,#fff)",borderBottom:"1px solid #f1f5f9",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <div style={{width:28,height:28,borderRadius:8,background:"#e0f2fe",display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.2" strokeLinecap="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-          </div>
-          <div>
-            <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>Carte clients</div>
-            <div style={{fontSize:10,color:"#94a3b8",marginTop:1}}>
-              {status==="loading" ? `${located}/${clientsWithAddr.length} localisés…`
-                : status==="ready"   ? `${located} client${located>1?"s":""} sur la carte`
-                : status==="error"   ? "Erreur de chargement"
-                : "Chargement…"}
+    <div className="db-s6" style={{borderRadius:18,overflow:"hidden",border:"1px solid #e2e8f0",boxShadow:"0 2px 16px rgba(0,0,0,0.07)",background:"#fff",marginBottom:14,position:"relative"}}>
+
+      {/* ── Header enrichi ── */}
+      <div style={{padding:"11px 14px 10px",background:"linear-gradient(135deg,#f0f9ff 0%,#fff 100%)",borderBottom:"1px solid #f1f5f9"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:status==="loading"?6:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <div style={{width:30,height:30,borderRadius:9,background:"linear-gradient(135deg,#0891b2,#0284c7)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 8px rgba(8,145,178,0.3)"}}>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            </div>
+            <div>
+              <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>Carte clients</div>
+              <div style={{fontSize:10,color:"#94a3b8",marginTop:1,display:"flex",alignItems:"center",gap:5}}>
+                {status==="loading"
+                  ? <><svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.5" strokeLinecap="round" style={{animation:"spin .7s linear infinite"}}><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>{located}/{clientsWithAddr.length} géolocalisés…</>
+                  : status==="ready" ? `${located} client${located>1?"s":""} sur la carte`
+                  : status==="error" ? "Erreur de chargement"
+                  : "Initialisation…"}
+              </div>
             </div>
           </div>
+
+          <div style={{display:"flex",gap:5,alignItems:"center"}}>
+            {/* Badge aujourd'hui */}
+            {clientsToday.size > 0 && (
+              <span style={{fontSize:9,fontWeight:700,color:"#16a34a",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:20,padding:"2px 8px"}}>
+                ✓ {clientsToday.size} auj.
+              </span>
+            )}
+            {/* Badge sans adresse */}
+            {clientsSansAdresse.length > 0 && (
+              <span style={{fontSize:9,fontWeight:700,color:"#d97706",background:"#fffbeb",border:"1px solid #fde68a",borderRadius:20,padding:"2px 8px"}}>
+                ⚠ {clientsSansAdresse.length}
+              </span>
+            )}
+            {/* Recentrer */}
+            {status==="ready" && located > 0 && (
+              <button onClick={recentrer} title="Recentrer la carte"
+                style={{width:28,height:28,borderRadius:8,border:"1px solid #e2e8f0",background:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",WebkitTapHighlightColor:"transparent"}}>
+                <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+              </button>
+            )}
+          </div>
         </div>
-        {status==="loading"&&(
-          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.5" strokeLinecap="round" style={{animation:"spin .7s linear infinite",flexShrink:0}}><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
+
+        {/* Barre de progression géocodage */}
+        {status==="loading" && clientsWithAddr.length > 0 && (
+          <div style={{height:3,background:"#e2e8f0",borderRadius:99,overflow:"hidden",marginTop:2}}>
+            <div style={{height:"100%",width:`${pct}%`,background:"linear-gradient(90deg,#0891b2,#06b6d4)",borderRadius:99,transition:"width .3s ease"}}/>
+          </div>
         )}
       </div>
 
-      {/* Carte Leaflet */}
-      <div ref={mapRef} style={{height:340,width:"100%",background:"#e8f4f8"}}/>
+      {/* Carte Leaflet — plus haute */}
+      <div ref={mapRef} style={{height:380,width:"100%",background:"#f0f4f8"}}/>
 
       {/* ── PANEL CLIENT compact ── */}
       {panel && (
@@ -1525,7 +1591,7 @@ export function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPass
       )}
 
       {/* ── CARTE CLIENTS ── */}
-      <CarteClients clients={clients} onClientClick={onClientClick}/>
+      <CarteClients clients={clients} passages={passages} onClientClick={onClientClick}/>
 
 
     </div>
