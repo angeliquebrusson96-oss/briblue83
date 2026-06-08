@@ -512,10 +512,12 @@ function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEdit
         </div>
       </div>
 
-      {/* ── Grille jours — 7 jours lun→dim, scroll centré sur aujourd'hui ── */}
+      {/* ── Grille jours — 7 jours lun→dim ── */}
+      {/* Mobile : scroll horizontal centré sur aujourd'hui          */}
+      {/* Desktop : flex:1 — 7 colonnes égales, pas de scroll         */}
       <div ref={scrollRef} style={{
         display:"flex",gap:5,
-        overflowX:"auto",
+        overflowX: isMobile ? "auto" : "hidden",
         WebkitOverflowScrolling:"touch",
         scrollbarWidth:"none",
         msOverflowStyle:"none",
@@ -532,8 +534,12 @@ function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEdit
 
           return (
             <div key={ds} data-today={isToday?"true":"false"} style={{
-              minWidth:isMobile?105:100,flex:"0 0 auto",
-              width:isMobile?105:"calc(14.28% - 5px)",
+              // Mobile : largeur fixe 105px + scroll
+              // Desktop : flex:1 = répartition égale des 7 colonnes
+              ...(isMobile
+                ? { minWidth:105, flex:"0 0 105px" }
+                : { flex:1, minWidth:0 }
+              ),
               borderRadius:12,
               background:isToday?"#f0f9ff":"#fafafa",
               border:`${isToday?"2px":"1.5px"} solid ${isToday?"#0891b2":"#e2e8f0"}`,
