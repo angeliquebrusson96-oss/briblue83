@@ -461,7 +461,7 @@ export async function save(key, val) {
       const existingRaw = localStorage.getItem("briblue_bb_clients_v2");
       if (existingRaw) {
         const existing = JSON.parse(existingRaw);
-        if (Array.isArray(existing) && existing.length > val.length + 1) {
+        if (Array.isArray(existing) && existing.length > val.length) {
           console.warn(`[briblue] GARDE-FOU clients : ${val.length} → ${existing.length} clients — fusion automatique.`);
           return save(key, mergeArrayById(val, existing));
         }
@@ -477,7 +477,7 @@ export async function save(key, val) {
       const existingRaw = localStorage.getItem("briblue_bb_passages_v2");
       if (existingRaw) {
         const existing = JSON.parse(existingRaw);
-        if (Array.isArray(existing) && existing.length > val.length + 3) {
+        if (Array.isArray(existing) && existing.length > val.length) {
           console.warn(`[briblue] GARDE-FOU passages : tentative de sauvegarder ${val.length} passages alors que ${existing.length} existent — fusion automatique.`);
           return save(key, mergeArrayById(val, existing));
         }
@@ -696,21 +696,54 @@ export function subscribeToRealtime(callbacks) {
         // ── Mettre à jour le cache getDoc pour éviter un re-fetch inutile ──
         _docCache[docName] = { snap, at: Date.now() };
 
-        // ── Mettre à jour localStorage ──────────────────────────────────────
+        // ── Mettre à jour localStorage — avec merge pour les tableaux ─────
+        // IMPORTANT : on ne remplace JAMAIS directement les tableaux (passages,
+        // clients…) par les données Firebase brutes. Un snapshot partiel (race
+        // condition, debounce 800 ms, réseau lent) peut contenir MOINS d'entrées
+        // que ce qui est en local → on fusionne pour ne perdre aucun rapport.
         const remoteTime = data.savedAt ? new Date(data.savedAt).getTime() : 0;
+        const patchedData = { ...data }; // copie enrichie envoyée au callback React
+        let needsPush = false;
+
         for (const key of spec.keys) {
           const mapping = KEY_MAP[key];
           if (!mapping) continue;
-          const val = data[mapping.field];
+          let val = data[mapping.field];
           if (val === undefined) continue;
+
+          // Fusion protectrice pour les clés de type tableau
+          if (MERGE_ARRAY_KEYS.has(key) && Array.isArray(val)) {
+            try {
+              const localRaw = localStorage.getItem("briblue_" + key);
+              const localArr = localRaw ? JSON.parse(localRaw) : [];
+              if (Array.isArray(localArr) && localArr.length > 0) {
+                const merged = mergeArrayById(val, localArr);
+                if (merged.length > val.length) {
+                  console.info(`[briblue] onSnapshot "${key}" : ${merged.length - val.length} entrée(s) locale(s) absente(s) de Firebase — fusion automatique.`);
+                  val = merged;
+                  patchedData[mapping.field] = merged;
+                  // Planifier un push pour que Firebase récupère les entrées manquantes
+                  offlineQueue.pending[key] = merged;
+                  needsPush = true;
+                }
+              }
+            } catch { /* noop */ }
+          }
+
           try {
             localStorage.setItem("briblue_" + key, JSON.stringify(val));
             localStorage.setItem("briblue_meta_" + key, JSON.stringify({ savedAt: remoteTime }));
           } catch { /* quota → pas critique, le state React sera à jour */ }
         }
 
+        // Si des entrées locales manquaient dans Firebase → les y repousser
+        if (needsPush) {
+          _persistQueue(); // survit à la fermeture de l'app
+          setTimeout(() => flushOfflineQueue(), FIREBASE_DEBOUNCE_MS * 2);
+        }
+
         // ── Notifier l'app React ────────────────────────────────────────────
-        spec.cb(data);
+        spec.cb(patchedData);
       },
       (err) => {
         // Erreur réseau normale (offline) — silencieuse
