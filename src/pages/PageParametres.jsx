@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef } from "react";
-import { flushPendingNow, forceRestoreFromFirebase } from "../lib/storage";
+import { flushPendingNow, forceRestoreFromFirebase, save } from "../lib/storage";
 import { playChimeMorning, playAlertRdv, playNotifSound, playSound, SOUND_TYPES, sendLocalNotification } from "../styles";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -271,6 +271,9 @@ export function PageParametres({
   const [cacheSize,    setCacheSize]    = useState("…");
   const [restoreMsg,   setRestoreMsg]   = useState("");
   const [restoring,    setRestoring]    = useState(false);
+  const [importMsg,    setImportMsg]    = useState("");
+  const [importing,    setImporting]    = useState(false);
+  const importInputRef = useRef(null);
 
   // ── Helpers localStorage ──
   const ls    = (k, def) => { try { const v = localStorage.getItem(k); return v === null ? def : JSON.parse(v); } catch { return def; } };
@@ -405,6 +408,130 @@ export function PageParametres({
     }
     setRestoring(false);
     setTimeout(() => setRestoreMsg(""), 8000);
+  };
+
+  // ── Import rapports HTML ──
+  const importerRapportsHTML = async (files) => {
+    if (!files || files.length === 0) return;
+    setImporting(true);
+    setImportMsg("⏳ Analyse en cours…");
+
+    const parser = new DOMParser();
+    let added = 0, skipped = 0, notFound = 0;
+
+    // Charger les passages actuels depuis localStorage (version fraîche)
+    let existingPassages = [];
+    try {
+      const raw = localStorage.getItem("briblue_bb_passages_v2");
+      existingPassages = raw ? JSON.parse(raw) : passages;
+    } catch { existingPassages = passages; }
+
+    const newPassages = [...existingPassages];
+
+    for (const file of Array.from(files)) {
+      try {
+        const html = await file.text();
+        const doc = parser.parseFromString(html, "text/html");
+
+        // Extraire les champs label→valeur
+        const fields = {};
+        doc.querySelectorAll(".field-label, .label").forEach(el => {
+          const label = el.textContent.trim().toLowerCase().replace(/:$/, "");
+          const val   = el.nextElementSibling?.textContent?.trim() || "";
+          if (label && val) fields[label] = val;
+        });
+
+        // Essayer aussi les tables ou structures clé/valeur alternatives
+        doc.querySelectorAll("tr").forEach(tr => {
+          const cells = tr.querySelectorAll("td, th");
+          if (cells.length >= 2) {
+            const k = cells[0].textContent.trim().toLowerCase().replace(/:$/, "");
+            const v = cells[1].textContent.trim();
+            if (k && v) fields[k] = v;
+          }
+        });
+
+        // Chercher nom client — plusieurs variantes de clé
+        const nomClient = fields["client"] || fields["nom"] || fields["nom client"] || fields["client name"] || "";
+        const dateRapport = fields["date"] || fields["date passage"] || fields["date du passage"] || "";
+
+        // Chercher par correspondance nom dans clients
+        let client = null;
+        if (nomClient) {
+          const needle = nomClient.toLowerCase().trim();
+          client = clients.find(c => {
+            const full = `${c.prenom || ""} ${c.nom || ""}`.toLowerCase().trim();
+            const nomOnly = (c.nom || "").toLowerCase().trim();
+            return full === needle || nomOnly === needle || needle.includes(nomOnly) || nomOnly.includes(needle);
+          });
+        }
+
+        if (!client) {
+          // Essayer de trouver le nom dans le HTML brut (titre de page, h1, etc.)
+          const titleEl = doc.querySelector("h1, h2, title, .client-name, .nom-client");
+          const titleText = titleEl?.textContent?.trim() || "";
+          if (titleText) {
+            const needle = titleText.toLowerCase();
+            client = clients.find(c => {
+              const nomOnly = (c.nom || "").toLowerCase().trim();
+              return nomOnly.length > 2 && needle.includes(nomOnly);
+            });
+          }
+        }
+
+        if (!client) { notFound++; continue; }
+
+        // Vérifier doublon (même clientId + même date)
+        const dateKey = dateRapport || file.name.replace(/\.html?$/i, "");
+        const exists = newPassages.some(p => p.clientId === client.id && (p.date === dateKey || p.date === dateRapport));
+        if (exists) { skipped++; continue; }
+
+        // Créer l'objet passage
+        const passage = {
+          id: `html_import_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          clientId: client.id,
+          date: dateRapport || new Date().toISOString().slice(0, 10),
+          heure: fields["heure"] || fields["heure passage"] || "",
+          type: fields["type"] || fields["type passage"] || fields["prestation"] || "entretien",
+          observations: fields["observations"] || fields["commentaires"] || fields["remarques"] || fields["notes"] || "",
+          produits: [],
+          photos: [],
+          importedFromHTML: true,
+          importedFile: file.name,
+        };
+
+        // Tenter d'extraire quelques mesures courantes
+        const mesures = {};
+        ["ph", "chlore", "tac", "th", "temperature", "sel", "cya", "brome"].forEach(k => {
+          const v = fields[k] || fields[`${k} (g/l)`] || fields[`${k} mesure`] || fields[`${k} valeur`];
+          if (v) mesures[k] = v;
+        });
+        if (Object.keys(mesures).length > 0) passage.mesures = mesures;
+
+        newPassages.push(passage);
+        added++;
+      } catch (e) {
+        console.warn("[briblue] Erreur import HTML :", file.name, e);
+      }
+    }
+
+    if (added > 0) {
+      try {
+        await save("bb_passages_v2", newPassages);
+        await flushPendingNow();
+        setImportMsg(`✅ ${added} rapport${added > 1 ? "s" : ""} importé${added > 1 ? "s" : ""}${skipped > 0 ? ` · ${skipped} déjà présent${skipped > 1 ? "s" : ""}` : ""}${notFound > 0 ? ` · ${notFound} client${notFound > 1 ? "s" : ""} non trouvé${notFound > 1 ? "s" : ""}` : ""} — rechargez l'app`);
+      } catch {
+        setImportMsg("⚠️ Import OK mais erreur de sauvegarde — réessayez");
+      }
+    } else if (skipped > 0) {
+      setImportMsg(`ℹ️ ${skipped} rapport${skipped > 1 ? "s" : ""} déjà présent${skipped > 1 ? "s" : ""}${notFound > 0 ? ` · ${notFound} client${notFound > 1 ? "s" : ""} non trouvé${notFound > 1 ? "s" : ""}` : ""}`);
+    } else {
+      setImportMsg(`❌ Aucun rapport importé${notFound > 0 ? ` · ${notFound} client${notFound > 1 ? "s" : ""} non trouvé${notFound > 1 ? "s" : ""}` : ""} — vérifiez les fichiers`);
+    }
+
+    setImporting(false);
+    if (importInputRef.current) importInputRef.current.value = "";
+    setTimeout(() => setImportMsg(""), 10000);
   };
 
   // ── Export JSON ──
@@ -884,7 +1011,26 @@ export function PageParametres({
           label="Synchroniser Firebase"
           detail={syncMsg || "Forcer la sauvegarde en ligne maintenant"}
           onClick={syncFirebase}
+        />
+        <Ligne
+          icone={<svg width={17} height={17} viewBox="0 0 24 24" fill="none"
+            stroke="#059669" strokeWidth="2" strokeLinecap="round">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>}
+          label="Importer rapports HTML"
+          detail={importMsg || (importing ? "Import en cours…" : "Restaurer des rapports reçus par mail (.html)")}
+          onClick={() => !importing && importInputRef.current?.click()}
           sep={modeExpert}
+        />
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".html,.htm"
+          multiple
+          style={{ display: "none" }}
+          onChange={e => importerRapportsHTML(e.target.files)}
         />
         {modeExpert && (
           <Ligne
