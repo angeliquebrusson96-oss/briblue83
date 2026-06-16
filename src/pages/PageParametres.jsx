@@ -414,124 +414,189 @@ export function PageParametres({
   const importerRapportsHTML = async (files) => {
     if (!files || files.length === 0) return;
     setImporting(true);
-    setImportMsg("⏳ Analyse en cours…");
+    setImportMsg("⏳ Récupération Firebase en cours…");
 
-    const parser = new DOMParser();
-    let added = 0, skipped = 0, notFound = 0;
-
-    // Charger les passages actuels depuis localStorage (version fraîche)
+    // SÉCURITÉ : toujours récupérer Firebase en premier pour ne jamais écraser des données plus récentes
     let existingPassages = [];
     try {
+      await forceRestoreFromFirebase();
       const raw = localStorage.getItem("briblue_bb_passages_v2");
-      existingPassages = raw ? JSON.parse(raw) : passages;
-    } catch { existingPassages = passages; }
+      existingPassages = raw ? JSON.parse(raw) : [];
+    } catch { /* noop */ }
+    if (existingPassages.length === 0 && passages.length > 0) existingPassages = [...passages];
 
-    const newPassages = [...existingPassages];
+    setImportMsg("⏳ Analyse des fichiers HTML…");
+
+    const htmlParser = new DOMParser();
+    let added = 0, enriched = 0, skipped = 0, notFound = 0;
+    const resultPassages = [...existingPassages];
+
+    // Convertit la date française "16 juin 2026" → "2026-06-16"
+    const MOIS_FR = { janvier:"01",février:"02",mars:"03",avril:"04",mai:"05",juin:"06",
+      juillet:"07",août:"08",septembre:"09",octobre:"10",novembre:"11",décembre:"12" };
+    const parseDateFR = (s) => {
+      if (!s) return "";
+      const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (iso) return s;
+      const m = s.match(/(\d{1,2})\s+(\w+)\s+(\d{4})/);
+      if (m) {
+        const mo = MOIS_FR[m[2].toLowerCase()];
+        if (mo) return `${m[3]}-${mo}-${m[1].padStart(2,"0")}`;
+      }
+      // "16/06/2026" ou "16-06-2026"
+      const mslash = s.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
+      if (mslash) return `${mslash[3]}-${mslash[2]}-${mslash[1]}`;
+      return "";
+    };
+
+    // Extrait la valeur numérique brute d'un champ (retire unités, "ppm", etc.)
+    const cleanVal = (s) => {
+      if (!s || s === "—") return "";
+      return s.replace(/<[^>]+>/g, "").trim();
+    };
 
     for (const file of Array.from(files)) {
       try {
         const html = await file.text();
-        const doc = parser.parseFromString(html, "text/html");
+        const doc = htmlParser.parseFromString(html, "text/html");
 
-        // Extraire les champs label→valeur
-        const fields = {};
-        doc.querySelectorAll(".field-label, .label").forEach(el => {
-          const label = el.textContent.trim().toLowerCase().replace(/:$/, "");
-          const val   = el.nextElementSibling?.textContent?.trim() || "";
-          if (label && val) fields[label] = val;
+        // ── 1. Nom client depuis .meta-item ──────────────────────────────
+        let nomClient = "";
+        let dateRapport = "";
+        doc.querySelectorAll(".meta-item").forEach(el => {
+          const text = el.textContent.trim();
+          const strong = el.querySelector("strong")?.textContent?.trim() || "";
+          if (text.startsWith("Client")) nomClient = strong;
+          if (text.startsWith("Date"))   dateRapport = strong;
         });
 
-        // Essayer aussi les tables ou structures clé/valeur alternatives
-        doc.querySelectorAll("tr").forEach(tr => {
-          const cells = tr.querySelectorAll("td, th");
-          if (cells.length >= 2) {
-            const k = cells[0].textContent.trim().toLowerCase().replace(/:$/, "");
-            const v = cells[1].textContent.trim();
-            if (k && v) fields[k] = v;
-          }
-        });
+        // Fallback : chercher dans le HTML texte brut
+        if (!nomClient) {
+          const fullText = doc.body?.textContent || "";
+          const mClient = fullText.match(/Client\s*([A-ZÁÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÁÀÂÄÉÈÊËÏÎÔÙÛÜÇa-záàâäéèêëïîôùûüç\s\-]+)/);
+          if (mClient) nomClient = mClient[1].trim();
+        }
 
-        // Chercher nom client — plusieurs variantes de clé
-        const nomClient = fields["client"] || fields["nom"] || fields["nom client"] || fields["client name"] || "";
-        const dateRapport = fields["date"] || fields["date passage"] || fields["date du passage"] || "";
-
-        // Chercher par correspondance nom dans clients
+        // ── 2. Trouver le client ─────────────────────────────────────────
         let client = null;
         if (nomClient) {
           const needle = nomClient.toLowerCase().trim();
           client = clients.find(c => {
-            const full = `${c.prenom || ""} ${c.nom || ""}`.toLowerCase().trim();
-            const nomOnly = (c.nom || "").toLowerCase().trim();
-            return full === needle || nomOnly === needle || needle.includes(nomOnly) || nomOnly.includes(needle);
+            const full = `${c.prenom||""} ${c.nom||""}`.toLowerCase().trim();
+            const nomOnly = (c.nom||"").toLowerCase().trim();
+            return full === needle || nomOnly === needle ||
+                   needle.includes(nomOnly) || nomOnly.includes(needle);
           });
         }
-
-        if (!client) {
-          // Essayer de trouver le nom dans le HTML brut (titre de page, h1, etc.)
-          const titleEl = doc.querySelector("h1, h2, title, .client-name, .nom-client");
-          const titleText = titleEl?.textContent?.trim() || "";
-          if (titleText) {
-            const needle = titleText.toLowerCase();
-            client = clients.find(c => {
-              const nomOnly = (c.nom || "").toLowerCase().trim();
-              return nomOnly.length > 2 && needle.includes(nomOnly);
-            });
-          }
-        }
-
         if (!client) { notFound++; continue; }
 
-        // Vérifier doublon (même clientId + même date)
-        const dateKey = dateRapport || file.name.replace(/\.html?$/i, "");
-        const exists = newPassages.some(p => p.clientId === client.id && (p.date === dateKey || p.date === dateRapport));
-        if (exists) { skipped++; continue; }
+        const dateISO = parseDateFR(dateRapport) || new Date().toISOString().slice(0,10);
 
-        // Créer l'objet passage
-        const passage = {
-          id: `html_import_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        // ── 3. Extraire champs par section (évite conflit "pH" × 2) ─────
+        const bySection = {}; // { sectionTitle: { label: value } }
+        doc.querySelectorAll(".section").forEach(sec => {
+          const title = sec.querySelector(".section-title")?.textContent?.replace(/[^\w\séàâäéèêëïîôùûüç]/gi,"").trim().toLowerCase() || "global";
+          bySection[title] = {};
+          sec.querySelectorAll(".field").forEach(f => {
+            const lbl = f.querySelector(".field-label")?.textContent?.trim() || "";
+            const val = cleanVal(f.querySelector(".field-value")?.textContent || "");
+            if (lbl && val && val !== "—") bySection[title][lbl.toLowerCase()] = val;
+          });
+        });
+
+        const eau      = bySection["analyses eau"] || bySection["analyses de leau"] || {};
+        const etat     = bySection["tat du bassin"] || bySection["etat du bassin"] || {};
+        const corr     = bySection["correctifs apports"] || bySection["correctifs apportés"] || {};
+        const cloture  = bySection["clture"] || bySection["clôture"] || {};
+        const bassin   = bySection["bassin  intervention"] || bySection["bassin intervention"] || {};
+
+        // ── 4. Chercher si passage existant à enrichir ───────────────────
+        const existIdx = resultPassages.findIndex(p =>
+          p.clientId === client.id && p.date === dateISO
+        );
+
+        const passageData = {
           clientId: client.id,
-          date: dateRapport || new Date().toISOString().slice(0, 10),
-          heure: fields["heure"] || fields["heure passage"] || "",
-          type: fields["type"] || fields["type passage"] || fields["prestation"] || "entretien",
-          observations: fields["observations"] || fields["commentaires"] || fields["remarques"] || fields["notes"] || "",
-          produits: [],
-          photos: [],
+          date: dateISO,
+          type: bassin["type"] || "entretien",
+          // Analyses eau
+          ph:           eau["ph"] || "",
+          chloreLibre:  eau["chlore libre"]?.replace(/\s*ppm/i,"").trim() || "",
+          alcalinite:   eau["alcalinité"]?.replace(/\s*ppm/i,"").trim() || "",
+          stabilisant:  eau["stabilisant"]?.replace(/\s*ppm/i,"").trim() || "",
+          tChlore:      eau["taux chlore"] || "",
+          tPH:          eau["taux ph"] || "",
+          tSel:         eau["taux sel"] || "",
+          tPhosphate:   eau["taux phosphate"] || "",
+          // État bassin
+          qualiteEau:   etat["qualité eau"] || "",
+          etatFond:     etat["fond"] ? [etat["fond"]] : [],
+          etatParois:   etat["parois"] ? [etat["parois"]] : [],
+          etatLocal:    etat["local technique"] ? [etat["local technique"]] : [],
+          etatBacTampon:etat["bac tampon"] ? [etat["bac tampon"]] : [],
+          etatVoletBac: etat["volet / bac"] ? [etat["volet / bac"]] : [],
+          // Correctifs
+          corrChlore:       corr["chlore"] || "",
+          corrPH:           corr["ph"] || "",
+          corrSel:          corr["sel"] || "",
+          corrAlgicide:     corr["algicide"] || "",
+          corrPeroxyde:     corr["peroxyde"] || "",
+          corrChloreChoc:   corr["chlore choc"] || "",
+          corrPhosphate:    corr["phosphate"] || "",
+          corrAlcafix:      corr["tac +"] || "",
+          corrAutre:        corr["autre"] || "",
+          // Clôture
+          commentaires: cloture["commentaires"] || "",
           importedFromHTML: true,
           importedFile: file.name,
         };
 
-        // Tenter d'extraire quelques mesures courantes
-        const mesures = {};
-        ["ph", "chlore", "tac", "th", "temperature", "sel", "cya", "brome"].forEach(k => {
-          const v = fields[k] || fields[`${k} (g/l)`] || fields[`${k} mesure`] || fields[`${k} valeur`];
-          if (v) mesures[k] = v;
-        });
-        if (Object.keys(mesures).length > 0) passage.mesures = mesures;
-
-        newPassages.push(passage);
-        added++;
+        if (existIdx >= 0) {
+          // Enrichir un passage existant sans écraser ses données déjà renseignées
+          const existing = resultPassages[existIdx];
+          const merged = { ...passageData, ...Object.fromEntries(
+            Object.entries(existing).filter(([,v]) => v !== "" && v !== null && v !== undefined &&
+              !(Array.isArray(v) && v.length === 0))
+          )};
+          resultPassages[existIdx] = merged;
+          enriched++;
+        } else {
+          resultPassages.push({
+            id: `html_import_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
+            photos: [],
+            produits: [],
+            ...passageData,
+          });
+          added++;
+        }
       } catch (e) {
         console.warn("[briblue] Erreur import HTML :", file.name, e);
       }
     }
 
-    if (added > 0) {
+    const total = added + enriched;
+    if (total > 0) {
       try {
-        await save("bb_passages_v2", newPassages);
+        await save("bb_passages_v2", resultPassages);
         await flushPendingNow();
-        setImportMsg(`✅ ${added} rapport${added > 1 ? "s" : ""} importé${added > 1 ? "s" : ""}${skipped > 0 ? ` · ${skipped} déjà présent${skipped > 1 ? "s" : ""}` : ""}${notFound > 0 ? ` · ${notFound} client${notFound > 1 ? "s" : ""} non trouvé${notFound > 1 ? "s" : ""}` : ""} — rechargez l'app`);
+        let msg = "✅";
+        if (added > 0) msg += ` ${added} rapport${added>1?"s":""} ajouté${added>1?"s":""}`;
+        if (enriched > 0) msg += `${added>0?" ·":""} ${enriched} enrichi${enriched>1?"s":""}`;
+        if (skipped > 0) msg += ` · ${skipped} déjà présent${skipped>1?"s":""}`;
+        if (notFound > 0) msg += ` · ${notFound} client${notFound>1?"s":""} non trouvé${notFound>1?"s":""}`;
+        setImportMsg(msg + " — rechargez l'app");
       } catch {
         setImportMsg("⚠️ Import OK mais erreur de sauvegarde — réessayez");
       }
-    } else if (skipped > 0) {
-      setImportMsg(`ℹ️ ${skipped} rapport${skipped > 1 ? "s" : ""} déjà présent${skipped > 1 ? "s" : ""}${notFound > 0 ? ` · ${notFound} client${notFound > 1 ? "s" : ""} non trouvé${notFound > 1 ? "s" : ""}` : ""}`);
+    } else if (notFound > 0) {
+      setImportMsg(`❌ ${notFound} client${notFound>1?"s":""} non trouvé${notFound>1?"s":""} — vérifiez les noms dans l'app`);
     } else {
-      setImportMsg(`❌ Aucun rapport importé${notFound > 0 ? ` · ${notFound} client${notFound > 1 ? "s" : ""} non trouvé${notFound > 1 ? "s" : ""}` : ""} — vérifiez les fichiers`);
+      setImportMsg("ℹ️ Aucune modification — tous les rapports sont déjà à jour");
     }
 
     setImporting(false);
     if (importInputRef.current) importInputRef.current.value = "";
-    setTimeout(() => setImportMsg(""), 10000);
+    setTimeout(() => setImportMsg(""), 12000);
   };
 
   // ── Export JSON ──
