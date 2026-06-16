@@ -12,7 +12,7 @@
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { getDoc } from "firebase/firestore";
 import { signInAnonymously } from "firebase/auth";
-import { storage, auth, DOCS } from "./firebase";
+import { storage, auth, DOCS, STORAGE_BUCKET } from "./firebase";
 
 // ─── INDEXEDDB ───────────────────────────────────────────────────────────────
 const DB_NAME    = "briblue_photos";
@@ -108,10 +108,26 @@ export async function loadPhoto(key) {
   return "";
 }
 
+// ─── URL FIREBASE STORAGE (lecture publique — rules: allow read: if true) ────
+// Construit l'URL de téléchargement sans token pour les photos publiques.
+// Utilisée comme fallback quand idb:key n'est pas trouvée localement.
+function buildStorageUrl(key) {
+  return `https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/photos%2F${encodeURIComponent(key)}.jpg?alt=media`;
+}
+
 // ─── RÉSOLUTION ──────────────────────────────────────────────────────────────
 export async function resolvePhoto(value) {
   if (!value) return "";
-  if (value.startsWith("idb:")) return loadPhoto(value.slice(4));
+  if (value.startsWith("idb:")) {
+    const key = value.slice(4);
+    const local = await loadPhoto(key);
+    if (local) return local;
+    // Photo absente de l'IDB local (autre appareil ou IDB purgé par iOS).
+    // Elle a peut-être déjà été uploadée vers Firebase Storage lors de la
+    // migration. On retourne l'URL publique → l'image sera visible sur tous
+    // les appareils même si la migration n'a pas encore mis à jour la référence.
+    return buildStorageUrl(key);
+  }
   // fsp:clientId → photo stockée dans Firestore briblue/client_photos
   if (value.startsWith("fsp:")) {
     const clientId = value.slice(4);
