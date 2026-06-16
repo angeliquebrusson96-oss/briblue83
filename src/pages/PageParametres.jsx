@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef } from "react";
-import { flushPendingNow } from "../lib/storage";
+import { flushPendingNow, forceRestoreFromFirebase } from "../lib/storage";
 import { playChimeMorning, playAlertRdv, playNotifSound, playSound, SOUND_TYPES, sendLocalNotification } from "../styles";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -265,10 +265,12 @@ export function PageParametres({
   clients = [], passages = [], rdvs = [],
   onLogout,
 }) {
-  const [syncMsg,    setSyncMsg]    = useState("");
-  const [exportMsg,  setExportMsg]  = useState("");
-  const [cacheMsg,   setCacheMsg]   = useState("");
-  const [cacheSize,  setCacheSize]  = useState("…");
+  const [syncMsg,      setSyncMsg]      = useState("");
+  const [exportMsg,    setExportMsg]    = useState("");
+  const [cacheMsg,     setCacheMsg]     = useState("");
+  const [cacheSize,    setCacheSize]    = useState("…");
+  const [restoreMsg,   setRestoreMsg]   = useState("");
+  const [restoring,    setRestoring]    = useState(false);
 
   // ── Helpers localStorage ──
   const ls    = (k, def) => { try { const v = localStorage.getItem(k); return v === null ? def : JSON.parse(v); } catch { return def; } };
@@ -384,6 +386,27 @@ export function PageParametres({
     setTimeout(() => setSyncMsg(""), 3000);
   };
 
+  // ── Récupération forcée depuis Firebase ──
+  const restaurerDepuisFirebase = async () => {
+    setRestoring(true);
+    setRestoreMsg("⏳ Récupération en cours…");
+    try {
+      const { restored, details } = await forceRestoreFromFirebase();
+      if (restored > 0) {
+        const detail = Object.entries(details)
+          .map(([k, n]) => `${n} ${k.includes("passage") ? "rapport" : k.includes("client") ? "client" : "entrée"}${n > 1 ? "s" : ""}`)
+          .join(", ");
+        setRestoreMsg(`✅ ${restored} donnée${restored > 1 ? "s" : ""} récupérée${restored > 1 ? "s" : ""} (${detail}) — rechargez l'app`);
+      } else {
+        setRestoreMsg("ℹ️ Aucune donnée supplémentaire trouvée sur Firebase");
+      }
+    } catch {
+      setRestoreMsg("❌ Erreur de récupération (hors ligne ?)");
+    }
+    setRestoring(false);
+    setTimeout(() => setRestoreMsg(""), 8000);
+  };
+
   // ── Export JSON ──
   const exportJSON = () => {
     try {
@@ -427,6 +450,82 @@ export function PageParametres({
 
   return (
     <div style={{maxWidth:560, margin:"0 auto", padding:"0 0 60px"}}>
+
+      {/* ── BLOC RÉCUPÉRATION D'URGENCE ── */}
+      <div style={{
+        marginBottom:20,
+        borderRadius:18,
+        overflow:"hidden",
+        border:"2px solid #fca5a5",
+        background:"#fff5f5",
+        boxShadow:"0 4px 20px rgba(220,38,38,0.10)",
+      }}>
+        {/* Header rouge */}
+        <div style={{
+          background:"linear-gradient(135deg,#dc2626,#ef4444)",
+          padding:"12px 16px",
+          display:"flex",alignItems:"center",gap:10,
+        }}>
+          <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <span style={{fontSize:13,fontWeight:800,color:"#fff"}}>Récupération de données</span>
+        </div>
+
+        <div style={{padding:"14px 16px"}}>
+          <p style={{margin:"0 0 12px",fontSize:12,color:"#7f1d1d",lineHeight:1.6}}>
+            Si des rapports ont disparu, ce bouton force la récupération depuis Firebase et fusionne les données manquantes avec le local.
+            <br/><strong>Ne remplace rien</strong> — ajoute uniquement ce qui manque.
+          </p>
+
+          <button
+            onClick={restaurerDepuisFirebase}
+            disabled={restoring}
+            style={{
+              width:"100%",padding:"13px",borderRadius:12,
+              background:restoring ? "#fca5a5" : "linear-gradient(135deg,#dc2626,#b91c1c)",
+              border:"none",cursor:restoring?"not-allowed":"pointer",
+              fontSize:13,fontWeight:800,color:"#fff",fontFamily:"inherit",
+              display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+              boxShadow:restoring?"none":"0 4px 14px rgba(220,38,38,0.35)",
+              WebkitTapHighlightColor:"transparent",
+            }}>
+            {restoring ? (
+              <><svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"
+                style={{animation:"spin .7s linear infinite"}}>
+                <path d="M21 12a9 9 0 11-6.219-8.56"/>
+              </svg> Récupération…</>
+            ) : (
+              <><svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>
+              </svg> Récupérer les données depuis Firebase</>
+            )}
+          </button>
+
+          {restoreMsg && (
+            <div style={{
+              marginTop:10,padding:"10px 14px",borderRadius:10,
+              background: restoreMsg.startsWith("✅") ? "#f0fdf4" : restoreMsg.startsWith("ℹ") ? "#f0f9ff" : "#fef2f2",
+              border: `1px solid ${restoreMsg.startsWith("✅") ? "#86efac" : restoreMsg.startsWith("ℹ") ? "#bae6fd" : "#fca5a5"}`,
+              fontSize:12,fontWeight:600,
+              color: restoreMsg.startsWith("✅") ? "#15803d" : restoreMsg.startsWith("ℹ") ? "#0369a1" : "#dc2626",
+              lineHeight:1.5,
+            }}>
+              {restoreMsg}
+              {restoreMsg.startsWith("✅") && (
+                <div style={{marginTop:6,fontSize:11,fontWeight:400,color:"#64748b"}}>
+                  👉 Fermez et rouvrez l'application pour voir les données restaurées.
+                </div>
+              )}
+            </div>
+          )}
+
+          <div style={{marginTop:10,padding:"8px 12px",borderRadius:8,background:"#fee2e2",fontSize:10,color:"#991b1b"}}>
+            💡 <strong>Si vous avez l'app ouverte sur un autre appareil (téléphone, tablette)</strong> : ne la fermez pas — les données sont peut-être encore dans son cache local. Ouvrez-la et attendez qu'elle se synchronise.
+          </div>
+        </div>
+      </div>
 
       {/* ── CARTE PROFIL ── */}
       <div style={{

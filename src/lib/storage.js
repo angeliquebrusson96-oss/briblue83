@@ -41,15 +41,16 @@ function _persistQueue() {
 }
 
 // ─── MERGE DONNÉES TABLEAUX ──────────────────────────────────────────────────
-// UNIQUEMENT pour bb_clients_v2 : les clients ne doivent JAMAIS disparaître
-// accidentellement (scénario FOULON — localStorage plein + Firebase offline).
-//
-// ⚠️ NE PAS mettre bb_passages_v2 / bb_rdvs_v1 / bb_livraisons_v1 ici :
-// le MERGE réajouterait les rapports/rdvs SUPPRIMÉS INTENTIONNELLEMENT depuis
-// Firebase (la suppression locale serait annulée au prochain reconcile).
-// Pour ces clés : le timestamp gagne (local plus récent = suppression respectée).
+// Toutes les clés de type tableau utilisent le MERGE par ID :
+// aucune donnée existante dans l'une des deux sources ne peut disparaître.
+// Note : une suppression intentionnelle locale peut réapparaître depuis Firebase
+// jusqu'au prochain push ; c'est un compromis acceptable face au risque de perte
+// totale (comportement précédent "timestamp gagne").
 const MERGE_ARRAY_KEYS = new Set([
-  "bb_clients_v2",  // ← seule clé avec MERGE : protect contre perte accidentelle
+  "bb_clients_v2",
+  "bb_passages_v2",    // ← ajouté : empêche l'écrasement de rapports par des données locales vides
+  "bb_rdvs_v1",        // ← idem
+  "bb_livraisons_v1",  // ← idem
 ]);
 
 function mergeArrayById(priorityArr, secondaryArr) {
@@ -190,6 +191,77 @@ export function flushPendingNow() {
     // Si REST échoue, remettre dans la queue
     Object.assign(offlineQueue.pending, snapshot);
   });
+}
+
+// ─── RÉCUPÉRATION FORCÉE DEPUIS FIREBASE ────────────────────────────────────
+// Ignore complètement les timestamps locaux et tire les données depuis Firebase.
+// Fusionne avec le local (le local l'emporte pour les conflits d'ID).
+// Vérifie aussi l'ancien document app_data (legacy) pour récupérer des données
+// antérieures à la migration.
+// Retourne { restored: number, details: { key: count, ... } }
+export async function forceRestoreFromFirebase() {
+  const details = {};
+  let totalRestored = 0;
+
+  try {
+    // 1. Lire tous les documents Firestore
+    const docNames = [...new Set(Object.values(KEY_MAP).map(m => m.doc))];
+    const snapshots = {};
+    await Promise.all(docNames.map(async (docName) => {
+      try {
+        const s = await getDoc(DOCS[docName]);
+        snapshots[docName] = s.exists() ? s.data() : null;
+      } catch { snapshots[docName] = null; }
+    }));
+
+    // 2. Tenter aussi le document legacy app_data
+    let legacyData = null;
+    try {
+      const legacySnap = await getDoc(DOCS.app_data);
+      if (legacySnap.exists()) legacyData = legacySnap.data();
+    } catch { /* noop */ }
+
+    // 3. Pour chaque clé : merge Firebase → local
+    for (const [key, mapping] of Object.entries(KEY_MAP)) {
+      try {
+        const docSnap = snapshots[mapping.doc];
+        let remoteVal = docSnap?.[mapping.field] ?? null;
+
+        // Fallback legacy
+        if (remoteVal == null && legacyData) remoteVal = legacyData[key] ?? null;
+
+        if (remoteVal == null) continue;
+
+        const localRaw = localStorage.getItem("briblue_" + key);
+        const localVal = localRaw ? JSON.parse(localRaw) : null;
+
+        let finalVal;
+        if (Array.isArray(remoteVal)) {
+          const localArr  = Array.isArray(localVal) ? localVal : [];
+          const remoteArr = remoteVal;
+          // Merge : local prioritaire pour les conflits, Firebase ajoute les absents
+          finalVal = mergeArrayById(localArr, remoteArr);
+          const added = finalVal.length - localArr.length;
+          if (added > 0) {
+            details[key] = added;
+            totalRestored += added;
+          }
+        } else if (typeof remoteVal === "object" && remoteVal !== null) {
+          // Pour les objets : prendre Firebase si local est vide
+          finalVal = (localVal && Object.keys(localVal).length > 0) ? localVal : remoteVal;
+        } else {
+          finalVal = localVal ?? remoteVal;
+        }
+
+        localStorage.setItem("briblue_" + key, JSON.stringify(finalVal));
+        localStorage.setItem("briblue_meta_" + key, JSON.stringify({ savedAt: Date.now() }));
+      } catch { /* noop */ }
+    }
+  } catch (e) {
+    console.warn("[briblue] forceRestoreFromFirebase:", e?.message);
+  }
+
+  return { restored: totalRestored, details };
 }
 
 // ─── FLUSH ONLINE (reconnexion réseau) ──────────────────────────────────────
@@ -384,19 +456,30 @@ export async function save(key, val) {
   }
 
   // ── GARDE-FOU anti-perte de clients ────────────────────────────────────────
-  // Si une sauvegarde de bb_clients_v2 réduirait le nombre de clients de façon
-  // suspecte (≥ 2 clients en moins), on fusionne avec les données existantes
-  // plutôt que de remplacer. Protège contre les états React périmés.
   if (key === "bb_clients_v2" && Array.isArray(val)) {
     try {
       const existingRaw = localStorage.getItem("briblue_bb_clients_v2");
       if (existingRaw) {
         const existing = JSON.parse(existingRaw);
         if (Array.isArray(existing) && existing.length > val.length + 1) {
-          console.warn(`[briblue] GARDE-FOU clients : tentative de sauvegarder ${val.length} clients alors que ${existing.length} existent — fusion automatique.`);
-          // Fusionner : garder les clients existants absents du nouveau tableau
-          const merged = mergeArrayById(val, existing);
-          return save(key, merged); // relancer avec la version fusionnée
+          console.warn(`[briblue] GARDE-FOU clients : ${val.length} → ${existing.length} clients — fusion automatique.`);
+          return save(key, mergeArrayById(val, existing));
+        }
+      }
+    } catch { /* noop */ }
+  }
+
+  // ── GARDE-FOU anti-perte de passages ────────────────────────────────────────
+  // Même protection que les clients : si une sauvegarde supprimerait > 3 rapports
+  // d'un coup (état React périmé, rechargement partiel…), on fusionne.
+  if (key === "bb_passages_v2" && Array.isArray(val)) {
+    try {
+      const existingRaw = localStorage.getItem("briblue_bb_passages_v2");
+      if (existingRaw) {
+        const existing = JSON.parse(existingRaw);
+        if (Array.isArray(existing) && existing.length > val.length + 3) {
+          console.warn(`[briblue] GARDE-FOU passages : tentative de sauvegarder ${val.length} passages alors que ${existing.length} existent — fusion automatique.`);
+          return save(key, mergeArrayById(val, existing));
         }
       }
     } catch { /* noop */ }
