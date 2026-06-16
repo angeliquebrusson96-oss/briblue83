@@ -10,6 +10,52 @@ const FIREBASE_DEBOUNCE_MS = 800;
 const offlineQueue    = { pending: {} };
 const _debounceTimers = {};
 
+// ─── SAUVEGARDE IDB (backup critique — survit aux nettoyages iOS localStorage) ─
+// iOS peut purger le localStorage des PWAs après 7 jours sans visite.
+// IndexedDB n'est PAS affecté par cette purge → couche de protection supplémentaire.
+// Seules les clés MERGE_ARRAY_KEYS (passages, clients, rdvs, livraisons) sont
+// sauvegardées ici car ce sont les données les plus critiques.
+const _DATA_DB_NAME  = "briblue_data_v1";
+const _DATA_STORE    = "backup";
+let _dataDbPromise   = null;
+
+function _openDataDB() {
+  if (_dataDbPromise) return _dataDbPromise;
+  _dataDbPromise = new Promise((resolve, reject) => {
+    if (typeof indexedDB === "undefined") { reject(new Error("IDB absent")); return; }
+    const req = indexedDB.open(_DATA_DB_NAME, 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore(_DATA_STORE);
+    req.onsuccess  = e => resolve(e.target.result);
+    req.onerror    = e => { _dataDbPromise = null; reject(e.target.error); };
+  });
+  return _dataDbPromise;
+}
+
+async function _saveDataIDB(key, val) {
+  try {
+    const db = await _openDataDB();
+    await new Promise((res, rej) => {
+      const tx = db.transaction(_DATA_STORE, "readwrite");
+      tx.objectStore(_DATA_STORE).put({ val, savedAt: Date.now() }, key);
+      tx.oncomplete = res;
+      tx.onerror = e => rej(e.target.error);
+    });
+  } catch { /* IDB indisponible → dégradation silencieuse */ }
+}
+
+async function _loadDataIDB(key) {
+  try {
+    const db = await _openDataDB();
+    const result = await new Promise((res, rej) => {
+      const tx = db.transaction(_DATA_STORE, "readonly");
+      const req = tx.objectStore(_DATA_STORE).get(key);
+      req.onsuccess = () => res(req.result ?? null);
+      req.onerror   = e => rej(e.target.error);
+    });
+    return result; // { val, savedAt } ou null
+  } catch { return null; }
+}
+
 // ─── QUEUE PERSISTANTE ───────────────────────────────────────────────────────
 // Si l'app se ferme AVANT que Firebase reçoive les données (réseau coupé,
 // fermeture brutale), la queue est sauvée en localStorage et restaurée au
@@ -341,6 +387,23 @@ export async function reconcileOnBoot() {
       try { const ls = localStorage.getItem("briblue_" + key); if (ls) local = JSON.parse(ls); } catch {} // eslint-disable-line no-empty
       try { const m = localStorage.getItem("briblue_meta_" + key); if (m) localTime = JSON.parse(m).savedAt || 0; } catch {} // eslint-disable-line no-empty
 
+      // ── Fallback IDB si localStorage vide (purge iOS 7 jours) ──────────────
+      // iOS peut effacer le localStorage des PWAs après inactivité. L'IDB
+      // (IndexedDB) n'est pas affecté → on l'utilise comme couche de récupération.
+      if (local == null && MERGE_ARRAY_KEYS.has(key)) {
+        const idbEntry = await _loadDataIDB(key).catch(() => null);
+        if (idbEntry?.val) {
+          local     = idbEntry.val;
+          localTime = idbEntry.savedAt || 0;
+          // Restaurer aussi dans localStorage pour les lectures synchrones
+          try {
+            localStorage.setItem("briblue_" + key, JSON.stringify(local));
+            localStorage.setItem("briblue_meta_" + key, JSON.stringify({ savedAt: localTime }));
+          } catch {} // eslint-disable-line no-empty
+          console.info(`[briblue] ✅ Récupéré depuis IDB : "${key}" (${Array.isArray(local) ? local.length : "?"} entrées)`);
+        }
+      }
+
       if (local == null && remoteVal == null) continue;
 
       // Rien en local → prendre Firebase
@@ -489,6 +552,12 @@ export async function save(key, val) {
   // FIX #1 — si localStorage est plein, purge les vignettes photo et réessaie
   writeLS(key, serialized);
 
+  // 1b. Sauvegarde IDB en parallèle pour les clés critiques
+  // IDB survit aux purges iOS localStorage (contrairement au localStorage)
+  if (MERGE_ARRAY_KEYS.has(key)) {
+    _saveDataIDB(key, val).catch(() => {});
+  }
+
   // 2. Mettre dans la queue (protection si le réseau échoue)
   offlineQueue.pending[key] = val;
   _persistQueue(); // persister la queue → survit à la fermeture de l'app
@@ -634,6 +703,15 @@ if (typeof window !== "undefined") {
   } else {
     doReconcile();
   }
+
+  // Flush périodique toutes les 30 s : garantit que les données en attente
+  // arrivent dans Firebase même si aucun événement visibilitychange ne se déclenche
+  // (cas iOS où l'app reste en avant-plan très longtemps sans être fermée).
+  setInterval(() => {
+    if (navigator.onLine && Object.keys(offlineQueue.pending).length > 0) {
+      flushOfflineQueue();
+    }
+  }, 30_000);
 
   // Debug helpers
   window.briblue = window.briblue || {};
