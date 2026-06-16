@@ -65,4 +65,7 @@ export const REST_URLS = {
 export const APP_DOC = DOCS.app_data;
 export const FIRESTORE_REST_URL = _restBase + "app_data";
 
+// Bucket public pour construire les URLs Firebase Storage sans token (lecture publique)
+export const STORAGE_BUCKET = firebaseConfig.storageBucket;
+
 export default firebaseApp;

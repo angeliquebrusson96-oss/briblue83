@@ -722,7 +722,6 @@ export function subscribeToRealtime(callbacks) {
                   console.info(`[briblue] onSnapshot "${key}" : ${merged.length - val.length} entrée(s) locale(s) absente(s) de Firebase — fusion automatique.`);
                   val = merged;
                   patchedData[mapping.field] = merged;
-                  // Planifier un push pour que Firebase récupère les entrées manquantes
                   offlineQueue.pending[key] = merged;
                   needsPush = true;
                 }
