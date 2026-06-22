@@ -4,7 +4,7 @@ import { DS, Ico, MOIS, MOIS_L, RAPPORT_STATUS, PRODUITS_DEFAUT } from "../utils
 import { TODAY, getRapportStatus, isEntretienType, isControleType, getPH, getCL, getTemp, getResumePassage, normalizeRapportStatus, migrateMois, totalAnnuel, calcMensualites, uid } from "../utils/helpers";
 import { useIsMobile, Modal, BtnPrimary, Card, Section, FmField, FmSectionTitle, FmHeader, FmSteps, DraftBanner, PhotoPicker, SunBurstActions, SunBurstFormNav, RapportStatusPicker, Tag, Avatar, PhotoImg } from "./ui";
 import { toastWarn, toastSuccess, toastInfo, showConfirm } from "../styles";
-import { extractPassagePhotos, resolvePhoto } from "../lib/photoStore";
+import { extractPassagePhotos, resolvePhoto, migratePassagePhotosToStorage } from "../lib/photoStore";
 
 // ─── COMPRESSION PHOTO ───────────────────────────────────────────────────────
 // Réduit à max 1 000 px JPEG 0.65 → ~80-150 Ko pour la prévisualisation.
@@ -462,9 +462,28 @@ export async function ouvrirRapport(passage, client) {
 export async function envoyerEmail(passage, client, onSent) {
   if (!client?.email) { toastWarn("Aucun email renseigné pour ce client."); return; }
   const dateStr = new Date(passage.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"});
-  const resolved = await resolvePassageForHTML(passage);
+
+  // ── Étape 1 : Forcer l'upload des photos idb: vers Firebase Storage (timeout 30s)
+  // Cela garantit que les URLs seront des https:// publics, visibles sur tous les appareils.
+  let passageToSend = passage;
+  const hasIdbPhotos = ["photoArrivee","photoDepart",...(passage.photos||[]),...(passage.photosDepart||[])].some(v=>v?.startsWith("idb:"));
+  if (hasIdbPhotos && navigator.onLine) {
+    try {
+      const migrated = await Promise.race([
+        migratePassagePhotosToStorage(passage),
+        new Promise(resolve => setTimeout(() => resolve(null), 30_000)),
+      ]);
+      if (migrated) passageToSend = migrated;
+    } catch { /* migration échouée → on continue avec les photos locales */ }
+  }
+
+  // ── Étape 2 : Résoudre les photos restantes (idb: → data: depuis IDB local)
+  const resolved = await resolvePassageForHTML(passageToSend);
   const htmlRapport = genererHTMLRapport(resolved, client);
-  const htmlEmail = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#f0f4f8;font-family:Arial,Helvetica,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;margin:0 auto;"><tr><td style="background:#0c1222;padding:20px 28px;border-radius:10px 10px 0 0;"><span style="font-size:20px;font-weight:bold;color:#ffffff;letter-spacing:2px;">BRI BLUE</span></td></tr><tr><td style="background:#ffffff;padding:28px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;"><p style="font-size:15px;color:#1e293b;margin:0 0 12px;">Bonjour <strong>${client?.nom||""}</strong>,</p><p style="font-size:14px;color:#475569;margin:0 0 20px;line-height:1.6;">Votre rapport d'entretien piscine du <strong>${dateStr}</strong> est disponible.</p></td></tr><tr><td style="background:#f8fafc;padding:16px 28px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px;"><p style="margin:0;font-size:12px;color:#64748b;"><strong>Dorian Briaire</strong><br/>Technicien de Piscine — BRI BLUE</p></td></tr></table></body></html>`;
+
+  // ── Étape 3 : Envoyer le rapport HTML dans le CORPS du mail (pas en pièce jointe)
+  // Les pièces jointes .html sont bloquées par Gmail/Android/Outlook pour des raisons de sécurité.
+  // Les URLs https:// Firebase Storage sont publiques et s'affichent sur tous les appareils.
   try {
     const res = await fetch("/api/send-email", {
       method: "POST",
@@ -472,14 +491,10 @@ export async function envoyerEmail(passage, client, onSent) {
       body: JSON.stringify({
         from: `BRIBLUE <rapport-piscine@briblue83.com>`,
         to: [client.email],
-        bcc: ["briblue83@hotmail.com"], // FIX #6 — copie systématique
+        bcc: ["briblue83@hotmail.com"],
         subject: `Rapport entretien piscine — ${dateStr}`,
-        html: htmlEmail,
+        html: htmlRapport,
         text: `Bonjour ${client?.nom||""},\n\nVotre rapport d'entretien piscine du ${dateStr} est disponible.\n\nCordialement,\nDorian Briaire`,
-        attachments: [{
-          filename: `Rapport_BRIBLUE_${(client?.nom||"client").replace(/\s/g,"_")}_${passage.date}.html`,
-          content: btoa(unescape(encodeURIComponent(htmlRapport))),
-        }],
       }),
     });
     const data = await res.json();

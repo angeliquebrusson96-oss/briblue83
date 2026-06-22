@@ -193,6 +193,9 @@ function CarteClients({ clients, onClientClick, passages = [] }) {
   const [located, setLocated] = useState(0);
   const [panel,   setPanel]   = useState(null);
   const [filter,  setFilter]  = useState("tous");
+  const [expanded, setExpanded] = useState(false); // mode plein écran mobile
+  const [locating, setLocating] = useState(false); // GPS en cours
+  const isMobile = useIsMobile();
 
   const clientsWithAddr = clients.filter(c => c.adresse?.trim());
   const todayStr = new Date().toISOString().split("T")[0];
@@ -207,6 +210,21 @@ function CarteClients({ clients, onClientClick, passages = [] }) {
     } else {
       mapInstance.current.fitBounds(boundsRef.current, { padding:[40,40], maxZoom:14 });
     }
+  };
+
+  // Localiser ma position GPS
+  const locaterMoi = () => {
+    if (!mapInstance.current || !navigator.geolocation) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocating(false);
+        const { latitude: lat, longitude: lng } = pos.coords;
+        mapInstance.current.setView([lat, lng], 14);
+      },
+      () => setLocating(false),
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
   };
 
   useEffect(() => {
@@ -241,12 +259,18 @@ function CarteClients({ clients, onClientClick, passages = [] }) {
           if (!document.getElementById("bb-map-css")) {
             const s = document.createElement("style");
             s.id = "bb-map-css";
+            const mobile = window.innerWidth < 768;
+            const zoomSize = mobile ? 44 : 28; // 44px = taille min recommandée pour touch
+            const zoomFontSize = mobile ? 18 : 14;
             s.textContent = [
               `.leaflet-tooltip.bb-tip{background:transparent!important;border:none!important;box-shadow:none!important;padding:0!important}`,
               `.leaflet-tooltip.bb-tip::before{display:none!important}`,
-              `.leaflet-control-zoom a{font-size:14px!important;line-height:28px!important;width:28px!important;height:28px!important;border-radius:8px!important;box-shadow:0 2px 8px rgba(0,0,0,0.12)!important}`,
-              `.leaflet-control-zoom{border:none!important;box-shadow:none!important}`,
+              `.leaflet-control-zoom a{font-size:${zoomFontSize}px!important;line-height:${zoomSize}px!important;width:${zoomSize}px!important;height:${zoomSize}px!important;border-radius:${mobile?12:8}px!important;box-shadow:0 2px 8px rgba(0,0,0,0.18)!important;font-weight:bold!important}`,
+              `.leaflet-control-zoom{border:none!important;box-shadow:none!important;gap:${mobile?4:2}px!important;display:flex!important;flex-direction:column!important}`,
+              `.leaflet-control-zoom-in,.leaflet-control-zoom-out{display:flex!important;align-items:center!important;justify-content:center!important}`,
+              `.leaflet-control-attribution{display:none!important}`, // masque l'attribution sur mobile
               `@keyframes bb-ping{0%{transform:scale(1);opacity:1}80%{transform:scale(2.2);opacity:0}100%{transform:scale(2.2);opacity:0}}`,
+              `@keyframes bb-spin{to{transform:rotate(360deg)}}`,
             ].join("");
             document.head.appendChild(s);
           }
@@ -340,10 +364,15 @@ function CarteClients({ clients, onClientClick, passages = [] }) {
             </div>`;
 
           const clientSnapshot = { client, photoUrl, color, initials };
+          // Sur mobile : clic = panel directement (pas de tooltip hover)
+          // Sur desktop : tooltip au survol + clic = panel
+          const isTouchDevice = window.innerWidth < 768;
           const marker = L.marker([pos.lat, pos.lon], { icon })
             .addTo(mapInstance.current)
-            .bindTooltip(tooltipHtml, { permanent:false, direction:"top", className:"bb-tip", offset:[0,-62], opacity:1 })
-            .on("click", () => setPanel(clientSnapshot));
+            .on("click", () => { setPanel(clientSnapshot); });
+          if (!isTouchDevice) {
+            marker.bindTooltip(tooltipHtml, { permanent:false, direction:"top", className:"bb-tip", offset:[0,-62], opacity:1 });
+          }
 
           markers.current.push(marker);
           markersDataRef.current.push({ marker, clientId: client.id, formule: client.formule || "", isToday, latlng: [pos.lat, pos.lon] });
@@ -393,6 +422,20 @@ function CarteClients({ clients, onClientClick, passages = [] }) {
     }
   }, [filter, status]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Quand la carte change de taille (plein écran), Leaflet doit recalculer ses dimensions
+  useEffect(() => {
+    if (!mapInstance.current) return;
+    const timer = setTimeout(() => {
+      mapInstance.current?.invalidateSize();
+      if (boundsRef.current.length > 1) {
+        mapInstance.current?.fitBounds(boundsRef.current, { padding:[40,40], maxZoom:14 });
+      } else if (boundsRef.current.length === 1) {
+        mapInstance.current?.setView(boundsRef.current[0], 14);
+      }
+    }, 280); // après la transition CSS
+    return () => clearTimeout(timer);
+  }, [expanded]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     return () => {
       if (mapInstance.current) { mapInstance.current.remove(); mapInstance.current = null; }
@@ -402,11 +445,41 @@ function CarteClients({ clients, onClientClick, passages = [] }) {
   const clientsSansAdresse = clients.filter(c => !c.adresse?.trim());
   const pct = clientsWithAddr.length > 0 ? Math.round(located / clientsWithAddr.length * 100) : 0;
 
-  return (
-    <div className="db-s6" style={{borderRadius:18,overflow:"hidden",border:"1px solid #e2e8f0",boxShadow:"0 2px 16px rgba(0,0,0,0.07)",background:"#fff",marginBottom:14,position:"relative"}}>
+  // Hauteur de la carte : plein écran mobile si expanded, sinon adaptative
+  const mapHeight = expanded
+    ? (isMobile ? "calc(100vh - 120px)" : 500)
+    : (isMobile ? "calc(55vw + 60px)" : 380);
 
-      {/* ── Header enrichi ── */}
-      <div style={{padding:"11px 14px 10px",background:"linear-gradient(135deg,#f0f9ff 0%,#fff 100%)",borderBottom:"1px solid #f1f5f9"}}>
+  const btnStyle = (active) => ({
+    width: isMobile ? 40 : 32,
+    height: isMobile ? 40 : 32,
+    borderRadius: isMobile ? 12 : 8,
+    border: "1px solid #e2e8f0",
+    background: active ? "#0891b2" : "#fff",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+    WebkitTapHighlightColor: "transparent",
+    flexShrink: 0,
+  });
+
+  return (
+    <div className="db-s6" style={{
+      borderRadius: expanded ? 0 : 18,
+      overflow: "hidden",
+      border: expanded ? "none" : "1px solid #e2e8f0",
+      boxShadow: expanded ? "none" : "0 2px 16px rgba(0,0,0,0.07)",
+      background: "#fff",
+      marginBottom: 14,
+      position: expanded && isMobile ? "fixed" : "relative",
+      inset: expanded && isMobile ? 0 : "auto",
+      zIndex: expanded && isMobile ? 9000 : "auto",
+    }}>
+
+      {/* ── Header ── */}
+      <div style={{padding: isMobile ? "10px 12px 8px" : "11px 14px 10px", background:"linear-gradient(135deg,#f0f9ff 0%,#fff 100%)",borderBottom:"1px solid #f1f5f9"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:status==="loading"?6:0}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <div style={{width:30,height:30,borderRadius:9,background:"linear-gradient(135deg,#0891b2,#0284c7)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 8px rgba(8,145,178,0.3)"}}>
@@ -424,24 +497,41 @@ function CarteClients({ clients, onClientClick, passages = [] }) {
             </div>
           </div>
 
-          <div style={{display:"flex",gap:5,alignItems:"center"}}>
-            {/* Badge aujourd'hui */}
-            {clientsToday.size > 0 && (
+          <div style={{display:"flex",gap:isMobile?6:5,alignItems:"center"}}>
+            {/* Badge aujourd'hui — masqué en mode expanded */}
+            {clientsToday.size > 0 && !expanded && (
               <span style={{fontSize:9,fontWeight:700,color:"#16a34a",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:20,padding:"2px 8px"}}>
                 ✓ {clientsToday.size} auj.
               </span>
             )}
             {/* Badge sans adresse */}
-            {clientsSansAdresse.length > 0 && (
+            {clientsSansAdresse.length > 0 && !expanded && (
               <span style={{fontSize:9,fontWeight:700,color:"#d97706",background:"#fffbeb",border:"1px solid #fde68a",borderRadius:20,padding:"2px 8px"}}>
                 ⚠ {clientsSansAdresse.length}
               </span>
             )}
+            {/* Me localiser (GPS) — mobile seulement */}
+            {isMobile && status==="ready" && navigator.geolocation && (
+              <button onClick={locaterMoi} title="Me localiser" style={btnStyle(locating)}>
+                {locating
+                  ? <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" style={{animation:"bb-spin .7s linear infinite"}}><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
+                  : <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={locating?"#fff":"#0891b2"} strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7" strokeDasharray="2 2"/></svg>
+                }
+              </button>
+            )}
             {/* Recentrer */}
             {status==="ready" && located > 0 && (
-              <button onClick={recentrer} title="Recentrer la carte"
-                style={{width:28,height:28,borderRadius:8,border:"1px solid #e2e8f0",background:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",WebkitTapHighlightColor:"transparent"}}>
-                <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+              <button onClick={recentrer} title="Recentrer la carte" style={btnStyle(false)}>
+                <svg width={isMobile?15:13} height={isMobile?15:13} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.2" strokeLinecap="round"><path d="M3 12l4-4m0 0l4-4m-4 4h14M21 12l-4 4m0 0l-4 4m4-4H7"/></svg>
+              </button>
+            )}
+            {/* Plein écran (mobile seulement) */}
+            {isMobile && (
+              <button onClick={() => { setExpanded(e => !e); setTimeout(()=>{ if(mapInstance.current) mapInstance.current.invalidateSize(); },100); }} title={expanded?"Réduire":"Plein écran"} style={btnStyle(expanded)}>
+                {expanded
+                  ? <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={expanded?"#fff":"#0891b2"} strokeWidth="2.2" strokeLinecap="round"><path d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3"/></svg>
+                  : <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.2" strokeLinecap="round"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>
+                }
               </button>
             )}
           </div>
@@ -463,19 +553,21 @@ function CarteClients({ clients, onClientClick, passages = [] }) {
             ...formules.map(f => ({ key:f, label:f, color:formuleColor(f) })),
           ];
           return (
-            <div style={{display:"flex",gap:5,flexWrap:"nowrap",overflowX:"auto",scrollbarWidth:"none",paddingTop:8,paddingBottom:2,marginTop:4}}>
+            <div style={{display:"flex",gap:5,flexWrap:"nowrap",overflowX:"auto",scrollbarWidth:"none",paddingTop:8,paddingBottom:2,marginTop:4,WebkitOverflowScrolling:"touch"}}>
               {chips.map(({ key, label, color }) => {
                 const active = filter === key;
                 return (
                   <button key={key} onClick={() => setFilter(key)}
                     style={{
                       flexShrink:0,
-                      padding:"3px 10px",
+                      padding: isMobile ? "5px 12px" : "3px 10px",
+                      minHeight: isMobile ? 32 : "auto",
                       borderRadius:20,
                       border:`1.5px solid ${active ? color : "#e2e8f0"}`,
                       background:active ? color : "#fff",
                       color:active ? "#fff" : "#64748b",
-                      fontSize:10, fontWeight:active ? 700 : 500,
+                      fontSize: isMobile ? 11 : 10,
+                      fontWeight:active ? 700 : 500,
                       cursor:"pointer", fontFamily:"inherit",
                       transition:"all .12s",
                       WebkitTapHighlightColor:"transparent",
@@ -489,63 +581,83 @@ function CarteClients({ clients, onClientClick, passages = [] }) {
         })()}
       </div>
 
-      {/* Carte Leaflet — plus haute */}
-      <div ref={mapRef} style={{height:380,width:"100%",background:"#f0f4f8"}}/>
+      {/* ── Carte Leaflet ── hauteur adaptative */}
+      <div ref={mapRef} style={{height: mapHeight, width:"100%", background:"#f0f4f8", transition:"height .25s ease", minHeight: isMobile ? 240 : 300}}/>
 
-      {/* ── PANEL CLIENT compact ── */}
+      {/* ── PANEL CLIENT amélioré ── */}
       {panel && (
         <div style={{
           position:"absolute", bottom:0, left:0, right:0, zIndex:2000,
           background:"#fff",
-          borderRadius:"14px 14px 0 0",
-          boxShadow:"0 -4px 20px rgba(0,0,0,0.15)",
+          borderRadius:"18px 18px 0 0",
+          boxShadow:"0 -6px 28px rgba(0,0,0,0.18)",
           animation:"fadeIn .15s ease",
-          padding:"8px 12px 12px",
+          padding: isMobile ? "8px 14px 20px" : "8px 12px 12px",
         }}>
-          {/* Poignée fine */}
-          <div style={{display:"flex",justifyContent:"center",marginBottom:8}}>
-            <div style={{width:28,height:3,borderRadius:2,background:"#e2e8f0"}}/>
+          {/* Poignée */}
+          <div style={{display:"flex",justifyContent:"center",marginBottom:10}}>
+            <div style={{width:36,height:4,borderRadius:2,background:"#e2e8f0"}}/>
           </div>
 
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
-            {/* Avatar compact */}
-            <div style={{width:40,height:40,borderRadius:10,overflow:"hidden",flexShrink:0,
-              background:panel.color,
-              display:"flex",alignItems:"center",justifyContent:"center"}}>
-              {panel.photoUrl
-                ? <img src={panel.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                : <span style={{color:"#fff",fontWeight:900,fontSize:15}}>{panel.initials}</span>
-              }
+          {/* Photo piscine en bannière si disponible */}
+          {panel.photoUrl && isMobile && (
+            <div style={{height:90,borderRadius:12,overflow:"hidden",marginBottom:10,border:"1px solid #f1f5f9"}}>
+              <img src={panel.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
             </div>
+          )}
 
-            {/* Nom + formule sur une ligne */}
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            {/* Avatar */}
+            {!panel.photoUrl && (
+              <div style={{width: isMobile?44:40, height: isMobile?44:40, borderRadius:12, overflow:"hidden", flexShrink:0,
+                background:panel.color, display:"flex", alignItems:"center", justifyContent:"center"}}>
+                <span style={{color:"#fff",fontWeight:900,fontSize: isMobile?17:15}}>{panel.initials}</span>
+              </div>
+            )}
+            {panel.photoUrl && !isMobile && (
+              <div style={{width:40,height:40,borderRadius:10,overflow:"hidden",flexShrink:0}}>
+                <img src={panel.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+              </div>
+            )}
+
+            {/* Nom + formule + adresse */}
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:13,fontWeight:800,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+              <div style={{fontSize: isMobile?15:13, fontWeight:800, color:"#0f172a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
                 {panel.client.nom}
               </div>
-              {panel.client.formule && (
-                <div style={{fontSize:10,color:"#0891b2",fontWeight:600}}>{panel.client.formule}</div>
-              )}
+              <div style={{display:"flex",alignItems:"center",gap:5,marginTop:2,flexWrap:"wrap"}}>
+                {panel.client.formule && (
+                  <span style={{fontSize:10,color:panel.color,fontWeight:700,background:panel.color+"18",padding:"1px 7px",borderRadius:20}}>
+                    {panel.client.formule}
+                  </span>
+                )}
+                {panel.client.adresse && (
+                  <span style={{fontSize:9.5,color:"#94a3b8",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:160}}>
+                    📍 {panel.client.adresse.split(",")[0]}
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Bouton ouvrir */}
-            <button onClick={() => { onClientClick(panel.client); setPanel(null); }}
+            <button onClick={() => { onClientClick(panel.client); setPanel(null); setExpanded(false); }}
               style={{
-                padding:"7px 14px",
+                padding: isMobile ? "10px 18px" : "7px 14px",
                 background:"linear-gradient(135deg,#0891b2,#0e7490)",
-                color:"#fff",border:"none",borderRadius:20,
-                fontSize:11,fontWeight:700,cursor:"pointer",
-                fontFamily:"inherit",flexShrink:0,
+                color:"#fff", border:"none", borderRadius:22,
+                fontSize: isMobile ? 13 : 11, fontWeight:700, cursor:"pointer",
+                fontFamily:"inherit", flexShrink:0,
                 WebkitTapHighlightColor:"transparent",
+                boxShadow:"0 3px 12px rgba(8,145,178,0.35)",
               }}>
-              Ouvrir
+              Ouvrir →
             </button>
 
             {/* Fermer */}
             <button onClick={() => setPanel(null)}
-              style={{width:24,height:24,borderRadius:12,background:"#f1f5f9",border:"none",
-                cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round">
+              style={{width: isMobile?36:24, height: isMobile?36:24, borderRadius:isMobile?12:12, background:"#f1f5f9", border:"none",
+                cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0}}>
+              <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round">
                 <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
               </svg>
             </button>
@@ -553,14 +665,14 @@ function CarteClients({ clients, onClientClick, passages = [] }) {
         </div>
       )}
 
-      {/* Overlay sombre derrière le panel (clic pour fermer) */}
+      {/* Overlay clic pour fermer panel */}
       {panel && (
         <div onClick={() => setPanel(null)}
-          style={{position:"absolute",inset:0,zIndex:1999,background:"rgba(0,0,0,0.12)"}}/>
+          style={{position:"absolute",inset:0,zIndex:1999,background:"rgba(0,0,0,0.15)"}}/>
       )}
 
       {/* Clients sans adresse */}
-      {clientsSansAdresse.length > 0 && !panel && (
+      {clientsSansAdresse.length > 0 && !panel && !expanded && (
         <div style={{padding:"7px 12px",background:"#fffbeb",borderTop:"1px solid #fde68a",display:"flex",alignItems:"center",gap:6}}>
           <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#b45309" strokeWidth="2.5" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/></svg>
           <span style={{fontSize:10,color:"#92400e",fontWeight:600}}>
