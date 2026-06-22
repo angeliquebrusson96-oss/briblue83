@@ -140,26 +140,40 @@ async function geocodeAddress(address) {
   return null;
 }
 
+// Charge Leaflet + MarkerCluster dans le bon ordre
 function loadLeaflet() {
   return new Promise((resolve, reject) => {
-    if (window.L) { resolve(window.L); return; }
-    if (!document.getElementById("leaflet-css")) {
-      const link = document.createElement("link");
-      link.id = "leaflet-css"; link.rel = "stylesheet";
-      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-      document.head.appendChild(link);
-    }
-    if (document.getElementById("leaflet-js")) {
-      // Script en cours de chargement
-      document.getElementById("leaflet-js").addEventListener("load", () => resolve(window.L));
-      return;
-    }
-    const script = document.createElement("script");
-    script.id = "leaflet-js";
-    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-    script.onload = () => resolve(window.L);
-    script.onerror = reject;
-    document.head.appendChild(script);
+    const injectCss = (id, href) => {
+      if (!document.getElementById(id)) {
+        const l = document.createElement("link");
+        l.id = id; l.rel = "stylesheet"; l.href = href;
+        document.head.appendChild(l);
+      }
+    };
+    const injectScript = (id, src) => new Promise((res, rej) => {
+      if (document.getElementById(id)) {
+        // déjà en cours ou chargé
+        if (id === "leaflet-js" && window.L) { res(); return; }
+        document.getElementById(id).addEventListener("load", res);
+        document.getElementById(id).addEventListener("error", rej);
+        return;
+      }
+      const s = document.createElement("script");
+      s.id = id; s.src = src;
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+
+    injectCss("leaflet-css",    "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css");
+    injectCss("mc-css",         "https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css");
+    injectCss("mc-default-css", "https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css");
+
+    if (window.L?.MarkerClusterGroup) { resolve(window.L); return; }
+
+    injectScript("leaflet-js", "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js")
+      .then(() => injectScript("mc-js", "https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"))
+      .then(() => resolve(window.L))
+      .catch(reject);
   });
 }
 
@@ -183,50 +197,94 @@ function formuleColor(formule) {
 }
 
 function CarteClients({ clients, onClientClick, passages = [] }) {
-  const mapRef         = useRef(null);
-  const mapInstance    = useRef(null);
-  const markers        = useRef([]);
-  const boundsRef      = useRef([]);
-  const markersDataRef = useRef([]); // { marker, clientId, formule, isToday, latlng }
-  const panelSnaps     = useRef({});  // { [clientId]: snapshot }
-  const [status,  setStatus]  = useState("init");
-  const [located, setLocated] = useState(0);
-  const [panel,   setPanel]   = useState(null);
-  const [filter,  setFilter]  = useState("tous");
-  const [expanded, setExpanded] = useState(false); // mode plein écran mobile
+  const mapRef          = useRef(null);
+  const mapInstance     = useRef(null);
+  const clusterGroup    = useRef(null);   // L.markerClusterGroup
+  const markersDataRef  = useRef([]);     // { marker, clientId, formule, isToday, latlng, nom }
+  const boundsRef       = useRef([]);
+  const panelSnaps      = useRef({});
+  const gpsMarkerRef    = useRef(null);   // point bleu GPS
+  const panelRef        = useRef(null);   // ref pour le swipe
+  const touchStartY     = useRef(null);
+  const [status,   setStatus]   = useState("init");
+  const [located,  setLocated]  = useState(0);
+  const [panel,    setPanel]    = useState(null);
+  const [filter,   setFilter]   = useState("tous");
+  const [search,   setSearch]   = useState("");    // barre de recherche
+  const [expanded, setExpanded] = useState(false); // mode plein écran
   const [locating, setLocating] = useState(false); // GPS en cours
+  const [panelDy,  setPanelDy]  = useState(0);     // offset swipe panel
   const isMobile = useIsMobile();
 
   const clientsWithAddr = clients.filter(c => c.adresse?.trim());
   const todayStr = new Date().toISOString().split("T")[0];
-  // Clients ayant un passage prévu aujourd'hui
   const clientsToday = new Set((passages||[]).filter(p => p.date === todayStr).map(p => p.clientId));
 
-  // Recentrer sur tous les marqueurs
+  // ── Recentrer sur tous les marqueurs visibles ─────────────────────────────
   const recentrer = () => {
     if (!mapInstance.current || !boundsRef.current.length) return;
     if (boundsRef.current.length === 1) {
-      mapInstance.current.setView(boundsRef.current[0], 14);
+      mapInstance.current.flyTo(boundsRef.current[0], 15, { duration: 0.8 });
     } else {
-      mapInstance.current.fitBounds(boundsRef.current, { padding:[40,40], maxZoom:14 });
+      mapInstance.current.flyToBounds(boundsRef.current, { padding:[48,48], maxZoom:14, duration:0.8 });
     }
   };
 
-  // Localiser ma position GPS
+  // ── Localiser ma position GPS — point bleu pulsant ────────────────────────
   const locaterMoi = () => {
     if (!mapInstance.current || !navigator.geolocation) return;
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setLocating(false);
-        const { latitude: lat, longitude: lng } = pos.coords;
-        mapInstance.current.setView([lat, lng], 14);
+        const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+        const L = window.L;
+        // Supprimer l'ancien point GPS
+        if (gpsMarkerRef.current) { gpsMarkerRef.current.remove(); gpsMarkerRef.current = null; }
+        // Cercle de précision
+        L.circle([lat, lng], { radius: Math.min(accuracy, 200), color:"#4285f4", fillColor:"#4285f4", fillOpacity:0.08, weight:1 }).addTo(mapInstance.current);
+        // Point bleu pulsant style Google Maps
+        const gpsDot = L.divIcon({
+          className: "",
+          html: `<div style="position:relative;width:24px;height:24px;">
+            <div style="position:absolute;inset:0;border-radius:50%;background:rgba(66,133,244,0.25);animation:gps-ring 1.8s ease-out infinite;"></div>
+            <div style="position:absolute;inset:4px;border-radius:50%;background:#4285f4;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(66,133,244,0.5);"></div>
+          </div>`,
+          iconSize: [24, 24],
+          iconAnchor: [12, 12],
+        });
+        gpsMarkerRef.current = L.marker([lat, lng], { icon: gpsDot, zIndexOffset: 9999 }).addTo(mapInstance.current);
+        mapInstance.current.flyTo([lat, lng], 15, { duration: 1 });
       },
       () => setLocating(false),
-      { enableHighAccuracy: true, timeout: 8000 }
+      { enableHighAccuracy: true, timeout: 10000 }
     );
   };
 
+  // ── Ouvrir Maps/Waze pour naviguer vers le client ─────────────────────────
+  const naviguerVers = (adresse) => {
+    const enc = encodeURIComponent(adresse);
+    // iOS → Apple Maps, Android → Google Maps
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const url = isIOS
+      ? `maps://maps.apple.com/?daddr=${enc}`
+      : `https://www.google.com/maps/dir/?api=1&destination=${enc}`;
+    window.open(url, "_blank");
+  };
+
+  // ── Swipe vers le bas pour fermer le panel ────────────────────────────────
+  const onTouchStart = (e) => { touchStartY.current = e.touches[0].clientY; };
+  const onTouchMove  = (e) => {
+    if (touchStartY.current === null) return;
+    const dy = e.touches[0].clientY - touchStartY.current;
+    if (dy > 0) setPanelDy(dy);
+  };
+  const onTouchEnd   = () => {
+    if (panelDy > 70) { setPanel(null); }
+    setPanelDy(0); touchStartY.current = null;
+  };
+
+  // ── Initialisation carte + géocodage ──────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
 
@@ -241,46 +299,79 @@ function CarteClients({ clients, onClientClick, passages = [] }) {
           mapInstance.current = L.map(mapRef.current, {
             center: [43.12, 5.93],
             zoom: 11,
-            zoomControl: false, // repositionné en bas à droite
+            zoomControl: false,
+            zoomAnimation: true,
+            markerZoomAnimation: true,
           });
 
-          // Tuiles CartoDB Positron — propres, modernes, lisibles
-          L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-            attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com">CARTO</a>',
-            maxZoom: 19,
-            subdomains: "abcd",
+          // Tuiles Stadia Alidade Smooth — plus proches de Google Maps visuellement
+          L.tileLayer("https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png", {
+            maxZoom: 20,
+            attribution: "",
           }).addTo(mapInstance.current);
 
-          // Contrôles repositionnés
+          // Contrôles zoom — repositionnés bas droite, grands sur mobile
           L.control.zoom({ position: "bottomright" }).addTo(mapInstance.current);
-          L.control.scale({ imperial: false, position: "bottomleft", maxWidth: 80 }).addTo(mapInstance.current);
 
-          // CSS tooltip + styles carte
+          // Injection CSS globale
           if (!document.getElementById("bb-map-css")) {
             const s = document.createElement("style");
             s.id = "bb-map-css";
-            const mobile = window.innerWidth < 768;
-            const zoomSize = mobile ? 44 : 28; // 44px = taille min recommandée pour touch
-            const zoomFontSize = mobile ? 18 : 14;
-            s.textContent = [
-              `.leaflet-tooltip.bb-tip{background:transparent!important;border:none!important;box-shadow:none!important;padding:0!important}`,
-              `.leaflet-tooltip.bb-tip::before{display:none!important}`,
-              `.leaflet-control-zoom a{font-size:${zoomFontSize}px!important;line-height:${zoomSize}px!important;width:${zoomSize}px!important;height:${zoomSize}px!important;border-radius:${mobile?12:8}px!important;box-shadow:0 2px 8px rgba(0,0,0,0.18)!important;font-weight:bold!important}`,
-              `.leaflet-control-zoom{border:none!important;box-shadow:none!important;gap:${mobile?4:2}px!important;display:flex!important;flex-direction:column!important}`,
-              `.leaflet-control-zoom-in,.leaflet-control-zoom-out{display:flex!important;align-items:center!important;justify-content:center!important}`,
-              `.leaflet-control-attribution{display:none!important}`, // masque l'attribution sur mobile
-              `@keyframes bb-ping{0%{transform:scale(1);opacity:1}80%{transform:scale(2.2);opacity:0}100%{transform:scale(2.2);opacity:0}}`,
-              `@keyframes bb-spin{to{transform:rotate(360deg)}}`,
-            ].join("");
+            const mob = window.innerWidth < 768;
+            const zSz = mob ? 46 : 30;
+            s.textContent = `
+              .leaflet-tooltip.bb-tip{background:transparent!important;border:none!important;box-shadow:none!important;padding:0!important}
+              .leaflet-tooltip.bb-tip::before{display:none!important}
+              .leaflet-control-zoom a{font-size:${mob?20:15}px!important;line-height:${zSz}px!important;width:${zSz}px!important;height:${zSz}px!important;border-radius:${mob?14:9}px!important;box-shadow:0 2px 10px rgba(0,0,0,0.18)!important;font-weight:700!important;background:#fff!important;color:#374151!important;border:none!important}
+              .leaflet-control-zoom{box-shadow:none!important;border:none!important;gap:${mob?5:3}px!important;display:flex!important;flex-direction:column!important}
+              .leaflet-control-attribution{display:none!important}
+              .marker-cluster{background:transparent!important;border:none!important}
+              .marker-cluster div{background:transparent!important}
+              @keyframes bb-spin{to{transform:rotate(360deg)}}
+              @keyframes gps-ring{0%{transform:scale(.5);opacity:.8}100%{transform:scale(2.5);opacity:0}}
+              @keyframes bb-bounce{0%,100%{transform:translateY(0)}30%{transform:translateY(-8px)}60%{transform:translateY(-3px)}}
+              @keyframes bb-fadein{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+            `;
             document.head.appendChild(s);
           }
         }
 
-        markers.current.forEach(m => m.remove());
-        markers.current = [];
+        // Supprimer l'ancien cluster group
+        if (clusterGroup.current) {
+          clusterGroup.current.remove();
+          clusterGroup.current = null;
+        }
         markersDataRef.current = [];
         boundsRef.current = [];
         let count = 0;
+
+        // Créer le cluster group avec des icônes custom style Google Maps
+        const cg = window.L.markerClusterGroup({
+          showCoverageOnHover: false,
+          maxClusterRadius: 60,
+          spiderfyOnMaxZoom: true,
+          animate: true,
+          animateAddingMarkers: true,
+          iconCreateFunction: (cluster) => {
+            const n = cluster.getChildCount();
+            const size = n < 5 ? 38 : n < 20 ? 46 : 54;
+            const bg   = n < 5 ? "#0891b2" : n < 20 ? "#d97706" : "#dc2626";
+            return window.L.divIcon({
+              html: `<div style="
+                width:${size}px;height:${size}px;border-radius:50%;
+                background:${bg};color:#fff;
+                display:flex;align-items:center;justify-content:center;
+                font-size:${n<10?14:12}px;font-weight:900;font-family:Inter,system-ui,sans-serif;
+                box-shadow:0 4px 14px ${bg}66;
+                border:3px solid rgba(255,255,255,0.85);
+              ">${n}</div>`,
+              className: "",
+              iconSize: [size, size],
+              iconAnchor: [size/2, size/2],
+            });
+          },
+        });
+        clusterGroup.current = cg;
 
         for (const client of clientsWithAddr) {
           if (cancelled) break;
@@ -289,9 +380,7 @@ function CarteClients({ clients, onClientClick, passages = [] }) {
 
           const initials = (client.nom||"?").replace(/^(M\.|Mme|Mlle)\s*/i,"").trim()
             .split(/\s+/).map(w=>w[0]).join("").slice(0,2).toUpperCase();
-
-          // Couleur selon formule (pas selon initiale)
-          const color = formuleColor(client.formule) || avatarColor(client.nom);
+          const color   = formuleColor(client.formule) || avatarColor(client.nom);
           const isToday = clientsToday.has(client.id);
 
           let photoUrl = null;
@@ -301,96 +390,86 @@ function CarteClients({ clients, onClientClick, passages = [] }) {
 
           const shortName = (
             client.nomFamille ||
-            (client.nom || "?").replace(/^(M\.|Mme|Mlle)\s*/i, "").trim().split(/\s+/)[0] ||
-            "?"
+            (client.nom||"?").replace(/^(M\.|Mme|Mlle)\s*/i,"").trim().split(/\s+/)[0] ||"?"
           ).slice(0, 12).toUpperCase();
 
-          // ── Marqueur : pin avec photo + nom + badge "aujourd'hui" ──
+          // Marqueur : bulle avec photo/initiales + nom + badge aujourd'hui
           const circleInner = photoUrl
-            ? `<img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:50%;"/>`
+            ? `<img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>`
             : `<span style="color:#fff;font-weight:900;font-size:13px;font-family:Inter,system-ui,sans-serif;">${initials}</span>`;
 
+          const todayRing = isToday
+            ? `position:absolute;inset:-3px;border-radius:50%;border:2.5px solid #22c55e;animation:bb-ping 1.8s ease-out infinite;`
+            : "";
           const todayBadge = isToday
-            ? `<div style="position:absolute;top:-3px;right:-3px;width:12px;height:12px;border-radius:50%;background:#22c55e;border:2px solid #fff;box-shadow:0 0 0 2px rgba(34,197,94,0.4)"></div>`
+            ? `<div style="position:absolute;top:-2px;right:-2px;width:11px;height:11px;border-radius:50%;background:#22c55e;border:2px solid #fff;"></div>`
             : "";
 
           const iconHtml = `
-            <div style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;user-select:none;">
-              <div style="
-                background:${color};color:#fff;
-                font-size:8.5px;font-weight:800;letter-spacing:.5px;
-                padding:2px 8px;border-radius:20px;
-                white-space:nowrap;max-width:96px;overflow:hidden;text-overflow:ellipsis;
-                font-family:Inter,system-ui,sans-serif;
-                box-shadow:0 2px 6px ${color}66;
-              ">${shortName}</div>
-              <div style="position:relative;width:46px;height:46px;">
-                <div style="
-                  width:46px;height:46px;border-radius:50%;
-                  background:${color};border:3px solid #fff;
-                  box-shadow:0 4px 16px ${color}55, 0 2px 6px rgba(0,0,0,0.2);
-                  overflow:hidden;display:flex;align-items:center;justify-content:center;
-                ">${circleInner}</div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;user-select:none;-webkit-user-select:none;">
+              <div style="background:${color};color:#fff;font-size:8px;font-weight:800;letter-spacing:.4px;padding:1px 7px;border-radius:20px;white-space:nowrap;max-width:90px;overflow:hidden;text-overflow:ellipsis;font-family:Inter,system-ui,sans-serif;box-shadow:0 2px 5px ${color}55;">${shortName}</div>
+              <div style="position:relative;width:44px;height:44px;">
+                ${isToday ? `<div style="${todayRing}position:absolute;inset:-3px;border-radius:50%;border:2px solid #22c55e;opacity:.5;"></div>` : ""}
+                <div style="width:44px;height:44px;border-radius:50%;background:${color};border:3px solid #fff;box-shadow:0 4px 14px ${color}55,0 2px 6px rgba(0,0,0,0.2);overflow:hidden;display:flex;align-items:center;justify-content:center;">${circleInner}</div>
                 ${todayBadge}
               </div>
-              <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid ${color};margin-top:-2px;filter:drop-shadow(0 2px 2px rgba(0,0,0,0.15))"></div>
+              <div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid ${color};margin-top:-1px;filter:drop-shadow(0 2px 2px rgba(0,0,0,0.15));"></div>
             </div>`;
 
-          const icon = L.divIcon({
+          const icon = window.L.divIcon({
             className: "",
             html: iconHtml,
-            iconSize: [100, 78],
-            iconAnchor: [50, 78], // pointe du triangle = point géographique
-            popupAnchor: [0, -80],
+            iconSize: [96, 74],
+            iconAnchor: [48, 74],
+            popupAnchor: [0, -76],
           });
 
-          // Tooltip survol
+          // Tooltip — desktop seulement
           const tooltipHtml = `
-            <div style="background:#fff;border-radius:14px;overflow:hidden;
-              box-shadow:0 8px 28px rgba(0,0,0,0.18);border:1px solid #e2e8f0;
-              min-width:170px;font-family:Inter,system-ui,sans-serif;">
+            <div style="background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 8px 28px rgba(0,0,0,0.18);border:1px solid #e2e8f0;min-width:170px;font-family:Inter,system-ui,sans-serif;">
               ${photoUrl
-                ? `<div style="height:82px;overflow:hidden;">
-                    <img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover;display:block;"/></div>`
-                : `<div style="height:40px;background:linear-gradient(135deg,${color},${color}cc);display:flex;align-items:center;justify-content:center;">
-                    <span style="color:#fff;font-weight:900;font-size:20px;">${initials}</span></div>`
+                ? `<div style="height:82px;overflow:hidden;"><img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover;display:block;"/></div>`
+                : `<div style="height:40px;background:linear-gradient(135deg,${color},${color}cc);display:flex;align-items:center;justify-content:center;"><span style="color:#fff;font-weight:900;font-size:20px;">${initials}</span></div>`
               }
               <div style="padding:9px 12px 10px">
                 <div style="font-weight:800;font-size:12.5px;color:#0f172a;margin-bottom:3px">${client.nom}</div>
                 ${client.formule ? `<span style="display:inline-block;font-size:9.5px;font-weight:700;color:${color};background:${color}18;padding:1px 7px;border-radius:20px;margin-bottom:3px">${client.formule}</span>` : ""}
-                <div style="font-size:9px;color:#94a3b8;margin-top:2px">${client.adresse.split(",").slice(-2).join(",").trim()}</div>
+                <div style="font-size:9px;color:#94a3b8;margin-top:2px">${client.adresse.split(",")[0]}</div>
                 ${isToday ? `<div style="margin-top:5px;font-size:9px;font-weight:700;color:#16a34a;background:#f0fdf4;padding:2px 7px;border-radius:20px;display:inline-block">✓ Intervention aujourd'hui</div>` : ""}
               </div>
             </div>`;
 
           const clientSnapshot = { client, photoUrl, color, initials };
-          // Sur mobile : clic = panel directement (pas de tooltip hover)
-          // Sur desktop : tooltip au survol + clic = panel
-          const isTouchDevice = window.innerWidth < 768;
-          const marker = L.marker([pos.lat, pos.lon], { icon })
-            .addTo(mapInstance.current)
-            .on("click", () => { setPanel(clientSnapshot); });
-          if (!isTouchDevice) {
-            marker.bindTooltip(tooltipHtml, { permanent:false, direction:"top", className:"bb-tip", offset:[0,-62], opacity:1 });
+          const marker = window.L.marker([pos.lat, pos.lon], { icon });
+          marker.on("click", () => {
+            setPanel(clientSnapshot);
+            // Centrer doucement sur le marqueur
+            mapInstance.current.panTo([pos.lat, pos.lon], { animate: true, duration: 0.5 });
+          });
+          if (window.innerWidth >= 768) {
+            marker.bindTooltip(tooltipHtml, { permanent:false, direction:"top", className:"bb-tip", offset:[0,-58], opacity:1 });
           }
 
-          markers.current.push(marker);
-          markersDataRef.current.push({ marker, clientId: client.id, formule: client.formule || "", isToday, latlng: [pos.lat, pos.lon] });
+          cg.addLayer(marker);
+          markersDataRef.current.push({ marker, clientId: client.id, formule: client.formule||"", isToday, latlng:[pos.lat, pos.lon], nom: client.nom.toLowerCase() });
           panelSnaps.current[client.id] = clientSnapshot;
           boundsRef.current.push([pos.lat, pos.lon]);
           count++;
           if (!cancelled) setLocated(count);
         }
 
-        if (!cancelled && boundsRef.current.length > 0 && mapInstance.current) {
+        mapInstance.current.addLayer(cg);
+
+        if (!cancelled && boundsRef.current.length > 0) {
           if (boundsRef.current.length === 1) {
-            mapInstance.current.setView(boundsRef.current[0], 14);
+            mapInstance.current.setView(boundsRef.current[0], 15);
           } else {
             mapInstance.current.fitBounds(boundsRef.current, { padding:[48,48], maxZoom:14 });
           }
         }
         if (!cancelled) setStatus("ready");
-      } catch {
+      } catch (e) {
+        console.error("[Carte]", e);
         if (!cancelled) setStatus("error");
       }
     };
@@ -399,43 +478,46 @@ function CarteClients({ clients, onClientClick, passages = [] }) {
     return () => { cancelled = true; };
   }, [clients.map(c=>c.id+c.adresse).join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Filtrage : affiche/masque les marqueurs sans re-géocoder ──
+  // ── Filtrage par chip + recherche ─────────────────────────────────────────
   useEffect(() => {
-    if (status !== "ready" || !mapInstance.current) return;
+    if (status !== "ready" || !clusterGroup.current) return;
+    const q = search.toLowerCase().trim();
     const visible = [];
-    markersDataRef.current.forEach(({ marker, formule, isToday, latlng }) => {
+    markersDataRef.current.forEach(({ marker, formule, isToday, latlng, nom }) => {
       let show = true;
       if (filter === "aujourd'hui") show = isToday;
       else if (filter !== "tous")   show = formule === filter;
+      if (show && q) show = nom.includes(q);
+
       if (show) {
-        if (!mapInstance.current.hasLayer(marker)) marker.addTo(mapInstance.current);
+        if (!clusterGroup.current.hasLayer(marker)) clusterGroup.current.addLayer(marker);
         visible.push(latlng);
       } else {
-        if (mapInstance.current.hasLayer(marker)) marker.remove();
+        if (clusterGroup.current.hasLayer(marker)) clusterGroup.current.removeLayer(marker);
       }
     });
-    // Recentrer sur les marqueurs visibles
+    // flyTo fluide sur les marqueurs visibles
     if (visible.length === 1) {
-      mapInstance.current.setView(visible[0], 14);
+      mapInstance.current.flyTo(visible[0], 15, { duration:0.7 });
     } else if (visible.length > 1) {
-      mapInstance.current.fitBounds(visible, { padding:[40,40], maxZoom:14 });
+      mapInstance.current.flyToBounds(visible, { padding:[40,40], maxZoom:14, duration:0.7 });
     }
-  }, [filter, status]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filter, search, status]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Quand la carte change de taille (plein écran), Leaflet doit recalculer ses dimensions
+  // ── Redimensionnement plein écran ─────────────────────────────────────────
   useEffect(() => {
     if (!mapInstance.current) return;
-    const timer = setTimeout(() => {
+    const t = setTimeout(() => {
       mapInstance.current?.invalidateSize();
-      if (boundsRef.current.length > 1) {
-        mapInstance.current?.fitBounds(boundsRef.current, { padding:[40,40], maxZoom:14 });
-      } else if (boundsRef.current.length === 1) {
-        mapInstance.current?.setView(boundsRef.current[0], 14);
-      }
-    }, 280); // après la transition CSS
-    return () => clearTimeout(timer);
+      if (boundsRef.current.length > 1)
+        mapInstance.current?.flyToBounds(boundsRef.current, { padding:[40,40], maxZoom:14, duration:0.5 });
+      else if (boundsRef.current.length === 1)
+        mapInstance.current?.flyTo(boundsRef.current[0], 15, { duration:0.5 });
+    }, 280);
+    return () => clearTimeout(t);
   }, [expanded]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Nettoyage ──────────────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
       if (mapInstance.current) { mapInstance.current.remove(); mapInstance.current = null; }
@@ -444,26 +526,23 @@ function CarteClients({ clients, onClientClick, passages = [] }) {
 
   const clientsSansAdresse = clients.filter(c => !c.adresse?.trim());
   const pct = clientsWithAddr.length > 0 ? Math.round(located / clientsWithAddr.length * 100) : 0;
-
-  // Hauteur de la carte : plein écran mobile si expanded, sinon adaptative
   const mapHeight = expanded
-    ? (isMobile ? "calc(100vh - 120px)" : 500)
-    : (isMobile ? "calc(55vw + 60px)" : 380);
+    ? (isMobile ? "calc(100vh - 112px)" : 520)
+    : (isMobile ? "calc(56vw + 60px)" : 400);
 
-  const btnStyle = (active) => ({
-    width: isMobile ? 40 : 32,
-    height: isMobile ? 40 : 32,
-    borderRadius: isMobile ? 12 : 8,
-    border: "1px solid #e2e8f0",
-    background: active ? "#0891b2" : "#fff",
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-    WebkitTapHighlightColor: "transparent",
-    flexShrink: 0,
-  });
+  const Btn = ({ onClick, active, title, children }) => (
+    <button onClick={onClick} title={title} style={{
+      width: isMobile?44:34, height: isMobile?44:34,
+      borderRadius: isMobile?14:10,
+      border: "none",
+      background: active ? "#0891b2" : "rgba(255,255,255,0.95)",
+      cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
+      boxShadow: "0 2px 10px rgba(0,0,0,0.14)",
+      WebkitTapHighlightColor:"transparent", flexShrink:0,
+      backdropFilter:"blur(8px)",
+      transition:"background .15s",
+    }}>{children}</button>
+  );
 
   return (
     <div className="db-s6" style={{
@@ -478,102 +557,73 @@ function CarteClients({ clients, onClientClick, passages = [] }) {
       zIndex: expanded && isMobile ? 9000 : "auto",
     }}>
 
-      {/* ── Header ── */}
-      <div style={{padding: isMobile ? "10px 12px 8px" : "11px 14px 10px", background:"linear-gradient(135deg,#f0f9ff 0%,#fff 100%)",borderBottom:"1px solid #f1f5f9"}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:status==="loading"?6:0}}>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <div style={{width:30,height:30,borderRadius:9,background:"linear-gradient(135deg,#0891b2,#0284c7)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 8px rgba(8,145,178,0.3)"}}>
-              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-            </div>
-            <div>
-              <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>Carte clients</div>
-              <div style={{fontSize:10,color:"#94a3b8",marginTop:1,display:"flex",alignItems:"center",gap:5}}>
-                {status==="loading"
-                  ? <><svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.5" strokeLinecap="round" style={{animation:"spin .7s linear infinite"}}><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>{located}/{clientsWithAddr.length} géolocalisés…</>
-                  : status==="ready" ? `${located} client${located>1?"s":""} sur la carte`
-                  : status==="error" ? "Erreur de chargement"
-                  : "Initialisation…"}
-              </div>
+      {/* ── Header compact ── */}
+      <div style={{padding: isMobile?"9px 12px 7px":"10px 14px 9px", background:"linear-gradient(135deg,#f0f9ff 0%,#fff 100%)", borderBottom:"1px solid #f1f5f9"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:status==="loading"?5:0}}>
+          {/* Icône */}
+          <div style={{width:28,height:28,borderRadius:9,background:"linear-gradient(135deg,#0891b2,#0284c7)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 8px rgba(8,145,178,0.3)",flexShrink:0}}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          </div>
+
+          {/* Titre + statut */}
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:12.5,fontWeight:700,color:"#0f172a"}}>Carte clients</div>
+            <div style={{fontSize:9.5,color:"#94a3b8",display:"flex",alignItems:"center",gap:4}}>
+              {status==="loading"
+                ? <><svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.5" strokeLinecap="round" style={{animation:"bb-spin .7s linear infinite",flexShrink:0}}><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>{located}/{clientsWithAddr.length} géolocalisés…</>
+                : status==="ready" ? `${located} client${located>1?"s":""} localisés` : status==="error" ? "Erreur" : "Chargement…"}
             </div>
           </div>
 
-          <div style={{display:"flex",gap:isMobile?6:5,alignItems:"center"}}>
-            {/* Badge aujourd'hui — masqué en mode expanded */}
-            {clientsToday.size > 0 && !expanded && (
-              <span style={{fontSize:9,fontWeight:700,color:"#16a34a",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:20,padding:"2px 8px"}}>
-                ✓ {clientsToday.size} auj.
-              </span>
-            )}
-            {/* Badge sans adresse */}
-            {clientsSansAdresse.length > 0 && !expanded && (
-              <span style={{fontSize:9,fontWeight:700,color:"#d97706",background:"#fffbeb",border:"1px solid #fde68a",borderRadius:20,padding:"2px 8px"}}>
-                ⚠ {clientsSansAdresse.length}
-              </span>
-            )}
-            {/* Me localiser (GPS) — mobile seulement */}
-            {isMobile && status==="ready" && navigator.geolocation && (
-              <button onClick={locaterMoi} title="Me localiser" style={btnStyle(locating)}>
-                {locating
-                  ? <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" style={{animation:"bb-spin .7s linear infinite"}}><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
-                  : <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={locating?"#fff":"#0891b2"} strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7" strokeDasharray="2 2"/></svg>
-                }
-              </button>
-            )}
-            {/* Recentrer */}
-            {status==="ready" && located > 0 && (
-              <button onClick={recentrer} title="Recentrer la carte" style={btnStyle(false)}>
-                <svg width={isMobile?15:13} height={isMobile?15:13} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.2" strokeLinecap="round"><path d="M3 12l4-4m0 0l4-4m-4 4h14M21 12l-4 4m0 0l-4 4m4-4H7"/></svg>
-              </button>
-            )}
-            {/* Plein écran (mobile seulement) */}
-            {isMobile && (
-              <button onClick={() => { setExpanded(e => !e); setTimeout(()=>{ if(mapInstance.current) mapInstance.current.invalidateSize(); },100); }} title={expanded?"Réduire":"Plein écran"} style={btnStyle(expanded)}>
-                {expanded
-                  ? <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={expanded?"#fff":"#0891b2"} strokeWidth="2.2" strokeLinecap="round"><path d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3"/></svg>
-                  : <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.2" strokeLinecap="round"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>
-                }
-              </button>
-            )}
-          </div>
+          {/* Badges */}
+          {clientsToday.size > 0 && !expanded && (
+            <span style={{fontSize:9,fontWeight:700,color:"#16a34a",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:20,padding:"2px 7px",flexShrink:0}}>✓ {clientsToday.size}</span>
+          )}
+          {clientsSansAdresse.length > 0 && !expanded && (
+            <span style={{fontSize:9,fontWeight:700,color:"#d97706",background:"#fffbeb",border:"1px solid #fde68a",borderRadius:20,padding:"2px 7px",flexShrink:0}}>⚠ {clientsSansAdresse.length}</span>
+          )}
+
+          {/* Bouton plein écran */}
+          {isMobile && (
+            <button onClick={() => { setExpanded(e => !e); setTimeout(()=>mapInstance.current?.invalidateSize(),120); }}
+              title={expanded?"Réduire":"Plein écran"}
+              style={{width:32,height:32,borderRadius:10,border:"1px solid #e2e8f0",background:expanded?"#0891b2":"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,WebkitTapHighlightColor:"transparent"}}>
+              {expanded
+                ? <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round"><path d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3"/></svg>
+                : <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.2" strokeLinecap="round"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>
+              }
+            </button>
+          )}
         </div>
 
-        {/* Barre de progression géocodage */}
+        {/* Barre de progression */}
         {status==="loading" && clientsWithAddr.length > 0 && (
-          <div style={{height:3,background:"#e2e8f0",borderRadius:99,overflow:"hidden",marginTop:2}}>
+          <div style={{height:3,background:"#e2e8f0",borderRadius:99,overflow:"hidden",marginTop:4}}>
             <div style={{height:"100%",width:`${pct}%`,background:"linear-gradient(90deg,#0891b2,#06b6d4)",borderRadius:99,transition:"width .3s ease"}}/>
           </div>
         )}
 
-        {/* ── Chips de filtre ── */}
+        {/* Chips filtre */}
         {status==="ready" && located > 0 && (() => {
-          const formules = [...new Set(clients.filter(c=>c.adresse?.trim()).map(c=>c.formule).filter(Boolean))].sort();
+          const formules = [...new Set(clientsWithAddr.map(c=>c.formule).filter(Boolean))].sort();
           const chips = [
-            { key:"tous",       label:"Tous",          color:"#64748b" },
-            ...(clientsToday.size > 0 ? [{ key:"aujourd'hui", label:"Aujourd'hui", color:"#16a34a" }] : []),
-            ...formules.map(f => ({ key:f, label:f, color:formuleColor(f) })),
+            {key:"tous", label:"Tous", color:"#64748b"},
+            ...(clientsToday.size>0 ? [{key:"aujourd'hui", label:"Aujourd'hui", color:"#16a34a"}] : []),
+            ...formules.map(f=>({key:f, label:f, color:formuleColor(f)})),
           ];
           return (
-            <div style={{display:"flex",gap:5,flexWrap:"nowrap",overflowX:"auto",scrollbarWidth:"none",paddingTop:8,paddingBottom:2,marginTop:4,WebkitOverflowScrolling:"touch"}}>
-              {chips.map(({ key, label, color }) => {
-                const active = filter === key;
+            <div style={{display:"flex",gap:5,overflowX:"auto",scrollbarWidth:"none",paddingTop:7,paddingBottom:1,WebkitOverflowScrolling:"touch"}}>
+              {chips.map(({key,label,color})=>{
+                const act = filter===key;
                 return (
-                  <button key={key} onClick={() => setFilter(key)}
-                    style={{
-                      flexShrink:0,
-                      padding: isMobile ? "5px 12px" : "3px 10px",
-                      minHeight: isMobile ? 32 : "auto",
-                      borderRadius:20,
-                      border:`1.5px solid ${active ? color : "#e2e8f0"}`,
-                      background:active ? color : "#fff",
-                      color:active ? "#fff" : "#64748b",
-                      fontSize: isMobile ? 11 : 10,
-                      fontWeight:active ? 700 : 500,
-                      cursor:"pointer", fontFamily:"inherit",
-                      transition:"all .12s",
-                      WebkitTapHighlightColor:"transparent",
-                    }}>
-                    {key==="aujourd'hui" ? "✓ " : ""}{label}
-                  </button>
+                  <button key={key} onClick={()=>setFilter(key)} style={{
+                    flexShrink:0, padding:isMobile?"5px 12px":"3px 10px", minHeight:isMobile?32:26,
+                    borderRadius:20, border:`1.5px solid ${act?color:"#e2e8f0"}`,
+                    background:act?color:"#fff", color:act?"#fff":"#64748b",
+                    fontSize:isMobile?11:10, fontWeight:act?700:500,
+                    cursor:"pointer", fontFamily:"inherit", transition:"all .15s",
+                    WebkitTapHighlightColor:"transparent",
+                  }}>{key==="aujourd'hui"?"✓ ":""}{label}</button>
                 );
               })}
             </div>
@@ -581,102 +631,140 @@ function CarteClients({ clients, onClientClick, passages = [] }) {
         })()}
       </div>
 
-      {/* ── Carte Leaflet ── hauteur adaptative */}
-      <div ref={mapRef} style={{height: mapHeight, width:"100%", background:"#f0f4f8", transition:"height .25s ease", minHeight: isMobile ? 240 : 300}}/>
+      {/* ── Carte Leaflet ── */}
+      <div style={{position:"relative"}}>
+        <div ref={mapRef} style={{height:mapHeight, width:"100%", background:"#e8edf0", transition:"height .3s cubic-bezier(.4,0,.2,1)"}}/>
 
-      {/* ── PANEL CLIENT amélioré ── */}
-      {panel && (
-        <div style={{
-          position:"absolute", bottom:0, left:0, right:0, zIndex:2000,
-          background:"#fff",
-          borderRadius:"18px 18px 0 0",
-          boxShadow:"0 -6px 28px rgba(0,0,0,0.18)",
-          animation:"fadeIn .15s ease",
-          padding: isMobile ? "8px 14px 20px" : "8px 12px 12px",
-        }}>
-          {/* Poignée */}
-          <div style={{display:"flex",justifyContent:"center",marginBottom:10}}>
-            <div style={{width:36,height:4,borderRadius:2,background:"#e2e8f0"}}/>
-          </div>
-
-          {/* Photo piscine en bannière si disponible */}
-          {panel.photoUrl && isMobile && (
-            <div style={{height:90,borderRadius:12,overflow:"hidden",marginBottom:10,border:"1px solid #f1f5f9"}}>
-              <img src={panel.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+        {/* Barre de recherche flottante sur la carte */}
+        {status==="ready" && located > 0 && (
+          <div style={{position:"absolute",top:10,left:"50%",transform:"translateX(-50%)",zIndex:1000,width:`min(85%,300px)`}}>
+            <div style={{display:"flex",alignItems:"center",background:"rgba(255,255,255,0.97)",borderRadius:24,padding:"0 12px",gap:7,boxShadow:"0 4px 20px rgba(0,0,0,0.16)",backdropFilter:"blur(8px)",border:"1px solid rgba(255,255,255,0.8)"}}>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.2" strokeLinecap="round" style={{flexShrink:0}}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <input
+                value={search}
+                onChange={e=>setSearch(e.target.value)}
+                placeholder="Rechercher un client…"
+                style={{flex:1,border:"none",background:"transparent",fontSize:13,color:"#0f172a",outline:"none",padding:"10px 0",fontFamily:"inherit",minWidth:0}}
+              />
+              {search && (
+                <button onClick={()=>setSearch("")} style={{background:"none",border:"none",cursor:"pointer",padding:0,display:"flex",lineHeight:1}}>
+                  <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg>
+                </button>
+              )}
             </div>
-          )}
+          </div>
+        )}
 
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
-            {/* Avatar */}
-            {!panel.photoUrl && (
-              <div style={{width: isMobile?44:40, height: isMobile?44:40, borderRadius:12, overflow:"hidden", flexShrink:0,
-                background:panel.color, display:"flex", alignItems:"center", justifyContent:"center"}}>
-                <span style={{color:"#fff",fontWeight:900,fontSize: isMobile?17:15}}>{panel.initials}</span>
-              </div>
+        {/* Boutons flottants droite */}
+        {status==="ready" && (
+          <div style={{position:"absolute",right:10,bottom: isMobile?70:60,zIndex:1000,display:"flex",flexDirection:"column",gap:8}}>
+            {/* Recentrer */}
+            {located > 0 && (
+              <Btn onClick={recentrer} title="Recentrer">
+                <svg width={isMobile?16:14} height={isMobile?16:14} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+              </Btn>
             )}
-            {panel.photoUrl && !isMobile && (
-              <div style={{width:40,height:40,borderRadius:10,overflow:"hidden",flexShrink:0}}>
+            {/* GPS */}
+            {navigator.geolocation && (
+              <Btn onClick={locaterMoi} active={locating} title="Me localiser">
+                {locating
+                  ? <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" style={{animation:"bb-spin .7s linear infinite"}}><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
+                  : <svg width={isMobile?16:14} height={isMobile?16:14} viewBox="0 0 24 24" fill="none" stroke="#4285f4" strokeWidth="2.2" strokeLinecap="round"><path d="M12 2 L12 22 M2 12 L22 12" strokeOpacity=".3"/><circle cx="12" cy="12" r="4" fill="#4285f4" stroke="none"/><circle cx="12" cy="12" r="9" strokeDasharray="3 3" stroke="#4285f4" strokeOpacity=".4"/></svg>
+                }
+              </Btn>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Panel client — slide-up avec swipe pour fermer ── */}
+      {panel && (
+        <>
+          {/* Overlay semi-transparent */}
+          <div onClick={()=>setPanel(null)} style={{position:"absolute",inset:0,zIndex:1999,background:"rgba(0,0,0,0.12)"}}/>
+
+          <div
+            ref={panelRef}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+            style={{
+              position:"absolute", bottom:0, left:0, right:0, zIndex:2000,
+              background:"#fff",
+              borderRadius:"20px 20px 0 0",
+              boxShadow:"0 -8px 32px rgba(0,0,0,0.18)",
+              animation:"bb-fadein .2s ease",
+              transform:`translateY(${panelDy}px)`,
+              transition: panelDy===0 ? "transform .2s ease" : "none",
+              paddingBottom: isMobile ? "env(safe-area-inset-bottom,12px)" : 0,
+            }}>
+            {/* Poignée swipe */}
+            <div style={{display:"flex",justifyContent:"center",paddingTop:10,paddingBottom:4,cursor:"grab"}}>
+              <div style={{width:40,height:4,borderRadius:2,background:"#e2e8f0"}}/>
+            </div>
+
+            {/* Bannière photo piscine */}
+            {panel.photoUrl && isMobile && (
+              <div style={{margin:"0 14px 10px",height:100,borderRadius:14,overflow:"hidden",border:"1px solid #f1f5f9",boxShadow:"0 2px 8px rgba(0,0,0,0.08)"}}>
                 <img src={panel.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
               </div>
             )}
 
-            {/* Nom + formule + adresse */}
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize: isMobile?15:13, fontWeight:800, color:"#0f172a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
-                {panel.client.nom}
+            <div style={{display:"flex",alignItems:"center",gap:10,padding: isMobile?"0 14px 14px":"0 12px 12px"}}>
+              {/* Avatar */}
+              <div style={{width:isMobile?48:42,height:isMobile?48:42,borderRadius:14,overflow:"hidden",flexShrink:0,background:panel.color,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 3px 12px ${panel.color}44`}}>
+                {panel.photoUrl && !isMobile
+                  ? <img src={panel.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                  : !panel.photoUrl
+                    ? <span style={{color:"#fff",fontWeight:900,fontSize:isMobile?18:16}}>{panel.initials}</span>
+                    : null
+                }
               </div>
-              <div style={{display:"flex",alignItems:"center",gap:5,marginTop:2,flexWrap:"wrap"}}>
-                {panel.client.formule && (
-                  <span style={{fontSize:10,color:panel.color,fontWeight:700,background:panel.color+"18",padding:"1px 7px",borderRadius:20}}>
-                    {panel.client.formule}
-                  </span>
-                )}
+
+              {/* Infos */}
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:isMobile?15:13,fontWeight:800,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                  {panel.client.nom}
+                </div>
+                <div style={{display:"flex",gap:5,marginTop:3,flexWrap:"wrap",alignItems:"center"}}>
+                  {panel.client.formule && (
+                    <span style={{fontSize:10,color:panel.color,fontWeight:700,background:panel.color+"18",padding:"1px 7px",borderRadius:20}}>{panel.client.formule}</span>
+                  )}
+                  {panel.client.adresse && (
+                    <span style={{fontSize:9.5,color:"#94a3b8",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:150}}>
+                      {panel.client.adresse.split(",")[0]}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Boutons action */}
+              <div style={{display:"flex",gap:7,flexShrink:0}}>
+                {/* Naviguer */}
                 {panel.client.adresse && (
-                  <span style={{fontSize:9.5,color:"#94a3b8",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:160}}>
-                    📍 {panel.client.adresse.split(",")[0]}
-                  </span>
+                  <button onClick={()=>naviguerVers(panel.client.adresse)}
+                    style={{width:isMobile?44:36,height:isMobile?44:36,borderRadius:isMobile?14:11,border:"1.5px solid #e2e8f0",background:"#f8fafc",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",WebkitTapHighlightColor:"transparent"}}
+                    title="Naviguer vers ce client">
+                    <svg width={isMobile?17:15} height={isMobile?17:15} viewBox="0 0 24 24" fill="none" stroke="#4285f4" strokeWidth="2.2" strokeLinecap="round"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
+                  </button>
                 )}
+                {/* Ouvrir fiche */}
+                <button onClick={()=>{ onClientClick(panel.client); setPanel(null); setExpanded(false); }}
+                  style={{padding:isMobile?"0 18px":"0 14px",height:isMobile?44:36,background:"linear-gradient(135deg,#0891b2,#0e7490)",color:"#fff",border:"none",borderRadius:isMobile?14:11,fontSize:isMobile?13:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit",WebkitTapHighlightColor:"transparent",boxShadow:"0 3px 12px rgba(8,145,178,0.35)",whiteSpace:"nowrap"}}>
+                  Ouvrir →
+                </button>
               </div>
             </div>
-
-            {/* Bouton ouvrir */}
-            <button onClick={() => { onClientClick(panel.client); setPanel(null); setExpanded(false); }}
-              style={{
-                padding: isMobile ? "10px 18px" : "7px 14px",
-                background:"linear-gradient(135deg,#0891b2,#0e7490)",
-                color:"#fff", border:"none", borderRadius:22,
-                fontSize: isMobile ? 13 : 11, fontWeight:700, cursor:"pointer",
-                fontFamily:"inherit", flexShrink:0,
-                WebkitTapHighlightColor:"transparent",
-                boxShadow:"0 3px 12px rgba(8,145,178,0.35)",
-              }}>
-              Ouvrir →
-            </button>
-
-            {/* Fermer */}
-            <button onClick={() => setPanel(null)}
-              style={{width: isMobile?36:24, height: isMobile?36:24, borderRadius:isMobile?12:12, background:"#f1f5f9", border:"none",
-                cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0}}>
-              <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </button>
           </div>
-        </div>
-      )}
-
-      {/* Overlay clic pour fermer panel */}
-      {panel && (
-        <div onClick={() => setPanel(null)}
-          style={{position:"absolute",inset:0,zIndex:1999,background:"rgba(0,0,0,0.15)"}}/>
+        </>
       )}
 
       {/* Clients sans adresse */}
       {clientsSansAdresse.length > 0 && !panel && !expanded && (
-        <div style={{padding:"7px 12px",background:"#fffbeb",borderTop:"1px solid #fde68a",display:"flex",alignItems:"center",gap:6}}>
+        <div style={{padding:"6px 12px",background:"#fffbeb",borderTop:"1px solid #fde68a",display:"flex",alignItems:"center",gap:6}}>
           <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#b45309" strokeWidth="2.5" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/></svg>
           <span style={{fontSize:10,color:"#92400e",fontWeight:600}}>
-            {clientsSansAdresse.length} client{clientsSansAdresse.length>1?"s":""} sans adresse : {clientsSansAdresse.slice(0,3).map(c=>c.nom.split(" ").pop()).join(", ")}{clientsSansAdresse.length>3?"…":""}
+            {clientsSansAdresse.length} sans adresse : {clientsSansAdresse.slice(0,3).map(c=>c.nom.split(" ").pop()).join(", ")}{clientsSansAdresse.length>3?"…":""}
           </span>
         </div>
       )}
