@@ -10,7 +10,7 @@ import { ouvrirRapport, envoyerEmail } from "../components/FormPassage";
 // ─────────────────────────────────────────────────────────────────────────────
 // PAGE PASSAGES
 // ─────────────────────────────────────────────────────────────────────────────
-export function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePassageStatus, onAddClient, onValider, onChangeStatut }) {
+export function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpdatePassageStatus, onAddClient, onValider, onChangeStatut, onClientClick }) {
   const [filter,setFilter]=useState("mois");
   const [detailPassage, setDetailPassage] = useState(null);
   const [accordionOpen, setAccordionOpen] = useState(null);
@@ -102,7 +102,12 @@ export function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpd
             return (
               <Card key={p.id} className="fade-in" style={{animationDelay:`${idx*0.05}s`}}>
                 <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
-                  <Avatar nom={c?.nom||"?"} size={42} photo={c?.photoPiscine}/>
+                  <div onClick={()=>onClientClick&&c&&onClientClick(c)} title="Ouvrir la fiche client"
+                    style={{cursor:onClientClick&&c?"pointer":"default",borderRadius:10,transition:"opacity .15s",flexShrink:0}}
+                    onMouseEnter={e=>{ if(onClientClick&&c) e.currentTarget.style.opacity=".75"; }}
+                    onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+                    <Avatar nom={c?.nom||"?"} size={42} photo={c?.photoPiscine}/>
+                  </div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
                       <div>

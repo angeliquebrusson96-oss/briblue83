@@ -636,20 +636,20 @@ function CarteClients({ clients, onClientClick, passages = [] }) {
       <div style={{position:"relative"}}>
         <div ref={mapRef} style={{height:mapHeight, width:"100%", background:"#e8edf0", transition:"height .3s cubic-bezier(.4,0,.2,1)"}}/>
 
-        {/* Barre de recherche flottante sur la carte */}
+        {/* Barre de recherche flottante — compacte */}
         {status==="ready" && located > 0 && (
-          <div style={{position:"absolute",top:10,left:"50%",transform:"translateX(-50%)",zIndex:1000,width:`min(85%,300px)`}}>
-            <div style={{display:"flex",alignItems:"center",background:"rgba(255,255,255,0.97)",borderRadius:24,padding:"0 12px",gap:7,boxShadow:"0 4px 20px rgba(0,0,0,0.16)",backdropFilter:"blur(8px)",border:"1px solid rgba(255,255,255,0.8)"}}>
-              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.2" strokeLinecap="round" style={{flexShrink:0}}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <div style={{position:"absolute",top:8,left:"50%",transform:"translateX(-50%)",zIndex:1000,width:isMobile?"min(72%,220px)":"min(60%,200px)"}}>
+            <div style={{display:"flex",alignItems:"center",background:"rgba(255,255,255,0.95)",borderRadius:20,padding:"0 9px",gap:5,boxShadow:"0 2px 12px rgba(0,0,0,0.13)",backdropFilter:"blur(8px)",border:"1px solid rgba(255,255,255,0.8)"}}>
+              <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.2" strokeLinecap="round" style={{flexShrink:0}}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
               <input
                 value={search}
                 onChange={e=>setSearch(e.target.value)}
-                placeholder="Rechercher un client…"
-                style={{flex:1,border:"none",background:"transparent",fontSize:13,color:"#0f172a",outline:"none",padding:"10px 0",fontFamily:"inherit",minWidth:0}}
+                placeholder="Rechercher…"
+                style={{flex:1,border:"none",background:"transparent",fontSize:12,color:"#0f172a",outline:"none",padding:"7px 0",fontFamily:"inherit",minWidth:0}}
               />
               {search && (
-                <button onClick={()=>setSearch("")} style={{background:"none",border:"none",cursor:"pointer",padding:0,display:"flex",lineHeight:1}}>
-                  <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg>
+                <button onClick={()=>setSearch("")} style={{background:"none",border:"none",cursor:"pointer",padding:0,display:"flex",lineHeight:1,flexShrink:0}}>
+                  <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg>
                 </button>
               )}
             </div>
