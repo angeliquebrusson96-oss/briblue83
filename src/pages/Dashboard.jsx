@@ -304,9 +304,10 @@ function CarteClients({ clients, onClientClick, passages = [] }) {
             markerZoomAnimation: true,
           });
 
-          // Tuiles Stadia Alidade Smooth — plus proches de Google Maps visuellement
-          L.tileLayer("https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png", {
-            maxZoom: 20,
+          // Tuiles CartoDB Voyager — gratuites, modernes, proches de Google Maps
+          L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+            maxZoom: 19,
+            subdomains: "abcd",
             attribution: "",
           }).addTo(mapInstance.current);
 
