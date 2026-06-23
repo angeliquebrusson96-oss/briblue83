@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { save, flushPendingNow, IS_IOS, reconcileOnBoot, invalidateDocCache, subscribeToRealtime, markPassageDeleted } from "./lib/storage";
-import { extractPassagePhotos, migratePassagePhotosToStorage, migrateAllPassagesPhotos, migrateClientPhotoToStorage } from "./lib/photoStore";
+import { extractPassagePhotos, migratePassagePhotosToStorage, migrateAllPassagesPhotos, migrateClientPhotoToStorage, retryPendingUploads, _getUploadQueue } from "./lib/photoStore";
 import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import { auth } from "./lib/firebase";
 
@@ -771,7 +771,34 @@ export default function App() {
   const runPhotoMigration = useCallback(async () => {
     if (!navigator.onLine || !auth.currentUser) return;
 
-    // 1. Passages
+    // 0. Retry des uploads en attente (clés IDB qui avaient échoué lors de sessions précédentes)
+    const retried = await retryPendingUploads().catch(() => ({}));
+    if (Object.keys(retried).length > 0) {
+      // Remplacer les idb:key par les https:// dans les passages
+      setPassages(prev => {
+        let changed = false;
+        const updated = prev.map(p => {
+          let np = p;
+          const SINGLE = ["photoArrivee","photoDepart"];
+          const ARRAYS = ["photos","photosDepart"];
+          for (const f of SINGLE) {
+            if (np[f]?.startsWith("idb:") && retried[np[f].slice(4)]) {
+              np = { ...np, [f]: retried[np[f].slice(4)] }; changed = true;
+            }
+          }
+          for (const f of ARRAYS) {
+            if (!Array.isArray(np[f])) continue;
+            const arr = np[f].map(v => (v?.startsWith("idb:") && retried[v.slice(4)]) ? retried[v.slice(4)] : v);
+            if (arr.some((v, i) => v !== np[f][i])) { np = { ...np, [f]: arr }; changed = true; }
+          }
+          return np;
+        });
+        if (changed) savePassages(updated);
+        return changed ? updated : prev;
+      });
+    }
+
+    // 1. Passages — migrer les clés idb: restantes vers Firebase Storage
     const current = readLS("bb_passages_v2", PASSAGES_INIT);
     if (current.some(p =>
       ["photoArrivee","photoDepart"].some(f => p[f]?.startsWith("idb:")) ||

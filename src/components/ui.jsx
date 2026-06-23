@@ -162,34 +162,56 @@ export function Avatar({ nom, size=40, photo }) {
 
 // ─── PHOTO IMG ────────────────────────────────────────────────────────────────
 // Résout les références spéciales avant d'afficher l'image :
-//   idb:key  → IndexedDB local
+//   idb:key  → IndexedDB local, puis fallback Firebase Storage URL
 //   fsp:id   → Firestore briblue/client_photos (fallback garanti multi-appareils)
 //   https:// → URL directe (pas de résolution)
 //   data:    → base64 directe (pas de résolution)
 // Les clés non reconnues passent par resolvePhoto pour être sûr.
 const _isDirectUrl = (s) => !s || s.startsWith("http") || s.startsWith("data:") || s.startsWith("blob:");
 
-export function PhotoImg({ src, alt="", style={} }) {
+export function PhotoImg({ src, alt="", style={}, showSyncWarning=true }) {
   const needsResolve = src && !_isDirectUrl(src);
-  const [resolved, setResolved] = useState(() => needsResolve ? null : (src || ""));
+  // "pending" = résolution en cours | "" = pas de photo | string = URL résolue
+  const [resolved, setResolved] = useState(() => needsResolve ? "pending" : (src || ""));
+  // wasIdb = la source originale était une référence locale (idb:)
+  const [wasIdb,   setWasIdb]   = useState(() => !!(src?.startsWith("idb:")));
   const [imgError, setImgError] = useState(false);
+
   useEffect(() => {
     setImgError(false);
-    if (!src) { setResolved(""); return; }
-    if (_isDirectUrl(src)) { setResolved(src); return; }
-    // idb:, fsp: ou autre préfixe spécial → résolution asynchrone
-    setResolved(null);
+    if (!src) { setResolved(""); setWasIdb(false); return; }
+    if (_isDirectUrl(src)) { setResolved(src); setWasIdb(false); return; }
+    setWasIdb(src.startsWith("idb:"));
+    setResolved("pending");
     let cancelled = false;
     resolvePhoto(src).then(v => { if (!cancelled) setResolved(v || ""); });
     return () => { cancelled = true; };
   }, [src]);
-  if (resolved === null) return (
+
+  // Chargement en cours
+  if (resolved === "pending") return (
     <div style={{...style, background:"#e2e8f0", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0}}>
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round" style={{animation:"bb-spin .8s linear infinite"}}><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
     </div>
   );
-  if (!resolved || imgError) return null;
-  return <img src={resolved} alt={alt} style={style} onError={() => setImgError(true)} />;
+
+  // Photo chargée avec succès
+  if (resolved && !imgError) {
+    return <img src={resolved} alt={alt} style={style} onError={() => setImgError(true)} />;
+  }
+
+  // Photo absente ou erreur de chargement (ex: Firebase Storage 404 car jamais uploadée)
+  // → Afficher un placeholder "non synchronisée" quand la source était idb: sur cet appareil
+  if (showSyncWarning && wasIdb && (imgError || !resolved)) {
+    return (
+      <div style={{...style, background:"#fef3c7", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", flexShrink:0, gap:4}}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 8v4M12 16h.01"/></svg>
+        <span style={{fontSize:8,color:"#92400e",fontWeight:700,textAlign:"center",lineHeight:1.2,padding:"0 4px"}}>Photo en attente de sync</span>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 // ─── ICO BUBBLE ──────────────────────────────────────────────────────────────

@@ -181,8 +181,8 @@ export async function copyPhoto(fromKey, toKey) {
 const _SINGLE = ["photoArrivee", "photoDepart"];
 const _ARRAYS = ["photos", "photosDepart"];
 
-// Timeout upload par photo dans extractPassagePhotos (8s — plus court que uploadOne)
-const EXTRACT_UPLOAD_TIMEOUT_MS = 8_000;
+// Timeout upload par photo dans extractPassagePhotos (45s — connexions mobiles lentes)
+const EXTRACT_UPLOAD_TIMEOUT_MS = 45_000;
 
 export async function extractPassagePhotos(passage) {
   if (!passage?.id) return passage;
@@ -251,28 +251,28 @@ export async function extractPassagePhotos(passage) {
     p[field] = arr;
   }
 
-  // ── Étape 2 : Firebase Storage — upload en parallèle (si connecté) ────────
-  // Les photos qui viennent d'être mises en IDB sont uploadées en parallèle.
-  // Timeout par photo : 8s. Si l'upload réussit, on remplace idb: par https://.
-  // Si échec → idb: reste → migrateAllPassagesPhotos tentera plus tard.
+  // ── Étape 2 : Firebase Storage — uploads SÉQUENTIELS (si connecté) ─────────
+  // Séquentiel (pas Promise.all) pour ne pas saturer le réseau mobile et éviter
+  // les timeouts en cascade sur iOS. Timeout par photo : 45s.
+  // Si échec → idb: reste + ajout à la queue de retry → migration ultérieure.
   if (toUpload.length > 0 && navigator.onLine) {
     if (!auth.currentUser) {
       try { await signInAnonymously(auth); } catch { /* réseau indisponible */ }
     }
     if (auth.currentUser) {
-      await Promise.all(
-        toUpload.map(async ({ setVal, key }) => {
-          try {
-            const dataUrl = await loadPhoto(key);
-            if (!dataUrl) return;
-            const url = await Promise.race([
-              uploadOne(key, dataUrl),
-              new Promise((resolve) => setTimeout(() => resolve(null), EXTRACT_UPLOAD_TIMEOUT_MS)),
-            ]);
-            if (url) setVal(url); // ✓ Photo sur Firebase Storage → https://
-          } catch { /* upload échoué → idb: reste, migration ultérieure */ }
-        })
-      );
+      for (const { setVal, key } of toUpload) {
+        if (!navigator.onLine) break;
+        try {
+          const dataUrl = await loadPhoto(key);
+          if (!dataUrl) continue;
+          const url = await Promise.race([
+            uploadOne(key, dataUrl),
+            new Promise((resolve) => setTimeout(() => resolve(null), EXTRACT_UPLOAD_TIMEOUT_MS)),
+          ]);
+          if (url) setVal(url); // ✓ Photo sur Firebase Storage → https://
+          // Si url null → uploadOne a déjà ajouté key à la queue de retry
+        } catch { /* upload échoué → idb: reste, migration ultérieure */ }
+      }
     }
   }
 

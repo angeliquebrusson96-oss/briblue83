@@ -165,12 +165,25 @@ export function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpd
                       {_cl&&<Tag color={clOk?DS.green:DS.red} style={{fontSize:11}}>Cl {_cl}</Tag>}
                       <Tag color={rapportMeta.color} bg={rapportMeta.bg} style={{fontSize:11}}>{rapportMeta.label}</Tag>
                     </div>
-                    {(p.photoArrivee||p.photoDepart) && (
-                      <div style={{display:"flex",gap:6,marginBottom:6}}>
-                        {p.photoArrivee && (<div style={{position:"relative"}}><PhotoImg src={p.photoArrivee} alt="Arrivée" style={{height:48,width:72,objectFit:"cover",borderRadius:7,border:"1px solid "+DS.border}}/><span style={{position:"absolute",bottom:2,left:3,fontSize:8,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:3,padding:"1px 4px"}}>Arr.</span></div>)}
-                        {p.photoDepart && (<div style={{position:"relative"}}><PhotoImg src={p.photoDepart} alt="Départ" style={{height:48,width:72,objectFit:"cover",borderRadius:7,border:"1px solid "+DS.border}}/><span style={{position:"absolute",bottom:2,left:3,fontSize:8,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:3,padding:"1px 4px"}}>Dép.</span></div>)}
-                      </div>
-                    )}
+                    {(p.photoArrivee||p.photoDepart||(p.photos||[]).some(Boolean)) && (() => {
+                      const allPhotos = [p.photoArrivee, ...(p.photos||[]), p.photoDepart].filter(Boolean);
+                      const hasPending = allPhotos.some(v => v?.startsWith("idb:"));
+                      return (
+                        <div style={{marginBottom:6}}>
+                          {/* Badge de sync si photos en attente sur cet appareil */}
+                          {hasPending && (
+                            <div style={{display:"inline-flex",alignItems:"center",gap:4,padding:"2px 7px",borderRadius:20,background:"#fef3c7",border:"1px solid #fde68a",marginBottom:5}}>
+                              <svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2.5" strokeLinecap="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 8v4M12 16h.01"/></svg>
+                              <span style={{fontSize:9,color:"#92400e",fontWeight:700}}>Photos en attente de synchronisation</span>
+                            </div>
+                          )}
+                          <div style={{display:"flex",gap:6}}>
+                            {p.photoArrivee && (<div style={{position:"relative"}}><PhotoImg src={p.photoArrivee} alt="Arrivée" style={{height:48,width:72,objectFit:"cover",borderRadius:7,border:"1px solid "+DS.border}}/><span style={{position:"absolute",bottom:2,left:3,fontSize:8,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:3,padding:"1px 4px"}}>Arr.</span></div>)}
+                            {p.photoDepart && (<div style={{position:"relative"}}><PhotoImg src={p.photoDepart} alt="Départ" style={{height:48,width:72,objectFit:"cover",borderRadius:7,border:"1px solid "+DS.border}}/><span style={{position:"absolute",bottom:2,left:3,fontSize:8,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.55)",borderRadius:3,padding:"1px 4px"}}>Dép.</span></div>)}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* ═══ ACTIONS : accordéon mobile / grille desktop ═══ */}
                     <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid "+DS.border}}>
