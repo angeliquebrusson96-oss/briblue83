@@ -523,6 +523,492 @@ function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta,
   );
 }
 
+// ─── MODAL IMPORT HTML INTELLIGENT ───────────────────────────────────────────
+// Parse un ou plusieurs rapports HTML BRIBLUE et détecte automatiquement :
+//   • rapports manquants → à créer
+//   • rapports existants avec données vides → à enrichir
+//   • photos / signatures manquantes → à ajouter
+// Affiche un récap détaillé avant import, avec sélection par item.
+function ModalImportHTML({ clients, passages, onImport, onClose }) {
+  const [status, setStatus]     = useState("idle"); // idle|analyzing|preview|importing|done
+  const [items, setItems]       = useState([]);
+  const [selected, setSelected] = useState(() => new Set());
+  const [result, setResult]     = useState(null);
+  const [dragging, setDragging] = useState(false);
+  const fileRef = useRef(null);
+
+  // ── Parser un rapport HTML BRIBLUE ──────────────────────────────────────
+  const parseHTML = (html) => {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+
+    // Header : client, date, technicien
+    let nomClient = "", dateStr = "", tech = "";
+    doc.querySelectorAll(".meta-item").forEach(el => {
+      const txt = el.textContent.trim();
+      const val = el.querySelector("strong")?.textContent?.trim() || "";
+      if (/client/i.test(txt) && !/date/i.test(txt)) nomClient = val;
+      else if (/date/i.test(txt))     dateStr = val;
+      else if (/technicien/i.test(txt)) tech  = val;
+    });
+    // Fallback texte brut
+    if (!nomClient) {
+      const raw = doc.body?.textContent || "";
+      const m = raw.match(/Client\s+([A-ZÁÀÂÄÉÈÊËÏÎÔÙÛÜÇ][^\n\r\t]{1,40})/);
+      if (m) nomClient = m[1].trim();
+    }
+
+    // Date FR "16 juin 2025" → "2025-06-16"
+    const MOIS = {janvier:"01",février:"02",mars:"03",avril:"04",mai:"05",juin:"06",
+      juillet:"07",août:"08",septembre:"09",octobre:"10",novembre:"11",décembre:"12"};
+    const parseDateFR = (s) => {
+      if (!s) return "";
+      const m1 = s.match(/(\d{1,2})\s+(\w+)\s+(\d{4})/);
+      if (m1) { const mo = MOIS[m1[2].toLowerCase()]; if (mo) return `${m1[3]}-${mo}-${m1[1].padStart(2,"0")}`; }
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+      const m3 = s.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/); if (m3) return `${m3[3]}-${m3[2]}-${m3[1]}`;
+      return "";
+    };
+
+    // Sections → champs par catégorie
+    const secs = {};
+    doc.querySelectorAll(".section").forEach(sec => {
+      const t = (sec.querySelector(".section-title")?.textContent || "").toLowerCase();
+      let key = "unknown";
+      if (/analys|eau/.test(t))           key = "eau";
+      else if (/bassin|intervention/.test(t)) key = "bassin";
+      else if (/[eé]tat/.test(t))         key = "etat";
+      else if (/correctif/.test(t))       key = "corr";
+      else if (/cl[oô]ture/.test(t))      key = "cloture";
+      else if (/produit|livr/.test(t))    key = "produits";
+      else if (/signature/.test(t))       key = "signatures";
+      if (!secs[key]) secs[key] = {};
+      sec.querySelectorAll(".field").forEach(f => {
+        const lbl = (f.querySelector(".field-label")?.textContent || "").trim().toLowerCase();
+        const ve  = f.querySelector(".field-value");
+        if (!lbl || !ve || ve.querySelector(".empty")) return;
+        const badge = ve.querySelector(".badge");
+        if (badge) { secs[key][lbl] = badge.classList.contains("ok") ? "OUI" : "NON"; return; }
+        const stars = ve.querySelector(".stars");
+        if (stars) { secs[key][lbl] = String((stars.textContent.match(/★/g)||[]).length); return; }
+        const val = ve.textContent.trim();
+        if (val && val !== "—") secs[key][lbl] = val;
+      });
+    });
+
+    const eau  = secs.eau     || {};
+    const bas  = secs.bassin  || {};
+    const eta  = secs.etat    || {};
+    const cor  = secs.corr    || {};
+    const cl   = secs.cloture || {};
+    const prod = secs.produits|| {};
+    const clean = v => v ? v.replace(/\s*(ppm|m³|%)/gi,"").trim() : "";
+    const list  = v => v ? v.split(/[,;]/).map(s=>s.trim()).filter(Boolean) : [];
+    const bool  = v => v==="OUI" ? true : v==="NON" ? false : null;
+
+    // Photos : distinguer arrivée / départ via label si possible
+    let photoArrivee = "", photoDepart = "", photosRest = [];
+    doc.querySelectorAll(".photo").forEach(img => {
+      const src = img.getAttribute("src");
+      if (!src || !/^(data:|https?)/.test(src)) return;
+      // Chercher le label du parent immédiat ou frère précédent
+      const lbl = (img.previousElementSibling?.textContent || "").toLowerCase() +
+                  (img.closest("div")?.querySelector(".photo-label")?.textContent || "").toLowerCase();
+      if (/d[eé]part/.test(lbl))       { if (!photoDepart) photoDepart = src; }
+      else if (/arriv/.test(lbl))      { if (!photoArrivee) photoArrivee = src; }
+      else                             { photosRest.push(src); }
+    });
+    // Fallback : ordre d'apparition
+    const allPhotoSrcs = Array.from(doc.querySelectorAll(".photo"))
+      .map(i=>i.getAttribute("src")).filter(s=>s&&/^(data:|https?)/.test(s));
+    if (!photoArrivee && allPhotoSrcs.length > 0) {
+      photoArrivee = allPhotoSrcs[0];
+      photosRest = allPhotoSrcs.slice(1);
+      if (!photoDepart && photosRest.length > 0) {
+        photoDepart = photosRest[photosRest.length-1];
+        photosRest = photosRest.slice(0,-1);
+      }
+    }
+    const sigSrcs = Array.from(doc.querySelectorAll(".sig-img"))
+      .map(i=>i.getAttribute("src")).filter(s=>s&&/^(data:|https?)/.test(s));
+
+    // Produits livrés
+    const produitsStr = prod["produits livrés"] || prod["produits"] || "";
+    const produitsLivres = list(produitsStr);
+
+    return {
+      clientNom: nomClient,  date: parseDateFR(dateStr),  tech,
+      type:         bas["type"] || "",
+      ph:           clean(eau["ph"]),         chloreLibre:  clean(eau["chlore libre"]),
+      alcalinite:   clean(eau["alcalinité"]), stabilisant:  clean(eau["stabilisant"]),
+      tChlore:      clean(eau["taux chlore"]),tPH:          clean(eau["taux ph"]),
+      tSel:         clean(eau["taux sel"]),   tPhosphate:   clean(eau["taux phosphate"]),
+      qualiteEau:   eta["qualité eau"] || "",
+      etatFond:     list(eta["fond"]),        etatParois:   list(eta["parois"]),
+      etatLocal:    list(eta["local technique"]),
+      etatBacTampon:list(eta["bac tampon"]),  etatVoletBac: list(eta["volet / bac"]),
+      corrChlore:   cor["chlore"] || "",      corrPH:       cor["ph"] || "",
+      corrSel:      cor["sel"] || "",         corrAlgicide: cor["algicide"] || "",
+      corrPeroxyde: cor["peroxyde"] || "",    corrChloreChoc:cor["chlore choc"] || "",
+      corrPhosphate:cor["phosphate"] || "",   corrAlcafix:  cor["tac +"] || "",
+      corrAutre:    cor["autre"] || "",
+      devis:            bool(cl["devis à faire"]),
+      priseEchantillon: bool(cl["prise d'échantillon"]),
+      presenceClient:   bool(cl["présence client"]),
+      ressenti: cl["ressenti"] ? (parseInt(cl["ressenti"])||0) : 0,
+      commentaires: cl["commentaires"] || "",
+      livraisonProduits: produitsLivres.length > 0 ? true : null,
+      produitsLivres,
+      photoArrivee,  photos: photosRest,  photoDepart,  photosDepart: [],
+      signatureTech:   sigSrcs[0] || "",
+      signatureClient: sigSrcs[1] || "",
+    };
+  };
+
+  // ── Analyse un lot de fichiers ───────────────────────────────────────────
+  const DATA_LABELS = [
+    ["ph","pH"],["chloreLibre","Chlore libre"],["alcalinite","Alcalinité"],
+    ["stabilisant","Stabilisant"],["tChlore","Taux chlore"],["tPH","Taux pH"],
+    ["tSel","Taux sel"],["tPhosphate","Taux phosphate"],
+    ["qualiteEau","Qualité eau"],["corrChlore","Corr. chlore"],
+    ["corrPH","Corr. pH"],["corrSel","Corr. sel"],["corrAlgicide","Algicide"],
+    ["corrPeroxyde","Peroxyde"],["corrChloreChoc","Chlore choc"],
+    ["corrPhosphate","Corr. phosphate"],["corrAlcafix","TAC+"],
+    ["corrAutre","Autre correctif"],["commentaires","Commentaires"],["type","Type"],
+  ];
+
+  const matchClient = (nom) => {
+    if (!nom) return null;
+    const needle = nom.toLowerCase().trim();
+    const slug = s => s.replace(/[^a-z]/g,"");
+    return clients.find(c => {
+      const n = (c.nom||"").toLowerCase().trim();
+      return n === needle || n.includes(needle) || needle.includes(n) ||
+        (slug(n).length >= 4 && slug(n).slice(0,6) === slug(needle).slice(0,6));
+    });
+  };
+
+  const analyseFiles = async (files) => {
+    setStatus("analyzing");
+    const analyzed = [];
+    for (const file of Array.from(files)) {
+      try {
+        const html = await file.text();
+        const parsed = parseHTML(html);
+        if (!parsed.date || !parsed.clientNom) {
+          analyzed.push({ status:"error", fileName:file.name, reason:"Nom client ou date non détecté" }); continue;
+        }
+        const client = matchClient(parsed.clientNom);
+        if (!client) {
+          analyzed.push({ status:"no_client", fileName:file.name, clientNom:parsed.clientNom, date:parsed.date }); continue;
+        }
+        const existing = passages.find(p => p.clientId===client.id && p.date===parsed.date);
+        const photoCount = [parsed.photoArrivee,...(parsed.photos||[]),parsed.photoDepart].filter(Boolean).length;
+
+        if (!existing) {
+          analyzed.push({ status:"new", fileName:file.name, client, parsed, photoCount }); continue;
+        }
+        // Quels champs manquent dans le passage existant ?
+        const missingData = DATA_LABELS.filter(([f]) => {
+          const nv = parsed[f]; const ev = existing[f];
+          if (!nv || nv==="" || (Array.isArray(nv)&&!nv.length)) return false;
+          return !ev || ev==="" || (Array.isArray(ev)&&!ev.length);
+        }).map(([,l]) => l);
+
+        const hasPhotoHTML = !!(parsed.photoArrivee||(parsed.photos||[]).length||parsed.photoDepart);
+        const hasPhotoApp  = !!(existing.photoArrivee||(existing.photos||[]).length||existing.photoDepart);
+        const missingPhotos = hasPhotoHTML && !hasPhotoApp;
+        const hasSigHTML = !!parsed.signatureTech;
+        const hasSigApp  = !!existing.signatureTech;
+        const missingSig = hasSigHTML && !hasSigApp;
+
+        if (!missingData.length && !missingPhotos && !missingSig) {
+          analyzed.push({ status:"uptodate", fileName:file.name, client, date:parsed.date }); continue;
+        }
+        analyzed.push({ status:"enrich", fileName:file.name, client, date:parsed.date,
+          existing, parsed, missingData, missingPhotos, missingSig, photoCount });
+      } catch(e) {
+        analyzed.push({ status:"error", fileName:file.name, reason:String(e) });
+      }
+    }
+    setItems(analyzed);
+    setSelected(new Set(
+      analyzed.map((it,i) => ["new","enrich"].includes(it.status) ? i : null).filter(n=>n!==null)
+    ));
+    setStatus("preview");
+  };
+
+  // ── Import des items sélectionnés ────────────────────────────────────────
+  const doImport = () => {
+    setStatus("importing");
+    const uid = () => Math.random().toString(36).slice(2)+Date.now().toString(36);
+    const ALL_FIELDS = ["ph","chloreLibre","alcalinite","stabilisant","tChlore","tPH","tSel","tPhosphate",
+      "qualiteEau","etatFond","etatParois","etatLocal","etatBacTampon","etatVoletBac",
+      "corrChlore","corrPH","corrSel","corrAlgicide","corrPeroxyde","corrChloreChoc",
+      "corrPhosphate","corrAlcafix","corrAutre","devis","priseEchantillon","presenceClient",
+      "ressenti","commentaires","type","livraisonProduits","produitsLivres"];
+    const updated = [...passages];
+    let added=0, enriched=0, photosAdded=0;
+    for (const i of [...selected]) {
+      const it = items[i];
+      if (it.status === "new") {
+        updated.push({ id:uid(), ok:true, rapportStatut:"cree",
+          photos:[], photosDepart:[], ...it.parsed, clientId:it.client.id, importedFromHTML:true });
+        added++;
+        if (it.photoCount>0) photosAdded += it.photoCount;
+      } else if (it.status === "enrich") {
+        const idx = updated.findIndex(p => p.id === it.existing.id);
+        if (idx<0) continue;
+        const ex = updated[idx];
+        const patch = {};
+        for (const f of ALL_FIELDS) {
+          const nv=it.parsed[f]; const ev=ex[f];
+          if (!nv||nv===""|| (Array.isArray(nv)&&!nv.length)) continue;
+          if (!ev||ev===""|| (Array.isArray(ev)&&!ev.length)) patch[f]=nv;
+        }
+        if (it.missingPhotos) {
+          if (it.parsed.photoArrivee) patch.photoArrivee=it.parsed.photoArrivee;
+          if ((it.parsed.photos||[]).length) patch.photos=it.parsed.photos;
+          if (it.parsed.photoDepart) patch.photoDepart=it.parsed.photoDepart;
+          photosAdded+=it.photoCount;
+        }
+        if (it.missingSig) {
+          if (it.parsed.signatureTech)   patch.signatureTech=it.parsed.signatureTech;
+          if (it.parsed.signatureClient) patch.signatureClient=it.parsed.signatureClient;
+        }
+        updated[idx]={...ex,...patch};
+        enriched++;
+      }
+    }
+    onImport(updated);
+    setResult({ added, enriched, photosAdded });
+    setStatus("done");
+  };
+
+  const handleFiles = (files) => {
+    const f = Array.from(files||[]).filter(x => /\.html?$/i.test(x.name));
+    if (f.length) analyseFiles(f);
+  };
+  const toggleSel = (i) => setSelected(prev => {
+    const s=new Set(prev); s.has(i)?s.delete(i):s.add(i); return s;
+  });
+  const actionable = items.map((_,i)=>i).filter(i=>["new","enrich"].includes(items[i]?.status));
+  const allSel = actionable.length>0 && actionable.every(i=>selected.has(i));
+  const selCount = [...selected].filter(i=>["new","enrich"].includes(items[i]?.status)).length;
+  const chip = (bg,col,txt) => (
+    <span style={{fontSize:10,fontWeight:800,color:col,background:bg,borderRadius:20,padding:"2px 8px"}}>{txt}</span>
+  );
+  const tag = (label,bg="#dbeafe",col="#1e40af") => (
+    <span style={{fontSize:10,fontWeight:700,color:col,background:bg,borderRadius:4,
+      padding:"1px 6px",display:"inline-block",marginRight:3,marginBottom:2}}>{label}</span>
+  );
+
+  return (
+    <Modal title="📥 Import intelligent — Rapports HTML" onClose={onClose} wide>
+
+      {/* IDLE : zone de drop */}
+      {status==="idle" && (
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div
+            onDragOver={e=>{e.preventDefault();setDragging(true);}}
+            onDragLeave={()=>setDragging(false)}
+            onDrop={e=>{e.preventDefault();setDragging(false);handleFiles(e.dataTransfer.files);}}
+            onClick={()=>fileRef.current?.click()}
+            style={{padding:36,borderRadius:14,border:`2px dashed ${dragging?"#0369a1":"#cbd5e1"}`,
+              background:dragging?"#f0f9ff":"#f8fafc",textAlign:"center",cursor:"pointer",transition:"all .2s"}}
+          >
+            <div style={{fontSize:44,marginBottom:12}}>📄</div>
+            <div style={{fontWeight:800,fontSize:16,color:"#0f172a",marginBottom:4}}>Glisse tes rapports ici</div>
+            <div style={{fontSize:13,color:"#64748b",marginBottom:18}}>
+              ou clique pour sélectionner — <strong>plusieurs .html</strong> simultanément
+            </div>
+            <div style={{display:"inline-flex",alignItems:"center",gap:7,padding:"10px 22px",
+              borderRadius:10,background:"linear-gradient(135deg,#0369a1,#0891b2)",color:"#fff",fontWeight:700,fontSize:14}}>
+              📂 Choisir les fichiers
+            </div>
+          </div>
+          <input ref={fileRef} type="file" accept=".html,.htm" multiple style={{display:"none"}}
+            onChange={e=>handleFiles(e.target.files)}/>
+          <div style={{textAlign:"center",fontSize:12,color:"#94a3b8",lineHeight:1.7}}>
+            Détection automatique : rapports manquants • données vides • photos non importées
+          </div>
+        </div>
+      )}
+
+      {/* ANALYZING */}
+      {status==="analyzing" && (
+        <div style={{textAlign:"center",padding:52,display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
+          <div style={{fontSize:44}}>🔍</div>
+          <div style={{fontWeight:800,fontSize:16,color:"#0f172a"}}>Analyse en cours…</div>
+          <div style={{fontSize:13,color:"#64748b"}}>Lecture des sections, mesures, photos…</div>
+        </div>
+      )}
+
+      {/* PREVIEW */}
+      {status==="preview" && (
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {/* Barre résumé */}
+          <div style={{display:"flex",gap:7,flexWrap:"wrap",padding:"10px 14px",borderRadius:10,
+            background:"#f8fafc",border:"1px solid #e2e8f0",alignItems:"center"}}>
+            {items.filter(it=>it.status==="new").length>0 &&
+              chip("#d1fae5","#065f46",`🆕 ${items.filter(it=>it.status==="new").length} nouveau${items.filter(it=>it.status==="new").length>1?"x":""}`)}
+            {items.filter(it=>it.status==="enrich").length>0 &&
+              chip("#dbeafe","#1e40af",`✏️ ${items.filter(it=>it.status==="enrich").length} à compléter`)}
+            {items.filter(it=>it.status==="uptodate").length>0 &&
+              chip("#f0fdf4","#166534",`✅ ${items.filter(it=>it.status==="uptodate").length} à jour`)}
+            {items.filter(it=>["error","no_client"].includes(it.status)).length>0 &&
+              chip("#fee2e2","#991b1b",`⚠️ ${items.filter(it=>["error","no_client"].includes(it.status)).length} erreur${items.filter(it=>["error","no_client"].includes(it.status)).length>1?"s":""}`)}
+            <div style={{flex:1}}/>
+            {actionable.length>0 && (
+              <button onClick={()=>setSelected(allSel ? new Set() : new Set(actionable))}
+                style={{fontSize:11,fontWeight:700,color:"#0369a1",background:"none",border:"none",cursor:"pointer"}}>
+                {allSel?"Tout désél.":"Tout sélect."}
+              </button>
+            )}
+          </div>
+
+          <div style={{maxHeight:430,overflowY:"auto",WebkitOverflowScrolling:"touch",
+            display:"flex",flexDirection:"column",gap:6}}>
+
+            {/* Rapports manquants */}
+            {items.some(it=>it.status==="new") && (
+              <div style={{border:"1px solid #a7f3d0",borderRadius:10,overflow:"hidden"}}>
+                <div style={{background:"#d1fae5",padding:"8px 14px",display:"flex",alignItems:"center",gap:8}}>
+                  <span>🆕</span>
+                  <span style={{fontWeight:800,fontSize:12,color:"#065f46"}}>Rapports manquants — à créer</span>
+                </div>
+                {items.map((it,i) => it.status!=="new" ? null : (
+                  <label key={i} onClick={()=>toggleSel(i)}
+                    style={{display:"flex",gap:10,alignItems:"flex-start",padding:"9px 14px",cursor:"pointer",
+                      background:selected.has(i)?"#f0fdf4":"#fff",borderBottom:"1px solid #f1f5f9",transition:"background .1s"}}>
+                    <input type="checkbox" checked={selected.has(i)} readOnly
+                      style={{accentColor:"#059669",width:15,height:15,flexShrink:0,marginTop:2}}/>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:800,fontSize:13,color:"#0f172a"}}>{it.client.nom}</div>
+                      <div style={{fontSize:11,color:"#64748b",marginTop:2}}>
+                        {it.date?new Date(it.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}):"date ?"}
+                        {it.parsed.type&&<> · <span style={{color:"#0369a1"}}>{it.parsed.type}</span></>}
+                        {it.parsed.tech&&<> · {it.parsed.tech}</>}
+                      </div>
+                      {(it.photoCount>0||it.parsed.signatureTech) && (
+                        <div style={{marginTop:5}}>
+                          {it.photoCount>0 && tag(`📸 ${it.photoCount} photo${it.photoCount>1?"s":""}`, "#fef3c7","#92400e")}
+                          {it.parsed.signatureTech && tag("✍️ Signatures","#ede9fe","#6d28d9")}
+                          {Object.entries({ph:it.parsed.ph,chloreLibre:it.parsed.chloreLibre}).filter(([,v])=>v).map(([k,v])=>(
+                            <span key={k} style={{fontSize:10,color:"#64748b",marginRight:6}}>{k==="ph"?"pH":k==="chloreLibre"?"Cl":""}:{v}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {/* Rapports à enrichir */}
+            {items.some(it=>it.status==="enrich") && (
+              <div style={{border:"1px solid #bfdbfe",borderRadius:10,overflow:"hidden"}}>
+                <div style={{background:"#dbeafe",padding:"8px 14px",display:"flex",alignItems:"center",gap:8}}>
+                  <span>✏️</span>
+                  <span style={{fontWeight:800,fontSize:12,color:"#1e40af"}}>Données ou photos manquantes — à compléter</span>
+                </div>
+                {items.map((it,i) => it.status!=="enrich" ? null : (
+                  <label key={i} onClick={()=>toggleSel(i)}
+                    style={{display:"flex",gap:10,alignItems:"flex-start",padding:"9px 14px",cursor:"pointer",
+                      background:selected.has(i)?"#eff6ff":"#fff",borderBottom:"1px solid #f1f5f9",transition:"background .1s"}}>
+                    <input type="checkbox" checked={selected.has(i)} readOnly
+                      style={{accentColor:"#1d4ed8",width:15,height:15,flexShrink:0,marginTop:2}}/>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:800,fontSize:13,color:"#0f172a"}}>{it.client.nom}</div>
+                      <div style={{fontSize:11,color:"#64748b",marginTop:2}}>
+                        {it.date?new Date(it.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}):""}
+                      </div>
+                      <div style={{marginTop:5,lineHeight:1.8}}>
+                        {it.missingPhotos && tag(`📸 ${it.photoCount} photo${it.photoCount>1?"s":""}`, "#fef3c7","#92400e")}
+                        {it.missingSig   && tag("✍️ Signatures","#ede9fe","#6d28d9")}
+                        {it.missingData.slice(0,7).map(l => tag(l))}
+                        {it.missingData.length>7 && tag(`+${it.missingData.length-7}…`,"#f1f5f9","#64748b")}
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {/* Déjà à jour */}
+            {items.some(it=>it.status==="uptodate") && (
+              <div style={{padding:"10px 14px",borderRadius:10,background:"#f0fdf4",
+                border:"1px solid #bbf7d0",fontSize:12,color:"#166534"}}>
+                ✅ <strong>{items.filter(it=>it.status==="uptodate").length}</strong> rapport{items.filter(it=>it.status==="uptodate").length>1?"s":""} déjà complets — rien à faire
+              </div>
+            )}
+
+            {/* Erreurs */}
+            {items.filter(it=>["error","no_client"].includes(it.status)).map((it,i) => (
+              <div key={i} style={{padding:"10px 14px",borderRadius:10,background:"#fef2f2",
+                border:"1px solid #fecaca",fontSize:12,color:"#991b1b"}}>
+                ⚠️ <strong>{it.fileName}</strong> —{" "}
+                {it.status==="no_client"
+                  ? <>Client "<strong>{it.clientNom}</strong>" introuvable dans l'app</>
+                  : it.reason}
+              </div>
+            ))}
+          </div>
+
+          {/* Boutons */}
+          <div style={{display:"flex",gap:10,paddingTop:10,borderTop:"1px solid #e2e8f0"}}>
+            <button onClick={()=>setStatus("idle")}
+              style={{flex:1,padding:"11px",borderRadius:8,background:"#f8fafc",
+                border:"1px solid #e2e8f0",cursor:"pointer",fontWeight:700,fontSize:13,color:"#64748b",fontFamily:"inherit"}}>
+              ← Retour
+            </button>
+            {actionable.length > 0 ? (
+              <button onClick={doImport} disabled={selCount===0}
+                style={{flex:2,padding:"11px",borderRadius:8,border:"none",fontFamily:"inherit",fontWeight:800,fontSize:14,color:"#fff",
+                  background:selCount>0?"linear-gradient(135deg,#0369a1,#0891b2)":"#9ca3af",
+                  cursor:selCount>0?"pointer":"default"}}>
+                Importer {selCount} rapport{selCount>1?"s":""}
+              </button>
+            ) : (
+              <button onClick={onClose}
+                style={{flex:2,padding:"11px",borderRadius:8,background:"#f0fdf4",
+                  border:"1px solid #bbf7d0",cursor:"pointer",fontWeight:700,fontSize:13,color:"#166534",fontFamily:"inherit"}}>
+                Tout est à jour ✅
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* IMPORTING */}
+      {status==="importing" && (
+        <div style={{textAlign:"center",padding:52,display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
+          <div style={{fontSize:44}}>💾</div>
+          <div style={{fontWeight:800,fontSize:16,color:"#0f172a"}}>Import en cours…</div>
+        </div>
+      )}
+
+      {/* DONE */}
+      {status==="done" && result && (
+        <div style={{textAlign:"center",padding:44,display:"flex",flexDirection:"column",alignItems:"center",gap:14}}>
+          <div style={{fontSize:56}}>✅</div>
+          <div style={{fontWeight:900,fontSize:18,color:"#0f172a"}}>Import réussi !</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8,fontSize:14,color:"#475569",textAlign:"center"}}>
+            {result.added>0     && <div>🆕 <strong>{result.added}</strong> rapport{result.added>1?"s":""} créé{result.added>1?"s":""}</div>}
+            {result.enriched>0  && <div>✏️ <strong>{result.enriched}</strong> rapport{result.enriched>1?"s":""} complété{result.enriched>1?"s":""}</div>}
+            {result.photosAdded>0 && <div>📸 <strong>{result.photosAdded}</strong> photo{result.photosAdded>1?"s":""} ajoutée{result.photosAdded>1?"s":""}</div>}
+          </div>
+          <button onClick={onClose}
+            style={{marginTop:10,padding:"13px 30px",borderRadius:10,
+              background:"linear-gradient(135deg,#0369a1,#0891b2)",border:"none",
+              cursor:"pointer",fontWeight:800,fontSize:15,color:"#fff",fontFamily:"inherit"}}>
+            Fermer
+          </button>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 function ModalImportConnecteam({ clients, onImport, onClose }) {
   const [status, setStatus] = useState("idle");
   const [rows, setRows] = useState([]);
@@ -698,7 +1184,8 @@ export default function App() {
   const [stock, setStock] = useState({});
   const [stockMeta, setStockMeta] = useState({});
   const [showStock, setShowStock] = useState(false);
-  const [showImport, setShowImport] = useState(false);
+  const [showImport, setShowImport]     = useState(false);
+  const [showImportHTML, setShowImportHTML] = useState(false);
   const [contrats, setContrats] = useState({});
   const [versements, setVersements] = useState({});
   const [retardsCarnet, setRetardsCarnet] = useState({});
@@ -1169,6 +1656,11 @@ export default function App() {
   const updateStockMeta = useCallback((nom, meta) => { setStockMeta(prev=>{ const next={...prev,[nom]:meta}; saveStockMeta(next); return next; }); },[saveStockMeta]);
   const nbStockBas = useMemo(()=>Object.values(stock).filter(q=>q<=2).length,[stock]);
 
+  const handleImportHTML = useCallback((updatedPassages) => {
+    setPassages(updatedPassages);
+    savePassages(updatedPassages);
+  }, [savePassages]);
+
   const handleImport = useCallback((newClients, newPassages) => {
     setClients(prev => { const next = [...prev, ...newClients]; saveClients(next); return next; });
     setPassages(prev => { const next = [...prev, ...newPassages]; savePassages(next); return next; });
@@ -1323,7 +1815,7 @@ export default function App() {
             {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddClient={openAddClient} onValider={validerPassage} onChangeStatut={updateStatutPassage} onClientClick={setFicheClient}/>}
             {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
             {page==="gestion"&&<PageGestion clients={clients} versements={versements} onToggleVersement={handleToggleVersement} livraisons={livraisons} onUpdateStatutLivraison={updateStatutLivraison} retardsCarnet={retardsCarnet} onToggleRetardCarnet={handleToggleRetardCarnet} contrats={contrats} onOpenContrat={(client,contrat)=>ouvrirContrat(client,contrat?.signaturePrestataire||"",contrat?.signatureClient||"")}/>}
-            {page==="parametres"&&<PageParametres modeExpert={modeExpert} onToggleExpert={toggleExpert} clients={clients} passages={passages} rdvs={rdvs} onLogout={handleLogout}/>}
+            {page==="parametres"&&<PageParametres modeExpert={modeExpert} onToggleExpert={toggleExpert} clients={clients} passages={passages} rdvs={rdvs} onLogout={handleLogout} onOpenImportHTML={()=>setShowImportHTML(true)}/>}
           </div>
         </>
       ) : (
@@ -1361,7 +1853,7 @@ export default function App() {
               {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddClient={openAddClient} onValider={validerPassage} onChangeStatut={updateStatutPassage} onClientClick={setFicheClient}/>}
               {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
               {page==="gestion"&&<PageGestion clients={clients} versements={versements} onToggleVersement={handleToggleVersement} livraisons={livraisons} onUpdateStatutLivraison={updateStatutLivraison} retardsCarnet={retardsCarnet} onToggleRetardCarnet={handleToggleRetardCarnet} contrats={contrats} onOpenContrat={(client,contrat)=>ouvrirContrat(client,contrat?.signaturePrestataire||"",contrat?.signatureClient||"")}/>}
-              {page==="parametres"&&<PageParametres modeExpert={modeExpert} onToggleExpert={toggleExpert} clients={clients} passages={passages} rdvs={rdvs} onLogout={handleLogout}/>}
+              {page==="parametres"&&<PageParametres modeExpert={modeExpert} onToggleExpert={toggleExpert} clients={clients} passages={passages} rdvs={rdvs} onLogout={handleLogout} onOpenImportHTML={()=>setShowImportHTML(true)}/>}
             </div>
           </div>
         </div>
@@ -1407,6 +1899,7 @@ export default function App() {
       {showFormLivraison&&<FormLivraison clientId={defaultLivraisonClientId} clients={clients} produitsStock={Object.keys(stock)} onSave={l=>{saveLivraison(l);setShowFormLivraison(false);}} onClose={()=>setShowFormLivraison(false)}/>}
       {showFormRdv&&<FormRdv initial={editRdv} clients={clients} onSave={saveRdv} onClose={()=>{setShowFormRdv(false);setEditRdv(null);}}/>}
       {showImport&&<ModalImportConnecteam clients={clients} onImport={handleImport} onClose={()=>setShowImport(false)}/>}
+      {showImportHTML&&<ModalImportHTML clients={clients} passages={passages} onImport={handleImportHTML} onClose={()=>setShowImportHTML(false)}/>}
       {showStock&&<ModalStock stock={stock} stockMeta={stockMeta} onClose={()=>setShowStock(false)} onUpdateStock={updateStock} onUpdateMeta={updateStockMeta} onAddProduit={addProduitStock} onDeleteProduit={deleteProduitStock}/>}
 
       {showModalAlertes&&(()=>{

@@ -263,7 +263,7 @@ function BoutonTest({ label, onClick }) {
 export function PageParametres({
   modeExpert, onToggleExpert,
   clients = [], passages = [], rdvs = [],
-  onLogout,
+  onLogout, onOpenImportHTML,
 }) {
   const [syncMsg,      setSyncMsg]      = useState("");
   const [exportMsg,    setExportMsg]    = useState("");
@@ -271,9 +271,6 @@ export function PageParametres({
   const [cacheSize,    setCacheSize]    = useState("…");
   const [restoreMsg,   setRestoreMsg]   = useState("");
   const [restoring,    setRestoring]    = useState(false);
-  const [importMsg,    setImportMsg]    = useState("");
-  const [importing,    setImporting]    = useState(false);
-  const importInputRef = useRef(null);
 
   // ── Helpers localStorage ──
   const ls    = (k, def) => { try { const v = localStorage.getItem(k); return v === null ? def : JSON.parse(v); } catch { return def; } };
@@ -410,11 +407,14 @@ export function PageParametres({
     setTimeout(() => setRestoreMsg(""), 8000);
   };
 
-  // ── Import rapports HTML ──
-  const importerRapportsHTML = async (files) => {
+  // ── Import rapports HTML → délégué à ModalImportHTML dans App.jsx ──
+  const importerRapportsHTML_LEGACY = async (files) => {
     if (!files || files.length === 0) return;
-    setImporting(true);
-    setImportMsg("⏳ Récupération Firebase en cours…");
+    // L'import est maintenant géré par ModalImportHTML (App.jsx) via onOpenImportHTML.
+    // Cette fonction est conservée comme fallback si onOpenImportHTML n'est pas fourni.
+    if (onOpenImportHTML) { onOpenImportHTML(); return; }
+    // Fallback minimal (ne devrait pas être atteint)
+    alert(`${files.length} fichier(s) reçu(s) — veuillez utiliser le bouton Import HTML`);
 
     // SÉCURITÉ : toujours récupérer Firebase en premier pour ne jamais écraser des données plus récentes
     let existingPassages = [];
@@ -1084,18 +1084,10 @@ export function PageParametres({
             <polyline points="17 8 12 3 7 8"/>
             <line x1="12" y1="3" x2="12" y2="15"/>
           </svg>}
-          label="Importer rapports HTML"
-          detail={importMsg || (importing ? "Import en cours…" : "Restaurer des rapports reçus par mail (.html)")}
-          onClick={() => !importing && importInputRef.current?.click()}
+          label="Import intelligent — Rapports HTML"
+          detail="Rapports manquants • données vides • photos — tout détecté automatiquement"
+          onClick={() => onOpenImportHTML?.()}
           sep={modeExpert}
-        />
-        <input
-          ref={importInputRef}
-          type="file"
-          accept=".html,.htm"
-          multiple
-          style={{ display: "none" }}
-          onChange={e => importerRapportsHTML(e.target.files)}
         />
         {modeExpert && (
           <Ligne
