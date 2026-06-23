@@ -37,15 +37,16 @@ export const DOCS = {
 
 // Mapping clé localStorage → document + champ Firestore
 export const KEY_MAP = {
-  "bb_clients_v2":        { doc: "clients",    field: "data" },
-  "bb_passages_v2":       { doc: "passages",   field: "data" },
-  "bb_rdvs_v1":           { doc: "rdvs",       field: "data" },
-  "bb_livraisons_v1":     { doc: "livraisons", field: "data" },
-  "bb_contrats_v1":       { doc: "contrats",   field: "data" },
-  "bb_stock_v1":          { doc: "stock",      field: "data" },
-  "bb_versements_v1":     { doc: "meta",       field: "versements" },
-  "bb_retards_carnet_v1": { doc: "meta",       field: "retards" },
-  "bb_notes_v1":          { doc: "meta",       field: "notes" },
+  "bb_clients_v2":           { doc: "clients",    field: "data" },
+  "bb_passages_v2":          { doc: "passages",   field: "data" },
+  "bb_deleted_passages_v1":  { doc: "passages",   field: "deletedIds" }, // IDs des passages supprimés (tombstones)
+  "bb_rdvs_v1":              { doc: "rdvs",       field: "data" },
+  "bb_livraisons_v1":        { doc: "livraisons", field: "data" },
+  "bb_contrats_v1":          { doc: "contrats",   field: "data" },
+  "bb_stock_v1":             { doc: "stock",      field: "data" },
+  "bb_versements_v1":        { doc: "meta",       field: "versements" },
+  "bb_retards_carnet_v1":    { doc: "meta",       field: "retards" },
+  "bb_notes_v1":             { doc: "meta",       field: "notes" },
 };
 
 // URLs REST Firestore par document (pour iOS — le SDK peut être tué en arrière-plan)

@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { save, flushPendingNow, IS_IOS, reconcileOnBoot, invalidateDocCache, subscribeToRealtime } from "./lib/storage";
+import { save, flushPendingNow, IS_IOS, reconcileOnBoot, invalidateDocCache, subscribeToRealtime, markPassageDeleted } from "./lib/storage";
 import { extractPassagePhotos, migratePassagePhotosToStorage, migrateAllPassagesPhotos, migrateClientPhotoToStorage } from "./lib/photoStore";
 import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import { auth } from "./lib/firebase";
@@ -1106,6 +1106,9 @@ export default function App() {
   const deletePassage = useCallback(async id=>{
     const p = passages.find(x=>x.id===id);
     if(p?.statut==="validee"){ toastError("Impossible de supprimer une intervention validée."); return; }
+    // Marquer l'ID comme supprimé AVANT de sauvegarder : empêche le retour
+    // via merge, reconcileOnBoot ou snapshot Firebase au rechargement.
+    markPassageDeleted(id);
     const next = passages.filter(x=>x.id!==id);
     setPassages(next);
     await savePassages(next);
