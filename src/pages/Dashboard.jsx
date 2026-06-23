@@ -778,10 +778,13 @@ const PLANNING_ACTIONS = [
   {label:"Rapport",     emoji:"📋", color:"#0891b2", bg:"#e0f2fe", bord:"#7dd3fc", type:null},
 ];
 
+const MAX_EVENTS_VISIBLE = 5;
+
 function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEditRdv, onClientClick, isMobile }) {
   const [weekOffset, setWeekOffset] = useState(0);
   const [menuDay, setMenuDay] = useState(null);
   const [menuPos, setMenuPos] = useState(null); // desktop uniquement
+  const [expandedDay, setExpandedDay] = useState(null); // jour dont on affiche tous les événements
   const scrollRef = useRef(null);
 
   const closeMenu = () => { setMenuDay(null); setMenuPos(null); };
@@ -983,61 +986,105 @@ function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEdit
               </div>
 
               {/* Événements */}
-              <div style={{padding:"4px",display:"flex",flexDirection:"column",gap:3,flex:1}}>
-                {events.map((ev, j) => {
-                  const client = (clients||[]).find(c => c.id === ev.clientId);
-                  const nom = (() => {
-                    if (!client?.nom) return "?";
-                    const parts = client.nom.replace(/^(M\.|Mme|Mlle)\s*/i,"").trim().split(/\s+/);
-                    return (parts[parts.length-1]||parts[0]).slice(0,10);
-                  })();
-                  const isPassage = ev._kind === "passage";
-                  const isCtrl = isControleType(ev.type);
-                  const isSav = /sav|dépann/i.test(ev.type||"");
+              {(() => {
+                const isExpanded = expandedDay === ds;
+                const visible = isExpanded ? events : events.slice(0, MAX_EVENTS_VISIBLE);
+                const hidden  = events.length - MAX_EVENTS_VISIBLE;
 
-                  const [color, bg, bord] = isPassage
-                    ? isCtrl  ? ["#0e7490","#e0f2fe","#7dd3fc"]
-                    : isSav   ? ["#ea580c","#fff7ed","#fdba74"]
-                    : ["#059669","#f0fdf4","#86efac"]
-                    : ["#7c3aed","#f5f3ff","#c4b5fd"];
+                return (
+                  <div style={{padding:"4px",display:"flex",flexDirection:"column",gap:3,flex:1}}>
+                    {visible.map((ev, j) => {
+                      const client = (clients||[]).find(c => c.id === ev.clientId);
+                      const nom = (() => {
+                        if (!client?.nom) return "?";
+                        const parts = client.nom.replace(/^(M\.|Mme|Mlle)\s*/i,"").trim().split(/\s+/);
+                        return (parts[parts.length-1]||parts[0]).slice(0,10);
+                      })();
+                      const isPassage = ev._kind === "passage";
+                      const isCtrl = isControleType(ev.type);
+                      const isSav = /sav|dépann/i.test(ev.type||"");
 
-                  const emoji = isPassage ? (isCtrl?"💧":isSav?"🔧":"✓") : "📅";
+                      const [color, bg, bord] = isPassage
+                        ? isCtrl  ? ["#0e7490","#e0f2fe","#7dd3fc"]
+                        : isSav   ? ["#ea580c","#fff7ed","#fdba74"]
+                        : ["#059669","#f0fdf4","#86efac"]
+                        : ["#7c3aed","#f5f3ff","#c4b5fd"];
 
-                  return (
-                    <button key={ev.id||j}
-                      onClick={()=> isPassage && client ? onClientClick(client) : (!isPassage && onEditRdv && onEditRdv(ev))}
+                      const emoji = isPassage ? (isCtrl?"💧":isSav?"🔧":"✓") : "📅";
+
+                      return (
+                        <button key={ev.id||j}
+                          onClick={()=> isPassage && client ? onClientClick(client) : (!isPassage && onEditRdv && onEditRdv(ev))}
+                          style={{
+                            width:"100%",padding:"3px 4px",borderRadius:6,
+                            background:bg,border:`1px solid ${bord}`,
+                            cursor:"pointer",fontFamily:"inherit",textAlign:"left",
+                            WebkitTapHighlightColor:"transparent",
+                            opacity:isPast&&!isPassage?.6:1,
+                          }}>
+                          <div style={{fontSize:8,color:"#64748b",marginBottom:1,display:"flex",alignItems:"center",gap:2,lineHeight:1}}>
+                            <span>{emoji}</span>
+                            {ev.heure&&<span>{ev.heure.slice(0,5)}</span>}
+                          </div>
+                          <div style={{fontSize:10,fontWeight:700,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",lineHeight:1.2}}>{nom}</div>
+                          <div style={{fontSize:8,color,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{(ev.type||"RDV").slice(0,13)}</div>
+                        </button>
+                      );
+                    })}
+
+                    {/* Bouton "+ N autres" si > MAX_EVENTS_VISIBLE et pas encore étendu */}
+                    {!isExpanded && hidden > 0 && (
+                      <button
+                        onClick={e=>{ e.stopPropagation(); setExpandedDay(ds); }}
+                        style={{
+                          width:"100%",padding:"3px 4px",borderRadius:6,
+                          background:"#f1f5f9",border:"1px solid #cbd5e1",
+                          cursor:"pointer",fontFamily:"inherit",
+                          display:"flex",alignItems:"center",justifyContent:"center",gap:3,
+                          WebkitTapHighlightColor:"transparent",transition:"background .12s",
+                        }}
+                        onMouseEnter={e=>e.currentTarget.style.background="#e2e8f0"}
+                        onMouseLeave={e=>e.currentTarget.style.background="#f1f5f9"}>
+                        <svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="3" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+                        <span style={{fontSize:9,fontWeight:700,color:"#64748b"}}>+{hidden} de plus</span>
+                      </button>
+                    )}
+
+                    {/* Bouton réduire si étendu */}
+                    {isExpanded && events.length > MAX_EVENTS_VISIBLE && (
+                      <button
+                        onClick={e=>{ e.stopPropagation(); setExpandedDay(null); }}
+                        style={{
+                          width:"100%",padding:"3px 4px",borderRadius:6,
+                          background:"#f1f5f9",border:"1px solid #cbd5e1",
+                          cursor:"pointer",fontFamily:"inherit",
+                          display:"flex",alignItems:"center",justifyContent:"center",gap:3,
+                          WebkitTapHighlightColor:"transparent",transition:"background .12s",
+                        }}
+                        onMouseEnter={e=>e.currentTarget.style.background="#e2e8f0"}
+                        onMouseLeave={e=>e.currentTarget.style.background="#f1f5f9"}>
+                        <svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="3" strokeLinecap="round"><polyline points="18 15 12 9 6 15"/></svg>
+                        <span style={{fontSize:9,fontWeight:700,color:"#64748b"}}>Réduire</span>
+                      </button>
+                    )}
+
+                    {/* Bouton + — onClick uniquement (évite double déclenchement touchstart+mousedown) */}
+                    <button
+                      onClick={e=>handlePlus(e,ds)}
                       style={{
-                        width:"100%",padding:"3px 4px",borderRadius:6,
-                        background:bg,border:`1px solid ${bord}`,
-                        cursor:"pointer",fontFamily:"inherit",textAlign:"left",
-                        WebkitTapHighlightColor:"transparent",
-                        opacity:isPast&&!isPassage?.6:1,
+                        width:"100%",minHeight:22,padding:"2px",borderRadius:6,
+                        background:menuDay===ds?"#e0f2fe":"transparent",
+                        border:`1.5px dashed ${menuDay===ds?"#0891b2":"#e2e8f0"}`,
+                        cursor:"pointer",color:menuDay===ds?"#0891b2":"#d1d5db",
+                        fontSize:15,fontWeight:700,
+                        display:"flex",alignItems:"center",justifyContent:"center",
+                        fontFamily:"inherit",lineHeight:1,transition:"all .15s",
                       }}>
-                      <div style={{fontSize:8,color:"#64748b",marginBottom:1,display:"flex",alignItems:"center",gap:2,lineHeight:1}}>
-                        <span>{emoji}</span>
-                        {ev.heure&&<span>{ev.heure.slice(0,5)}</span>}
-                      </div>
-                      <div style={{fontSize:10,fontWeight:700,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",lineHeight:1.2}}>{nom}</div>
-                      <div style={{fontSize:8,color,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{(ev.type||"RDV").slice(0,13)}</div>
+                      +
                     </button>
-                  );
-                })}
-
-                {/* Bouton + — onClick uniquement (évite double déclenchement touchstart+mousedown) */}
-                <button
-                  onClick={e=>handlePlus(e,ds)}
-                  style={{
-                    width:"100%",minHeight:22,padding:"2px",borderRadius:6,
-                    background:menuDay===ds?"#e0f2fe":"transparent",
-                    border:`1.5px dashed ${menuDay===ds?"#0891b2":"#e2e8f0"}`,
-                    cursor:"pointer",color:menuDay===ds?"#0891b2":"#d1d5db",
-                    fontSize:15,fontWeight:700,
-                    display:"flex",alignItems:"center",justifyContent:"center",
-                    fontFamily:"inherit",lineHeight:1,transition:"all .15s",
-                  }}>
-                  +
-                </button>
-              </div>
+                  </div>
+                );
+              })()}
             </div>
           );
         })}
