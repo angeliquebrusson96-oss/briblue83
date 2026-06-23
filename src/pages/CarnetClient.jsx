@@ -1237,7 +1237,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
                 <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8}}>
                   {[p.photoArrivee?{src:p.photoArrivee,lbl:"Arrivée"}:null,...((p.photos||[]).filter(Boolean).map((s,i)=>({src:s,lbl:`Photo ${i+2}`}))),p.photoDepart?{src:p.photoDepart,lbl:"Départ"}:null].filter(Boolean).map((ph,i)=>(
                     <div key={i} style={{position:"relative",borderRadius:10,overflow:"hidden"}}>
-                      <PhotoImg src={ph.src} alt={ph.lbl} style={{width:"100%",height:110,objectFit:"cover",display:"block"}}/>
+                      <PhotoImg src={ph.src} alt={ph.lbl} showSyncWarning={false} style={{width:"100%",height:110,objectFit:"cover",display:"block"}}/>
                       <span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>{ph.lbl}</span>
                     </div>
                   ))}

@@ -154,7 +154,7 @@ export function PassageDetailModal({ passage, client, onClose }) {
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(3,1fr)",gap:8}}>
             {photos.map((ph,i)=>(
               <div key={i} style={{position:"relative",borderRadius:10,overflow:"hidden",border:"1px solid "+DS.border}}>
-                <PhotoImg src={ph.src} alt={ph.label} style={{width:"100%",height:isMobile?90:110,objectFit:"cover",display:"block"}}/>
+                <PhotoImg src={ph.src} alt={ph.label} showSyncWarning={false} style={{width:"100%",height:isMobile?90:110,objectFit:"cover",display:"block"}}/>
                 <span style={{position:"absolute",bottom:4,left:5,fontSize:9,fontWeight:700,color:"#fff",background:"rgba(0,0,0,0.6)",borderRadius:4,padding:"1px 6px"}}>{ph.label}</span>
               </div>
             ))}
@@ -341,7 +341,8 @@ export function PageClients({ clients, passages, contrats={}, onUpdateContrat, o
               <div style={{height:110,position:"relative",flexShrink:0,overflow:"hidden",borderRadius:"20px 20px 0 0"}}>
                 {c.photoPiscine
                   ? <>
-                      <PhotoImg src={c.photoPiscine} alt="" style={{width:"100%",height:"100%",objectFit:"contain",display:"block",background:"rgba(0,0,0,0.6)"}}/>
+                      {/* showSyncWarning=false : on préfère le fallback gradient au placeholder jaune */}
+                      <PhotoImg src={c.photoPiscine} alt="" showSyncWarning={false} style={{width:"100%",height:"100%",objectFit:"contain",display:"block",background:"rgba(0,0,0,0.6)"}}/>
                       <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,rgba(0,0,0,0.08) 0%,rgba(0,0,0,0.55) 100%)"}}/>
                     </>
                   : <div style={{width:"100%",height:"100%",background:avatarGrad(c.nom),display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>

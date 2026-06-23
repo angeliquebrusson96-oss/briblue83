@@ -508,7 +508,46 @@ export async function reconcileOnBoot() {
         continue;
       }
 
-      // ── Timestamp gagne pour les objets (stock, contrats…) ───────────────
+      // ── Merge intelligent pour les contrats ─────────────────────────────
+      // JAMAIS "timestamp gagne" pour bb_contrats_v1 : une signature client
+      // enregistrée via l'API serait écrasée si le localStorage local est plus récent.
+      // On fusionne entry par entry en gardant le statut le plus avancé + les signatures.
+      if (key === "bb_contrats_v1") {
+        const RANK = { signe_complet:4, signe_client:3, demande_envoyee:2, cree:1, reset:0 };
+        const localObj  = local     && typeof local     === "object" ? local     : {};
+        const remoteObj = remoteVal && typeof remoteVal === "object" ? remoteVal : {};
+        const merged = { ...localObj };
+        for (const [id, rct] of Object.entries(remoteObj)) {
+          if (!rct || typeof rct !== "object") { merged[id] = merged[id] ?? rct; continue; }
+          const lct = merged[id];
+          if (!lct || typeof lct !== "object") { merged[id] = rct; continue; }
+          const lr = RANK[lct.statut] ?? -1;
+          const rr = RANK[rct.statut] ?? -1;
+          if (rr > lr) {
+            merged[id] = rct; // Firebase plus avancé → prendre Firebase
+          } else {
+            // Local aussi avancé OU plus avancé → fusionner les signatures reçues
+            merged[id] = {
+              ...lct,
+              signatureClient:      rct.signatureClient      || lct.signatureClient      || "",
+              signaturePrestataire: rct.signaturePrestataire || lct.signaturePrestataire || "",
+              signedAt:             lct.signedAt             || rct.signedAt,
+              signedByPrestaAt:     lct.signedByPrestaAt     || rct.signedByPrestaAt,
+            };
+          }
+        }
+        try {
+          localStorage.setItem("briblue_" + key, JSON.stringify(merged));
+          localStorage.setItem("briblue_meta_" + key, JSON.stringify({ savedAt: Date.now() }));
+        } catch {} // eslint-disable-line no-empty
+        // Toujours pousser le merged (contient signatures locales + Firebase)
+        if (!toPush[mapping.doc]) toPush[mapping.doc] = { savedAt: now };
+        toPush[mapping.doc][mapping.field] = merged;
+        needsPush = true;
+        continue;
+      }
+
+      // ── Timestamp gagne pour les autres objets (stock…) ─────────────────
       if (localTime >= remoteTime) {
         if (!toPush[mapping.doc]) toPush[mapping.doc] = { savedAt: now };
         toPush[mapping.doc][mapping.field] = local;
@@ -887,6 +926,39 @@ export function subscribeToRealtime(callbacks) {
               } else {
                 val = valFiltered;
                 patchedData[mapping.field] = valFiltered;
+              }
+            } catch { /* noop */ }
+          }
+
+          // ── Merge spécial pour les contrats (signatures ne doivent jamais disparaître) ─
+          if (key === "bb_contrats_v1" && val && typeof val === "object") {
+            try {
+              const RANK = { signe_complet:4, signe_client:3, demande_envoyee:2, cree:1, reset:0 };
+              const localRaw = localStorage.getItem("briblue_" + key);
+              const localObj = localRaw ? JSON.parse(localRaw) : {};
+              if (localObj && typeof localObj === "object") {
+                const mergedConts = { ...val };
+                for (const [id, lct] of Object.entries(localObj)) {
+                  if (!lct || typeof lct !== "object") continue;
+                  const rct = mergedConts[id];
+                  if (!rct || typeof rct !== "object") { mergedConts[id] = lct; continue; }
+                  const lr = RANK[lct.statut] ?? -1;
+                  const rr = RANK[rct.statut] ?? -1;
+                  if (lr > rr) {
+                    mergedConts[id] = lct; // local plus avancé → garder local
+                  } else {
+                    // Toujours récupérer les signatures des deux côtés
+                    mergedConts[id] = {
+                      ...rct,
+                      signatureClient:      rct.signatureClient      || lct.signatureClient      || "",
+                      signaturePrestataire: rct.signaturePrestataire || lct.signaturePrestataire || "",
+                      signedAt:             rct.signedAt             || lct.signedAt,
+                      signedByPrestaAt:     rct.signedByPrestaAt     || lct.signedByPrestaAt,
+                    };
+                  }
+                }
+                val = mergedConts;
+                patchedData[mapping.field] = mergedConts;
               }
             } catch { /* noop */ }
           }

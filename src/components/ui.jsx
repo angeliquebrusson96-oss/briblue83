@@ -149,7 +149,8 @@ export function Avatar({ nom, size=40, photo }) {
       <div style={{width:size,height:size,borderRadius:r,position:"relative",flexShrink:0,overflow:"hidden",background:bg,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 8px rgba(0,0,0,0.15)"}}>
         <span style={{color:"#fff",fontWeight:800,fontSize:size*0.35,letterSpacing:-0.5,position:"absolute"}}>{initials}</span>
         {/* PhotoImg résout idb:/https:/data: — retourne null si introuvable → initiales visibles */}
-        <PhotoImg src={photo} alt={nom} style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover"}}/>
+        {/* showSyncWarning=false : on préfère les initiales au placeholder jaune dans un avatar */}
+        <PhotoImg src={photo} alt={nom} showSyncWarning={false} style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover"}}/>
       </div>
     );
   }

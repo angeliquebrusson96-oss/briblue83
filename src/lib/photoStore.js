@@ -256,23 +256,23 @@ export async function extractPassagePhotos(passage) {
   // les timeouts en cascade sur iOS. Timeout par photo : 45s.
   // Si échec → idb: reste + ajout à la queue de retry → migration ultérieure.
   if (toUpload.length > 0 && navigator.onLine) {
+    // On tente l'auth anonyme mais on n'annule PAS si ça échoue :
+    // uploadOne réessaie en interne et les règles Storage autorisent l'écriture publique.
     if (!auth.currentUser) {
-      try { await signInAnonymously(auth); } catch { /* réseau indisponible */ }
+      try { await signInAnonymously(auth); } catch { /* continue sans auth */ }
     }
-    if (auth.currentUser) {
-      for (const { setVal, key } of toUpload) {
-        if (!navigator.onLine) break;
-        try {
-          const dataUrl = await loadPhoto(key);
-          if (!dataUrl) continue;
-          const url = await Promise.race([
-            uploadOne(key, dataUrl),
-            new Promise((resolve) => setTimeout(() => resolve(null), EXTRACT_UPLOAD_TIMEOUT_MS)),
-          ]);
-          if (url) setVal(url); // ✓ Photo sur Firebase Storage → https://
-          // Si url null → uploadOne a déjà ajouté key à la queue de retry
-        } catch { /* upload échoué → idb: reste, migration ultérieure */ }
-      }
+    for (const { setVal, key } of toUpload) {
+      if (!navigator.onLine) break;
+      try {
+        const dataUrl = await loadPhoto(key);
+        if (!dataUrl) continue;
+        const url = await Promise.race([
+          uploadOne(key, dataUrl),
+          new Promise((resolve) => setTimeout(() => resolve(null), EXTRACT_UPLOAD_TIMEOUT_MS)),
+        ]);
+        if (url) setVal(url); // ✓ Photo sur Firebase Storage → https://
+        // Si url null → uploadOne a déjà ajouté key à la queue de retry
+      } catch { /* upload échoué → idb: reste, migration ultérieure */ }
     }
   }
 
@@ -328,10 +328,12 @@ const UPLOAD_TIMEOUT_MS = 60_000;
 
 async function uploadOne(key, dataUrl) {
   if (!dataUrl || !navigator.onLine) return null;
+  // Tentative de sign-in anonyme pour enrichir le token Firebase Storage.
+  // Si ça échoue (401, 400 "anonymous disabled"), on tente l'upload quand même :
+  // les règles Storage autorisent l'écriture publique (voir storage.rules).
   if (!auth.currentUser) {
-    try { await signInAnonymously(auth); } catch { return null; }
+    try { await signInAnonymously(auth); } catch { /* continue sans auth */ }
   }
-  if (!auth.currentUser) return null;
   try {
     const compressed = await compressForUpload(dataUrl);
     if (!compressed?.startsWith("data:")) return null;
