@@ -301,36 +301,94 @@ function compressForUpload(dataUrl) {
   });
 }
 
+// ─── QUEUE PERSISTANTE D'UPLOADS EN ATTENTE ──────────────────────────────────
+// Stocke les clés IDB qui n'ont pas pu être uploadées (réseau, timeout, iOS bg).
+// Traitée à chaque boot / retour en ligne.
+const _UPLOAD_QUEUE_KEY = "briblue_photo_upload_queue_v1";
+
+export function _getUploadQueue() {
+  try { return JSON.parse(localStorage.getItem(_UPLOAD_QUEUE_KEY) || "[]"); } catch { return []; }
+}
+function _saveUploadQueue(arr) {
+  try { localStorage.setItem(_UPLOAD_QUEUE_KEY, JSON.stringify(arr)); } catch { /* quota */ }
+}
+function _addToUploadQueue(key) {
+  const q = _getUploadQueue();
+  if (!q.includes(key)) { q.push(key); _saveUploadQueue(q); }
+}
+function _removeFromUploadQueue(key) {
+  const q = _getUploadQueue().filter(k => k !== key);
+  _saveUploadQueue(q);
+}
+
 // ─── UPLOAD UN FICHIER VERS FIREBASE STORAGE ─────────────────────────────────
-const UPLOAD_TIMEOUT_MS = 20000;
+// Utilise fetch().blob() (plus fiable sur iOS que atob + Uint8Array manuel).
+// Timeout 60 s pour les connexions mobiles lentes.
+const UPLOAD_TIMEOUT_MS = 60_000;
 
 async function uploadOne(key, dataUrl) {
   if (!dataUrl || !navigator.onLine) return null;
-  // Auto-signin anonyme si l'auth n'est pas encore prête (fire-and-forget dans App)
   if (!auth.currentUser) {
-    try { await signInAnonymously(auth); } catch { /* réseau indisponible */ }
+    try { await signInAnonymously(auth); } catch { return null; }
   }
   if (!auth.currentUser) return null;
   try {
-    // Compresser avant envoi pour réduire la taille sur le réseau mobile
     const compressed = await compressForUpload(dataUrl);
-    const [, b64] = compressed.split(",");
-    if (!b64) return null;
-    const binary = atob(b64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const blob = new Blob([bytes], { type: "image/jpeg" });
+    if (!compressed?.startsWith("data:")) return null;
+
+    // fetch().blob() — plus fiable que atob() sur iOS (évite les problèmes
+    // de mémoire avec de grands tableaux Uint8Array et les bugs de charset)
+    const blob = await fetch(compressed).then(r => r.blob());
+    if (!blob || blob.size === 0) return null;
+
     const storageRef = ref(storage, `photos/${key}.jpg`);
-    const upload = uploadBytes(storageRef, blob, { contentType: "image/jpeg" })
-      .then(() => getDownloadURL(storageRef));
+    const uploadTask = uploadBytes(storageRef, blob, { contentType: "image/jpeg" })
+      .then(snapshot => getDownloadURL(snapshot.ref));
     const timeout = new Promise((_, rej) =>
-      setTimeout(() => rej(new Error("timeout")), UPLOAD_TIMEOUT_MS)
+      setTimeout(() => rej(new Error("upload-timeout")), UPLOAD_TIMEOUT_MS)
     );
-    return await Promise.race([upload, timeout]);
+    const url = await Promise.race([uploadTask, timeout]);
+    if (url) _removeFromUploadQueue(key); // succès → retirer de la queue
+    return url;
   } catch (e) {
     console.warn("[briblue] uploadOne échoué:", key, e?.message);
+    _addToUploadQueue(key); // échec → ajouter à la queue de retry
     return null;
   }
+}
+
+// ─── RETRY UPLOADS EN ATTENTE ─────────────────────────────────────────────────
+// Appelée à chaque boot / retour en ligne pour uploader les photos manquantes.
+// Retourne un mapping { idbKey → httpsUrl } pour les clés qui ont pu être uploadées.
+export async function retryPendingUploads() {
+  if (!navigator.onLine) return {};
+  if (!auth.currentUser) {
+    try { await signInAnonymously(auth); } catch { return {}; }
+  }
+  const queue = _getUploadQueue();
+  if (!queue.length) return {};
+
+  const results = {};
+  for (const key of queue) {
+    if (!navigator.onLine) break;
+    try {
+      // Vérifier si le fichier existe déjà en Storage (évite re-upload inutile)
+      const existingUrl = buildStorageUrl(key);
+      const head = await fetch(existingUrl, { method: "HEAD" }).catch(() => null);
+      if (head?.ok) {
+        // Fichier déjà sur Storage → récupérer l'URL et retirer de la queue
+        results[key] = existingUrl;
+        _removeFromUploadQueue(key);
+        continue;
+      }
+      // Charger depuis IDB et re-tenter l'upload
+      const dataUrl = await loadPhoto(key);
+      if (!dataUrl) { _removeFromUploadQueue(key); continue; } // IDB purgé → abandonner
+      const url = await uploadOne(key, dataUrl); // uploadOne retire de la queue si succès
+      if (url) results[key] = url;
+    } catch { /* noop — reste dans la queue */ }
+  }
+  return results; // { idbKey → httpsUrl }
 }
 
 // ─── MIGRATION GLOBALE : tous les passages avec des clés idb: ────────────────
