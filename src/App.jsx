@@ -1256,7 +1256,7 @@ export default function App() {
   // ─── MIGRATION PHOTOS passages + clients ─────────────────────────────────────
   // Pousse les clés idb: locales vers Firebase Storage → URL https:// multi-appareils
   const runPhotoMigration = useCallback(async () => {
-    if (!navigator.onLine || !auth.currentUser) return;
+    if (!navigator.onLine) return;
 
     // 0. Retry des uploads en attente (clés IDB qui avaient échoué lors de sessions précédentes)
     const retried = await retryPendingUploads().catch(() => ({}));
@@ -1309,7 +1309,7 @@ export default function App() {
       !cl.photoPiscine.startsWith("fsp:")
     );
     for (const cl of toMigrate) {
-      if (!navigator.onLine || !auth.currentUser) break;
+      if (!navigator.onLine) break;
       const migrated = await migrateClientPhotoToStorage(cl).catch(() => null);
       if (migrated) {
         // Mise à jour atomique : ne modifie que CE client, préserve tous les autres
@@ -1343,9 +1343,6 @@ export default function App() {
   useEffect(() => {
     if (!ready) return;
     const onOnline = async () => {
-      if (!auth.currentUser) {
-        await signInAnonymously(auth).catch(() => {});
-      }
       // Invalider le cache Firestore pour forcer un nouveau fetch
       invalidateDocCache();
       // Re-reconcilier : met à jour localStorage + état React avec les données Firebase
@@ -1359,13 +1356,11 @@ export default function App() {
     return () => window.removeEventListener("online", onOnline);
   }, [ready, runPhotoMigration, applyLocalData]);
 
-  // ─── RETRY MIGRATION dès que Firebase Auth est prêt ──────────────────────────
+  // ─── MIGRATION PHOTOS au démarrage (sans condition auth) ────────────────────
+  // Les uploads passent par /api/upload-photo (Admin SDK) — pas besoin d'auth Firebase.
   useEffect(() => {
     if (!ready) return;
-    const unsub = onAuthStateChanged(auth, (user) => {
-      if (user && navigator.onLine) runPhotoMigration().catch(() => {});
-    });
-    return () => unsub();
+    if (navigator.onLine) runPhotoMigration().catch(() => {});
   }, [ready, runPhotoMigration]);
 
   // ─── TEMPS RÉEL : onSnapshot sur tous les documents Firestore ─────────────

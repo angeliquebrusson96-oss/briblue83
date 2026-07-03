@@ -39,7 +39,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const bucket = getStorage().bucket();
+    // Spécifier le bucket explicitement — évite l'erreur si l'app Firebase
+    // a été initialisée sans storageBucket (ex: depuis sign-contract.js)
+    const bucket = getStorage().bucket(BUCKET);
     const file   = bucket.file(`photos/${key}.jpg`);
 
     await file.save(buffer, {
