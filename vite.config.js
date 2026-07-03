@@ -19,7 +19,8 @@ export default defineConfig({
     //
     // Solution : terser avec mangle désactivé (pas de renommage = pas de collision).
     // La compression whitespace/dead-code reste active → ~même taille que OXC.
-    chunkSizeWarningLimit: 1000,
+    // html2pdf.js fait ~1.2 Mo (chargé dynamiquement uniquement à l'envoi d'email)
+    chunkSizeWarningLimit: 1500,
     minify: 'terser',
     terserOptions: {
       // Ne pas renommer les variables → aucun risque de collision de noms
@@ -59,6 +60,12 @@ export default defineConfig({
           if (normalId.includes('/src/utils/helpers')) return 'utils-helpers';
           if (normalId.includes('/src/utils/constants')) return 'utils-constants';
           if (normalId.includes('/src/lib/')) return 'lib';
+          // html2pdf.js en chunk isolé (import dynamique — chargé seulement à l'envoi d'email)
+          if (normalId.includes('node_modules/html2pdf') ||
+              normalId.includes('node_modules/jspdf') ||
+              normalId.includes('node_modules/html2canvas')) {
+            return 'html2pdf';
+          }
           if (normalId.includes('/src/pages/')) return 'pages';
           if (normalId.includes('/src/components/')) return 'components';
           if (normalId.includes('/src/styles')) return 'styles';
