@@ -543,44 +543,89 @@ export function PhotoPicker({ label, value, onChange, compact }) {
 
   // Sauvegarde la photo dans IDB immédiatement (clé tmp), évite de mettre
   // des data: URLs dans localStorage (draft) ce qui causerait QuotaExceededError.
+  //
+  // FIXES Android :
+  //  1. URL.revokeObjectURL() APRÈS canvas.drawImage (avant → canvas vide sur Android)
+  //  2. try-catch autour du canvas → si ça plante, fallback FileReader
+  //  3. Validation dataUrl (canvas peut retourner "data:," si échoué)
+  //  4. Double tentative de compression dans le fallback FileReader
   const handleFile = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
-    const objectUrl = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = async () => {
-      URL.revokeObjectURL(objectUrl);
-      const MAX = 1600;
-      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.88);
-      // Sauvegarder dans IDB tout de suite → le draft ne stockera qu'une clé "idb:tmp_..."
-      // au lieu du data: brut (qui fait exploser le quota localStorage)
+
+    const compressViaCanvas = (src, maxSize, quality) => new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const scale = Math.min(1, maxSize / Math.max(img.width || 1, img.height || 1));
+          const w = Math.max(1, Math.round((img.width  || 1) * scale));
+          const h = Math.max(1, Math.round((img.height || 1) * scale));
+          const canvas = document.createElement("canvas");
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) { reject(new Error("no-ctx")); return; }
+          ctx.drawImage(img, 0, 0, w, h);
+          const result = canvas.toDataURL("image/jpeg", quality);
+          // "data:," = canvas vide (drawImage silencieusement raté)
+          if (!result || result.length < 1000 || result === "data:,") {
+            reject(new Error("canvas-empty")); return;
+          }
+          resolve(result);
+        } catch (err) { reject(err); }
+      };
+      img.onerror = () => reject(new Error("img-onerror"));
+      img.src = src;
+    });
+
+    const processAndSave = async () => {
+      let dataUrl = null;
+
+      // ── Tentative 1 : ObjectURL → canvas (rapide, bonne qualité) ────────────
+      const objectUrl = URL.createObjectURL(file);
+      try {
+        dataUrl = await compressViaCanvas(objectUrl, 1600, 0.85);
+      } catch {
+        // Tentative 2 : FileReader → base64 → re-canvas (plus lent, compatible HEIC/WebP)
+        try {
+          const raw = await new Promise((res, rej) => {
+            const reader = new FileReader();
+            reader.onload  = () => res(reader.result);
+            reader.onerror = () => rej(reader.error);
+            reader.readAsDataURL(file);
+          });
+          // Re-compresser depuis le base64 (résout les problèmes de format exotique)
+          try { dataUrl = await compressViaCanvas(raw, 1400, 0.82); } catch { dataUrl = raw; }
+        } catch { /* échec total → dataUrl reste null */ }
+      } finally {
+        // Révoquer APRÈS les canvas ops (FIX Android : ne pas révoquer avant drawImage)
+        try { URL.revokeObjectURL(objectUrl); } catch { /* noop */ }
+      }
+
+      if (!dataUrl) {
+        // Dernier recours : FileReader brut sans canvas (fichier potentiellement grand)
+        try {
+          dataUrl = await new Promise((res, rej) => {
+            const reader = new FileReader();
+            reader.onload  = () => res(reader.result);
+            reader.onerror = () => rej(reader.error);
+            reader.readAsDataURL(file);
+          });
+        } catch { /* pas de photo → on abandonne silencieusement */ }
+      }
+
+      if (!dataUrl?.startsWith("data:")) return; // sécurité
+
+      // ── Sauvegarde IDB → clé tmp (le draft ne stocke qu'une référence) ──────
       try {
         const tmpKey = await savePhotoTemp(dataUrl);
         onChange(tmpKey ? `idb:${tmpKey}` : dataUrl);
       } catch {
-        onChange(dataUrl); // fallback si IDB indisponible
+        onChange(dataUrl); // IDB indisponible → data: direct
       }
     };
-    img.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          const tmpKey = await savePhotoTemp(reader.result);
-          onChange(tmpKey ? `idb:${tmpKey}` : reader.result);
-        } catch {
-          onChange(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
-    };
-    img.src = objectUrl;
+
+    processAndSave().catch(() => { /* erreur totale → silencieux */ });
   };
 
   return (
