@@ -9,10 +9,8 @@
 //   data:     → base64 direct
 //   fsp:id    → Firestore briblue/client_photos[id] (fallback garanti pour photos piscine)
 
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { getDoc } from "firebase/firestore";
-import { signInAnonymously } from "firebase/auth";
-import { storage, auth, DOCS, STORAGE_BUCKET } from "./firebase";
+import { DOCS, STORAGE_BUCKET } from "./firebase";
 
 // ─── INDEXEDDB ───────────────────────────────────────────────────────────────
 const DB_NAME    = "briblue_photos";
@@ -322,40 +320,51 @@ function _removeFromUploadQueue(key) {
   _saveUploadQueue(q);
 }
 
-// ─── UPLOAD UN FICHIER VERS FIREBASE STORAGE ─────────────────────────────────
-// Utilise fetch().blob() (plus fiable sur iOS que atob + Uint8Array manuel).
+// ─── UPLOAD UN FICHIER VIA API SERVEUR ───────────────────────────────────────
+// Passe par /api/upload-photo (Firebase Admin SDK) au lieu du SDK client.
+// → Contourne complètement les règles Storage et l'auth anonyme (HTTP 400/403).
 // Timeout 60 s pour les connexions mobiles lentes.
 const UPLOAD_TIMEOUT_MS = 60_000;
 
 async function uploadOne(key, dataUrl) {
   if (!dataUrl || !navigator.onLine) return null;
-  // Tentative de sign-in anonyme pour enrichir le token Firebase Storage.
-  // Si ça échoue (401, 400 "anonymous disabled"), on tente l'upload quand même :
-  // les règles Storage autorisent l'écriture publique (voir storage.rules).
-  if (!auth.currentUser) {
-    try { await signInAnonymously(auth); } catch { /* continue sans auth */ }
-  }
   try {
     const compressed = await compressForUpload(dataUrl);
     if (!compressed?.startsWith("data:")) return null;
 
-    // fetch().blob() — plus fiable que atob() sur iOS (évite les problèmes
-    // de mémoire avec de grands tableaux Uint8Array et les bugs de charset)
-    const blob = await fetch(compressed).then(r => r.blob());
-    if (!blob || blob.size === 0) return null;
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
 
-    const storageRef = ref(storage, `photos/${key}.jpg`);
-    const uploadTask = uploadBytes(storageRef, blob, { contentType: "image/jpeg" })
-      .then(snapshot => getDownloadURL(snapshot.ref));
-    const timeout = new Promise((_, rej) =>
-      setTimeout(() => rej(new Error("upload-timeout")), UPLOAD_TIMEOUT_MS)
-    );
-    const url = await Promise.race([uploadTask, timeout]);
-    if (url) _removeFromUploadQueue(key); // succès → retirer de la queue
-    return url;
+    let url = null;
+    try {
+      const res = await fetch("/api/upload-photo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, dataUrl: compressed }),
+        signal: controller.signal,
+      });
+      if (res.ok) {
+        const json = await res.json();
+        url = json.url || null;
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.warn("[briblue] upload-photo API erreur:", res.status, err?.error);
+      }
+    } finally {
+      clearTimeout(tid);
+    }
+
+    if (url) {
+      _removeFromUploadQueue(key);
+      return url;
+    }
+    _addToUploadQueue(key);
+    return null;
   } catch (e) {
-    console.warn("[briblue] uploadOne échoué:", key, e?.message);
-    _addToUploadQueue(key); // échec → ajouter à la queue de retry
+    if (e?.name !== "AbortError") {
+      console.warn("[briblue] uploadOne échoué:", key, e?.message);
+    }
+    _addToUploadQueue(key);
     return null;
   }
 }
