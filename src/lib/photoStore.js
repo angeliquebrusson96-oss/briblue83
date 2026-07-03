@@ -251,31 +251,32 @@ export async function extractPassagePhotos(passage) {
     p[field] = arr;
   }
 
-  // ── Étape 2 : Firebase Storage — uploads SÉQUENTIELS (si connecté) ─────────
-  // Séquentiel (pas Promise.all) pour ne pas saturer le réseau mobile et éviter
-  // les timeouts en cascade sur iOS. Timeout par photo : 45s.
-  // Si échec → idb: reste + ajout à la queue de retry → migration ultérieure.
-  if (toUpload.length > 0 && navigator.onLine) {
-    // On tente l'auth anonyme mais on n'annule PAS si ça échoue :
-    // uploadOne réessaie en interne et les règles Storage autorisent l'écriture publique.
-    if (!auth.currentUser) {
-      try { await signInAnonymously(auth); } catch { /* continue sans auth */ }
-    }
-    for (const { setVal, key } of toUpload) {
-      if (!navigator.onLine) break;
-      try {
-        const dataUrl = await loadPhoto(key);
-        if (!dataUrl) continue;
-        const url = await Promise.race([
-          uploadOne(key, dataUrl),
-          new Promise((resolve) => setTimeout(() => resolve(null), EXTRACT_UPLOAD_TIMEOUT_MS)),
-        ]);
-        if (url) setVal(url); // ✓ Photo sur Firebase Storage → https://
-        // Si url null → uploadOne a déjà ajouté key à la queue de retry
-      } catch { /* upload échoué → idb: reste, migration ultérieure */ }
-    }
+  // ── Étape 2 : Firebase Storage — uploads EN ARRIÈRE-PLAN (non bloquant) ─────
+  // Les uploads NE bloquent PAS la sauvegarde. Le passage est sauvegardé
+  // immédiatement avec des clés idb:. Les uploads s'effectuent en tâche de fond :
+  // la queue persistante (bb_photo_upload_queue_v1) garantit qu'ils seront
+  // retentés au démarrage ou au retour en ligne si le réseau échoue maintenant.
+  if (toUpload.length > 0) {
+    // Ajouter toutes les clés à la queue persistante de retry
+    toUpload.forEach(({ key }) => _addToUploadQueue(key));
+
+    // Lancer les uploads en arrière-plan (sans await)
+    (async () => {
+      if (!navigator.onLine) return;
+      if (!auth.currentUser) {
+        try { await signInAnonymously(auth); } catch { /* continue sans auth */ }
+      }
+      for (const { key } of toUpload) {
+        if (!navigator.onLine) break;
+        try {
+          const dataUrl = await loadPhoto(key);
+          if (dataUrl) await uploadOne(key, dataUrl);
+        } catch { /* upload échoué → déjà dans la queue → retentative au prochain boot */ }
+      }
+    })();
   }
 
+  // Retour IMMÉDIAT avec les clés idb: — sauvegarde non bloquée
   return p;
 }
 
