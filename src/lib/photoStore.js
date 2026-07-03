@@ -261,9 +261,6 @@ export async function extractPassagePhotos(passage) {
     // Lancer les uploads en arrière-plan (sans await)
     (async () => {
       if (!navigator.onLine) return;
-      if (!auth.currentUser) {
-        try { await signInAnonymously(auth); } catch { /* continue sans auth */ }
-      }
       for (const { key } of toUpload) {
         if (!navigator.onLine) break;
         try {
@@ -374,9 +371,6 @@ async function uploadOne(key, dataUrl) {
 // Retourne un mapping { idbKey → httpsUrl } pour les clés qui ont pu être uploadées.
 export async function retryPendingUploads() {
   if (!navigator.onLine) return {};
-  if (!auth.currentUser) {
-    try { await signInAnonymously(auth); } catch { return {}; }
-  }
   const queue = _getUploadQueue();
   if (!queue.length) return {};
 
@@ -409,15 +403,10 @@ export async function retryPendingUploads() {
 // Traite les passages séquentiellement pour ne pas saturer le réseau mobile
 export async function migrateAllPassagesPhotos(passages) {
   if (!Array.isArray(passages) || !navigator.onLine) return passages;
-  // S'assurer d'avoir une session Firebase avant de commencer
-  if (!auth.currentUser) {
-    try { await signInAnonymously(auth); } catch { return passages; }
-  }
-  if (!auth.currentUser) return passages;
   let changed = false;
   const updated = [...passages];
   for (let i = 0; i < passages.length; i++) {
-    if (!navigator.onLine || !auth.currentUser) break;
+    if (!navigator.onLine) break;
     const migrated = await migratePassagePhotosToStorage(passages[i]);
     if (migrated) { updated[i] = migrated; changed = true; }
   }
@@ -430,11 +419,6 @@ export async function migrateAllPassagesPhotos(passages) {
 // Retourne null si rien n'a changé (pas besoin de re-sauvegarder).
 export async function migratePassagePhotosToStorage(passage) {
   if (!passage?.id || !navigator.onLine) return null;
-  // S'assurer d'avoir une session Firebase
-  if (!auth.currentUser) {
-    try { await signInAnonymously(auth); } catch { return null; }
-  }
-  if (!auth.currentUser) return null;
   const p = { ...passage };
   let changed = false;
 
@@ -483,11 +467,6 @@ export async function migrateClientPhotoToStorage(client) {
     dataUrl = val;
   }
   if (!dataUrl) return null;
-
-  if (!auth.currentUser) {
-    try { await signInAnonymously(auth); } catch { return null; }
-  }
-  if (!auth.currentUser) return null;
 
   const storageKey = `client_${client.id}_photoPiscine`;
   const url = await uploadOne(storageKey, dataUrl).catch(() => null);
