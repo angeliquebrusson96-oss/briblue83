@@ -479,9 +479,42 @@ export async function envoyerEmail(passage, client, onSent) {
 
   // ── Étape 2 : Résoudre les photos restantes (idb: → data: depuis IDB local)
   const resolved = await resolvePassageForHTML(passageToSend);
-  const htmlRapport = genererHTMLRapport(resolved, client);
 
-  // ── Étape 3 : Envoyer le rapport HTML dans le CORPS du mail (pas en pièce jointe)
+  // ── Étape 3 : Limiter la taille de l'email (éviter le rejet par les FAI)
+  // Les emails > ~1 Mo sont rejetés silencieusement par Orange, SFR, Free, Bouygues…
+  // Si des photos sont encore en base64 (idb: non uploadé), on les retire du HTML
+  // et on ajoute une note. Les https:// Firebase sont conservés (URL courte, pas de limite).
+  const MAX_EMAIL_BYTES = 700_000; // 700 Ko — marge de sécurité
+  function stripBase64Photos(p) {
+    const PLACEHOLDER = "https://firebasestorage.googleapis.com/"; // url réelle → OK
+    const strip = (v) => v && v.startsWith("data:") ? null : v;
+    return {
+      ...p,
+      photoArrivee: strip(p.photoArrivee),
+      photoDepart:  strip(p.photoDepart),
+      photos:       (p.photos||[]).map(strip),
+      photosDepart: (p.photosDepart||[]).map(strip),
+      signatureTech:   strip(p.signatureTech),
+      signatureClient: strip(p.signatureClient),
+      _photosStripped: true,
+    };
+  }
+  let passagePourEmail = resolved;
+  let htmlRapport = genererHTMLRapport(passagePourEmail, client);
+  if (new Blob([htmlRapport]).size > MAX_EMAIL_BYTES) {
+    // Trop lourd → retirer les photos base64, garder uniquement les URLs https://
+    passagePourEmail = stripBase64Photos(resolved);
+    htmlRapport = genererHTMLRapport(passagePourEmail, client);
+    // Ajouter une note en bas de l'email
+    htmlRapport = htmlRapport.replace(
+      '</body>',
+      `<div style="background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:12px 16px;margin:16px;font-size:12px;color:#92400e;">
+        📸 <strong>Photos non incluses</strong> — Les photos de ce rapport sont stockées localement et seront synchronisées lors de votre prochaine connexion. Contactez BRIBLUE pour les recevoir par email.
+      </div></body>`
+    );
+  }
+
+  // ── Étape 4 : Envoyer le rapport HTML dans le CORPS du mail (pas en pièce jointe)
   // Les pièces jointes .html sont bloquées par Gmail/Android/Outlook pour des raisons de sécurité.
   // Les URLs https:// Firebase Storage sont publiques et s'affichent sur tous les appareils.
   try {
