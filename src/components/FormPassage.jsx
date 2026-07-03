@@ -5,6 +5,7 @@ import { TODAY, getRapportStatus, isEntretienType, isControleType, getPH, getCL,
 import { useIsMobile, Modal, BtnPrimary, Card, Section, FmField, FmSectionTitle, FmHeader, FmSteps, DraftBanner, PhotoPicker, SunBurstActions, SunBurstFormNav, RapportStatusPicker, Tag, Avatar, PhotoImg } from "./ui";
 import { toastWarn, toastSuccess, toastInfo, showConfirm } from "../styles";
 import { extractPassagePhotos, resolvePhoto, migratePassagePhotosToStorage } from "../lib/photoStore";
+import { generatePDFBase64 } from "../lib/pdfGen";
 
 // ─── COMPRESSION PHOTO ───────────────────────────────────────────────────────
 // Réduit à max 1 000 px JPEG 0.65 → ~80-150 Ko pour la prévisualisation.
@@ -219,6 +220,51 @@ export async function ouvrirContrat(client, sigPrestataire="", sigClient="") {
   a.href = url; a.target = "_blank"; a.rel = "noopener";
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(()=>URL.revokeObjectURL(url), 5000);
+}
+
+// ─── ENVOI AUTO CONTRAT PDF (co-signé par les deux parties) ─────────────────
+// Génère le contrat en PDF et l'envoie par email au client + BCC Dorian.
+// Appelé depuis App.jsx quand l'onSnapshot détecte statut="signe_complet" + pdfSentAt absent.
+export async function envoyerContratPDF(client, contrat) {
+  if (!client?.email) return;
+  try {
+    // Résoudre les signatures (peuvent être data: ou idb:)
+    let sigPre = contrat.signaturePrestataire || "";
+    let sigCli = contrat.signatureClient || "";
+    if (sigPre.startsWith("idb:")) sigPre = (await resolvePhoto(sigPre)) || "";
+    if (sigCli.startsWith("idb:")) sigCli = (await resolvePhoto(sigCli)) || "";
+
+    const html = genererContratHTML(client, sigPre, sigCli);
+    const dateStr = new Date(contrat.signedAt || new Date())
+      .toLocaleDateString("fr", { day:"2-digit", month:"long", year:"numeric" });
+    const nomFichier = `contrat-briblue-${client.nom.replace(/\s+/g,"-")}.pdf`;
+
+    const pdfBase64 = await generatePDFBase64(html, { filename: nomFichier });
+
+    const res = await fetch("/api/send-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: `BRIBLUE <rapport-piscine@briblue83.com>`,
+        to: [client.email],
+        bcc: ["briblue83@hotmail.com"],
+        subject: `Votre contrat BRIBLUE — signé par les deux parties`,
+        html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
+          <h2 style="color:#059669">✅ Contrat co-signé</h2>
+          <p>Bonjour <strong>${client.nom}</strong>,</p>
+          <p>Votre contrat d'entretien piscine BRIBLUE a été signé par les deux parties le <strong>${dateStr}</strong>.</p>
+          <p>Veuillez trouver votre contrat en pièce jointe pour vos archives.</p>
+          <p style="margin-top:24px">Cordialement,<br/><strong>Dorian Briaire</strong><br/>BRI BLUE — Entretien & Traitement de piscines<br/>06 67 18 61 15</p>
+        </div>`,
+        text: `Bonjour ${client.nom},\n\nVotre contrat BRIBLUE a été co-signé le ${dateStr}. Voir la pièce jointe.\n\nCordialement,\nDorian Briaire - BRI BLUE`,
+        attachments: [{ filename: nomFichier, content: pdfBase64 }],
+      }),
+    });
+    return res.ok;
+  } catch (e) {
+    console.warn("[briblue] envoyerContratPDF échoué:", e?.message);
+    return false;
+  }
 }
 
 // Verrou par clientId — empêche les doubles envois si le bouton est cliqué plusieurs fois
@@ -462,9 +508,9 @@ export async function ouvrirRapport(passage, client) {
 export async function envoyerEmail(passage, client, onSent) {
   if (!client?.email) { toastWarn("Aucun email renseigné pour ce client."); return; }
   const dateStr = new Date(passage.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"});
+  const nomFichier = `rapport-${client.nom.replace(/\s+/g,"-")}-${dateStr.replace(/\s+/g,"-")}.pdf`;
 
   // ── Étape 1 : Forcer l'upload des photos idb: vers Firebase Storage (timeout 30s)
-  // Cela garantit que les URLs seront des https:// publics, visibles sur tous les appareils.
   let passageToSend = passage;
   const hasIdbPhotos = ["photoArrivee","photoDepart",...(passage.photos||[]),...(passage.photosDepart||[])].some(v=>v?.startsWith("idb:"));
   if (hasIdbPhotos && navigator.onLine) {
@@ -477,63 +523,56 @@ export async function envoyerEmail(passage, client, onSent) {
     } catch { /* migration échouée → on continue avec les photos locales */ }
   }
 
-  // ── Étape 2 : Résoudre les photos restantes (idb: → data: depuis IDB local)
+  // ── Étape 2 : Résoudre toutes les photos (idb: → data:) pour le PDF
+  // Toutes les images sont en data: → aucun problème CORS pour html2canvas
   const resolved = await resolvePassageForHTML(passageToSend);
+  const htmlRapport = genererHTMLRapport(resolved, client);
 
-  // ── Étape 3 : Limiter la taille de l'email (éviter le rejet par les FAI)
-  // Les emails > ~1 Mo sont rejetés silencieusement par Orange, SFR, Free, Bouygues…
-  // Si des photos sont encore en base64 (idb: non uploadé), on les retire du HTML
-  // et on ajoute une note. Les https:// Firebase sont conservés (URL courte, pas de limite).
-  const MAX_EMAIL_BYTES = 700_000; // 700 Ko — marge de sécurité
-  function stripBase64Photos(p) {
-    const PLACEHOLDER = "https://firebasestorage.googleapis.com/"; // url réelle → OK
-    const strip = (v) => v && v.startsWith("data:") ? null : v;
-    return {
-      ...p,
-      photoArrivee: strip(p.photoArrivee),
-      photoDepart:  strip(p.photoDepart),
-      photos:       (p.photos||[]).map(strip),
-      photosDepart: (p.photosDepart||[]).map(strip),
-      signatureTech:   strip(p.signatureTech),
-      signatureClient: strip(p.signatureClient),
-      _photosStripped: true,
-    };
-  }
-  let passagePourEmail = resolved;
-  let htmlRapport = genererHTMLRapport(passagePourEmail, client);
-  if (new Blob([htmlRapport]).size > MAX_EMAIL_BYTES) {
-    // Trop lourd → retirer les photos base64, garder uniquement les URLs https://
-    passagePourEmail = stripBase64Photos(resolved);
-    htmlRapport = genererHTMLRapport(passagePourEmail, client);
-    // Ajouter une note en bas de l'email
-    htmlRapport = htmlRapport.replace(
-      '</body>',
-      `<div style="background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:12px 16px;margin:16px;font-size:12px;color:#92400e;">
-        📸 <strong>Photos non incluses</strong> — Les photos de ce rapport sont stockées localement et seront synchronisées lors de votre prochaine connexion. Contactez BRIBLUE pour les recevoir par email.
-      </div></body>`
-    );
-  }
-
-  // ── Étape 4 : Envoyer le rapport HTML dans le CORPS du mail (pas en pièce jointe)
-  // Les pièces jointes .html sont bloquées par Gmail/Android/Outlook pour des raisons de sécurité.
-  // Les URLs https:// Firebase Storage sont publiques et s'affichent sur tous les appareils.
+  // ── Étape 3 : Générer le PDF (avec toutes les photos incluses)
+  toastInfo("Génération du PDF en cours…");
+  let pdfBase64 = null;
   try {
+    pdfBase64 = await generatePDFBase64(htmlRapport, { filename: nomFichier });
+  } catch(pdfErr) {
+    console.warn("[briblue] PDF échoué, envoi HTML en fallback:", pdfErr?.message);
+  }
+
+  // ── Étape 4 : Envoyer — PDF en pièce jointe si généré, sinon HTML en corps
+  try {
+    const body = pdfBase64
+      ? {
+          from: `BRIBLUE <rapport-piscine@briblue83.com>`,
+          to: [client.email],
+          bcc: ["briblue83@hotmail.com"],
+          subject: `Rapport entretien piscine — ${dateStr}`,
+          html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
+            <h2 style="color:#0369a1">Rapport d'entretien piscine</h2>
+            <p>Bonjour <strong>${client.nom}</strong>,</p>
+            <p>Veuillez trouver en pièce jointe votre rapport d'entretien piscine du <strong>${dateStr}</strong>.</p>
+            <p style="margin-top:24px">Cordialement,<br/><strong>Dorian Briaire</strong><br/>BRI BLUE — Entretien & Traitement de piscines<br/>06 67 18 61 15</p>
+          </div>`,
+          text: `Bonjour ${client.nom},\n\nVotre rapport d'entretien piscine du ${dateStr} est en pièce jointe.\n\nCordialement,\nDorian Briaire - BRI BLUE`,
+          attachments: [{ filename: nomFichier, content: pdfBase64 }],
+        }
+      : {
+          // Fallback : PDF non disponible → HTML dans le corps (ancienne méthode)
+          from: `BRIBLUE <rapport-piscine@briblue83.com>`,
+          to: [client.email],
+          bcc: ["briblue83@hotmail.com"],
+          subject: `Rapport entretien piscine — ${dateStr}`,
+          html: htmlRapport,
+          text: `Bonjour ${client.nom},\n\nVotre rapport d'entretien piscine du ${dateStr} est disponible.\n\nCordialement,\nDorian Briaire - BRI BLUE`,
+        };
+
     const res = await fetch("/api/send-email", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: `BRIBLUE <rapport-piscine@briblue83.com>`,
-        to: [client.email],
-        bcc: ["briblue83@hotmail.com"],
-        subject: `Rapport entretien piscine — ${dateStr}`,
-        html: htmlRapport,
-        text: `Bonjour ${client?.nom||""},\n\nVotre rapport d'entretien piscine du ${dateStr} est disponible.\n\nCordialement,\nDorian Briaire`,
-      }),
+      body: JSON.stringify(body),
     });
     const data = await res.json();
     if (res.ok) {
       if (onSent) onSent({ ...passage, rapportStatut: "envoye", rapportEnvoyeAt: new Date().toISOString() });
-      toastSuccess(`Fiche envoyée à ${client.email} !`);
+      toastSuccess(pdfBase64 ? `📎 Rapport PDF envoyé à ${client.email} !` : `Rapport envoyé à ${client.email} !`);
     } else { toastError(`Erreur envoi : ${data?.message || JSON.stringify(data)}`); }
   } catch(err) { toastError(`Erreur réseau : ${err.message}`); }
 }

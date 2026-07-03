@@ -10,7 +10,7 @@ import { migrateMois, alerteClient, getEntretienMois, getControleMois, isEntreti
 import { GlobalStyles, setupPWA, sendLocalNotification, playNotifSound, playChimeMorning, playAlertRdv, playSound, toastInfo, toastError, showConfirm, ToastContainer, ConfirmModal } from "./styles";
 import { useIsMobile, useOnlineStatus, Modal, BtnPrimary, Card, Section, Avatar, Tag } from "./components/ui";
 import { FormClient } from "./components/FormClient";
-import { FormPassage, ouvrirContrat, envoyerContratSignature } from "./components/FormPassage";
+import { FormPassage, ouvrirContrat, envoyerContratSignature, envoyerContratPDF } from "./components/FormPassage";
 import { FormLivraison } from "./components/FormLivraison";
 import { FormRdv } from "./components/FormRdv";
 import { FicheClient } from "./components/FicheClient";
@@ -1413,6 +1413,21 @@ export default function App() {
               isComplet ? `${nomCli} a co-signé le contrat.` : `${nomCli} a signé — votre tour !`,
               { tag: "briblue-contrat-" + newSig.clientId, requireInteraction: !isComplet }
             );
+            // ── Envoi automatique du contrat PDF quand les deux parties ont signé ──
+            if (isComplet && !newSig.pdfSentAt && cli?.email) {
+              const ctKey = keys.find(k => data[k] === newSig);
+              // Délai court pour laisser le state React se stabiliser
+              setTimeout(async () => {
+                const ok = await envoyerContratPDF(cli, newSig).catch(() => false);
+                if (ok && ctKey) {
+                  setContrats(prev => {
+                    const next = { ...prev, [ctKey]: { ...prev[ctKey], pdfSentAt: new Date().toISOString() } };
+                    saveContrats(next);
+                    return next;
+                  });
+                }
+              }, 2000);
+            }
           }
           return data;
         });
