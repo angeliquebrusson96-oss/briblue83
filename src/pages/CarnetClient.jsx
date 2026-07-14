@@ -543,16 +543,21 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
   })();
 
   // ─── WIDGET VERSEMENT (vue client) ─────────────────────────────────────────
+  // Produits facturés (livraisons statut="facture") mais pas encore payés
+  // → montant ajouté au restant dû affiché au client.
+  const livraisonsDues = (livraisons||[]).filter(l => l.statut === "facture" && Number(l.montant) > 0);
+  const montantLivraisonsDues = livraisonsDues.reduce((s,l)=>s+Number(l.montant), 0);
+
   const VersementWidget = () => {
-    if (!mensualite || !client.dateDebut) return null;
+    if ((!mensualite || !client.dateDebut) && montantLivraisonsDues <= 0) return null;
     const today = new Date();
     const nbDus = versementMoisDus.length;
     // mois en retard = tous les mois dus SAUF le mois courant
     const retards = versementMoisDus.filter(({year:y,month:m}) =>
       !(y === today.getFullYear() && m === today.getMonth()+1)
     );
-    const aJour = nbDus === 0;
-    const totalDu = nbDus * mensualite;
+    const aJour = nbDus === 0 && montantLivraisonsDues <= 0;
+    const totalDu = nbDus * (mensualite||0) + montantLivraisonsDues;
 
     return (
       <div style={{padding:"0 12px",marginBottom:4}}>
@@ -577,7 +582,10 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
               </div>
               <div style={{flex:1}}>
                 <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>
-                  {aJour ? "Paiements à jour" : retards.length>=2 ? `${retards.length} mensualité${retards.length>1?"s":""} en retard` : "Mensualité en attente"}
+                  {aJour ? "Paiements à jour"
+                    : retards.length>=2 ? `${retards.length} mensualité${retards.length>1?"s":""} en retard`
+                    : retards.length===1 ? "Mensualité en attente"
+                    : "Produits à régler"}
                 </div>
                 <div style={{fontSize:11,color:"#64748b",marginTop:2}}>
                   {aJour ? `${mensualite}€ / mois · contrat ${client.formule||""}` : `${totalDu}€ restant${totalDu>mensualite?"s":""} à régler`}
@@ -615,6 +623,24 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
                     </div>
                   );
                 })}
+                {livraisonsDues.map(l=>(
+                  <div key={l.id} style={{
+                    display:"flex",alignItems:"center",justifyContent:"space-between",
+                    padding:"8px 10px",borderRadius:10,
+                    background:"#fff7ed",border:"1px solid #fed7aa",
+                  }}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+                      <div style={{width:30,height:30,borderRadius:8,background:"#ffedd5",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#ea580c" strokeWidth="2" strokeLinecap="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+                      </div>
+                      <div style={{minWidth:0}}>
+                        <div style={{fontSize:12,fontWeight:600,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{(l.produits||[]).join(", ")||l.description||"Produits livrés"}</div>
+                        <div style={{fontSize:10,color:"#64748b"}}>{l.date?new Date(l.date).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"}):"Facturé"}</div>
+                      </div>
+                    </div>
+                    <span style={{fontSize:14,fontWeight:700,color:"#ea580c",flexShrink:0}}>{Number(l.montant)}€</span>
+                  </div>
+                ))}
                 <a href="tel:+33667186115" style={{display:"flex",alignItems:"center",justifyContent:"center",gap:7,marginTop:2,padding:"10px",borderRadius:10,background:"linear-gradient(135deg,#0891b2,#0e7490)",textDecoration:"none",boxShadow:"0 4px 14px rgba(8,145,178,0.3)"}}>
                   <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.01 1.18 2 2 0 012 0h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 14.92z"/></svg>
                   <span style={{fontSize:12,fontWeight:700,color:"white"}}>Contacter BRIBLUE</span>
