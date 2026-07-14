@@ -212,6 +212,18 @@ export function PhotoImg({ src, alt="", style={}, showSyncWarning=true }) {
     );
   }
 
+  // Toute autre erreur/échec (ex: URL Storage cassée) : ne jamais renvoyer null.
+  // Un container vide (hauteur 0) masquerait le bouton supprimer positionné
+  // par-dessus dans les listes de photos (overflow:hidden côté parent).
+  if (imgError || !resolved) {
+    return (
+      <div style={{...style, background:"#f1f5f9", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", flexShrink:0, gap:4}}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+        <span style={{fontSize:8,color:"#64748b",fontWeight:700,textAlign:"center",lineHeight:1.2,padding:"0 4px"}}>Photo indisponible</span>
+      </div>
+    );
+  }
+
   return null;
 }
 
