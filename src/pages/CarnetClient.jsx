@@ -92,7 +92,7 @@ function buildRapportHTML(passage, client) {
       <button class="print-btn" onclick="window.print()">🖨️ Enregistrer en PDF</button>
     </main></body></html>`;
 }
-async function ouvrirContrat(client, sigPrestataire="", sigClient="") {
+async function ouvrirContrat(client, sigPrestataire="", sigClient="", contrat={}) {
   // Résoudre les clés idb: avant de générer le PDF signé
   let sigPre = sigPrestataire||"";
   let sigCli = sigClient||"";
@@ -100,7 +100,7 @@ async function ouvrirContrat(client, sigPrestataire="", sigClient="") {
     if (sigPre.startsWith("idb:")) sigPre = (await resolvePhoto(sigPre)) || "";
     if (sigCli.startsWith("idb:")) sigCli = (await resolvePhoto(sigCli)) || "";
   }
-  const html = genererContratHTML(client, sigPre, sigCli);
+  const html = genererContratHTML(client, sigPre, sigCli, contrat);
   const blob = new Blob([html], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -1095,7 +1095,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
 
       {/* Bouton Voir mon contrat */}
       <button
-        onClick={()=>ouvrirContrat(client, contrat.signaturePrestataire||"", contrat.signatureClient||"")}
+        onClick={()=>ouvrirContrat(client, contrat.signaturePrestataire||"", contrat.signatureClient||"", contrat)}
         className="cv-btn-press"
         style={{display:"flex",alignItems:"center",gap:12,background:"#fff",borderRadius:14,border:"1px solid #e2e8f0",padding:"14px 16px",marginTop:8,width:"100%",cursor:"pointer",fontFamily:"inherit",textAlign:"left",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
         <div style={{width:36,height:36,background:"linear-gradient(135deg,#f0f9ff,#e0f2fe)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,border:"1px solid #bae6fd"}}>

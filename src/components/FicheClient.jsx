@@ -1396,7 +1396,7 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
             {/* Actions contrat */}
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               <div style={{fontSize:10,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.8}}>Actions</div>
-              <button onClick={()=>{ouvrirContrat(client,ct?.signaturePrestataire||"",ct?.signatureClient||"");if(!ct?.statut&&onUpdateContrat)onUpdateContrat("CT-"+client.id,{clientId:client.id,statut:"cree"});}}
+              <button onClick={()=>{ouvrirContrat(client,ct?.signaturePrestataire||"",ct?.signatureClient||"",ct||{});if(!ct?.statut&&onUpdateContrat)onUpdateContrat("CT-"+client.id,{clientId:client.id,statut:"cree"});}}
                 style={{height:44,borderRadius:12,background:"linear-gradient(135deg,#0284c7,#0ea5e9)",border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:7,boxShadow:"0 2px 10px rgba(2,132,199,0.3)",WebkitTapHighlightColor:"transparent"}}>
                 {Ico.contract(14,"#fff")} Ouvrir le contrat PDF
               </button>

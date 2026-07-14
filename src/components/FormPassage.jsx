@@ -40,7 +40,7 @@ const ETAT_LOCAL_OPTIONS = ["Nettoyage du sol","Trace d'eau au sol","Trace d'eau
 
 // ─── HELPERS LOCAUX ────────────────────────────────────────────────────────
 
-export function genererContratHTML(client, sigPrestataire="", sigClient="") {
+export function genererContratHTML(client, sigPrestataire="", sigClient="", contrat={}) {
   const mpm = migrateMois(client.moisParMois||client.saisons);
   const totalE = totalAnnuel(client.moisParMois||client.saisons,"entretien");
   const totalC = totalAnnuel(client.moisParMois||client.saisons,"controle");
@@ -53,6 +53,8 @@ export function genererContratHTML(client, sigPrestataire="", sigClient="") {
   const { m1, m11, estRond } = calcMensualites(totalAnnuelPrix);
   const dateContrat = client.dateDebut ? new Date(client.dateDebut).toLocaleDateString("fr") : "—";
   const dateFin = client.dateFin ? new Date(client.dateFin).toLocaleDateString("fr") : "—";
+  const datePrestaSig = contrat.signedByPrestaAt ? new Date(contrat.signedByPrestaAt).toLocaleDateString("fr") : new Date().toLocaleDateString("fr");
+  const dateClientSig = contrat.signedAt ? new Date(contrat.signedAt).toLocaleDateString("fr") : new Date().toLocaleDateString("fr");
   let moisRows = "";
   for (let m=1;m<=12;m++) {
     const mv = mpm[m] || {entretien:0,controle:0};
@@ -180,13 +182,13 @@ ${client.notesTarifaires ? `
 <div class="signatures">
   <div class="sig-box">
     <div class="sig-label">Le prestataire — BRIBLUE</div>
-    <div class="sig-date">Dorian Briaire · ${new Date().toLocaleDateString("fr")}</div>
+    <div class="sig-date">Dorian Briaire · ${datePrestaSig}</div>
     ${sigPrestaHTML}
     ${!sigPrestataire ? `<button class="btn-clear" onclick="clearSig('sigPresta')">Effacer</button>` : ""}
   </div>
   <div class="sig-box">
     <div class="sig-label">Le client — ${client.nom}</div>
-    <div class="sig-date">Lu et approuvé · ${new Date().toLocaleDateString("fr")}</div>
+    <div class="sig-date">Lu et approuvé · ${dateClientSig}</div>
     ${sigClientHTML}
     ${!sigClient ? `<button class="btn-clear" onclick="clearSig('sigClient')">Effacer</button>` : ""}
   </div>
@@ -207,13 +209,13 @@ setupCanvas('sigPresta');setupCanvas('sigClient');
 </body></html>`;
 }
 
-export async function ouvrirContrat(client, sigPrestataire="", sigClient="") {
+export async function ouvrirContrat(client, sigPrestataire="", sigClient="", contrat={}) {
   // Résoudre les clés idb: en base64 avant de générer le PDF
   let sigPre = sigPrestataire||"";
   let sigCli = sigClient||"";
   if (sigPre.startsWith("idb:")) sigPre = (await resolvePhoto(sigPre)) || "";
   if (sigCli.startsWith("idb:")) sigCli = (await resolvePhoto(sigCli)) || "";
-  const html = genererContratHTML(client, sigPre, sigCli);
+  const html = genererContratHTML(client, sigPre, sigCli, contrat);
   const blob = new Blob([html], {type:"text/html;charset=utf-8"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -234,7 +236,7 @@ export async function envoyerContratPDF(client, contrat) {
     if (sigPre.startsWith("idb:")) sigPre = (await resolvePhoto(sigPre)) || "";
     if (sigCli.startsWith("idb:")) sigCli = (await resolvePhoto(sigCli)) || "";
 
-    const html = genererContratHTML(client, sigPre, sigCli);
+    const html = genererContratHTML(client, sigPre, sigCli, contrat);
     const dateStr = new Date(contrat.signedAt || new Date())
       .toLocaleDateString("fr", { day:"2-digit", month:"long", year:"numeric" });
     const nomFichier = `contrat-briblue-${client.nom.replace(/\s+/g,"-")}.pdf`;

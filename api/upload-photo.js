@@ -49,10 +49,15 @@ export default async function handler(req, res) {
       metadata: { cacheControl: "public, max-age=31536000" },
     });
 
-    // Rendre publique (accessible sans token)
-    await file.makePublic();
+    // Rendre publique si possible (best-effort — échoue si "uniform bucket-level
+    // access" est activé sur le bucket ; dans ce cas la lecture publique doit être
+    // assurée par les Storage Rules, pas par l'ACL). Ne doit jamais faire échouer
+    // l'upload : le fichier est déjà enregistré à ce stade.
+    try { await file.makePublic(); } catch (e) { console.warn("[briblue] makePublic échoué (uniform bucket access ?):", e.message); }
 
-    const url = `https://storage.googleapis.com/${BUCKET}/photos/${key}.jpg`;
+    // URL via l'endpoint Firebase Storage (v0) — respecte les Storage Rules
+    // ("allow read: if true"), fonctionne que l'ACL publique ait pu être posée ou non.
+    const url = `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/${encodeURIComponent(`photos/${key}.jpg`)}?alt=media`;
     return res.status(200).json({ url });
   } catch (err) {
     console.error("[briblue] upload-photo error:", err.message);
