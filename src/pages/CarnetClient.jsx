@@ -498,7 +498,10 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
 
   const totalVisitesPrevues = calculerPassagesPrevusContrat(client);
   const passagesDeduits = passClient.filter(p => isPassageDansContrat(p, client) && isPassageEffectue(p));
-  const visitesEffectuees = passagesDeduits.length;
+  // Inclut les déductions manuelles saisies dans l'onglet Planning de la fiche
+  // client (bouton +/-) — mêmes visites comptées côté admin (FicheClient.jsx).
+  const effManuel = Object.values(client.passagesManuel||{}).reduce((s,v)=>s+(Number(v)||0),0);
+  const visitesEffectuees = passagesDeduits.length + effManuel;
   const progressPct = totalVisitesPrevues > 0 ? Math.min(100, (visitesEffectuees / totalVisitesPrevues) * 100) : 0;
 
   const daysUntilFin = client.dateFin ? Math.ceil((new Date(client.dateFin) - new Date()) / (1000*60*60*24)) : null;
