@@ -4,7 +4,7 @@ import { DS, Ico, MOIS, MOIS_L, RAPPORT_STATUS, PRODUITS_DEFAUT } from "../utils
 import { TODAY, getRapportStatus, isEntretienType, isControleType, getPH, getCL, getTemp, getResumePassage, normalizeRapportStatus, migrateMois, totalAnnuel, calcMensualites, uid } from "../utils/helpers";
 import { useIsMobile, Modal, BtnPrimary, Card, Section, FmField, FmSectionTitle, FmHeader, FmSteps, DraftBanner, PhotoPicker, SunBurstActions, SunBurstFormNav, RapportStatusPicker, Tag, Avatar, PhotoImg } from "./ui";
 import { toastWarn, toastSuccess, toastInfo, showConfirm } from "../styles";
-import { extractPassagePhotos, resolvePhoto, migratePassagePhotosToStorage } from "../lib/photoStore";
+import { extractPassagePhotos, resolvePhoto, resolvePhotoForPdf, migratePassagePhotosToStorage } from "../lib/photoStore";
 import { generatePDFBase64 } from "../lib/pdfGen";
 
 // ─── COMPRESSION PHOTO ───────────────────────────────────────────────────────
@@ -230,11 +230,12 @@ export async function ouvrirContrat(client, sigPrestataire="", sigClient="", con
 export async function envoyerContratPDF(client, contrat) {
   if (!client?.email) return;
   try {
-    // Résoudre les signatures (peuvent être data: ou idb:)
+    // Résoudre les signatures (data:, idb: ou https:// déjà migrée) en base64
+    // pour éviter l'échec CORS de html2canvas sur les URL Firebase Storage.
     let sigPre = contrat.signaturePrestataire || "";
     let sigCli = contrat.signatureClient || "";
-    if (sigPre.startsWith("idb:")) sigPre = (await resolvePhoto(sigPre)) || "";
-    if (sigCli.startsWith("idb:")) sigCli = (await resolvePhoto(sigCli)) || "";
+    if (sigPre) sigPre = (await resolvePhotoForPdf(sigPre)) || "";
+    if (sigCli) sigCli = (await resolvePhotoForPdf(sigCli)) || "";
 
     const html = genererContratHTML(client, sigPre, sigCli, contrat);
     const dateStr = new Date(contrat.signedAt || new Date())
@@ -486,11 +487,11 @@ async function resolvePassageForHTML(passage) {
   const ARRAYS = ["photos", "photosDepart"];
   const p = { ...passage };
   for (const field of SINGLE) {
-    if (p[field]) p[field] = await resolvePhoto(p[field]);
+    if (p[field]) p[field] = await resolvePhotoForPdf(p[field]);
   }
   for (const field of ARRAYS) {
     if (Array.isArray(p[field])) {
-      p[field] = await Promise.all(p[field].map(v => resolvePhoto(v)));
+      p[field] = await Promise.all(p[field].map(v => resolvePhotoForPdf(v)));
     }
   }
   return p;

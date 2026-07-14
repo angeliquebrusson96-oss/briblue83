@@ -141,6 +141,25 @@ export async function resolvePhoto(value) {
   return value;
 }
 
+// ─── RÉSOLUTION POUR GÉNÉRATION PDF (html2canvas) ────────────────────────────
+// Le bucket Firebase Storage n'a pas de configuration CORS : un <img> classique
+// affiche les URL https:// sans souci, mais html2canvas charge les images en
+// mode CORS strict et échoue silencieusement sans en-tête ACAO → PDF blanc.
+// On passe donc par le proxy serveur /api/get-photo qui télécharge le fichier
+// côté serveur (pas de CORS) et le renvoie en base64, intégrable directement.
+export async function resolvePhotoForPdf(value) {
+  const resolved = await resolvePhoto(value);
+  if (!resolved?.startsWith("https://")) return resolved;
+  try {
+    const res = await fetch(`/api/get-photo?url=${encodeURIComponent(resolved)}`);
+    if (res.ok) {
+      const { dataUrl } = await res.json();
+      if (dataUrl) return dataUrl;
+    }
+  } catch { /* proxy indisponible → on retente l'URL directe (peut échouer en PDF) */ }
+  return resolved;
+}
+
 export function resolvePhotoSync(value) {
   if (!value) return "";
   if (value.startsWith("idb:")) return _cache.get(value.slice(4)) || "";
