@@ -267,6 +267,29 @@ const LivraisonsClient = ({ client, livraisons, onUpdateStatut, retardVisible, o
 // ─────────────────────────────────────────────────────────────────────────────
 // PAGE GESTION
 // ─────────────────────────────────────────────────────────────────────────────
+// Montant dû (mois passés + courant non cochés) pour UN client — utilisé à
+// la fois pour le total global et pour trier/badger la liste par urgence.
+function getMensualiteDue(client, versements) {
+  if (!client.prix || !client.dateDebut) return 0;
+  const { m1: men1, m11: menBase } = calcMensualites(client.prix, getNMoisContrat(client));
+  const today = new Date();
+  const debut = new Date(client.dateDebut);
+  const debutY = debut.getFullYear(), debutM = debut.getMonth() + 1;
+  let cur = new Date(debut.getFullYear(), debut.getMonth(), 1);
+  const finMoisBorne = finMoisExclu(client.dateFin) || new Date(debut.getFullYear() + 1, debut.getMonth(), 1);
+  const curMois = new Date(today.getFullYear(), today.getMonth(), 1);
+  let sum = 0;
+  while (cur < finMoisBorne && cur <= curMois) {
+    const y = cur.getFullYear(), m = cur.getMonth() + 1;
+    const key = `${client.id}_${y}_${String(m).padStart(2, "0")}`;
+    const isCurrentMonth = y === today.getFullYear() && m === today.getMonth() + 1;
+    const montant = (y === debutY && m === debutM) ? men1 : menBase;
+    if (!versements?.[key] && !isCurrentMonth) sum += montant;
+    cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+  }
+  return Math.round(sum * 100) / 100;
+}
+
 export function PageGestion({
   clients,
   versements = {},
@@ -277,6 +300,7 @@ export function PageGestion({
   onToggleRetardCarnet,
   contrats = {},
   onOpenContrat,
+  onClientClick,
 }) {
   const [tab, setTab] = useState("mensualites");
 
@@ -289,45 +313,34 @@ export function PageGestion({
     return ct?.statut || "aucun";
   }, [contrats]);
 
+  // Clients à jour vs en retard, retard en premier pour repérer le problème
+  // en un coup d'œil sans avoir à tout dérouler.
   const clientsAvecMensualites = useMemo(
-    () => clients.filter(c =>
-      c.prix > 0 &&
-      c.dateDebut &&
-      getContratStatut(c.id) === "signe_complet"   // ← contrat signé obligatoire
-    ),
-    [clients, getContratStatut]
+    () => clients
+      .filter(c => c.prix > 0 && c.dateDebut && getContratStatut(c.id) === "signe_complet")
+      .map(c => ({ c, due: getMensualiteDue(c, versements) }))
+      .sort((a, b) => b.due - a.due)
+      .map(x => x.c),
+    [clients, getContratStatut, versements]
   );
 
   const clientsAvecLivraisons = useMemo(() => {
     const ids = new Set(livraisons.map(l => l.clientId));
-    return clients.filter(c => ids.has(c.id));
+    const impayeMontant = (clientId) => livraisons
+      .filter(l => l.clientId === clientId && l.statut !== "payee" && l.statut !== "annulee")
+      .reduce((s, l) => s + (l.montant || l.prixTotal || l.total || 0), 0);
+    return clients
+      .filter(c => ids.has(c.id))
+      .map(c => ({ c, due: impayeMontant(c.id) }))
+      .sort((a, b) => b.due - a.due)
+      .map(x => x.c);
   }, [clients, livraisons]);
 
   // Total mensualités en retard — au centime près
-  const totalMensualitesDu = useMemo(() => {
-    const today = new Date();
-    return clientsAvecMensualites.reduce((sum, c) => {
-      const { m1: men1, m11: menBase } = calcMensualites(c.prix, getNMoisContrat(c));
-      const debut = new Date(c.dateDebut);
-      const debutY = debut.getFullYear(), debutM = debut.getMonth()+1;
-      const fin = c.dateFin
-        ? new Date(c.dateFin)
-        : new Date(debut.getFullYear() + 1, debut.getMonth(), debut.getDate());
-      let cur = new Date(debut.getFullYear(), debut.getMonth(), 1);
-      const finMoisBorne2 = finMoisExclu(c.dateFin)
-        || new Date(debut.getFullYear() + 1, debut.getMonth(), 1);
-      const curMois = new Date(today.getFullYear(), today.getMonth(), 1);
-      while (cur < finMoisBorne2 && cur <= curMois) {
-        const y = cur.getFullYear(), m = cur.getMonth() + 1;
-        const key = `${c.id}_${y}_${String(m).padStart(2, "0")}`;
-        const isCurrentMonth = y === today.getFullYear() && m === today.getMonth() + 1;
-        const montant = (y === debutY && m === debutM) ? men1 : menBase;
-        if (!versements?.[key] && !isCurrentMonth) sum += montant;
-        cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
-      }
-      return Math.round(sum * 100) / 100;
-    }, 0);
-  }, [clientsAvecMensualites, versements]);
+  const totalMensualitesDu = useMemo(
+    () => Math.round(clientsAvecMensualites.reduce((sum, c) => sum + getMensualiteDue(c, versements), 0) * 100) / 100,
+    [clientsAvecMensualites, versements]
+  );
 
   // Total livraisons impayées
   const totalLivraisonsDu = useMemo(
@@ -392,14 +405,19 @@ export function PageGestion({
           {clientsAvecMensualites.length === 0 && (
             <div style={{textAlign:"center",color:DS.mid,padding:40,fontSize:13}}>Aucun client avec contrat mensuel</div>
           )}
-          {clientsAvecMensualites.map(c => (
-            <div key={c.id} style={{background:"rgba(255,255,255,0.45)",borderRadius:DS.radius,border:"1px solid " + DS.border,padding:"12px 14px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+          {clientsAvecMensualites.map(c => {
+            const due = getMensualiteDue(c, versements);
+            return (
+            <div key={c.id} style={{background:"rgba(255,255,255,0.45)",borderRadius:DS.radius,border:"1px solid " + DS.border,borderLeft:`4px solid ${due>0?"#dc2626":"#22c55e"}`,padding:"12px 14px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+              <div
+                onClick={onClientClick ? () => onClientClick(c) : undefined}
+                style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,cursor:onClientClick?"pointer":"default",borderRadius:8}}>
                 <Avatar nom={c.nom} size={32}/>
-                <div>
+                <div style={{flex:1,minWidth:0}}>
                   <div style={{fontWeight:700,fontSize:13,color:DS.dark}}>{c.nom}</div>
                   <div style={{fontSize:10,color:DS.mid}}>{c.formule} · {c.prix}€/an</div>
                 </div>
+                {onClientClick && <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round" style={{flexShrink:0}}><polyline points="9 18 15 12 9 6"/></svg>}
               </div>
               <VersementsClient
                 client={c}
@@ -409,7 +427,8 @@ export function PageGestion({
                 onToggleRetardCarnet={onToggleRetardCarnet}
               />
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -421,14 +440,20 @@ export function PageGestion({
           )}
           {clientsAvecLivraisons.map(c => {
             const nb = livraisons.filter(l => l.clientId === c.id).length;
+            const due = livraisons
+              .filter(l => l.clientId === c.id && l.statut !== "payee" && l.statut !== "annulee")
+              .reduce((s, l) => s + (l.montant || l.prixTotal || l.total || 0), 0);
             return (
-              <div key={c.id} style={{background:"rgba(255,255,255,0.45)",borderRadius:DS.radius,border:"1px solid " + DS.border,padding:"12px 14px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+              <div key={c.id} style={{background:"rgba(255,255,255,0.45)",borderRadius:DS.radius,border:"1px solid " + DS.border,borderLeft:`4px solid ${due>0?"#ea580c":"#22c55e"}`,padding:"12px 14px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+                <div
+                  onClick={onClientClick ? () => onClientClick(c) : undefined}
+                  style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,cursor:onClientClick?"pointer":"default",borderRadius:8}}>
                   <Avatar nom={c.nom} size={32}/>
-                  <div>
+                  <div style={{flex:1,minWidth:0}}>
                     <div style={{fontWeight:700,fontSize:13,color:DS.dark}}>{c.nom}</div>
                     <div style={{fontSize:10,color:DS.mid}}>{nb} livraison{nb > 1 ? "s" : ""}</div>
                   </div>
+                  {onClientClick && <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round" style={{flexShrink:0}}><polyline points="9 18 15 12 9 6"/></svg>}
                 </div>
                 <LivraisonsClient
                   client={c}
@@ -478,7 +503,9 @@ export function PageGestion({
                     const dateSign = ct.signedAt ? new Date(ct.signedAt).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"2-digit"}) : null;
                     return (
                       <div key={contractId} style={{background:"rgba(255,255,255,0.55)",borderRadius:14,border:"1.5px solid "+s.border,overflow:"hidden"}}>
-                        <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10}}>
+                        <div
+                          onClick={onClientClick ? () => onClientClick(client) : undefined}
+                          style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,cursor:onClientClick?"pointer":"default"}}>
                           <div style={{width:40,height:40,borderRadius:11,background:s.bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:18}}>
                             {ct.statut==="signe_complet"?"✅":ct.statut==="signe_client"?"✍️":"📄"}
                           </div>
