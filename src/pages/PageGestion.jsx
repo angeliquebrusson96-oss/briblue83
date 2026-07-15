@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useState, useMemo, useCallback } from "react";
 import { DS, Ico } from "../utils/constants";
-import { calcMensualites, finMoisExclu, getNMoisContrat } from "../utils/helpers";
+import { calcMensualites, finMoisExclu, getNMoisContrat, getMensualiteDue, getStatutPaiement } from "../utils/helpers";
 import { Avatar } from "../components/ui";
 
 const MOIS_LONG = ["","Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
@@ -14,6 +14,43 @@ const Toggle = ({ value, onChange, colorOn = "#dc2626", colorOff = "#e2e8f0" }) 
   >
     <div style={{width:16,height:16,borderRadius:8,background:"#fff",position:"absolute",top:2,left:value?18:2,transition:"left .15s",boxShadow:"0 1px 3px rgba(0,0,0,0.2)"}}/>
   </button>
+);
+
+// ─── Toggle Liste / Kanban ────────────────────────────────────────────────────
+const ViewSwitch = ({ view, onChange }) => (
+  <div style={{display:"flex",gap:3,background:"rgba(0,0,0,0.04)",borderRadius:10,padding:3,flexShrink:0}}>
+    {[
+      { key:"liste",  icon:<><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></> },
+      { key:"kanban", icon:<><rect x="3" y="3" width="6" height="18" rx="1"/><rect x="10.5" y="3" width="6" height="11" rx="1"/><rect x="18" y="3" width="3" height="7" rx="1"/></> },
+    ].map(v => (
+      <button key={v.key} onClick={() => onChange(v.key)} title={v.key === "liste" ? "Vue liste" : "Vue Kanban"}
+        style={{width:30,height:26,borderRadius:7,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
+          background:view===v.key?"#fff":"transparent",boxShadow:view===v.key?"0 1px 3px rgba(0,0,0,0.15)":"none"}}>
+        <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={view===v.key?"#0891b2":"#94a3b8"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{v.icon}</svg>
+      </button>
+    ))}
+  </div>
+);
+
+// ─── Colonnes Kanban génériques (scroll horizontal, clic carte = action) ──────
+const KanbanBoard = ({ columns }) => (
+  <div style={{display:"flex",gap:10,overflowX:"auto",WebkitOverflowScrolling:"touch",paddingBottom:6,scrollSnapType:"x proximity"}}>
+    {columns.map(col => (
+      <div key={col.key} style={{flex:"0 0 250px",scrollSnapAlign:"start"}}>
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,padding:"0 2px"}}>
+          <span style={{width:8,height:8,borderRadius:4,background:col.color,flexShrink:0}}/>
+          <span style={{fontSize:12,fontWeight:800,color:"#374151"}}>{col.label}</span>
+          <span style={{fontSize:10,fontWeight:700,color:"#94a3b8",background:"#f1f5f9",borderRadius:20,padding:"1px 7px"}}>{col.items.length}</span>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:8,minHeight:40}}>
+          {col.items.length===0
+            ? <div style={{fontSize:11,color:"#cbd5e1",padding:"14px 0",textAlign:"center",border:"1.5px dashed #e2e8f0",borderRadius:12}}>Vide</div>
+            : col.items.map(col.render)
+          }
+        </div>
+      </div>
+    ))}
+  </div>
 );
 
 // ─── Mensualités d'un client ──────────────────────────────────────────────────
@@ -267,29 +304,6 @@ const LivraisonsClient = ({ client, livraisons, onUpdateStatut, retardVisible, o
 // ─────────────────────────────────────────────────────────────────────────────
 // PAGE GESTION
 // ─────────────────────────────────────────────────────────────────────────────
-// Montant dû (mois passés + courant non cochés) pour UN client — utilisé à
-// la fois pour le total global et pour trier/badger la liste par urgence.
-function getMensualiteDue(client, versements) {
-  if (!client.prix || !client.dateDebut) return 0;
-  const { m1: men1, m11: menBase } = calcMensualites(client.prix, getNMoisContrat(client));
-  const today = new Date();
-  const debut = new Date(client.dateDebut);
-  const debutY = debut.getFullYear(), debutM = debut.getMonth() + 1;
-  let cur = new Date(debut.getFullYear(), debut.getMonth(), 1);
-  const finMoisBorne = finMoisExclu(client.dateFin) || new Date(debut.getFullYear() + 1, debut.getMonth(), 1);
-  const curMois = new Date(today.getFullYear(), today.getMonth(), 1);
-  let sum = 0;
-  while (cur < finMoisBorne && cur <= curMois) {
-    const y = cur.getFullYear(), m = cur.getMonth() + 1;
-    const key = `${client.id}_${y}_${String(m).padStart(2, "0")}`;
-    const isCurrentMonth = y === today.getFullYear() && m === today.getMonth() + 1;
-    const montant = (y === debutY && m === debutM) ? men1 : menBase;
-    if (!versements?.[key] && !isCurrentMonth) sum += montant;
-    cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
-  }
-  return Math.round(sum * 100) / 100;
-}
-
 export function PageGestion({
   clients,
   versements = {},
@@ -303,7 +317,7 @@ export function PageGestion({
   onClientClick,
 }) {
   const [tab, setTab] = useState("mensualites");
-
+  const [view, setView] = useState("liste");
 
   // Seuls les clients avec un contrat SIGNÉ (signe_complet) sont comptabilisés.
   // Un contrat en attente (signe_client) ou non signé ne génère pas encore de mensualités.
@@ -399,8 +413,55 @@ export function PageGestion({
         ))}
       </div>
 
-      {/* ─── Mensualités ─── */}
-      {tab === "mensualites" && (
+      {/* ─── Sélecteur vue liste / Kanban ─── */}
+      <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
+        <ViewSwitch view={view} onChange={setView}/>
+      </div>
+
+      {/* ─── Mensualités — vue Kanban (par statut de paiement) ─── */}
+      {tab === "mensualites" && view === "kanban" && (
+        <KanbanBoard columns={[
+          { key:"retard", label:"En retard", color:"#dc2626",
+            items: clientsAvecMensualites.filter(c => getStatutPaiement(c, versements) === "retard"),
+            render: c => (
+              <div key={c.id} onClick={onClientClick ? () => onClientClick(c) : undefined}
+                style={{background:"#fff",borderRadius:12,border:"1px solid #fecaca",padding:"10px 12px",cursor:onClientClick?"pointer":"default",boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                  <Avatar nom={c.nom} size={26}/>
+                  <span style={{fontSize:12,fontWeight:700,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</span>
+                </div>
+                <div style={{fontSize:13,fontWeight:800,color:"#dc2626"}}>{getMensualiteDue(c, versements)}€ dû</div>
+              </div>
+            ) },
+          { key:"attente", label:"Mois en cours", color:"#d97706",
+            items: clientsAvecMensualites.filter(c => getStatutPaiement(c, versements) === "attente"),
+            render: c => (
+              <div key={c.id} onClick={onClientClick ? () => onClientClick(c) : undefined}
+                style={{background:"#fff",borderRadius:12,border:"1px solid #fde68a",padding:"10px 12px",cursor:onClientClick?"pointer":"default",boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                  <Avatar nom={c.nom} size={26}/>
+                  <span style={{fontSize:12,fontWeight:700,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</span>
+                </div>
+                <div style={{fontSize:11,color:"#94a3b8"}}>{c.prix}€/an</div>
+              </div>
+            ) },
+          { key:"jour", label:"À jour", color:"#22c55e",
+            items: clientsAvecMensualites.filter(c => getStatutPaiement(c, versements) === "jour"),
+            render: c => (
+              <div key={c.id} onClick={onClientClick ? () => onClientClick(c) : undefined}
+                style={{background:"#fff",borderRadius:12,border:"1px solid #bbf7d0",padding:"10px 12px",cursor:onClientClick?"pointer":"default",boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                  <Avatar nom={c.nom} size={26}/>
+                  <span style={{fontSize:12,fontWeight:700,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</span>
+                </div>
+                <div style={{fontSize:11,color:"#94a3b8"}}>{c.prix}€/an</div>
+              </div>
+            ) },
+        ]}/>
+      )}
+
+      {/* ─── Mensualités — vue liste ─── */}
+      {tab === "mensualites" && view === "liste" && (
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {clientsAvecMensualites.length === 0 && (
             <div style={{textAlign:"center",color:DS.mid,padding:40,fontSize:13}}>Aucun client avec contrat mensuel</div>
@@ -432,8 +493,34 @@ export function PageGestion({
         </div>
       )}
 
-      {/* ─── Livraisons ─── */}
-      {tab === "livraisons" && (
+      {/* ─── Livraisons — vue Kanban (par livraison, statut) ─── */}
+      {tab === "livraisons" && view === "kanban" && (()=>{
+        const withClient = livraisons.map(l => ({ l, client: clients.find(c => c.id === l.clientId) })).filter(x => x.client);
+        const renderLiv = ({ l, client }) => (
+          <div key={l.id} onClick={onClientClick ? () => onClientClick(client) : undefined}
+            style={{background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:"10px 12px",cursor:onClientClick?"pointer":"default",boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#0f172a",marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{client.nom}</div>
+            <div style={{fontSize:10,color:"#94a3b8",marginBottom:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{(l.produits||[]).slice(0,2).join(", ")||l.description||"—"}</div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:10,color:"#94a3b8"}}>{l.date?new Date(l.date).toLocaleDateString("fr",{day:"2-digit",month:"short"}):"—"}</span>
+              {(l.montant||l.prixTotal||l.total)>0 && <span style={{fontSize:12,fontWeight:800,color:"#0f172a"}}>{l.montant||l.prixTotal||l.total}€</span>}
+            </div>
+          </div>
+        );
+        return (
+          <KanbanBoard columns={[
+            { key:"attente", label:"En attente", color:"#d97706",
+              items: withClient.filter(x => x.l.statut !== "payee" && x.l.statut !== "annulee"), render: renderLiv },
+            { key:"payee", label:"Payée", color:"#22c55e",
+              items: withClient.filter(x => x.l.statut === "payee"), render: renderLiv },
+            { key:"annulee", label:"Annulée", color:"#94a3b8",
+              items: withClient.filter(x => x.l.statut === "annulee"), render: renderLiv },
+          ]}/>
+        );
+      })()}
+
+      {/* ─── Livraisons — vue liste ─── */}
+      {tab === "livraisons" && view === "liste" && (
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {clientsAvecLivraisons.length === 0 && (
             <div style={{textAlign:"center",color:DS.mid,padding:40,fontSize:13}}>Aucune livraison enregistrée</div>
@@ -497,6 +584,29 @@ export function PageGestion({
                   <div style={{fontSize:40,marginBottom:10}}>📄</div>
                   Aucun contrat enregistré
                 </div>
+              : view === "kanban"
+              ? (()=>{
+                  const renderCt = ({ contractId, ct, client }) => {
+                    const s = STATUT[ct.statut] || STATUT.reset;
+                    return (
+                      <div key={contractId} onClick={onClientClick ? () => onClientClick(client) : undefined}
+                        style={{background:"#fff",borderRadius:12,border:"1px solid "+s.border,padding:"10px 12px",cursor:onClientClick?"pointer":"default",boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
+                        <div style={{fontSize:12,fontWeight:700,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{client.nom}</div>
+                        <div style={{fontSize:10,color:"#94a3b8",marginTop:2}}>{client.formule}</div>
+                      </div>
+                    );
+                  };
+                  return (
+                    <KanbanBoard columns={[
+                      { key:"signe_complet", label:"Signé", color:"#059669",
+                        items: actifs.filter(x=>x.ct.statut==="signe_complet"), render: renderCt },
+                      { key:"signe_client", label:"En attente signature", color:"#4f46e5",
+                        items: actifs.filter(x=>x.ct.statut==="signe_client"), render: renderCt },
+                      { key:"demande_envoyee", label:"Envoyé", color:"#0891b2",
+                        items: actifs.filter(x=>x.ct.statut==="demande_envoyee"), render: renderCt },
+                    ]}/>
+                  );
+                })()
               : <div style={{display:"flex",flexDirection:"column",gap:8}}>
                   {actifs.map(({contractId,ct,client})=>{
                     const s = STATUT[ct.statut]||STATUT.reset;

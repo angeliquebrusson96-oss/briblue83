@@ -227,6 +227,43 @@ export function calcMensualites(prixTotal, nMois = 12) {
   return { m1, m11: base, estRond, total: prixTotal, nMois: n };
 }
 
+// ─── MONTANT MENSUALITÉ DÛ (mois passés + courant non cochés) ───────────────
+// Partagé entre PageGestion (tri/total) et PageClients (vue Kanban statut
+// paiement) pour ne pas dupliquer la logique de boucle sur les mois du contrat.
+export function getMensualiteDue(client, versements) {
+  if (!client?.prix || !client?.dateDebut) return 0;
+  const { m1: men1, m11: menBase } = calcMensualites(client.prix, getNMoisContrat(client));
+  const today = new Date();
+  const debut = new Date(client.dateDebut);
+  const debutY = debut.getFullYear(), debutM = debut.getMonth() + 1;
+  let cur = new Date(debut.getFullYear(), debut.getMonth(), 1);
+  const finMoisBorne = finMoisExclu(client.dateFin) || new Date(debut.getFullYear() + 1, debut.getMonth(), 1);
+  const curMois = new Date(today.getFullYear(), today.getMonth(), 1);
+  let sum = 0;
+  while (cur < finMoisBorne && cur <= curMois) {
+    const y = cur.getFullYear(), m = cur.getMonth() + 1;
+    const key = `${client.id}_${y}_${String(m).padStart(2, "0")}`;
+    const isCurrentMonth = y === today.getFullYear() && m === today.getMonth() + 1;
+    const montant = (y === debutY && m === debutM) ? men1 : menBase;
+    if (!versements?.[key] && !isCurrentMonth) sum += montant;
+    cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+  }
+  return Math.round(sum * 100) / 100;
+}
+
+// ─── STATUT DE PAIEMENT D'UN CLIENT ──────────────────────────────────────────
+// "sans"    = pas de mensualité configurée (pas de prix ou pas de date de début)
+// "retard"  = au moins un mois passé non réglé
+// "attente" = à jour sur les mois passés mais le mois courant n'est pas encore coché payé
+// "jour"    = tout est réglé, y compris le mois courant
+export function getStatutPaiement(client, versements) {
+  if (!client?.prix || !client?.dateDebut) return "sans";
+  if (getMensualiteDue(client, versements) > 0) return "retard";
+  const today = new Date();
+  const key = `${client.id}_${today.getFullYear()}_${String(today.getMonth() + 1).padStart(2, "0")}`;
+  return versements?.[key] === true ? "jour" : "attente";
+}
+
 // ─── RAPPORT STATUS ──────────────────────────────────────────────────────────
 export function normalizeRapportStatus(s) {
   if (!s) return "cree";

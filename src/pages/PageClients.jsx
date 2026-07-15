@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useState, useMemo } from "react";
 import { DS, Ico, RAPPORT_STATUS, AC } from "../utils/constants";
-import { alerteClient, daysUntil, isEntretienType, isControleType, totalAnnuel, getRapportStatus, YEAR_NOW, calculerPassagesPrevusContrat, isPassageDansContrat, isPassageEffectue } from "../utils/helpers";
+import { alerteClient, daysUntil, isEntretienType, isControleType, totalAnnuel, getRapportStatus, YEAR_NOW, calculerPassagesPrevusContrat, isPassageDansContrat, isPassageEffectue, getStatutPaiement, getMensualiteDue } from "../utils/helpers";
 import { useIsMobile, Avatar, Modal, Tag, BtnPrimary, PhotoImg } from "../components/ui";
 
 // ─── Component to render block icons ────────────────────────────────────────
@@ -175,14 +175,52 @@ export function PassageDetailModal({ passage, client, onClose }) {
   );
 }
 
+// ─── Toggle Liste / Kanban ────────────────────────────────────────────────────
+const ViewSwitch = ({ view, onChange }) => (
+  <div style={{display:"flex",gap:3,background:"rgba(0,0,0,0.04)",borderRadius:10,padding:3,flexShrink:0}}>
+    {[
+      { key:"liste",  icon:<><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></> },
+      { key:"kanban", icon:<><rect x="3" y="3" width="6" height="18" rx="1"/><rect x="10.5" y="3" width="6" height="11" rx="1"/><rect x="18" y="3" width="3" height="7" rx="1"/></> },
+    ].map(v => (
+      <button key={v.key} onClick={() => onChange(v.key)} title={v.key === "liste" ? "Vue liste" : "Vue Kanban"}
+        style={{width:34,height:30,borderRadius:8,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
+          background:view===v.key?"#fff":"transparent",boxShadow:view===v.key?"0 1px 3px rgba(0,0,0,0.15)":"none"}}>
+        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={view===v.key?"#0891b2":"#94a3b8"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{v.icon}</svg>
+      </button>
+    ))}
+  </div>
+);
+
+// ─── Colonnes Kanban génériques (scroll horizontal, clic carte = ouvre fiche) ─
+const KanbanBoard = ({ columns }) => (
+  <div style={{display:"flex",gap:10,overflowX:"auto",WebkitOverflowScrolling:"touch",paddingBottom:6,scrollSnapType:"x proximity"}}>
+    {columns.map(col => (
+      <div key={col.key} style={{flex:"0 0 250px",scrollSnapAlign:"start"}}>
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,padding:"0 2px"}}>
+          <span style={{width:8,height:8,borderRadius:4,background:col.color,flexShrink:0}}/>
+          <span style={{fontSize:12,fontWeight:800,color:"#374151"}}>{col.label}</span>
+          <span style={{fontSize:10,fontWeight:700,color:"#94a3b8",background:"#f1f5f9",borderRadius:20,padding:"1px 7px"}}>{col.items.length}</span>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:8,minHeight:40}}>
+          {col.items.length===0
+            ? <div style={{fontSize:11,color:"#cbd5e1",padding:"14px 0",textAlign:"center",border:"1.5px dashed #e2e8f0",borderRadius:12}}>Vide</div>
+            : col.items.map(col.render)
+          }
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // PAGE CLIENTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function PageClients({ clients, passages, contrats={}, onUpdateContrat, onClientClick, onAdd }) {
+export function PageClients({ clients, passages, contrats={}, versements={}, onUpdateContrat, onClientClick, onAdd }) {
   const [search, setSearch] = useState("");
   const [openPicker, setOpenPicker] = useState(null); // clientId du picker ouvert
   const [filterStat, setFilterStat] = useState("all"); // all | contrat | alertes | expires
+  const [view, setView] = useState("liste"); // liste | kanban
   const isMobile = useIsMobile();
 
   const filtered = useMemo(()=>{
@@ -283,6 +321,7 @@ export function PageClients({ clients, passages, contrats={}, onUpdateContrat, o
             style={{width:"100%",padding:"12px 16px 12px 44px",borderRadius:12,border:"1.5px solid #e2e8f0",fontSize:14,outline:"none",boxSizing:"border-box",background:"#ffffff",color:"#0f172a",fontFamily:"inherit",transition:"border .15s",boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}}/>
           {search&&<button onClick={()=>setSearch("")} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"#94a3b8",fontSize:18,lineHeight:1,padding:4}}>×</button>}
         </div>
+        <ViewSwitch view={view} onChange={setView}/>
         <button onClick={onAdd}
           style={{height:46,borderRadius:16,background:"linear-gradient(135deg,#0891b2,#06b6d4)",border:"none",cursor:"pointer",fontWeight:800,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:7,padding:"0 20px",boxShadow:"0 4px 16px rgba(8,145,178,0.4)",flexShrink:0,WebkitTapHighlightColor:"transparent",whiteSpace:"nowrap"}}>
           {Ico.userPlus(15,"#fff")}
@@ -307,6 +346,7 @@ export function PageClients({ clients, passages, contrats={}, onUpdateContrat, o
         </div>
       )}
 
+      {view==="liste" && (
       <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(auto-fill,minmax(300px,1fr))",gap:14}}>
         {filtered.map((c,idx)=>{
           const al  = alerteClient(c,passages);
@@ -440,6 +480,33 @@ export function PageClients({ clients, passages, contrats={}, onUpdateContrat, o
           );
         })}
       </div>
+      )}
+
+      {/* ═══ VUE KANBAN — statut de paiement ═══ */}
+      {view==="kanban" && (()=>{
+        const renderCard = c => {
+          const due = getMensualiteDue(c, versements);
+          return (
+            <div key={c.id} onClick={()=>onClientClick(c)} style={{background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:"10px 12px",cursor:"pointer",boxShadow:"0 1px 3px rgba(0,0,0,0.05)",display:"flex",alignItems:"center",gap:8}}>
+              <Avatar nom={c.nom} size={28}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>
+                <div style={{fontSize:10,color:due>0?"#dc2626":"#94a3b8",fontWeight:due>0?700:400}}>{due>0?`${due}€ dû`:(c.formule||"")}</div>
+              </div>
+            </div>
+          );
+        };
+        const buckets = { retard:[], attente:[], jour:[], sans:[] };
+        filtered.forEach(c => buckets[getStatutPaiement(c, versements)].push(c));
+        return (
+          <KanbanBoard columns={[
+            { key:"retard",  label:"En retard",       color:"#dc2626", items:buckets.retard,  render:renderCard },
+            { key:"attente", label:"Mois en cours",   color:"#d97706", items:buckets.attente, render:renderCard },
+            { key:"jour",    label:"À jour",          color:"#22c55e", items:buckets.jour,    render:renderCard },
+            { key:"sans",    label:"Sans mensualité", color:"#94a3b8", items:buckets.sans,    render:renderCard },
+          ]}/>
+        );
+      })()}
     </div>
   );
 }
