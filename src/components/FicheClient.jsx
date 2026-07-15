@@ -209,7 +209,7 @@ export function PassageDetailModal({ passage, client, onClose }) {
 }
 
 // ─── FICHE CLIENT ─────────────────────────────────────────────────────────────
-export function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[], contrats={}, versements={}, onToggleVersement, onUpdateContrat, onDeleteContrat, onUpdateClient, onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onDeletePassage, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
+export function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[], contrats={}, versements={}, onToggleVersement, onUpdateContrat, onDeleteContrat, onResetContratSignatures, onUpdateClient, onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onDeletePassage, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
   const [tab, setTab] = useState("gestion");
   const [notesPrivees, setNotesPrivees] = useState(client.notesPrivees||"");
   const [notesSaved, setNotesSaved] = useState(false);
@@ -1505,13 +1505,21 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
               </div>
             )}
 
-            {/* ── Supprimer le contrat ── */}
-            {ct && onDeleteContrat && (
-              <div style={{borderTop:"1px solid #f1f5f9",paddingTop:14}}>
-                <button onClick={onDeleteContrat}
-                  style={{width:"100%",height:40,borderRadius:11,background:"#fef2f2",border:"1.5px solid #fecaca",cursor:"pointer",fontWeight:700,fontSize:12,color:"#dc2626",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:7,WebkitTapHighlightColor:"transparent"}}>
-                  {Ico.trash(13,"#dc2626")} Supprimer ce contrat
-                </button>
+            {/* ── Supprimer le contrat / réinitialiser les signatures ── */}
+            {ct && (onDeleteContrat || onResetContratSignatures) && (
+              <div style={{borderTop:"1px solid #f1f5f9",paddingTop:14,display:"flex",flexDirection:"column",gap:8}}>
+                {onResetContratSignatures && (ct.signatureClient || ct.signaturePrestataire) && (
+                  <button onClick={onResetContratSignatures}
+                    style={{width:"100%",height:40,borderRadius:11,background:"#fff7ed",border:"1.5px solid #fed7aa",cursor:"pointer",fontWeight:700,fontSize:12,color:"#c2410c",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:7,WebkitTapHighlightColor:"transparent"}}>
+                    {Ico.refresh ? Ico.refresh(13,"#c2410c") : Ico.trash(13,"#c2410c")} Réinitialiser les signatures uniquement
+                  </button>
+                )}
+                {onDeleteContrat && (
+                  <button onClick={onDeleteContrat}
+                    style={{width:"100%",height:40,borderRadius:11,background:"#fef2f2",border:"1.5px solid #fecaca",cursor:"pointer",fontWeight:700,fontSize:12,color:"#dc2626",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:7,WebkitTapHighlightColor:"transparent"}}>
+                    {Ico.trash(13,"#dc2626")} Supprimer le contrat entièrement
+                  </button>
+                )}
               </div>
             )}
 

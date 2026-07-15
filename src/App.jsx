@@ -1585,12 +1585,34 @@ export default function App() {
 
   const deleteClient = useCallback(id=>{ showConfirm("Supprimer ce client et tous ses passages ?", ()=>{ setClients(prev=>{ const next=prev.filter(x=>x.id!==id); saveClients(next); return next; }); setPassages(prev=>{ const next=prev.filter(x=>x.clientId!==id); savePassages(next); return next; }); setFicheClient(null); }); },[saveClients,savePassages]);
 
-  // Supprimer un contrat (retire l'entrée du registre des contrats)
+  // Supprimer un contrat entièrement (retire toutes les entrées du registre
+  // des contrats pour ce client — y compris d'éventuelles entrées orphelines
+  // non indexées sous la clé canonique "CT-{clientId}", cf. getContrat() dans
+  // PageClients.jsx qui fait le même fallback en lecture).
   const deleteContrat = useCallback((clientId) => {
-    showConfirm("Supprimer ce contrat ? Les signatures seront effacées.", () => {
+    showConfirm("Supprimer ce contrat ? Il faudra le recréer et l'envoyer à nouveau pour signature.", () => {
       setContrats(prev => {
         const next = {...prev};
-        delete next[`CT-${clientId}`];
+        Object.keys(next).forEach(k => {
+          if (k === `CT-${clientId}` || next[k]?.clientId === clientId) delete next[k];
+        });
+        saveContrats(next);
+        return next;
+      });
+    });
+  }, [saveContrats]);
+
+  // Réinitialiser uniquement les signatures d'un contrat (conserve le contrat,
+  // repasse au statut "cree" pour permettre une nouvelle signature).
+  const resetContratSignatures = useCallback((clientId) => {
+    showConfirm("Réinitialiser les signatures ? Le contrat sera conservé mais devra être re-signé par les deux parties.", () => {
+      setContrats(prev => {
+        const next = {...prev};
+        Object.keys(next).forEach(k => {
+          if (k === `CT-${clientId}` || next[k]?.clientId === clientId) {
+            next[k] = { ...next[k], clientId, statut: "cree", signatureClient: "", signaturePrestataire: "", signedAt: null, signedByPrestaAt: null };
+          }
+        });
         saveContrats(next);
         return next;
       });
@@ -1901,7 +1923,7 @@ export default function App() {
       {/* MODALS */}
       {ficheClient&&(()=>{
         const latest=clients.find(c=>c.id===ficheClient.id)||ficheClient;
-        return <FicheClient client={latest} passages={passages} livraisons={livraisons.filter(l=>l.clientId===latest.id)} rdvs={rdvs} produitsStock={Object.keys(stock)} contrats={contrats} versements={versements} onToggleVersement={handleToggleVersement} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onDeleteContrat={()=>deleteContrat(latest.id)} onUpdateClient={c=>{ setClients(prev=>{ const next=prev.map(x=>x.id===c.id?c:x); saveClients(next); return next; }); setFicheClient(c); }} onSaveLivraison={saveLivraison} onDeleteLivraison={deleteLivraison} onUpdateStatutLivraison={updateStatutLivraison} onClose={()=>setFicheClient(null)} onEdit={()=>{setEditClient(latest);setShowFormClient(true);setFicheClient(null);}} onDelete={()=>deleteClient(latest.id)} onDeletePassage={deletePassage} onAddPassage={()=>openAddPassageFromClient(latest.id)} onEditPassage={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddRdv={()=>{setEditRdv({clientId:latest.id});setShowFormRdv(true);}} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} onDeleteRdv={deleteRdv}/>;
+        return <FicheClient client={latest} passages={passages} livraisons={livraisons.filter(l=>l.clientId===latest.id)} rdvs={rdvs} produitsStock={Object.keys(stock)} contrats={contrats} versements={versements} onToggleVersement={handleToggleVersement} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onDeleteContrat={()=>deleteContrat(latest.id)} onResetContratSignatures={()=>resetContratSignatures(latest.id)} onUpdateClient={c=>{ setClients(prev=>{ const next=prev.map(x=>x.id===c.id?c:x); saveClients(next); return next; }); setFicheClient(c); }} onSaveLivraison={saveLivraison} onDeleteLivraison={deleteLivraison} onUpdateStatutLivraison={updateStatutLivraison} onClose={()=>setFicheClient(null)} onEdit={()=>{setEditClient(latest);setShowFormClient(true);setFicheClient(null);}} onDelete={()=>deleteClient(latest.id)} onDeletePassage={deletePassage} onAddPassage={()=>openAddPassageFromClient(latest.id)} onEditPassage={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddRdv={()=>{setEditRdv({clientId:latest.id});setShowFormRdv(true);}} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} onDeleteRdv={deleteRdv}/>;
       })()}
 
       {showFormClient&&<FormClient initial={editClient} clients={clients} onSave={saveClient} onClose={()=>{setShowFormClient(false);setEditClient(null);}}/>}
