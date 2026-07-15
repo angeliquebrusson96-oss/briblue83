@@ -556,8 +556,19 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
     const retards = versementMoisDus.filter(({year:y,month:m}) =>
       !(y === today.getFullYear() && m === today.getMonth()+1)
     );
-    const aJour = nbDus === 0 && montantLivraisonsDues <= 0;
+    const hasProduitsDue = montantLivraisonsDues > 0;
+    const aJour = nbDus === 0 && !hasProduitsDue;
     const totalDu = nbDus * (mensualite||0) + montantLivraisonsDues;
+    // Libellé : priorité aux mensualités en retard (le cas le plus critique),
+    // sinon mensualité du mois en cours, sinon uniquement des produits à régler.
+    // Ne jamais confondre "pas de retard strict" (retards exclut le mois en
+    // cours) avec "rien à payer" — un nouveau contrat a son 1er mois dû sans
+    // être en retard, ce qui ne doit pas être affiché comme "produits".
+    const label = aJour ? "Paiements à jour"
+      : retards.length>=2 ? `${retards.length} mensualités en retard${hasProduitsDue?" + produits":""}`
+      : retards.length===1 ? `Mensualité en retard${hasProduitsDue?" + produits":""}`
+      : nbDus>0 ? `Mensualité en attente${hasProduitsDue?" + produits":""}`
+      : "Produits à régler";
 
     return (
       <div style={{padding:"0 12px",marginBottom:4}}>
@@ -582,10 +593,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
               </div>
               <div style={{flex:1}}>
                 <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>
-                  {aJour ? "Paiements à jour"
-                    : retards.length>=2 ? `${retards.length} mensualité${retards.length>1?"s":""} en retard`
-                    : retards.length===1 ? "Mensualité en attente"
-                    : "Produits à régler"}
+                  {label}
                 </div>
                 <div style={{fontSize:11,color:"#64748b",marginTop:2}}>
                   {aJour ? `${mensualite}€ / mois · contrat ${client.formule||""}` : `${totalDu}€ restant${totalDu>mensualite?"s":""} à régler`}
@@ -600,6 +608,9 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
 
             {!aJour && (
               <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                {nbDus>0 && hasProduitsDue && (
+                  <div style={{fontSize:10,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:.5,marginTop:2}}>Mensualités</div>
+                )}
                 {versementMoisDus.map(({year:y,month:m})=>{
                   const estCourant = y===today.getFullYear() && m===today.getMonth()+1;
                   return (
@@ -623,6 +634,9 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
                     </div>
                   );
                 })}
+                {nbDus>0 && hasProduitsDue && (
+                  <div style={{fontSize:10,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:.5,marginTop:6}}>Produits</div>
+                )}
                 {livraisonsDues.map(l=>(
                   <div key={l.id} style={{
                     display:"flex",alignItems:"center",justifyContent:"space-between",
