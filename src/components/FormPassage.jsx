@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { DS, Ico, MOIS, MOIS_L, RAPPORT_STATUS, PRODUITS_DEFAUT } from "../utils/constants";
-import { TODAY, getRapportStatus, isEntretienType, isControleType, getPH, getCL, getTemp, getResumePassage, normalizeRapportStatus, migrateMois, totalAnnuel, calcMensualites, uid } from "../utils/helpers";
+import { TODAY, getRapportStatus, isEntretienType, isControleType, getPH, getCL, getTemp, getResumePassage, normalizeRapportStatus, migrateMois, totalAnnuel, calcMensualites, getNMoisContrat, uid } from "../utils/helpers";
 import { useIsMobile, Modal, BtnPrimary, Card, Section, FmField, FmSectionTitle, FmHeader, FmSteps, DraftBanner, PhotoPicker, SunBurstActions, SunBurstFormNav, RapportStatusPicker, Tag, Avatar, PhotoImg } from "./ui";
 import { toastWarn, toastSuccess, toastInfo, showConfirm } from "../styles";
 import { extractPassagePhotos, resolvePhoto, resolvePhotoForPdf, migratePassagePhotosToStorage } from "../lib/photoStore";
@@ -50,7 +50,11 @@ export function genererContratHTML(client, sigPrestataire="", sigClient="", cont
   const totalPrixE = totalE * prixE;
   const totalPrixC = totalC * prixC;
   const totalAnnuelPrix = totalPrixE + totalPrixC;
-  const { m1, m11, estRond } = calcMensualites(totalAnnuelPrix);
+  // Durée réelle du contrat (12, 6, 3 mois ou autre) — même calcul que la
+  // page Gestion et le carnet client, pour que la mensualité affichée soit
+  // identique partout (le PDF divisait toujours par 12, même pour un
+  // contrat plus court, causant un montant différent du carnet).
+  const { m1, m11, estRond } = calcMensualites(totalAnnuelPrix, getNMoisContrat(client));
   const dateContrat = client.dateDebut ? new Date(client.dateDebut).toLocaleDateString("fr") : "—";
   const dateFin = client.dateFin ? new Date(client.dateFin).toLocaleDateString("fr") : "—";
   const datePrestaSig = contrat.signedByPrestaAt ? new Date(contrat.signedByPrestaAt).toLocaleDateString("fr") : new Date().toLocaleDateString("fr");
