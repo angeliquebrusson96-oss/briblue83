@@ -1591,13 +1591,23 @@ export default function App() {
   // PageClients.jsx qui fait le même fallback en lecture).
   // Appel Admin SDK (bypass l'auth Firebase client, peu fiable) — garantit que
   // l'action atteint réellement Firestore, pas seulement le localStorage local.
-  const syncContratServer = (clientId, action) => {
-    fetch("/api/update-contract", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientId, action }),
-    }).catch(() => {});
-  };
+  // Un échec silencieux ici est ce qui causait "je supprime, ça revient au
+  // rechargement" : on retente une fois puis on prévient explicitement si ça
+  // échoue encore, plutôt que de laisser croire que l'action a réussi.
+  const syncContratServer = useCallback(async (clientId, action) => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await fetch("/api/update-contract", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clientId, action }),
+        });
+        if (res.ok) return true;
+      } catch { /* retry */ }
+    }
+    toastError("Échec de synchronisation avec le serveur — l'action pourrait ne pas persister. Vérifie ta connexion et réessaie.");
+    return false;
+  }, []);
 
   const deleteContrat = useCallback((clientId) => {
     showConfirm("Supprimer ce contrat ? Il faudra le recréer et l'envoyer à nouveau pour signature.", () => {
@@ -1611,7 +1621,7 @@ export default function App() {
         return next;
       });
     });
-  }, [saveContrats]);
+  }, [saveContrats, syncContratServer]);
 
   // Réinitialiser uniquement les signatures d'un contrat (conserve le contrat,
   // repasse au statut "cree" pour permettre une nouvelle signature).
@@ -1629,7 +1639,7 @@ export default function App() {
         return next;
       });
     });
-  }, [saveContrats]);
+  }, [saveContrats, syncContratServer]);
 
   const savePassage = useCallback(async p=>{
     const existing = passages.find(x=>x.id===p.id);

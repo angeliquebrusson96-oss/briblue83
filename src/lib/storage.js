@@ -931,6 +931,15 @@ export function subscribeToRealtime(callbacks) {
           }
 
           // ── Merge spécial pour les contrats (signatures ne doivent jamais disparaître) ─
+          // Un document Firestore est TOUJOURS lu en entier (pas de lecture partielle
+          // possible sur les clés d'un même objet) : si un contrat est absent du
+          // snapshot distant, c'est qu'il a été supprimé intentionnellement (via
+          // deleteContrat/resetContratSignatures → /api/update-contract, la source
+          // de vérité désormais fiable), jamais une lecture "en retard". On ne le
+          // réimporte donc plus depuis le local dans ce cas — seule la fusion des
+          // signatures entre versions EXISTANTES des deux côtés reste utile (protège
+          // contre une écriture locale pas encore confirmée par Firebase, déjà filtrée
+          // par ailleurs via hasPending ci-dessus pour nos propres écritures en cours).
           if (key === "bb_contrats_v1" && val && typeof val === "object") {
             try {
               const RANK = { signe_complet:4, signe_client:3, demande_envoyee:2, cree:1, reset:0 };
@@ -941,7 +950,7 @@ export function subscribeToRealtime(callbacks) {
                 for (const [id, lct] of Object.entries(localObj)) {
                   if (!lct || typeof lct !== "object") continue;
                   const rct = mergedConts[id];
-                  if (!rct || typeof rct !== "object") { mergedConts[id] = lct; continue; }
+                  if (!rct || typeof rct !== "object") continue; // absent du serveur → supprimé, on n'y touche pas
                   const lr = RANK[lct.statut] ?? -1;
                   const rr = RANK[rct.statut] ?? -1;
                   if (lr > rr) {
