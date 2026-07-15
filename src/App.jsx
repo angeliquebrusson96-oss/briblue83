@@ -1589,8 +1589,19 @@ export default function App() {
   // des contrats pour ce client — y compris d'éventuelles entrées orphelines
   // non indexées sous la clé canonique "CT-{clientId}", cf. getContrat() dans
   // PageClients.jsx qui fait le même fallback en lecture).
+  // Appel Admin SDK (bypass l'auth Firebase client, peu fiable) — garantit que
+  // l'action atteint réellement Firestore, pas seulement le localStorage local.
+  const syncContratServer = (clientId, action) => {
+    fetch("/api/update-contract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, action }),
+    }).catch(() => {});
+  };
+
   const deleteContrat = useCallback((clientId) => {
     showConfirm("Supprimer ce contrat ? Il faudra le recréer et l'envoyer à nouveau pour signature.", () => {
+      syncContratServer(clientId, "delete");
       setContrats(prev => {
         const next = {...prev};
         Object.keys(next).forEach(k => {
@@ -1606,6 +1617,7 @@ export default function App() {
   // repasse au statut "cree" pour permettre une nouvelle signature).
   const resetContratSignatures = useCallback((clientId) => {
     showConfirm("Réinitialiser les signatures ? Le contrat sera conservé mais devra être re-signé par les deux parties.", () => {
+      syncContratServer(clientId, "reset");
       setContrats(prev => {
         const next = {...prev};
         Object.keys(next).forEach(k => {
