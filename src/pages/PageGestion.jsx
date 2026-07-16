@@ -6,6 +6,16 @@ import { Avatar } from "../components/ui";
 
 const MOIS_LONG = ["","Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
 
+// ─── État vide ────────────────────────────────────────────────────────────────
+const EmptyState = ({ icon, text }) => (
+  <div style={{textAlign:"center",padding:"48px 20px",color:DS.mid,background:"#fff",borderRadius:20,border:"1px solid #f1f5f9"}}>
+    <div style={{width:60,height:60,borderRadius:18,background:"#f0f9ff",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px"}}>
+      {icon(24,"#7dd3fc")}
+    </div>
+    <div style={{fontSize:14,fontWeight:600,color:"#64748b"}}>{text}</div>
+  </div>
+);
+
 // ─── Toggle switch ────────────────────────────────────────────────────────────
 const Toggle = ({ value, onChange, colorOn = "#dc2626", colorOff = "#e2e8f0" }) => (
   <button
@@ -326,65 +336,93 @@ export function PageGestion({
     [livraisons]
   );
 
+  const TAB_META = {
+    mensualites: { icon: <rect x="2" y="5" width="20" height="14" rx="2"/>, icon2: <line x1="2" y1="10" x2="22" y2="10"/> },
+    livraisons:  { icon: <rect x="1" y="3" width="15" height="13" rx="1"/>, icon2: <path d="M16 8h4l3 4v4h-7V8zM5.5 18.5a2.5 2.5 0 100 .01M18.5 18.5a2.5 2.5 0 100 .01"/> },
+    documents:   { icon: <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>, icon2: <polyline points="14 2 14 8 20 8"/> },
+  };
+
   return (
     <div>
-      {/* ─── Summary cards ─── */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,marginBottom:16}}>
-        <div style={{background:"linear-gradient(135deg,#0c1f3f,#0369a1)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:"0 8px 24px rgba(12,31,63,0.25)"}}>
-          <div style={{position:"absolute",top:-15,right:-15,width:80,height:80,borderRadius:"50%",background:"rgba(56,189,248,0.15)",pointerEvents:"none"}}/>
-          <div style={{display:"flex",alignItems:"center",gap:10,position:"relative"}}>
-            <div style={{width:42,height:42,borderRadius:12,background:"rgba(56,189,248,0.25)",border:"1.5px solid rgba(56,189,248,0.4)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#7dd3fc" strokeWidth="2" strokeLinecap="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+      {/* ═══ HERO ═══ */}
+      <div style={{borderRadius:24,overflow:"hidden",position:"relative",marginBottom:16,
+        background:"linear-gradient(145deg,#0a1830 0%,#0d3563 45%,#0369a1 100%)",
+        boxShadow:"0 14px 40px rgba(3,54,99,0.35)"}}>
+        <div style={{position:"absolute",top:-50,right:-40,width:200,height:200,borderRadius:"50%",background:"radial-gradient(circle,rgba(56,189,248,0.22) 0%,transparent 70%)",pointerEvents:"none"}}/>
+        <div style={{position:"absolute",bottom:-60,left:-30,width:160,height:160,borderRadius:"50%",background:"radial-gradient(circle,rgba(14,116,144,0.35) 0%,transparent 70%)",pointerEvents:"none"}}/>
+        <div style={{position:"relative",padding:"22px 18px 18px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18}}>
+            <div style={{width:38,height:38,borderRadius:12,background:"rgba(255,255,255,0.12)",border:"1px solid rgba(255,255,255,0.18)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              {Ico.euro(18,"#7dd3fc")}
             </div>
             <div>
-              <div style={{fontSize:22,fontWeight:900,color:"#fff",lineHeight:1}}>{totalMensualitesDu > 0 ? totalMensualitesDu + "€" : "✓"}</div>
-              <div style={{fontSize:10,color:"rgba(255,255,255,0.6)",fontWeight:700,textTransform:"uppercase",letterSpacing:0.5,marginTop:2}}>Mensualités {totalMensualitesDu > 0 ? "dues" : "à jour"}</div>
+              <div style={{fontSize:18,fontWeight:900,color:"#fff",letterSpacing:-0.4,lineHeight:1.1}}>Gestion</div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,0.55)",fontWeight:600,marginTop:2}}>Paiements, livraisons &amp; contrats</div>
             </div>
           </div>
-        </div>
 
-        <div style={{background:totalLivraisonsDu>0?"linear-gradient(135deg,#d97706,#f59e0b)":"linear-gradient(135deg,#059669,#10b981)",borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:`0 8px 24px ${totalLivraisonsDu>0?"rgba(217,119,6,0.25)":"rgba(5,150,105,0.25)"}`}}>
-          <div style={{position:"absolute",top:-15,right:-15,width:80,height:80,borderRadius:"50%",background:"rgba(255,255,255,0.12)",pointerEvents:"none"}}/>
-          <div style={{display:"flex",alignItems:"center",gap:10,position:"relative"}}>
-            <div style={{width:42,height:42,borderRadius:12,background:"rgba(255,255,255,0.2)",border:"1.5px solid rgba(255,255,255,0.3)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 4v4h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+          {/* ─── Summary cards ─── */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8}}>
+            <div style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.14)",borderRadius:16,padding:"13px 14px",position:"relative",overflow:"hidden",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
+              <div style={{display:"flex",alignItems:"center",gap:9}}>
+                <div style={{width:36,height:36,borderRadius:11,background:totalMensualitesDu>0?"rgba(248,113,113,0.2)":"rgba(110,231,183,0.18)",border:`1.5px solid ${totalMensualitesDu>0?"rgba(248,113,113,0.4)":"rgba(110,231,183,0.35)"}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={totalMensualitesDu>0?"#fca5a5":"#6ee7b7"} strokeWidth="2" strokeLinecap="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                </div>
+                <div>
+                  <div style={{fontSize:19,fontWeight:900,color:"#fff",lineHeight:1}}>{totalMensualitesDu > 0 ? totalMensualitesDu + "€" : "✓"}</div>
+                  <div style={{fontSize:9,color:"rgba(255,255,255,0.55)",fontWeight:700,textTransform:"uppercase",letterSpacing:0.4,marginTop:3}}>Mensualités {totalMensualitesDu > 0 ? "dues" : "à jour"}</div>
+                </div>
+              </div>
             </div>
-            <div>
-              <div style={{fontSize:22,fontWeight:900,color:"#fff",lineHeight:1}}>{totalLivraisonsDu > 0 ? totalLivraisonsDu + "€" : "✓"}</div>
-              <div style={{fontSize:10,color:"rgba(255,255,255,0.85)",fontWeight:700,textTransform:"uppercase",letterSpacing:0.5,marginTop:2}}>Livraisons {totalLivraisonsDu > 0 ? "dues" : "à jour"}</div>
+
+            <div style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.14)",borderRadius:16,padding:"13px 14px",position:"relative",overflow:"hidden",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
+              <div style={{display:"flex",alignItems:"center",gap:9}}>
+                <div style={{width:36,height:36,borderRadius:11,background:totalLivraisonsDu>0?"rgba(251,191,36,0.2)":"rgba(110,231,183,0.18)",border:`1.5px solid ${totalLivraisonsDu>0?"rgba(251,191,36,0.4)":"rgba(110,231,183,0.35)"}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={totalLivraisonsDu>0?"#fbbf24":"#6ee7b7"} strokeWidth="2" strokeLinecap="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 4v4h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                </div>
+                <div>
+                  <div style={{fontSize:19,fontWeight:900,color:"#fff",lineHeight:1}}>{totalLivraisonsDu > 0 ? totalLivraisonsDu + "€" : "✓"}</div>
+                  <div style={{fontSize:9,color:"rgba(255,255,255,0.55)",fontWeight:700,textTransform:"uppercase",letterSpacing:0.4,marginTop:3}}>Livraisons {totalLivraisonsDu > 0 ? "dues" : "à jour"}</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* ─── Tabs ─── */}
-      <div style={{display:"flex",gap:4,marginBottom:14,background:"rgba(255,255,255,0.45)",borderRadius:14,padding:4,border:"1px solid "+DS.border,overflowX:"auto",scrollbarWidth:"none"}}>
+      <div style={{display:"flex",gap:5,marginBottom:16,background:"#fff",borderRadius:16,padding:5,border:"1px solid "+DS.border,boxShadow:"0 1px 2px rgba(15,23,42,0.04)",overflowX:"auto",scrollbarWidth:"none"}}>
         {[
           { key:"mensualites", label:"Mensualités", count:clientsAvecMensualites.length },
           { key:"livraisons",  label:"Livraisons",  count:clientsAvecLivraisons.length  },
           { key:"documents",   label:"Contrats",    count:Object.values(contrats).filter(c=>c?.statut&&c.statut!=="reset").length },
-        ].map(t => (
+        ].map(t => {
+          const active = tab === t.key;
+          return (
           <button key={t.key} onClick={() => setTab(t.key)}
-            style={{flex:1,padding:"9px 8px",borderRadius:10,border:"none",cursor:"pointer",flexShrink:0,
-              background:tab===t.key?"linear-gradient(135deg,#06b6d4,#0891b2)":"transparent",
-              color:tab===t.key?"#fff":DS.mid,fontWeight:700,fontSize:12,fontFamily:"inherit",
+            style={{flex:1,padding:"10px 8px",borderRadius:12,border:"none",cursor:"pointer",flexShrink:0,
+              background:active?"linear-gradient(135deg,#06b6d4,#0891b2)":"transparent",
+              color:active?"#fff":DS.mid,fontWeight:700,fontSize:12,fontFamily:"inherit",
+              boxShadow:active?"0 4px 12px rgba(8,145,178,0.35)":"none",
               transition:"all .2s",display:"flex",alignItems:"center",justifyContent:"center",gap:6,WebkitTapHighlightColor:"transparent"}}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{TAB_META[t.key].icon}{TAB_META[t.key].icon2}</svg>
             {t.label}
-            {t.count>0&&<span style={{background:tab===t.key?"rgba(255,255,255,0.25)":"rgba(8,145,178,0.1)",color:tab===t.key?"#fff":DS.blue,borderRadius:20,padding:"1px 7px",fontSize:10,fontWeight:800}}>{t.count}</span>}
+            {t.count>0&&<span style={{background:active?"rgba(255,255,255,0.25)":"rgba(8,145,178,0.1)",color:active?"#fff":DS.blue,borderRadius:20,padding:"1px 7px",fontSize:10,fontWeight:800}}>{t.count}</span>}
           </button>
-        ))}
+          );
+        })}
       </div>
 
       {/* ─── Mensualités ─── */}
       {tab === "mensualites" && (
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {clientsAvecMensualites.length === 0 && (
-            <div style={{textAlign:"center",color:DS.mid,padding:40,fontSize:13}}>Aucun client avec contrat mensuel</div>
+            <EmptyState icon={Ico.euro} text="Aucun client avec contrat mensuel"/>
           )}
           {clientsAvecMensualites.map(c => {
             const due = getMensualiteDue(c, versements);
             return (
-            <div key={c.id} style={{background:"rgba(255,255,255,0.45)",borderRadius:DS.radius,border:"1px solid " + DS.border,borderLeft:`4px solid ${due>0?"#dc2626":"#22c55e"}`,padding:"12px 14px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+            <div key={c.id} style={{background:"#fff",borderRadius:18,border:"1px solid #eef1f5",borderLeft:`4px solid ${due>0?"#dc2626":"#22c55e"}`,padding:"13px 15px",boxShadow:"0 1px 2px rgba(15,23,42,0.03), 0 4px 14px rgba(15,23,42,0.05)"}}>
               <div
                 onClick={onClientClick ? () => onClientClick(c) : undefined}
                 style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,cursor:onClientClick?"pointer":"default",borderRadius:8}}>
@@ -412,7 +450,7 @@ export function PageGestion({
       {tab === "livraisons" && (
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {clientsAvecLivraisons.length === 0 && (
-            <div style={{textAlign:"center",color:DS.mid,padding:40,fontSize:13}}>Aucune livraison enregistrée</div>
+            <EmptyState icon={Ico.truck} text="Aucune livraison enregistrée"/>
           )}
           {clientsAvecLivraisons.map(c => {
             const nb = livraisons.filter(l => l.clientId === c.id).length;
@@ -420,7 +458,7 @@ export function PageGestion({
               .filter(l => l.clientId === c.id && l.statut !== "payee" && l.statut !== "annulee")
               .reduce((s, l) => s + (l.montant || l.prixTotal || l.total || 0), 0);
             return (
-              <div key={c.id} style={{background:"rgba(255,255,255,0.45)",borderRadius:DS.radius,border:"1px solid " + DS.border,borderLeft:`4px solid ${due>0?"#ea580c":"#22c55e"}`,padding:"12px 14px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+              <div key={c.id} style={{background:"#fff",borderRadius:18,border:"1px solid #eef1f5",borderLeft:`4px solid ${due>0?"#ea580c":"#22c55e"}`,padding:"13px 15px",boxShadow:"0 1px 2px rgba(15,23,42,0.03), 0 4px 14px rgba(15,23,42,0.05)"}}>
                 <div
                   onClick={onClientClick ? () => onClientClick(c) : undefined}
                   style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,cursor:onClientClick?"pointer":"default",borderRadius:8}}>
@@ -462,23 +500,20 @@ export function PageGestion({
           <div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:14}}>
               {[{label:"Signés",val:nbSigned,color:"#059669",bg:"#f0fdf4"},{label:"En attente",val:actifs.filter(x=>x.ct.statut==="signe_client").length,color:"#4f46e5",bg:"#eef2ff"},{label:"Total",val:actifs.length,color:"#0891b2",bg:"#e0f2fe"}].map(s=>(
-                <div key={s.label} style={{background:s.bg,borderRadius:12,padding:"10px 8px",textAlign:"center",border:"1px solid "+s.color+"22"}}>
-                  <div style={{fontSize:22,fontWeight:900,color:s.color,lineHeight:1}}>{s.val}</div>
-                  <div style={{fontSize:10,color:s.color,fontWeight:700,marginTop:3,textTransform:"uppercase",letterSpacing:.4}}>{s.label}</div>
+                <div key={s.label} style={{background:s.bg,borderRadius:16,padding:"12px 8px",textAlign:"center",border:"1px solid "+s.color+"22",boxShadow:"0 1px 2px rgba(15,23,42,0.03)"}}>
+                  <div style={{fontSize:24,fontWeight:900,color:s.color,lineHeight:1}}>{s.val}</div>
+                  <div style={{fontSize:9,color:s.color,fontWeight:700,marginTop:4,textTransform:"uppercase",letterSpacing:.4}}>{s.label}</div>
                 </div>
               ))}
             </div>
             {actifs.length===0
-              ? <div style={{textAlign:"center",padding:40,color:DS.mid,fontSize:13}}>
-                  <div style={{fontSize:40,marginBottom:10}}>📄</div>
-                  Aucun contrat enregistré
-                </div>
+              ? <EmptyState icon={Ico.pdf} text="Aucun contrat enregistré"/>
               : <div style={{display:"flex",flexDirection:"column",gap:8}}>
                   {actifs.map(({contractId,ct,client})=>{
                     const s = STATUT[ct.statut]||STATUT.reset;
                     const dateSign = ct.signedAt ? new Date(ct.signedAt).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"2-digit"}) : null;
                     return (
-                      <div key={contractId} style={{background:"rgba(255,255,255,0.55)",borderRadius:14,border:"1.5px solid "+s.border,overflow:"hidden"}}>
+                      <div key={contractId} style={{background:"#fff",borderRadius:18,border:"1.5px solid "+s.border,overflow:"hidden",boxShadow:"0 1px 2px rgba(15,23,42,0.03), 0 4px 14px rgba(15,23,42,0.05)"}}>
                         <div
                           onClick={onClientClick ? () => onClientClick(client) : undefined}
                           style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10,cursor:onClientClick?"pointer":"default"}}>

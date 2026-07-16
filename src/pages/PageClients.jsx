@@ -247,52 +247,74 @@ export function PageClients({ clients, passages, contrats={}, onUpdateContrat, o
 
   return (
     <div>
-      {/* ═══ BARRE STATS / FILTRES ═══ */}
-      <div style={{display:"flex",gap:8,marginBottom:16,overflowX:"auto",scrollbarWidth:"none",WebkitOverflowScrolling:"touch",paddingBottom:2}}>
-        {[
-          { key:"all",      icon:"🏊", label:"Tous",          val:statsClients.total,     color:"#0891b2", grad:"linear-gradient(135deg,#0c1f3f,#0369a1)" },
-          { key:"contrat",  icon:"📋", label:"Sous contrat",  val:statsClients.sousContrat,color:"#059669",grad:"linear-gradient(135deg,#064e3b,#059669)" },
-          { key:"alertes",  icon:"⚠️", label:"Alertes",       val:statsClients.alertes,   color:"#d97706", grad:"linear-gradient(135deg,#78350f,#d97706)" },
-          { key:"expires",  icon:"⏰", label:"Expirent < 30j",val:statsClients.expires,   color:"#dc2626", grad:"linear-gradient(135deg,#7f1d1d,#dc2626)" },
-        ].map(f=>{
-          const active = filterStat === f.key;
-          return (
-            <button key={f.key} onClick={()=>setFilterStat(active && f.key!=="all" ? "all" : f.key)}
-              style={{flexShrink:0,display:"flex",alignItems:"center",gap:8,padding:"10px 16px",borderRadius:14,border:active?"none":"1px solid #e2e8f0",cursor:"pointer",fontFamily:"inherit",transition:"all .18s",WebkitTapHighlightColor:"transparent",
-                background:active ? f.grad : "#ffffff",
-                boxShadow:active ? "0 4px 12px rgba(0,0,0,0.15)" : "0 1px 3px rgba(0,0,0,0.05)",
-                transform:active?"scale(1.03)":"scale(1)",
-              }}>
-              <span style={{fontSize:16,lineHeight:1}}>{f.icon}</span>
-              <div style={{textAlign:"left"}}>
-                <div style={{fontSize:18,fontWeight:900,color:active?"#fff":DS.dark,lineHeight:1}}>{f.val}</div>
-                <div style={{fontSize:10,fontWeight:700,color:active?"rgba(255,255,255,0.75)":DS.mid,letterSpacing:.3,marginTop:1,whiteSpace:"nowrap"}}>{f.label}</div>
+      {/* ═══ HERO ═══ */}
+      <div style={{borderRadius:24,overflow:"hidden",position:"relative",marginBottom:16,
+        background:"linear-gradient(145deg,#0a1830 0%,#0d3563 45%,#0369a1 100%)",
+        boxShadow:"0 14px 40px rgba(3,54,99,0.35)"}}>
+        <div style={{position:"absolute",top:-50,right:-40,width:200,height:200,borderRadius:"50%",background:"radial-gradient(circle,rgba(56,189,248,0.22) 0%,transparent 70%)",pointerEvents:"none"}}/>
+        <div style={{position:"absolute",bottom:-60,left:-30,width:160,height:160,borderRadius:"50%",background:"radial-gradient(circle,rgba(14,116,144,0.35) 0%,transparent 70%)",pointerEvents:"none"}}/>
+        <div style={{position:"relative",padding:"22px 18px 18px"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div style={{width:38,height:38,borderRadius:12,background:"rgba(255,255,255,0.12)",border:"1px solid rgba(255,255,255,0.18)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                {Ico.user(18,"#7dd3fc")}
               </div>
+              <div>
+                <div style={{fontSize:18,fontWeight:900,color:"#fff",letterSpacing:-0.4,lineHeight:1.1}}>Clients</div>
+                <div style={{fontSize:11,color:"rgba(255,255,255,0.55)",fontWeight:600,marginTop:2}}>{statsClients.total} client{statsClients.total>1?"s":""} au total</div>
+              </div>
+            </div>
+            <button onClick={onAdd}
+              style={{height:40,borderRadius:13,background:"rgba(255,255,255,0.14)",border:"1px solid rgba(255,255,255,0.2)",cursor:"pointer",fontWeight:800,fontSize:12,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,padding:"0 14px",flexShrink:0,WebkitTapHighlightColor:"transparent",whiteSpace:"nowrap",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
+              {Ico.userPlus(14,"#fff")}
+              {!isMobile&&"Nouveau"}
             </button>
-          );
-        })}
+          </div>
+
+          {/* Filtres — tuiles verre cliquables */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7}}>
+            {[
+              { key:"all",      icon:Ico.user,  label:"Tous",          val:statsClients.total,      accent:"#7dd3fc" },
+              { key:"contrat",  icon:Ico.pdf,   label:"Sous contrat",  val:statsClients.sousContrat, accent:"#6ee7b7" },
+              { key:"alertes",  icon:Ico.alert, label:"Alertes",       val:statsClients.alertes,     accent:"#fbbf24" },
+              { key:"expires",  icon:Ico.clock, label:"Expirent -30j", val:statsClients.expires,     accent:"#fca5a5" },
+            ].map(f=>{
+              const active = filterStat === f.key;
+              return (
+                <button key={f.key} onClick={()=>setFilterStat(active && f.key!=="all" ? "all" : f.key)}
+                  style={{display:"flex",flexDirection:"column",alignItems:"flex-start",gap:6,padding:"10px 9px",borderRadius:13,cursor:"pointer",fontFamily:"inherit",transition:"all .18s",WebkitTapHighlightColor:"transparent",
+                    background:active ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.06)",
+                    border:`1px solid ${active?"rgba(255,255,255,0.35)":"rgba(255,255,255,0.1)"}`,
+                    boxShadow:active?"0 4px 14px rgba(0,0,0,0.2)":"none",
+                  }}>
+                  <span style={{color:active?f.accent:"rgba(255,255,255,0.55)"}}>{f.icon(15, active?f.accent:"rgba(255,255,255,0.55)")}</span>
+                  <div style={{fontSize:17,fontWeight:900,color:"#fff",lineHeight:1}}>{f.val}</div>
+                  <div style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.5)",letterSpacing:.2,lineHeight:1.2}}>{f.label}</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
-      {/* ═══ BARRE RECHERCHE + AJOUT ═══ */}
-      <div style={{display:"flex",gap:10,marginBottom:18,alignItems:"center"}}>
-        <div style={{flex:1,position:"relative"}}>
-          <div style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}>
+      {/* ═══ BARRE RECHERCHE ═══ */}
+      <div style={{marginBottom:16}}>
+        <div style={{position:"relative"}}>
+          <div style={{position:"absolute",left:15,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}>
             {Ico.search(16,"#94a3b8")}
           </div>
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher un client…"
-            style={{width:"100%",padding:"12px 16px 12px 44px",borderRadius:12,border:"1.5px solid #e2e8f0",fontSize:14,outline:"none",boxSizing:"border-box",background:"#ffffff",color:"#0f172a",fontFamily:"inherit",transition:"border .15s",boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}}/>
+            style={{width:"100%",padding:"13px 16px 13px 44px",borderRadius:15,border:"1.5px solid #e2e8f0",fontSize:14,outline:"none",boxSizing:"border-box",background:"#ffffff",color:"#0f172a",fontFamily:"inherit",transition:"border .15s, box-shadow .15s",boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}}
+            onFocus={e=>{e.target.style.border="1.5px solid #7dd3fc";e.target.style.boxShadow="0 0 0 4px rgba(8,145,178,0.1)";}}
+            onBlur={e=>{e.target.style.border="1.5px solid #e2e8f0";e.target.style.boxShadow="0 1px 3px rgba(0,0,0,0.04)";}}
+          />
           {search&&<button onClick={()=>setSearch("")} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"#94a3b8",fontSize:18,lineHeight:1,padding:4}}>×</button>}
         </div>
-        <button onClick={onAdd}
-          style={{height:46,borderRadius:16,background:"linear-gradient(135deg,#0891b2,#06b6d4)",border:"none",cursor:"pointer",fontWeight:800,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",gap:7,padding:"0 20px",boxShadow:"0 4px 16px rgba(8,145,178,0.4)",flexShrink:0,WebkitTapHighlightColor:"transparent",whiteSpace:"nowrap"}}>
-          {Ico.userPlus(15,"#fff")}
-          {!isMobile&&"Nouveau client"}
-        </button>
       </div>
 
       {/* ═══ RÉSULTATS ═══ */}
       {filterStat!=="all"&&filtered.length>0&&(
-        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:12,padding:"6px 12px",borderRadius:10,background:"rgba(8,145,178,0.06)",border:"1px solid rgba(8,145,178,0.12)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:12,padding:"7px 13px",borderRadius:12,background:"rgba(8,145,178,0.06)",border:"1px solid rgba(8,145,178,0.12)"}}>
           <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.5" strokeLinecap="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
           <span style={{fontSize:12,fontWeight:600,color:"#0891b2",flex:1}}>{filtered.length} client{filtered.length>1?"s":""} affiché{filtered.length>1?"s":""}</span>
           <button onClick={()=>setFilterStat("all")} style={{fontSize:11,fontWeight:700,color:"#0891b2",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",textDecoration:"underline"}}>Tout voir</button>
@@ -300,8 +322,10 @@ export function PageClients({ clients, passages, contrats={}, onUpdateContrat, o
       )}
 
       {filtered.length===0&&(
-        <div style={{textAlign:"center",padding:"60px 20px",color:DS.mid}}>
-          <div style={{fontSize:48,marginBottom:12}}>🔍</div>
+        <div style={{textAlign:"center",padding:"56px 20px",color:DS.mid,background:"#fff",borderRadius:20,border:"1px solid #f1f5f9"}}>
+          <div style={{width:64,height:64,borderRadius:20,background:"#f0f9ff",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px"}}>
+            {Ico.search(26,"#7dd3fc")}
+          </div>
           <div style={{fontSize:15,fontWeight:700,color:"#374151",marginBottom:4}}>Aucun client trouvé</div>
           <div style={{fontSize:13}}>Essayez un autre terme de recherche</div>
         </div>
@@ -329,16 +353,16 @@ export function PageClients({ clients, passages, contrats={}, onUpdateContrat, o
 
           return (
             <div key={c.id} onClick={()=>onClientClick(c)} className="fade-in"
-              style={{animationDelay:`${idx*0.04}s`,borderRadius:16,overflow:isOpen?"visible":"hidden",
-                boxShadow:"0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.05)",border:"1px solid #e2e8f0",
+              style={{animationDelay:`${idx*0.04}s`,borderRadius:20,overflow:isOpen?"visible":"hidden",
+                boxShadow:"0 1px 2px rgba(15,23,42,0.04), 0 8px 24px rgba(15,23,42,0.07)",border:"1px solid #eef1f5",
                 cursor:"pointer",display:"flex",flexDirection:"column",position:"relative",
-                zIndex:isOpen?999:1,background:"#fff",transition:"box-shadow .2s, transform .15s",
+                zIndex:isOpen?999:1,background:"#fff",transition:"box-shadow .25s, transform .2s",
               }}
-              onMouseEnter={e=>{ if(!isMobile){e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.1)";e.currentTarget.style.transform="translateY(-2px)";} }}
-              onMouseLeave={e=>{ if(!isMobile){e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.05)";e.currentTarget.style.transform="translateY(0)";} }}>
+              onMouseEnter={e=>{ if(!isMobile){e.currentTarget.style.boxShadow="0 4px 8px rgba(15,23,42,0.05), 0 16px 36px rgba(15,23,42,0.12)";e.currentTarget.style.transform="translateY(-3px)";} }}
+              onMouseLeave={e=>{ if(!isMobile){e.currentTarget.style.boxShadow="0 1px 2px rgba(15,23,42,0.04), 0 8px 24px rgba(15,23,42,0.07)";e.currentTarget.style.transform="translateY(0)";} }}>
 
               {/* ── HEADER : photo ou dégradé ── */}
-              <div style={{height:110,position:"relative",flexShrink:0,overflow:"hidden",borderRadius:"20px 20px 0 0"}}>
+              <div style={{height:112,position:"relative",flexShrink:0,overflow:"hidden",borderRadius:"20px 20px 0 0"}}>
                 {c.photoPiscine
                   ? <>
                       {/* showSyncWarning=false : on préfère le fallback gradient au placeholder jaune */}
