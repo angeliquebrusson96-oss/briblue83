@@ -290,6 +290,11 @@ export function PageGestion({
   onClientClick,
 }) {
   const [tab, setTab] = useState("mensualites");
+  const [search, setSearch] = useState("");
+  const matchSearch = useCallback(
+    (c) => !search.trim() || c.nom.toLowerCase().includes(search.trim().toLowerCase()),
+    [search]
+  );
 
   // Seuls les clients avec un contrat SIGNÉ (signe_complet) sont comptabilisés.
   // Un contrat en attente (signe_client) ou non signé ne génère pas encore de mensualités.
@@ -335,6 +340,11 @@ export function PageGestion({
       .reduce((sum, l) => sum + (l.montant || l.prixTotal || l.total || 0), 0),
     [livraisons]
   );
+
+  // Listes filtrées par la recherche — uniquement pour l'affichage des onglets,
+  // les totaux du hero (totalMensualitesDu/totalLivraisonsDu) restent globaux.
+  const mensualitesFiltered  = useMemo(() => clientsAvecMensualites.filter(matchSearch), [clientsAvecMensualites, matchSearch]);
+  const livraisonsFiltered   = useMemo(() => clientsAvecLivraisons.filter(matchSearch),  [clientsAvecLivraisons, matchSearch]);
 
   const TAB_META = {
     mensualites: { icon: <rect x="2" y="5" width="20" height="14" rx="2"/>, icon2: <line x1="2" y1="10" x2="22" y2="10"/> },
@@ -413,13 +423,26 @@ export function PageGestion({
         })}
       </div>
 
+      {/* ─── Recherche ─── */}
+      <div style={{position:"relative",marginBottom:14}}>
+        <div style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}>
+          {Ico.search(13,"#94a3b8")}
+        </div>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher un client…"
+          style={{width:"100%",padding:"8px 12px 8px 34px",borderRadius:11,border:"1.5px solid #e2e8f0",fontSize:13,outline:"none",boxSizing:"border-box",background:"#fff",color:"#0f172a",fontFamily:"inherit",transition:"border .15s, box-shadow .15s",boxShadow:"0 1px 2px rgba(15,23,42,0.03)"}}
+          onFocus={e=>{e.target.style.border="1.5px solid #7dd3fc";e.target.style.boxShadow="0 0 0 3px rgba(8,145,178,0.1)";}}
+          onBlur={e=>{e.target.style.border="1.5px solid #e2e8f0";e.target.style.boxShadow="0 1px 2px rgba(15,23,42,0.03)";}}
+        />
+        {search&&<button onClick={()=>setSearch("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"#94a3b8",fontSize:16,lineHeight:1,padding:2}}>×</button>}
+      </div>
+
       {/* ─── Mensualités ─── */}
       {tab === "mensualites" && (
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {clientsAvecMensualites.length === 0 && (
-            <EmptyState icon={Ico.euro} text="Aucun client avec contrat mensuel"/>
+          {mensualitesFiltered.length === 0 && (
+            <EmptyState icon={Ico.euro} text={search?"Aucun client ne correspond à la recherche":"Aucun client avec contrat mensuel"}/>
           )}
-          {clientsAvecMensualites.map(c => {
+          {mensualitesFiltered.map(c => {
             const due = getMensualiteDue(c, versements);
             return (
             <div key={c.id} style={{background:"#fff",borderRadius:18,border:"1px solid #eef1f5",borderLeft:`4px solid ${due>0?"#dc2626":"#22c55e"}`,padding:"13px 15px",boxShadow:"0 1px 2px rgba(15,23,42,0.03), 0 4px 14px rgba(15,23,42,0.05)"}}>
@@ -449,10 +472,10 @@ export function PageGestion({
       {/* ─── Livraisons ─── */}
       {tab === "livraisons" && (
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {clientsAvecLivraisons.length === 0 && (
-            <EmptyState icon={Ico.truck} text="Aucune livraison enregistrée"/>
+          {livraisonsFiltered.length === 0 && (
+            <EmptyState icon={Ico.truck} text={search?"Aucun client ne correspond à la recherche":"Aucune livraison enregistrée"}/>
           )}
-          {clientsAvecLivraisons.map(c => {
+          {livraisonsFiltered.map(c => {
             const nb = livraisons.filter(l => l.clientId === c.id).length;
             const due = livraisons
               .filter(l => l.clientId === c.id && l.statut !== "payee" && l.statut !== "annulee")
@@ -496,6 +519,7 @@ export function PageGestion({
           .filter(x => x.client && x.ct.statut && x.ct.statut !== "reset")
           .sort((a,b) => (b.ct.signedAt||b.ct.signedByPrestaAt||"").localeCompare(a.ct.signedAt||a.ct.signedByPrestaAt||""));
         const nbSigned = actifs.filter(x=>x.ct.statut==="signe_complet").length;
+        const actifsFiltered = actifs.filter(x => matchSearch(x.client));
         return (
           <div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:14}}>
@@ -506,10 +530,10 @@ export function PageGestion({
                 </div>
               ))}
             </div>
-            {actifs.length===0
-              ? <EmptyState icon={Ico.pdf} text="Aucun contrat enregistré"/>
+            {actifsFiltered.length===0
+              ? <EmptyState icon={Ico.pdf} text={search?"Aucun client ne correspond à la recherche":"Aucun contrat enregistré"}/>
               : <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                  {actifs.map(({contractId,ct,client})=>{
+                  {actifsFiltered.map(({contractId,ct,client})=>{
                     const s = STATUT[ct.statut]||STATUT.reset;
                     const dateSign = ct.signedAt ? new Date(ct.signedAt).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"2-digit"}) : null;
                     return (
