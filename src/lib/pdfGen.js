@@ -4,9 +4,15 @@
 //
 // ⚠️ On n'utilise PAS html2pdf.js (retiré) : sa version 0.14 clone le DOM via
 // un mécanisme interne ("snapdom") qui produit un clone à hauteur 0 pour un
-// conteneur détaché du flux normal (position:absolute hors écran), ce qui
-// génère un PDF entièrement blanc. html2canvas appelé directement sur le
-// conteneur (sans ce clonage intermédiaire) fonctionne correctement.
+// conteneur détaché du flux normal, ce qui génère un PDF entièrement blanc.
+// html2canvas appelé directement sur le conteneur fonctionne correctement.
+//
+// ⚠️ Le conteneur doit rester à opacity:1 (masqué en le plaçant hors-écran,
+// PAS via opacity:0) : html2canvas respecte fidèlement l'opacité CSS et
+// rendrait un canvas totalement blanc pour un élément à opacity:0, même si
+// sa structure DOM et ses styles sont par ailleurs corrects. Confirmé par
+// repro pixel par pixel (0 pixel non-blanc avec opacity:0, ~50% avec un
+// positionnement hors-écran à opacity:1 sur un contenu identique).
 
 let _html2canvas = null;
 async function getHtml2Canvas() {
@@ -32,12 +38,11 @@ async function getJsPDF() {
 export async function generatePDFBase64(htmlString) {
   const [html2canvas, JsPDF] = await Promise.all([getHtml2Canvas(), getJsPDF()]);
 
-  // Injecter dans un conteneur visuellement masqué mais dans le flux normal
-  // du document (opacity:0, hors du flux de scroll via position:fixed) —
-  // nécessaire pour que le calcul de hauteur du contenu soit correct.
+  // Injecter hors du viewport visible (opacity:1 — cf. note ci-dessus) plutôt
+  // que masqué par opacity, pour que html2canvas capture le contenu réel.
   const container = document.createElement("div");
   container.style.cssText =
-    "position:fixed;left:0;top:0;width:210mm;background:#fff;opacity:0;pointer-events:none;z-index:-1;";
+    "position:absolute;left:-9999px;top:0;width:210mm;background:#fff;";
   container.innerHTML = htmlString;
   document.body.appendChild(container);
 
