@@ -103,6 +103,61 @@ function buildRapportHTML(passage, client) {
       <button class="print-btn" onclick="window.print()">🖨️ Enregistrer en PDF</button>
     </main></body></html>`;
 }
+
+const MOIS_LONG_ATTESTATION = ["","Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+
+function buildAttestationHTML(client, moisPayes, totalPaye) {
+  const dateEmission = new Date().toLocaleDateString("fr-FR", { day:"2-digit", month:"long", year:"numeric" });
+  const rows = moisPayes.map(m => `<tr><td>${MOIS_LONG_ATTESTATION[m.month]} ${m.year}</td><td class="right">${esc(String(m.montant))} €</td></tr>`).join("");
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Attestation de paiement — ${esc(client?.nom)}</title>
+    <style>
+      @page{size:A4;margin:16mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#0f172a;margin:0;background:#fff}
+      .page{max-width:780px;margin:0 auto;padding:10px}
+      .brand{font-size:26px;font-weight:900;letter-spacing:-1px;color:#0c1222;margin-bottom:2px}
+      .brand span{color:#0369a1}
+      .sub{font-size:12px;color:#0369a1;font-weight:700;margin-bottom:22px}
+      h1{font-size:20px;font-weight:800;color:#0c1222;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+      .intro{font-size:13px;color:#334155;line-height:1.7;margin:14px 0 22px;padding:16px 18px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px}
+      table{width:100%;border-collapse:collapse;border:1px solid #e2e8f0;margin-bottom:18px}
+      table th{background:#f0f9ff;color:#0369a1;font-size:11px;text-transform:uppercase;letter-spacing:.5px;padding:9px 14px;text-align:left;border:1px solid #e2e8f0}
+      table td{padding:8px 14px;border:1px solid #e2e8f0;font-size:13px}
+      .right{text-align:right}
+      .total-row td{background:#f0f9ff;font-weight:800}
+      .footer-row{display:flex;justify-content:space-between;align-items:flex-end;margin-top:36px}
+      .mentions{font-size:11px;color:#94a3b8;max-width:340px;line-height:1.6}
+      .stamp{display:inline-block;transform:rotate(-7deg);border:3px double #0891b2;border-radius:10px;padding:12px 20px;color:#0891b2;text-align:center;opacity:0.92}
+      .stamp-brand{font-size:18px;font-weight:900;letter-spacing:.5px}
+      .stamp-line{height:2px;background:#0891b2;margin:5px 0;opacity:.5}
+      .stamp-sub{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px}
+      .stamp-date{font-size:10px;margin-top:5px;font-weight:600}
+      .foot{margin-top:24px;font-size:11px;color:#94a3b8;text-align:center}
+      .print-btn{display:block;margin:28px auto 0;border:0;border-radius:999px;background:#0891b2;color:white;padding:14px 28px;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 10px 25px rgba(8,145,178,.35)}
+      @media print{.print-btn{display:none}}
+    </style></head><body><main class="page">
+      <div class="brand">Bri<span>’</span>blue</div>
+      <div class="sub">Création · Traitement de l'eau · Installation · Dépannage</div>
+      <h1>Attestation de paiement</h1>
+      <div class="intro">
+        Je soussigné, <strong>Dorian Briaire</strong>, gérant de l'entreprise <strong>BRIBLUE</strong> (SIRET 84345436400053),
+        atteste par la présente que <strong>${esc(client?.nom)}</strong> s'est acquitté(e) des mensualités d'entretien
+        piscine suivantes, pour un montant total de <strong>${esc(String(totalPaye))} €</strong>.
+      </div>
+      ${rows ? `<table><thead><tr><th>Mois</th><th class="right">Montant réglé</th></tr></thead><tbody>${rows}
+        <tr class="total-row"><td>Total réglé</td><td class="right">${esc(String(totalPaye))} €</td></tr>
+      </tbody></table>` : `<p style="font-size:13px;color:#64748b">Aucune mensualité réglée à ce jour.</p>`}
+      <div class="footer-row">
+        <div class="mentions">Document émis à titre informatif, sans valeur comptable ou fiscale.<br/>BRIBLUE · SIRET 84345436400053 · La Seyne-sur-Mer · 06 67 18 61 15</div>
+        <div class="stamp">
+          <div class="stamp-brand">BRI’BLUE</div>
+          <div class="stamp-line"></div>
+          <div class="stamp-sub">Paiement certifié</div>
+          <div class="stamp-date">${esc(dateEmission)}</div>
+        </div>
+      </div>
+      <button class="print-btn" onclick="window.print()">🖨️ Enregistrer en PDF</button>
+    </main></body></html>`;
+}
+
 async function ouvrirContrat(client, sigPrestataire="", sigClient="", contrat={}) {
   toastInfo("Génération du PDF…");
   try {
@@ -154,6 +209,17 @@ async function telechargerRapport(passage, client) {
     await downloadPDF(html, `${cleanFileName(client?.nom)}-${cleanFileName(p.date)}-rapport.pdf`);
   } catch (e) {
     console.error("[briblue] génération PDF rapport échouée:", e);
+    toastError("Le PDF n'a pas pu être généré, réessayez.");
+  }
+}
+
+async function telechargerAttestation(client, moisPayes, totalPaye) {
+  toastInfo("Génération du PDF…");
+  try {
+    const html = buildAttestationHTML(client, moisPayes, totalPaye);
+    await downloadPDF(html, `${cleanFileName(client?.nom)}-attestation-paiement.pdf`);
+  } catch (e) {
+    console.error("[briblue] génération PDF attestation échouée:", e);
     toastError("Le PDF n'a pas pu être généré, réessayez.");
   }
 }
@@ -491,6 +557,8 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
   const [showSOS, setShowSOS] = useState(false);
   // openYears ici pour éviter un hook dans RapportsList (composant défini dans le rendu)
   const [openYears, setOpenYears] = useState({});
+  const [noteModal, setNoteModal] = useState(null); // { titre, note, montant, date }
+  const [showEcheancier, setShowEcheancier] = useState(false);
 
   const passClient = (passages||[])
     .filter(p => p.clientId === client.id)
@@ -546,6 +614,23 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
       cur = new Date(cur.getFullYear(), cur.getMonth()+1, 1);
     }
     return dus;
+  })();
+
+  // ─── ÉCHÉANCIER COMPLET (tous les mois du contrat, payés ou non) ───────────
+  // Utilisé par l'échéancier détaillé + l'attestation de paiement (PDF).
+  const echeancierComplet = (() => {
+    if (!client.dateDebut || !mensualiteBase) return [];
+    const debut = new Date(client.dateDebut);
+    const finMoisBorne = finMoisExclu(client.dateFin)
+      || new Date(debut.getFullYear() + 1, debut.getMonth(), 1);
+    const rows = [];
+    let cur = new Date(debut.getFullYear(), debut.getMonth(), 1);
+    while (cur < finMoisBorne) {
+      const y = cur.getFullYear(), m = cur.getMonth()+1;
+      rows.push({ year:y, month:m, montant: getMensualite(y,m), paye: !!versements[versKey(y,m)] });
+      cur = new Date(cur.getFullYear(), cur.getMonth()+1, 1);
+    }
+    return rows;
   })();
 
   // ─── WIDGET VERSEMENT (vue client) ─────────────────────────────────────────
@@ -620,47 +705,57 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
                 {versementMoisDus.map(({year:y,month:m})=>{
                   const estCourant = y===today.getFullYear() && m===today.getMonth()+1;
                   return (
-                    <div key={versKey(y,m)} style={{
+                    <button key={versKey(y,m)} onClick={()=>setShowEcheancier(true)} style={{
                       display:"flex",alignItems:"center",justifyContent:"space-between",
-                      padding:"8px 10px",borderRadius:10,
+                      padding:"8px 10px",borderRadius:10,cursor:"pointer",width:"100%",
+                      border:`1px solid ${estCourant?"#fed7aa":"#fecaca"}`,fontFamily:"inherit",textAlign:"left",
                       background:estCourant?"#fff7ed":"#fff1f2",
-                      border:`1px solid ${estCourant?"#fed7aa":"#fecaca"}`,
                     }}>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <div style={{width:30,height:30,borderRadius:8,background:estCourant?"#ffedd5":"#fee2e2",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+                        <div style={{width:30,height:30,borderRadius:8,background:estCourant?"#ffedd5":"#fee2e2",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                           <span style={{fontSize:8,fontWeight:700,color:estCourant?"#ea580c":"#dc2626",lineHeight:1.2}}>{MOIS_LONG[m].slice(0,3).toUpperCase()}</span>
                           <span style={{fontSize:8,color:estCourant?"#ea580c":"#dc2626",lineHeight:1.2}}>{y}</span>
                         </div>
-                        <div>
+                        <div style={{minWidth:0}}>
                           <div style={{fontSize:12,fontWeight:600,color:"#0f172a"}}>{MOIS_LONG[m]} {y}</div>
                           <div style={{fontSize:10,color:"#64748b"}}>{estCourant?"Mois en cours":"En retard"}</div>
                         </div>
                       </div>
-                      <span style={{fontSize:14,fontWeight:700,color:estCourant?"#ea580c":"#dc2626"}}>{mensualite}€</span>
-                    </div>
+                      <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+                        <span style={{fontSize:14,fontWeight:700,color:estCourant?"#ea580c":"#dc2626"}}>{mensualite}€</span>
+                        <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+                      </div>
+                    </button>
                   );
                 })}
                 {nbDus>0 && hasProduitsDue && (
                   <div style={{fontSize:10,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:.5,marginTop:6}}>Produits</div>
                 )}
-                {livraisonsDues.map(l=>(
-                  <div key={l.id} style={{
+                {livraisonsDues.map(l=>{
+                  const titre = (l.produits||[]).join(", ")||l.description||"Produits livrés";
+                  const noteComplete = (l.produits||[]).length>0 ? l.description : "";
+                  return (
+                  <button key={l.id} onClick={()=>setNoteModal({titre, note:noteComplete, montant:Number(l.montant), date:l.date})} style={{
                     display:"flex",alignItems:"center",justifyContent:"space-between",
-                    padding:"8px 10px",borderRadius:10,
-                    background:"#fff7ed",border:"1px solid #fed7aa",
+                    padding:"8px 10px",borderRadius:10,cursor:"pointer",width:"100%",
+                    background:"#fff7ed",border:"1px solid #fed7aa",fontFamily:"inherit",textAlign:"left",
                   }}>
                     <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
                       <div style={{width:30,height:30,borderRadius:8,background:"#ffedd5",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                         <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#ea580c" strokeWidth="2" strokeLinecap="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
                       </div>
                       <div style={{minWidth:0}}>
-                        <div style={{fontSize:12,fontWeight:600,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{(l.produits||[]).join(", ")||l.description||"Produits livrés"}</div>
+                        <div style={{fontSize:12,fontWeight:600,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{titre}</div>
                         <div style={{fontSize:10,color:"#64748b"}}>{l.date?new Date(l.date).toLocaleDateString("fr",{day:"2-digit",month:"short",year:"numeric"}):"Facturé"}</div>
                       </div>
                     </div>
-                    <span style={{fontSize:14,fontWeight:700,color:"#ea580c",flexShrink:0}}>{Number(l.montant)}€</span>
-                  </div>
-                ))}
+                    <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+                      <span style={{fontSize:14,fontWeight:700,color:"#ea580c"}}>{Number(l.montant)}€</span>
+                      <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+                    </div>
+                  </button>
+                  );
+                })}
                 <a href="tel:+33667186115" style={{display:"flex",alignItems:"center",justifyContent:"center",gap:7,marginTop:2,padding:"10px",borderRadius:10,background:"linear-gradient(135deg,#0891b2,#0e7490)",textDecoration:"none",boxShadow:"0 4px 14px rgba(8,145,178,0.3)"}}>
                   <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.01 1.18 2 2 0 012 0h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 14.92z"/></svg>
                   <span style={{fontSize:12,fontWeight:700,color:"white"}}>Contacter BRIBLUE</span>
@@ -1329,6 +1424,104 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
   // ─── SOS MODAL ─────────────────────────────────────────────────────────────
   // Rendu via composant externe pour éviter le re-render du parent à chaque frappe
 
+  // ─── NOTE COMPLÈTE (produit/livraison tronqué dans le widget) ──────────────
+  const NoteModal = () => {
+    if (!noteModal) return null;
+    return (
+      <div onClick={()=>setNoteModal(null)} style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.6)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:10004,backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",animation:"cv-fadeIn 0.2s ease"}}>
+        <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,maxHeight:"85vh",overflowY:"auto",WebkitOverflowScrolling:"touch",boxShadow:"0 -20px 60px rgba(0,0,0,0.25)",paddingBottom:"max(28px,env(safe-area-inset-bottom,28px))",animation:"cv-fadeUp 0.3s ease"}}>
+          <div style={{padding:"14px 0 4px",display:"flex",justifyContent:"center"}}>
+            <div style={{width:40,height:4,background:"#e2e8f0",borderRadius:2}}/>
+          </div>
+          <div style={{padding:"16px 22px 0"}}>
+            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:16,gap:12}}>
+              <div style={{minWidth:0}}>
+                <div style={{fontSize:17,fontWeight:700,color:"#0f172a",wordBreak:"break-word"}}>{noteModal.titre}</div>
+                {noteModal.date&&<div style={{fontSize:12,color:"#64748b",marginTop:3}}>{new Date(noteModal.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"})}</div>}
+              </div>
+              <button onClick={()=>setNoteModal(null)} style={{width:34,height:34,borderRadius:10,background:"#f1f5f9",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            {noteModal.note&&(
+              <div style={{background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:14,padding:"14px 16px",marginBottom:16}}>
+                <div style={{fontSize:11,fontWeight:700,color:"#9a3412",textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>Note</div>
+                <div style={{fontSize:14,color:"#0f172a",lineHeight:1.6,wordBreak:"break-word",whiteSpace:"pre-wrap"}}>{noteModal.note}</div>
+              </div>
+            )}
+            {typeof noteModal.montant==="number"&&(
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",borderRadius:12,background:"#f8fafc",border:"1px solid #e2e8f0",marginBottom:8}}>
+                <span style={{fontSize:12,color:"#64748b",fontWeight:600}}>Montant</span>
+                <span style={{fontSize:18,fontWeight:800,color:"#ea580c"}}>{noteModal.montant}€</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ─── ÉCHÉANCIER DÉTAILLÉ + ATTESTATION DE PAIEMENT ─────────────────────────
+  const EcheancierModal = () => {
+    if (!showEcheancier) return null;
+    const moisPayes = echeancierComplet.filter(r=>r.paye);
+    const totalPaye = moisPayes.reduce((s,r)=>s+r.montant,0);
+    return (
+      <div onClick={()=>setShowEcheancier(false)} style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.6)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:10004,backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",animation:"cv-fadeIn 0.2s ease"}}>
+        <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,maxHeight:"88vh",overflowY:"auto",WebkitOverflowScrolling:"touch",boxShadow:"0 -20px 60px rgba(0,0,0,0.25)",paddingBottom:"max(28px,env(safe-area-inset-bottom,28px))",animation:"cv-fadeUp 0.3s ease"}}>
+          <div style={{padding:"14px 0 4px",display:"flex",justifyContent:"center"}}>
+            <div style={{width:40,height:4,background:"#e2e8f0",borderRadius:2}}/>
+          </div>
+          <div style={{padding:"16px 22px 0"}}>
+            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:14,gap:12}}>
+              <div>
+                <div style={{fontSize:17,fontWeight:700,color:"#0f172a"}}>Échéancier des mensualités</div>
+                <div style={{fontSize:12,color:"#64748b",marginTop:2}}>{moisPayes.length}/{echeancierComplet.length} mois réglés · {totalPaye}€ payés</div>
+              </div>
+              <button onClick={()=>setShowEcheancier(false)} style={{width:34,height:34,borderRadius:10,background:"#f1f5f9",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+
+            <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:18}}>
+              {echeancierComplet.map(r=>{
+                const estCourant = r.year===new Date().getFullYear() && r.month===new Date().getMonth()+1;
+                const estPasse = new Date(r.year, r.month-1, 1) < new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+                const enRetard = !r.paye && estPasse;
+                return (
+                  <div key={versKey(r.year,r.month)} style={{
+                    display:"flex",alignItems:"center",justifyContent:"space-between",
+                    padding:"9px 12px",borderRadius:10,
+                    background:r.paye?"#f0fdf4":enRetard?"#fff1f2":estCourant?"#fffbeb":"#f8fafc",
+                    border:`1px solid ${r.paye?"#bbf7d0":enRetard?"#fecaca":estCourant?"#fde68a":"#e2e8f0"}`,
+                  }}>
+                    <div style={{fontSize:13,fontWeight:600,color:"#0f172a"}}>{MOIS_LONG[r.month]} {r.year}</div>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <span style={{fontSize:13,fontWeight:700,color:r.paye?"#15803d":enRetard?"#dc2626":"#0f172a"}}>{r.montant}€</span>
+                      <span style={{fontSize:10,fontWeight:700,padding:"3px 9px",borderRadius:999,
+                        background:r.paye?"#dcfce7":enRetard?"#fee2e2":estCourant?"#fef3c7":"#e2e8f0",
+                        color:r.paye?"#15803d":enRetard?"#dc2626":estCourant?"#92400e":"#64748b"}}>
+                        {r.paye?"Payé":enRetard?"En retard":estCourant?"En cours":"À venir"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <button onClick={()=>telechargerAttestation(client, moisPayes, totalPaye)} disabled={moisPayes.length===0}
+              style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,width:"100%",padding:"13px",borderRadius:12,border:"none",
+                background:moisPayes.length===0?"#e2e8f0":"linear-gradient(135deg,#0891b2,#0e7490)",
+                cursor:moisPayes.length===0?"not-allowed":"pointer",boxShadow:moisPayes.length===0?"none":"0 4px 14px rgba(8,145,178,0.3)",fontFamily:"inherit"}}>
+              <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={moisPayes.length===0?"#94a3b8":"white"} strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span style={{fontSize:13,fontWeight:700,color:moisPayes.length===0?"#94a3b8":"white"}}>Attestation de paiement (PDF)</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // ─── RENDER ────────────────────────────────────────────────────────────────
   return (
     <div className="cv-root" style={{background:"#f0f6fb",minHeight:"100vh",width:"100%",maxWidth:480,minWidth:0,margin:"0 auto",overflowX:"hidden"}}>
@@ -1383,6 +1576,8 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
 
       <BottomNav/>
       <PassageSheet/>
+      <NoteModal/>
+      <EcheancierModal/>
       <SOSModal show={showSOS} onClose={()=>setShowSOS(false)} clientNom={client.nom}/>
     </div>
   );
