@@ -30,10 +30,24 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { id } = req.body || {};
-  if (!id) return res.status(400).json({ error: "id requis" });
+  const { id, action, livraison } = req.body || {};
 
   try {
+    if (action === "restore") {
+      if (!livraison?.id) return res.status(400).json({ error: "livraison.id requis" });
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(LIVRAISONS_DOC);
+        const current = snap.exists ? snap.data() : {};
+        const data = Array.isArray(current.data) ? current.data : [];
+        const deletedIds = Array.isArray(current.deletedIds) ? current.deletedIds : [];
+        const nextData = data.some(l => l?.id === livraison.id) ? data : [...data, livraison];
+        const nextDeletedIds = deletedIds.filter(x => x !== livraison.id);
+        tx.set(LIVRAISONS_DOC, { data: nextData, deletedIds: nextDeletedIds, savedAt: new Date().toISOString() }, { merge: true });
+      });
+      return res.status(200).json({ success: true });
+    }
+
+    if (!id) return res.status(400).json({ error: "id requis" });
     await db.runTransaction(async (tx) => {
       const snap = await tx.get(LIVRAISONS_DOC);
       const current = snap.exists ? snap.data() : {};
