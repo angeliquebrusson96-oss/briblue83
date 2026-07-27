@@ -935,6 +935,20 @@ export function subscribeToRealtime(callbacks) {
               const localArr = localRaw ? JSON.parse(localRaw) : [];
               // Pour les passages : exclure les IDs supprimés intentionnellement du merge
               const deleted = _getDeletedIds(key);
+              // ⚠️ Incorporer les tombstones ARRIVÉS DANS CE MÊME SNAPSHOT (ex: suppression
+              // faite via un autre appareil ou l'API Admin SDK). Sans ça, ce navigateur
+              // ignore les suppressions qu'il ne connaît pas encore localement, considère
+              // son tableau local (obsolète) comme "plus complet" que Firebase, et les
+              // RESSUSCITE en les repoussant vers Firestore — annulant silencieusement
+              // une suppression pourtant bien effective côté serveur.
+              const tombstoneKey = TOMBSTONE_KEY_FOR[key];
+              const tombstoneField = tombstoneKey && KEY_MAP[tombstoneKey]?.field;
+              const remoteDeleted = tombstoneField ? data[tombstoneField] : undefined;
+              if (Array.isArray(remoteDeleted) && remoteDeleted.length) {
+                let grew = false;
+                for (const id of remoteDeleted) { if (!deleted.has(String(id))) { deleted.add(String(id)); grew = true; } }
+                if (grew) _saveDeletedIds(key, deleted);
+              }
               // Filtrer les supprimés du snapshot Firebase lui-même
               const valFiltered = deleted && deleted.size > 0
                 ? val.filter(x => !x?.id || !deleted.has(String(x.id)))
