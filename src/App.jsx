@@ -1706,8 +1706,17 @@ export default function App() {
   const openEditPassage = useCallback(p=>{ setEditPassage(p);setDefaultClientId(p.clientId);setShowFormPassage(true); },[]);
 
   const saveLivraison = useCallback(l=>{
-    setLivraisons(prev=>{ const next=prev.find(x=>x.id===l.id)?prev.map(x=>x.id===l.id?l:x):[...prev,l]; saveLivraisonsList(next); return next; });
-    if (l.produits?.length > 0) {
+    let isNew = false;
+    setLivraisons(prev=>{
+      const exists = prev.find(x=>x.id===l.id);
+      isNew = !exists;
+      const next = exists ? prev.map(x=>x.id===l.id?l:x) : [...prev,l];
+      saveLivraisonsList(next);
+      return next;
+    });
+    // Décrémenter le stock uniquement à la création — sinon resauvegarder la
+    // même livraison (ex: passage réédité) déciderait le stock à chaque fois.
+    if (isNew && l.produits?.length > 0) {
       setStock(prev => { const next = {...prev}; l.produits.forEach(p => { if(next[p] !== undefined) next[p] = Math.max(0, (next[p]||0) - 1); }); saveStock(next); return next; });
     }
   },[saveLivraisonsList, saveStock]);
@@ -1959,7 +1968,7 @@ export default function App() {
       })()}
 
       {showFormClient&&<FormClient initial={editClient} clients={clients} onSave={saveClient} onClose={()=>{setShowFormClient(false);setEditClient(null);}}/>}
-      {showFormPassage&&<FormPassage clients={clients} defaultClientId={defaultClientId} initial={editPassage} onSave={p=>savePassage(p)} onSaveLivraison={saveLivraison} produitsStock={Object.keys(stock)} onClose={()=>{setShowFormPassage(false);setEditPassage(null);}}/>}
+      {showFormPassage&&<FormPassage clients={clients} defaultClientId={defaultClientId} initial={editPassage} onSave={p=>savePassage(p)} onSaveLivraison={saveLivraison} livraisons={livraisons} produitsStock={Object.keys(stock)} onClose={()=>{setShowFormPassage(false);setEditPassage(null);}}/>}
       {showFormLivraison&&<FormLivraison clientId={defaultLivraisonClientId} clients={clients} produitsStock={Object.keys(stock)} onSave={l=>{saveLivraison(l);setShowFormLivraison(false);}} onClose={()=>setShowFormLivraison(false)}/>}
       {showFormRdv&&<FormRdv initial={editRdv} clients={clients} onSave={saveRdv} onClose={()=>{setShowFormRdv(false);setEditRdv(null);}}/>}
       {showImport&&<ModalImportConnecteam clients={clients} onImport={handleImport} onClose={()=>setShowImport(false)}/>}

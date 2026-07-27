@@ -817,7 +817,7 @@ function MRow({label,unit,value,onChange,ideal,okFn,icon,color="#0891b2",compact
 
 // ─── COMPOSANT PRINCIPAL ─────────────────────────────────────────────────────
 
-export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraison, produitsStock=[], onClose }) {
+export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraison, livraisons=[], produitsStock=[], onClose }) {
   const EMPTY = {
     date:TODAY, clientId:defaultClientId||"", type:"Entretien complet", tech:"Dorian",
     chloreLibre:"", ph:"", alcalinite:"", stabilisant:"",
@@ -1038,16 +1038,24 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
     } finally {
       setIsSaving(false);
     }
-    // Auto-créer une livraison si produits livrés
+    // Auto-créer/mettre à jour LA livraison de ce passage si produits livrés.
+    // ID déterministe (dérivé de l'ID du passage, jamais uid() aléatoire) :
+    // resauvegarder le même passage (édition) met à jour cette même livraison
+    // au lieu d'en créer une nouvelle à chaque fois — c'était la cause des
+    // doublons de livraisons (un de plus à chaque édition du rapport).
+    // Le montant/statut déjà saisis manuellement sur la livraison existante
+    // sont préservés (pas écrasés par les valeurs par défaut).
     if (f.livraisonProduits && (f.produitsLivres?.length > 0 || f.livraisonAutre) && onSaveLivraison) {
+      const livId = `auto-${rawPassage.id}`;
+      const existingLiv = livraisons.find(l => l.id === livId);
       onSaveLivraison({
-        id: uid(),
+        id: livId,
         clientId: f.clientId,
         date: f.date,
         produits: f.produitsLivres || [],
         description: f.livraisonAutre || "",
-        montant: "",
-        statut: "aFacturer",
+        montant: existingLiv?.montant ?? "",
+        statut: existingLiv?.statut ?? "aFacturer",
       });
     }
   };
