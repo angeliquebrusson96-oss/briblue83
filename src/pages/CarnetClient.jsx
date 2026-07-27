@@ -65,11 +65,19 @@ const getProduitsApportes = (p = {}) => [
   ["Chlore choc", p.corrChloreChoc], ["Peroxyde", p.corrPeroxyde], ["Phosphate", p.corrPhosphate],
   ["Alcafix", p.corrAlcafix], ["Autre", p.corrAutre],
 ].filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== "");
+const isValidPhotoSrc = (v) => typeof v === "string" && (v.startsWith("data:") || v.startsWith("http"));
+
 function buildRapportHTML(passage, client) {
   const p = passage || {};
   const fmt = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day:"2-digit", month:"long", year:"numeric" }) : "—";
   const produitsLivres = getProduitsLivres(p);
   const produitsApportes = getProduitsApportes(p);
+  const photos = [
+    isValidPhotoSrc(p.photoArrivee) ? {src:p.photoArrivee, lbl:"Arrivée"} : null,
+    ...((p.photos||[]).filter(isValidPhotoSrc).map((s,i)=>({src:s, lbl:`Photo ${i+2}`}))),
+    isValidPhotoSrc(p.photoDepart) ? {src:p.photoDepart, lbl:"Départ"} : null,
+    ...((p.photosDepart||[]).filter(isValidPhotoSrc).map((s,i)=>({src:s, lbl:`Départ ${i+2}`}))),
+  ].filter(Boolean);
   const mesures = [
     ["pH", p.ph ?? p.pH ?? p.tauxPH ?? p.tauxPh],
     ["Chlore", p.chlore ?? p.cl ?? p.tauxChlore],
@@ -81,7 +89,7 @@ function buildRapportHTML(passage, client) {
   ].filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== "");
   return `<!doctype html><html><head><meta charset="utf-8"><title>Rapport ${esc(client?.nom)}</title>
     <style>
-      @page{size:A4;margin:14mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#0f172a;margin:0;background:#eef6fb}.page{max-width:820px;margin:0 auto;background:#fff;min-height:100vh;padding:30px}.head{background:linear-gradient(135deg,#0891b2,#0e7490);color:white;border-radius:18px;padding:24px;margin-bottom:18px}.brand{font-size:13px;letter-spacing:2px;font-weight:700;opacity:.9}.title{font-size:28px;font-weight:800;margin:8px 0 4px}.sub{font-size:14px;opacity:.9}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}.card{border:1px solid #e2e8f0;border-radius:14px;padding:14px;background:#f8fafc}.label{font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;letter-spacing:.5px;margin-bottom:5px}.val{font-size:15px;font-weight:700}.section{margin-top:18px;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden}.section h2{font-size:15px;margin:0;padding:12px 14px;background:#f0f9ff;color:#075985}.section .content{padding:14px;line-height:1.55}.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{background:#e0f2fe;color:#075985;border-radius:999px;padding:7px 11px;font-size:13px;font-weight:700}.green{background:#f0fdf4;color:#166534}.muted{color:#64748b}.print-btn{display:block;margin:28px auto 0;border:0;border-radius:999px;background:#0891b2;color:white;padding:14px 28px;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 10px 25px rgba(8,145,178,.35)}@media print{body{background:white}.page{padding:0}.print-btn{display:none}}
+      @page{size:A4;margin:14mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#0f172a;margin:0;background:#eef6fb}.page{max-width:820px;margin:0 auto;background:#fff;min-height:100vh;padding:30px}.head{background:linear-gradient(135deg,#0891b2,#0e7490);color:white;border-radius:18px;padding:24px;margin-bottom:18px}.brand{font-size:13px;letter-spacing:2px;font-weight:700;opacity:.9}.title{font-size:28px;font-weight:800;margin:8px 0 4px}.sub{font-size:14px;opacity:.9}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}.card{border:1px solid #e2e8f0;border-radius:14px;padding:14px;background:#f8fafc}.label{font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;letter-spacing:.5px;margin-bottom:5px}.val{font-size:15px;font-weight:700}.section{margin-top:18px;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden}.section h2{font-size:15px;margin:0;padding:12px 14px;background:#f0f9ff;color:#075985}.section .content{padding:14px;line-height:1.55}.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{background:#e0f2fe;color:#075985;border-radius:999px;padding:7px 11px;font-size:13px;font-weight:700}.green{background:#f0fdf4;color:#166534}.muted{color:#64748b}.photo-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.photo-item img{width:100%;max-height:260px;object-fit:cover;border-radius:10px;border:1px solid #e2e8f0;display:block}.photo-lbl{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}.print-btn{display:block;margin:28px auto 0;border:0;border-radius:999px;background:#0891b2;color:white;padding:14px 28px;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 10px 25px rgba(8,145,178,.35)}@media print{body{background:white}.page{padding:0}.print-btn{display:none}}
     </style></head><body><main class="page">
       <div class="head"><div class="brand">BRIBLUE</div><div class="title">Rapport d'intervention</div><div class="sub">Carnet d'entretien piscine</div></div>
       <div class="grid"><div class="card"><div class="label">Client</div><div class="val">${esc(client?.nom)}</div></div><div class="card"><div class="label">Date</div><div class="val">${esc(fmt(p.date))}${p.heure ? ` · ${esc(p.heure)}` : ""}</div></div><div class="card"><div class="label">Type</div><div class="val">${esc(p.type || "Entretien")}</div></div><div class="card"><div class="label">Technicien</div><div class="val">${esc(p.tech || "BRIBLUE")}</div></div></div>
@@ -90,6 +98,7 @@ function buildRapportHTML(passage, client) {
       ${(p.obs || p.commentaires) ? `<div class="section"><h2>Observations</h2><div class="content">${esc(p.obs || p.commentaires)}</div></div>` : ""}
       ${produitsApportes.length ? `<div class="section"><h2>Produits apportés</h2><div class="content chips">${produitsApportes.map(([k,v])=>`<span class="chip">${esc(k)} : ${esc(v)}</span>`).join("")}</div></div>` : ""}
       ${produitsLivres.length ? `<div class="section"><h2>Produits livrés au client</h2><div class="content chips">${produitsLivres.map(x=>`<span class="chip green">${esc(x)}</span>`).join("")}</div></div>` : ""}
+      ${photos.length ? `<div class="section"><h2>Photos d'intervention</h2><div class="content"><div class="photo-grid">${photos.map(ph=>`<div class="photo-item"><div class="photo-lbl">${esc(ph.lbl)}</div><img src="${ph.src}"/></div>`).join("")}</div></div></div>` : ""}
       <p class="muted" style="margin-top:28px;font-size:12px">BRIBLUE · La Seyne-sur-Mer · SIRET 84345436400053</p>
       <button class="print-btn" onclick="window.print()">🖨️ Enregistrer en PDF</button>
     </main></body></html>`;
