@@ -1721,7 +1721,31 @@ export default function App() {
     }
   },[saveLivraisonsList, saveStock]);
 
-  const deleteLivraison = useCallback(id=>{ markDeleted("bb_livraisons_v1", id); setLivraisons(prev=>{ const next=prev.filter(x=>x.id!==id); saveLivraisonsList(next); return next; }); },[saveLivraisonsList]);
+  // Appel Admin SDK en parallèle de la sauvegarde client habituelle — garantit
+  // que la suppression atteint réellement Firestore même si l'auth Firebase
+  // anonyme échoue silencieusement (même root cause que syncContratServer /
+  // syncVersementServer : "je supprime, ça persiste en local après F5" mais
+  // le carnet client, qui lit Firestore, continue d'afficher le doublon).
+  const syncLivraisonDeleteServer = useCallback(async (id) => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await fetch("/api/update-livraison", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id }),
+        });
+        if (res.ok) return true;
+      } catch { /* retry */ }
+    }
+    toastError("Échec de synchronisation avec le serveur — la suppression pourrait ne pas s'afficher chez le client. Vérifie ta connexion et réessaie.");
+    return false;
+  }, []);
+
+  const deleteLivraison = useCallback(id=>{
+    syncLivraisonDeleteServer(id);
+    markDeleted("bb_livraisons_v1", id);
+    setLivraisons(prev=>{ const next=prev.filter(x=>x.id!==id); saveLivraisonsList(next); return next; });
+  },[saveLivraisonsList, syncLivraisonDeleteServer]);
   const updateStatutLivraison = useCallback((id,statut)=>{ setLivraisons(prev=>{ const next=prev.map(x=>x.id===id?{...x,statut}:x); saveLivraisonsList(next); return next; }); },[saveLivraisonsList]);
   const updateStock = useCallback((produit, qty) => { setStock(prev=>{ const next={...prev,[produit]:qty}; saveStock(next); return next; }); },[saveStock]);
   const addProduitStock = useCallback((nom) => { setStock(prev=>{ const next={...prev,[nom]:prev[nom]??0}; saveStock(next); return next; }); },[saveStock]);
