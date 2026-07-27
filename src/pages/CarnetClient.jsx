@@ -591,11 +591,11 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
                   : <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={retards.length>=2?"#dc2626":"#ea580c"} strokeWidth="2.5" strokeLinecap="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
                 }
               </div>
-              <div style={{flex:1}}>
-                <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#0f172a",overflowWrap:"anywhere"}}>
                   {label}
                 </div>
-                <div style={{fontSize:11,color:"#64748b",marginTop:2}}>
+                <div style={{fontSize:11,color:"#64748b",marginTop:2,overflowWrap:"anywhere"}}>
                   {aJour ? `${mensualite}€ / mois · contrat ${client.formule||""}` : `${totalDu}€ restant${totalDu>mensualite?"s":""} à régler`}
                 </div>
               </div>
