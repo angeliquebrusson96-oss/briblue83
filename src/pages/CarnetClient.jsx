@@ -4,8 +4,10 @@ import { getDoc } from "firebase/firestore";
 import { DOCS } from "../lib/firebase";
 import { getPH, getCL, getTemp, getResumePassage, isControleType, generateCarnetCode, calculerPassagesPrevusContrat, isPassageEffectue, isPassageDansContrat, calcMensualites, totalAnnuel, finMoisExclu, getNMoisContrat } from "../utils/helpers";
 import { genererContratHTML } from "../components/FormPassage";
-import { resolvePhoto } from "../lib/photoStore";
+import { resolvePhotoForPdf } from "../lib/photoStore";
+import { downloadPDF } from "../lib/pdfGen";
 import { PhotoImg } from "../components/ui";
+import { ToastContainer, toastInfo, toastError } from "../styles";
 
 // Génération autonome du rapport client : évite le bouton PDF cassé si App.jsx n'est pas chargé ici.
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
@@ -93,20 +95,19 @@ function buildRapportHTML(passage, client) {
     </main></body></html>`;
 }
 async function ouvrirContrat(client, sigPrestataire="", sigClient="", contrat={}) {
-  // Résoudre les clés idb: avant de générer le PDF signé
-  let sigPre = sigPrestataire||"";
-  let sigCli = sigClient||"";
-  if (sigPre.startsWith("idb:") || sigCli.startsWith("idb:")) {
-    if (sigPre.startsWith("idb:")) sigPre = (await resolvePhoto(sigPre)) || "";
-    if (sigCli.startsWith("idb:")) sigCli = (await resolvePhoto(sigCli)) || "";
+  toastInfo("Génération du PDF…");
+  try {
+    // Résoudre les clés idb:/fsp: + URLs Firebase Storage (CORS-safe) avant PDF
+    let sigPre = sigPrestataire||"";
+    let sigCli = sigClient||"";
+    if (sigPre) sigPre = (await resolvePhotoForPdf(sigPre)) || "";
+    if (sigCli) sigCli = (await resolvePhotoForPdf(sigCli)) || "";
+    const html = genererContratHTML(client, sigPre, sigCli, contrat);
+    await downloadPDF(html, `${cleanFileName(client?.nom)}-contrat.pdf`);
+  } catch (e) {
+    console.error("[briblue] génération PDF contrat échouée:", e);
+    toastError("Le PDF n'a pas pu être généré, réessayez.");
   }
-  const html = genererContratHTML(client, sigPre, sigCli, contrat);
-  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.target = "_blank"; a.rel = "noopener";
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 
 
@@ -115,41 +116,37 @@ async function resolvePassagePhotosLocal(passage) {
   const ARRAYS = ["photos", "photosDepart"];
   const p = { ...passage };
   for (const field of SINGLE) {
-    if (p[field]) p[field] = await resolvePhoto(p[field]);
+    if (p[field]) p[field] = await resolvePhotoForPdf(p[field]);
   }
   for (const field of ARRAYS) {
     if (Array.isArray(p[field])) {
-      p[field] = await Promise.all(p[field].map(v => resolvePhoto(v)));
+      p[field] = await Promise.all(p[field].map(v => resolvePhotoForPdf(v)));
     }
   }
   return p;
 }
 
 async function ouvrirRapport(passage, client) {
-  const resolved = await resolvePassagePhotosLocal(passage);
-  const html = buildRapportHTML(resolved, client);
-  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const w = window.open(url, "_blank");
-  if (!w) {
-    telechargerRapport(passage, client, url);
-    return;
+  toastInfo("Génération du PDF…");
+  try {
+    const resolved = await resolvePassagePhotosLocal(passage);
+    const html = buildRapportHTML(resolved, client);
+    await downloadPDF(html, `${cleanFileName(client?.nom)}-${cleanFileName(passage?.date)}-rapport.pdf`);
+  } catch (e) {
+    console.error("[briblue] génération PDF rapport échouée:", e);
+    toastError("Le PDF n'a pas pu être généré, réessayez.");
   }
-  setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
-async function telechargerRapport(passage, client, existingUrl) {
-  // Résoudre les clés idb: avant de générer le PDF (photos locales → base64)
-  const p = existingUrl ? (passage||{}) : await resolvePassagePhotosLocal(passage||{});
-  const url = existingUrl || URL.createObjectURL(
-    new Blob([buildRapportHTML(p, client)], { type: "text/html;charset=utf-8" })
-  );
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${cleanFileName(client?.nom)}-${cleanFileName(p.date)}-rapport.html`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
+async function telechargerRapport(passage, client) {
+  toastInfo("Génération du PDF…");
+  try {
+    const p = await resolvePassagePhotosLocal(passage||{});
+    const html = buildRapportHTML(p, client);
+    await downloadPDF(html, `${cleanFileName(client?.nom)}-${cleanFileName(p.date)}-rapport.pdf`);
+  } catch (e) {
+    console.error("[briblue] génération PDF rapport échouée:", e);
+    toastError("Le PDF n'a pas pu être généré, réessayez.");
+  }
 }
 
 // Fallback init data (mirrors App.jsx)
@@ -266,7 +263,7 @@ export function CarnetPublic({ code }) {
   const clientContrat = loadedContrats["CT-"+client.id]
     || Object.values(loadedContrats).find(ct=>ct?.clientId===client.id)
     || {};
-  return <CarnetView client={client} passages={loadedPassages||[]} livraisons={clientLivraisons} versements={loadedVersements} contrat={clientContrat} onRefresh={loadData} refreshing={refreshing}/>;
+  return <><ToastContainer/><CarnetView client={client} passages={loadedPassages||[]} livraisons={clientLivraisons} versements={loadedVersements} contrat={clientContrat} onRefresh={loadData} refreshing={refreshing}/></>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

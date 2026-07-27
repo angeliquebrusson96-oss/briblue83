@@ -32,10 +32,11 @@ async function getJsPDF() {
   return _jsPDF;
 }
 
-// ─── CONVERTIR HTML STRING → base64 PDF ──────────────────────────────────────
-// Retourne une chaîne base64 pure (sans le préfixe data:application/pdf;base64,)
-// Utilisable directement comme attachment Resend : { filename, content: base64 }
-export async function generatePDFBase64(htmlString) {
+// ─── CONVERTIR HTML STRING → Blob PDF ────────────────────────────────────────
+// Cœur partagé par generatePDFBase64 (attachment email) et downloadPDF
+// (téléchargement direct navigateur) — évite un aller-retour base64 inutile
+// pour le téléchargement.
+export async function generatePDFBlob(htmlString) {
   const [html2canvas, JsPDF] = await Promise.all([getHtml2Canvas(), getJsPDF()]);
 
   // Injecter hors du viewport visible (opacity:1 — cf. note ci-dessus) plutôt
@@ -44,6 +45,10 @@ export async function generatePDFBase64(htmlString) {
   container.style.cssText =
     "position:absolute;left:-9999px;top:0;width:210mm;background:#fff;";
   container.innerHTML = htmlString;
+  // Les gabarits HTML embarquent un bouton "Imprimer/PDF" masqué seulement en
+  // @media print (jamais appliqué par html2canvas) → à retirer avant capture,
+  // sinon il apparaît comme un bouton mort dans le PDF généré.
+  container.querySelectorAll(".no-print, .print-btn, .btn-print").forEach(el => el.remove());
   document.body.appendChild(container);
 
   try {
@@ -84,16 +89,36 @@ export async function generatePDFBase64(htmlString) {
       first = false;
     }
 
-    const blob = pdf.output("blob");
-
-    // Blob → base64 string
-    return await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload  = () => resolve(reader.result.split(",")[1]);
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(blob);
-    });
+    return pdf.output("blob");
   } finally {
     try { document.body.removeChild(container); } catch { /* noop */ }
   }
+}
+
+// ─── CONVERTIR HTML STRING → base64 PDF ──────────────────────────────────────
+// Retourne une chaîne base64 pure (sans le préfixe data:application/pdf;base64,)
+// Utilisable directement comme attachment Resend : { filename, content: base64 }
+export async function generatePDFBase64(htmlString) {
+  const blob = await generatePDFBlob(htmlString);
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = () => resolve(reader.result.split(",")[1]);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+// ─── GÉNÉRER + TÉLÉCHARGER DIRECTEMENT DANS LE NAVIGATEUR ───────────────────
+// Déclenche le téléchargement d'un vrai fichier PDF (pas un aperçu HTML à
+// imprimer manuellement) via un lien <a download> temporaire.
+export async function downloadPDF(htmlString, filename = "document.pdf") {
+  const blob = await generatePDFBlob(htmlString);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
