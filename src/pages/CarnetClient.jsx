@@ -1325,7 +1325,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
 
   // ─── RENDER ────────────────────────────────────────────────────────────────
   return (
-    <div className="cv-root" style={{background:"#f0f6fb",minHeight:"100vh",maxWidth:480,margin:"0 auto",overflowX:"hidden"}}>
+    <div className="cv-root" style={{background:"#f0f6fb",minHeight:"100vh",width:"100%",maxWidth:480,minWidth:0,margin:"0 auto",overflowX:"hidden"}}>
       {/* HEADER */}
       <div style={{background:"rgba(255,255,255,0.9)",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",padding:"13px 16px 11px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid rgba(226,232,240,0.8)",position:"sticky",top:0,zIndex:100}}>
         <div style={{width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:8,color:"#94a3b8"}}>
