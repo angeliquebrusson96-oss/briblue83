@@ -743,7 +743,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
         </div>
 
         {/* Nom + badge */}
-        <div style={{fontSize:22,fontWeight:700,color:"#fff",lineHeight:1.2,letterSpacing:"-0.3px",marginBottom:6}}>{client.nom}</div>
+        <div style={{fontSize:22,fontWeight:700,color:"#fff",lineHeight:1.2,letterSpacing:"-0.3px",marginBottom:6,overflowWrap:"anywhere",wordBreak:"break-word"}}>{client.nom}</div>
         <div style={{display:"inline-flex",alignItems:"center",gap:5,marginBottom:16,background:"rgba(255,255,255,0.15)",borderRadius:20,padding:"4px 11px",border:"1px solid rgba(255,255,255,0.2)"}}>
           <span style={{width:7,height:7,borderRadius:"50%",background:contratActif?"#4ade80":"#f87171",display:"inline-block",boxShadow:contratActif?"0 0 6px #4ade80":"0 0 6px #f87171"}}/>
           <span style={{fontSize:12,color:"#fff",fontWeight:500}}>Contrat {contratActif?"actif":"expiré"}</span>
@@ -1109,8 +1109,8 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
         <div style={{width:52,height:52,background:"rgba(255,255,255,0.2)",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,border:"2px solid rgba(255,255,255,0.3)"}}>
           <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         </div>
-        <div>
-          <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:4}}>{client.nom}</div>
+        <div style={{minWidth:0,flex:1}}>
+          <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:4,overflowWrap:"anywhere",wordBreak:"break-word"}}>{client.nom}</div>
           <div style={{display:"inline-flex",alignItems:"center",gap:5,background:"rgba(255,255,255,0.18)",borderRadius:20,padding:"3px 10px",border:"1px solid rgba(255,255,255,0.2)"}}>
             <span style={{width:6,height:6,borderRadius:"50%",background:contratActif?"#4ade80":"#f87171",display:"inline-block",boxShadow:contratActif?"0 0 5px #4ade80":"0 0 5px #f87171"}}/>
             <span style={{fontSize:11,color:"#fff",fontWeight:500}}>Contrat {contratActif?"actif":"expiré"}</span>
@@ -1131,7 +1131,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
               <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round">{row.icon}</svg>
             </div>
             <span style={{fontSize:13,color:"#64748b",flex:1}}>{row.label}</span>
-            <span style={{fontSize:13,fontWeight:600,color:"#0f172a"}}>{row.val}</span>
+            <span style={{fontSize:13,fontWeight:600,color:"#0f172a",textAlign:"right",overflowWrap:"anywhere",wordBreak:"break-word",maxWidth:"55%"}}>{row.val}</span>
           </div>
         ))}
       </div>
@@ -1319,7 +1319,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
 
   // ─── RENDER ────────────────────────────────────────────────────────────────
   return (
-    <div className="cv-root" style={{background:"#f0f6fb",minHeight:"100vh",maxWidth:480,margin:"0 auto"}}>
+    <div className="cv-root" style={{background:"#f0f6fb",minHeight:"100vh",maxWidth:480,margin:"0 auto",overflowX:"hidden"}}>
       {/* HEADER */}
       <div style={{background:"rgba(255,255,255,0.9)",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",padding:"13px 16px 11px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid rgba(226,232,240,0.8)",position:"sticky",top:0,zIndex:100}}>
         <div style={{width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:8,color:"#94a3b8"}}>
