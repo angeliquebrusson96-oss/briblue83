@@ -288,9 +288,12 @@ export function flushPendingNow() {
 
   // Toujours utiliser keepalive REST pour le flush (iOS ET desktop)
   // C'est le seul moyen fiable de survivre à la fermeture de page
-  saveViaREST(snapshot, true).catch(() => {
+  saveViaREST(snapshot, true).then(() => {
+    _persistQueue();
+  }).catch(() => {
     // Si REST échoue, remettre dans la queue
     Object.assign(offlineQueue.pending, snapshot);
+    _persistQueue();
   });
 }
 
@@ -368,6 +371,13 @@ export async function forceRestoreFromFirebase() {
 }
 
 // ─── FLUSH ONLINE (reconnexion réseau) ──────────────────────────────────────
+// ⚠️ Doit appeler _persistQueue() dans TOUS les cas (succès ET échec) : sans
+// ça, la queue persistée dans localStorage (QUEUE_LS_KEY) ne reflète jamais
+// le vidage réussi de la queue en mémoire. Au prochain chargement de la page,
+// _loadPersistedQueue() restaure alors indéfiniment un instantané périmé
+// (ex: un tableau de livraisons sans les entrées d'un client), qui écrase
+// silencieusement toute correction faite entre-temps (ex: via l'API Admin
+// SDK) à chaque nouveau flush — un "fantôme" qui ne disparaît jamais.
 async function flushOfflineQueue() {
   const keys = Object.keys(offlineQueue.pending);
   if (!keys.length) return;
@@ -375,9 +385,11 @@ async function flushOfflineQueue() {
   keys.forEach(k => { delete offlineQueue.pending[k]; });
   try {
     await saveViaREST(snapshot, false);
+    _persistQueue();
   } catch {
     // Remettre dans la queue si échec
     Object.assign(offlineQueue.pending, snapshot);
+    _persistQueue();
   }
 }
 
