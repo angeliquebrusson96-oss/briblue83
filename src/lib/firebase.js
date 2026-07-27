@@ -40,6 +40,9 @@ export const KEY_MAP = {
   "bb_clients_v2":           { doc: "clients",    field: "data" },
   "bb_passages_v2":          { doc: "passages",   field: "data" },
   "bb_deleted_passages_v1":  { doc: "passages",   field: "deletedIds" }, // IDs des passages supprimés (tombstones)
+  "bb_deleted_clients_v1":   { doc: "clients",    field: "deletedIds" }, // idem clients
+  "bb_deleted_livraisons_v1":{ doc: "livraisons", field: "deletedIds" }, // idem livraisons
+  "bb_deleted_rdvs_v1":      { doc: "rdvs",       field: "deletedIds" }, // idem rdvs
   "bb_rdvs_v1":              { doc: "rdvs",       field: "data" },
   "bb_livraisons_v1":        { doc: "livraisons", field: "data" },
   "bb_contrats_v1":          { doc: "contrats",   field: "data" },

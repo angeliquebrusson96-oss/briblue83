@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { save, flushPendingNow, IS_IOS, reconcileOnBoot, invalidateDocCache, subscribeToRealtime, markPassageDeleted } from "./lib/storage";
+import { save, flushPendingNow, IS_IOS, reconcileOnBoot, invalidateDocCache, subscribeToRealtime, markPassageDeleted, markDeleted } from "./lib/storage";
 import { extractPassagePhotos, migratePassagePhotosToStorage, migrateAllPassagesPhotos, migrateClientPhotoToStorage, retryPendingUploads, _getUploadQueue } from "./lib/photoStore";
 import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import { auth } from "./lib/firebase";
@@ -1583,7 +1583,17 @@ export default function App() {
     }
   },[saveClients, clients, saveContrats]);
 
-  const deleteClient = useCallback(id=>{ showConfirm("Supprimer ce client et tous ses passages ?", ()=>{ setClients(prev=>{ const next=prev.filter(x=>x.id!==id); saveClients(next); return next; }); setPassages(prev=>{ const next=prev.filter(x=>x.clientId!==id); savePassages(next); return next; }); setFicheClient(null); }); },[saveClients,savePassages]);
+  const deleteClient = useCallback(id=>{ showConfirm("Supprimer ce client et tous ses passages ?", ()=>{
+    markDeleted("bb_clients_v2", id);
+    setClients(prev=>{ const next=prev.filter(x=>x.id!==id); saveClients(next); return next; });
+    setPassages(prev=>{
+      prev.filter(x=>x.clientId===id).forEach(p=>markPassageDeleted(p.id));
+      const next=prev.filter(x=>x.clientId!==id);
+      savePassages(next);
+      return next;
+    });
+    setFicheClient(null);
+  }); },[saveClients,savePassages]);
 
   // Supprimer un contrat entièrement (retire toutes les entrées du registre
   // des contrats pour ce client — y compris d'éventuelles entrées orphelines
@@ -1702,7 +1712,7 @@ export default function App() {
     }
   },[saveLivraisonsList, saveStock]);
 
-  const deleteLivraison = useCallback(id=>{ setLivraisons(prev=>{ const next=prev.filter(x=>x.id!==id); saveLivraisonsList(next); return next; }); },[saveLivraisonsList]);
+  const deleteLivraison = useCallback(id=>{ markDeleted("bb_livraisons_v1", id); setLivraisons(prev=>{ const next=prev.filter(x=>x.id!==id); saveLivraisonsList(next); return next; }); },[saveLivraisonsList]);
   const updateStatutLivraison = useCallback((id,statut)=>{ setLivraisons(prev=>{ const next=prev.map(x=>x.id===id?{...x,statut}:x); saveLivraisonsList(next); return next; }); },[saveLivraisonsList]);
   const updateStock = useCallback((produit, qty) => { setStock(prev=>{ const next={...prev,[produit]:qty}; saveStock(next); return next; }); },[saveStock]);
   const addProduitStock = useCallback((nom) => { setStock(prev=>{ const next={...prev,[nom]:prev[nom]??0}; saveStock(next); return next; }); },[saveStock]);
@@ -1722,7 +1732,7 @@ export default function App() {
   }, [saveClients, savePassages]);
 
   const saveRdv = useCallback(r=>{ setRdvs(prev=>{ const next=prev.find(x=>x.id===r.id)?prev.map(x=>x.id===r.id?r:x):[...prev,r]; saveRdvsList(next); return next; }); setShowFormRdv(false);setEditRdv(null); },[saveRdvsList]);
-  const deleteRdv = useCallback(id=>{ setRdvs(prev=>{ const next=prev.filter(x=>x.id!==id); saveRdvsList(next); return next; }); },[saveRdvsList]);
+  const deleteRdv = useCallback(id=>{ markDeleted("bb_rdvs_v1", id); setRdvs(prev=>{ const next=prev.filter(x=>x.id!==id); saveRdvsList(next); return next; }); },[saveRdvsList]);
   const openAddClient = useCallback(()=>{ setEditClient(null); setShowFormClient(true); },[]);
 
   const handleToggleRetardCarnet = useCallback((key, visible) => {

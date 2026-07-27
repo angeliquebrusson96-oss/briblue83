@@ -98,35 +98,54 @@ const MERGE_ARRAY_KEYS = new Set([
   "bb_livraisons_v1",  // ← idem
 ]);
 
-// ─── TOMBSTONES : IDs DE PASSAGES SUPPRIMÉS INTENTIONNELLEMENT ──────────────
+// ─── TOMBSTONES : IDs SUPPRIMÉS INTENTIONNELLEMENT ──────────────────────────
 // Permet de différencier une suppression volontaire d'une perte accidentelle.
-// Un ID dans cette liste ne sera JAMAIS réintroduit par les mécanismes de merge.
-const _DELETED_LS_KEY = "briblue_bb_deleted_passages_v1";
+// Un ID dans cette liste ne sera JAMAIS réintroduit par les mécanismes de merge
+// (garde-fous de save(), reconcileOnBoot, sync périodique, onSnapshot temps réel).
+// Un tombstone existe pour CHAQUE clé de type tableau (clients, passages,
+// livraisons, rdvs) — sans ça, toute suppression peut être annulée par un
+// merge qui la prend pour une perte de données accidentelle (bug vécu sur
+// les clients : le garde-fou anti-perte réintroduisait le client supprimé
+// dès le save() suivant, invisible tant qu'on ne rechargeait pas la page).
+const TOMBSTONE_KEY_FOR = {
+  "bb_passages_v2":   "bb_deleted_passages_v1",
+  "bb_clients_v2":    "bb_deleted_clients_v1",
+  "bb_livraisons_v1": "bb_deleted_livraisons_v1",
+  "bb_rdvs_v1":       "bb_deleted_rdvs_v1",
+};
 
-function _getDeletedIds() {
+function _getDeletedIds(dataKey) {
+  const tombstoneKey = TOMBSTONE_KEY_FOR[dataKey];
+  if (!tombstoneKey) return new Set();
   try {
-    const raw = localStorage.getItem(_DELETED_LS_KEY);
+    const raw = localStorage.getItem("briblue_" + tombstoneKey);
     return raw ? new Set(JSON.parse(raw)) : new Set();
   } catch { return new Set(); }
 }
 
-function _saveDeletedIds(set) {
+function _saveDeletedIds(dataKey, set) {
+  const tombstoneKey = TOMBSTONE_KEY_FOR[dataKey];
+  if (!tombstoneKey) return;
   try {
-    localStorage.setItem(_DELETED_LS_KEY, JSON.stringify([...set]));
-    localStorage.setItem("briblue_meta_bb_deleted_passages_v1", JSON.stringify({ savedAt: Date.now() }));
+    localStorage.setItem("briblue_" + tombstoneKey, JSON.stringify([...set]));
+    localStorage.setItem("briblue_meta_" + tombstoneKey, JSON.stringify({ savedAt: Date.now() }));
   } catch { /* quota → silencieux */ }
 }
 
-// Marquer un passage comme supprimé : empêche tout retour via merge ou Firebase.
+// Marquer une entrée comme supprimée : empêche tout retour via merge ou Firebase.
 // À appeler AVANT save() lors d'une suppression intentionnelle.
-export function markPassageDeleted(id) {
-  if (!id) return;
-  const ids = _getDeletedIds();
+// dataKey = la clé de la donnée elle-même (ex: "bb_clients_v2"), pas le tombstone.
+export function markDeleted(dataKey, id) {
+  if (!id || !TOMBSTONE_KEY_FOR[dataKey]) return;
+  const ids = _getDeletedIds(dataKey);
   ids.add(String(id));
-  _saveDeletedIds(ids);
+  _saveDeletedIds(dataKey, ids);
   // Synchroniser sur Firebase (asynchrone, non bloquant)
-  save("bb_deleted_passages_v1", [...ids]).catch(() => {});
+  save(TOMBSTONE_KEY_FOR[dataKey], [...ids]).catch(() => {});
 }
+
+// Rétrocompatibilité — anciens appels explicites pour les passages.
+export function markPassageDeleted(id) { markDeleted("bb_passages_v2", id); }
 
 function mergeArrayById(priorityArr, secondaryArr, deletedIds = null) {
   const result = Array.isArray(priorityArr) ? [...priorityArr] : [];
@@ -322,7 +341,7 @@ export async function forceRestoreFromFirebase() {
           const localArr  = Array.isArray(localVal) ? localVal : [];
           const remoteArr = remoteVal;
           // Pour les passages : exclure les IDs supprimés intentionnellement
-          const deleted = key === "bb_passages_v2" ? _getDeletedIds() : null;
+          const deleted = _getDeletedIds(key);
           // Merge : local prioritaire pour les conflits, Firebase ajoute les absents
           finalVal = mergeArrayById(localArr, remoteArr, deleted);
           const added = finalVal.length - localArr.length;
@@ -372,8 +391,10 @@ export async function reconcileOnBoot() {
   try {
     _loadPersistedQueue();
 
-    // ⚠ bb_deleted_passages_v1 EN PREMIER — doit être chargé avant bb_passages_v2
-    const KEYS = ["bb_deleted_passages_v1",
+    // ⚠ Les tombstones (bb_deleted_*) EN PREMIER — doivent être chargés avant
+    // leurs données respectives (bb_clients_v2, bb_passages_v2, etc.)
+    const TOMBSTONE_DATA_KEYS = new Set(Object.values(TOMBSTONE_KEY_FOR));
+    const KEYS = [...TOMBSTONE_DATA_KEYS,
                   "bb_clients_v2","bb_passages_v2","bb_livraisons_v1","bb_rdvs_v1",
                   "bb_stock_v1","bb_contrats_v1","bb_versements_v1","bb_retards_carnet_v1","bb_notes_v1"];
 
@@ -445,13 +466,11 @@ export async function reconcileOnBoot() {
       }
 
       // ── Traitement spécial : union des IDs supprimés (tombstones) ────────
-      // Doit être traité AVANT bb_passages_v2 (voir ordre de KEYS).
-      if (key === "bb_deleted_passages_v1") {
+      // Doit être traité AVANT les données correspondantes (voir ordre de KEYS).
+      if (TOMBSTONE_DATA_KEYS.has(key)) {
         const localArr  = Array.isArray(local)     ? local     : [];
         const remoteArr = Array.isArray(remoteVal) ? remoteVal : [];
         const union = [...new Set([...localArr, ...remoteArr])];
-        // Sauvegarder l'union localement (lecture par _getDeletedIds())
-        try { localStorage.setItem(_DELETED_LS_KEY, JSON.stringify(union)); } catch {} // eslint-disable-line no-empty
         try {
           localStorage.setItem("briblue_" + key, JSON.stringify(union));
           localStorage.setItem("briblue_meta_" + key, JSON.stringify({ savedAt: Date.now() }));
@@ -489,7 +508,7 @@ export async function reconcileOnBoot() {
         const localArr  = Array.isArray(local)     ? local     : [];
         const remoteArr = Array.isArray(remoteVal) ? remoteVal : [];
         // Pour les passages : filtrer les IDs supprimés intentionnellement
-        const deleted = key === "bb_passages_v2" ? _getDeletedIds() : null;
+        const deleted = _getDeletedIds(key);
         const merged = localTime >= remoteTime
           ? mergeArrayById(localArr, remoteArr, deleted)
           : mergeArrayById(remoteArr, localArr, deleted);
@@ -621,14 +640,23 @@ export async function save(key, val) {
   }
 
   // ── GARDE-FOU anti-perte de clients ────────────────────────────────────────
+  // EXCEPTION : les IDs présents dans les tombstones (markDeleted) ont été
+  // supprimés intentionnellement → on ne les réintroduit pas. Sans ce filtre,
+  // CE garde-fou annulait silencieusement toute suppression de client : le
+  // tableau raccourci déclenchait systématiquement une "fusion automatique"
+  // qui recollait le client supprimé, invisible jusqu'au rechargement suivant.
   if (key === "bb_clients_v2" && Array.isArray(val)) {
     try {
       const existingRaw = localStorage.getItem("briblue_bb_clients_v2");
       if (existingRaw) {
         const existing = JSON.parse(existingRaw);
-        if (Array.isArray(existing) && existing.length > val.length) {
-          console.warn(`[briblue] GARDE-FOU clients : ${val.length} → ${existing.length} clients — fusion automatique.`);
-          return save(key, mergeArrayById(val, existing));
+        const deleted = _getDeletedIds(key);
+        const existingActive = deleted.size > 0
+          ? existing.filter(x => !x?.id || !deleted.has(String(x.id)))
+          : existing;
+        if (Array.isArray(existing) && existingActive.length > val.length) {
+          console.warn(`[briblue] GARDE-FOU clients : ${val.length} → ${existingActive.length} clients actifs — fusion automatique.`);
+          return save(key, mergeArrayById(val, existingActive, deleted));
         }
       }
     } catch { /* noop */ }
@@ -645,7 +673,7 @@ export async function save(key, val) {
       if (existingRaw) {
         const existing = JSON.parse(existingRaw);
         if (Array.isArray(existing)) {
-          const deleted = _getDeletedIds();
+          const deleted = _getDeletedIds(key);
           // Exclure les supprimés intentionnels avant la comparaison
           const existingActive = deleted.size > 0
             ? existing.filter(x => !x?.id || !deleted.has(String(x.id)))
@@ -906,7 +934,7 @@ export function subscribeToRealtime(callbacks) {
               const localRaw = localStorage.getItem("briblue_" + key);
               const localArr = localRaw ? JSON.parse(localRaw) : [];
               // Pour les passages : exclure les IDs supprimés intentionnellement du merge
-              const deleted = key === "bb_passages_v2" ? _getDeletedIds() : null;
+              const deleted = _getDeletedIds(key);
               // Filtrer les supprimés du snapshot Firebase lui-même
               const valFiltered = deleted && deleted.size > 0
                 ? val.filter(x => !x?.id || !deleted.has(String(x.id)))
