@@ -1073,7 +1073,12 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
             </div>
           : <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {all.map((item,i)=>{
+                // Titre = produits livrés, ou la note si aucun produit sélectionné.
+                // La note/quantité (ex: "2 sacs chlore lent, 1 bidon pH+") s'affiche
+                // TOUJOURS en plus quand elle existe — elle ne doit pas disparaître
+                // simplement parce que des produits sont aussi cochés.
                 const label = item.produits.length > 0 ? item.produits.join(", ") : (item.description||"Livraison");
+                const note = item.produits.length > 0 ? item.description : "";
                 return (
                   <div key={item.id||i} style={{background:"#fff",borderRadius:14,border:"1px solid #e2e8f0",padding:"12px 14px",display:"flex",alignItems:"center",gap:12,boxShadow:"0 1px 4px rgba(0,0,0,0.04)",minWidth:0}}>
                     <div style={{width:40,height:40,background:"linear-gradient(135deg,#f0fdf4,#dcfce7)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,border:"1px solid #bbf7d0"}}>
@@ -1081,6 +1086,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
                     </div>
                     <div style={{flex:1,minWidth:0,overflow:"hidden"}}>
                       <div style={{fontSize:13,fontWeight:600,color:"#0f172a",wordBreak:"break-word",lineHeight:1.4}}>{label}</div>
+                      {note&&<div style={{fontSize:12,color:"#475569",marginTop:2,wordBreak:"break-word",lineHeight:1.4}}>{note}</div>}
                       <div style={{fontSize:11,color:"#64748b",marginTop:1}}>{fmtDate(item.date,{day:"2-digit",month:"short",year:"numeric"})}</div>
                     </div>
                     <div style={{display:"flex",alignItems:"center",gap:4,background:"#f0fdf4",color:"#15803d",borderRadius:8,padding:"4px 9px",fontSize:11,fontWeight:600,flexShrink:0,border:"1px solid #bbf7d0"}}>
