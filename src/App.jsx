@@ -1753,14 +1753,35 @@ export default function App() {
     });
   }, [saveRetardsCarnet]);
 
+  // Appel Admin SDK en parallèle de la sauvegarde client habituelle — garantit
+  // que le paiement coché atteint réellement Firestore même si l'auth Firebase
+  // anonyme échoue silencieusement (cf. syncContratServer, même root cause :
+  // "je coche payé, ça persiste en local après F5" mais le client ne voit
+  // jamais la mise à jour car l'écriture n'avait jamais atteint le serveur).
+  const syncVersementServer = useCallback(async (key, paid) => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await fetch("/api/update-versement", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key, paid }),
+        });
+        if (res.ok) return true;
+      } catch { /* retry */ }
+    }
+    toastError("Échec de synchronisation avec le serveur — le paiement pourrait ne pas s'afficher chez le client. Vérifie ta connexion et réessaie.");
+    return false;
+  }, []);
+
   const handleToggleVersement = useCallback((key, paid) => {
+    syncVersementServer(key, paid);
     setVersements(prev => {
       const next = { ...prev };
       if (paid) next[key] = true; else delete next[key];
       saveVersements(next);
       return next;
     });
-  }, [saveVersements]);
+  }, [saveVersements, syncVersementServer]);
 
   const nbAlertes = useMemo(()=>clients.filter(c=>alerteClient(c,passages)!=="ok"&&!dismissedAlertes.includes(c.id)).length,[clients,passages,dismissedAlertes]);
 
