@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from "firebase/app";
-import { getFirestore, doc } from "firebase/firestore";
+import { getFirestore, doc, collection } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 
@@ -34,6 +34,17 @@ export const DOCS = {
   // Legacy — conservé pour la migration automatique au 1er démarrage
   app_data:   doc(db, "briblue", "app_data"),
 };
+
+// ─── PASSAGES : UN DOCUMENT PAR RAPPORT ────────────────────────────────────
+// L'ancien modèle (tous les passages dans UN champ "data" du document
+// briblue/passages) a fini par dépasser la limite Firestore de 1 Mo par
+// document (252 passages ≈ 1,3-3,6 Mo selon l'encodage) — TOUTE écriture y
+// échouait alors, pour tous les clients. Migration vers une sous-collection :
+// un document par passage (briblue/passages/items/{passageId}), qui scale
+// nativement sans limite de taille globale et élimine le besoin de fusion
+// manuelle par tableau (Firestore gère les ajouts/suppressions au niveau du
+// document, plus de risque de "résurrection" par écrasement de tableau).
+export const passagesCol = collection(db, "briblue", "passages", "items");
 
 // Mapping clé localStorage → document + champ Firestore
 export const KEY_MAP = {
