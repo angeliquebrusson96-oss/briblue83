@@ -674,7 +674,10 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
             :"linear-gradient(90deg,#f97316,#fb923c)"
           }}/>
           <div style={{padding:"13px 14px"}}>
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:aJour?0:10}}>
+            <button
+              onClick={()=>{ if (echeancierComplet.length>0) setShowEcheancier(true); }}
+              disabled={echeancierComplet.length===0}
+              style={{display:"flex",alignItems:"center",gap:10,marginBottom:aJour?0:10,width:"100%",background:"none",border:"none",padding:0,textAlign:"left",fontFamily:"inherit",cursor:echeancierComplet.length>0?"pointer":"default"}}>
               <div style={{width:40,height:40,borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
                 background:aJour?"#f0fdf4":retards.length>=2?"#fee2e2":"#fff7ed"}}>
                 {aJour
@@ -695,7 +698,10 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
                   <div style={{fontSize:18,fontWeight:900,color:retards.length>=2?"#dc2626":"#ea580c"}}>{totalDu}€</div>
                 </div>
               )}
-            </div>
+              {echeancierComplet.length>0 && (
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round" style={{flexShrink:0}}><polyline points="9 18 15 12 9 6"/></svg>
+              )}
+            </button>
 
             {!aJour && (
               <div style={{display:"flex",flexDirection:"column",gap:5}}>
