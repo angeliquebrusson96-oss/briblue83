@@ -1406,6 +1406,16 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
                   {Ico.sign(14,"#fff")} {ct?.statut==="signe_client"?"Renvoyer le contrat":"Envoyer pour signature"}
                 </button>
               )}
+              {ct?.statut!=="signe_complet"&&(
+                <button onClick={()=>{
+                    const sigLink = `${window.location.origin}/sign.html?clientId=${client.id}&contractId=CT-${client.id}`;
+                    try { navigator.clipboard.writeText(sigLink); toastSuccess("Lien de signature copié ! Utile si l'email n'arrive pas au client."); } catch { /* noop */ }
+                  }}
+                  style={{height:40,borderRadius:12,background:"#f8fafc",border:"1.5px solid #e2e8f0",cursor:"pointer",fontWeight:700,fontSize:12,color:"#475569",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:7,WebkitTapHighlightColor:"transparent"}}>
+                  <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                  Copier le lien de signature (si l'email échoue)
+                </button>
+              )}
               {ct?.statut==="signe_client"&&(
                 <a href={`/sign-prestataire.html?clientId=${client.id}&contractId=CT-${client.id}`} target="_blank" rel="noopener"
                   style={{height:44,borderRadius:12,background:"linear-gradient(135deg,#4f46e5,#6366f1)",border:"none",cursor:"pointer",fontWeight:700,fontSize:13,color:"#fff",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:7,textDecoration:"none",boxShadow:"0 2px 10px rgba(79,70,229,0.3)"}}>
