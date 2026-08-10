@@ -637,7 +637,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
   // Produits facturés (livraisons statut="facture") mais pas encore payés
   // → montant ajouté au restant dû affiché au client.
   const livraisonsDues = (livraisons||[]).filter(l => l.statut === "facture" && Number(l.montant) > 0);
-  const montantLivraisonsDues = livraisonsDues.reduce((s,l)=>s+Number(l.montant), 0);
+  const montantLivraisonsDues = Math.round(livraisonsDues.reduce((s,l)=>s+Number(l.montant), 0) * 100) / 100;
 
   const VersementWidget = () => {
     if ((!mensualite || !client.dateDebut) && montantLivraisonsDues <= 0) return null;
@@ -649,7 +649,9 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
     );
     const hasProduitsDue = montantLivraisonsDues > 0;
     const aJour = nbDus === 0 && !hasProduitsDue;
-    const totalDu = nbDus * (mensualite||0) + montantLivraisonsDues;
+    // Arrondi au centime — l'addition flottante (0.1+0.2 style) peut sinon
+    // afficher "164.42000000000002€" au client.
+    const totalDu = Math.round((nbDus * (mensualite||0) + montantLivraisonsDues) * 100) / 100;
     // Libellé : priorité aux mensualités en retard (le cas le plus critique),
     // sinon mensualité du mois en cours, sinon uniquement des produits à régler.
     // Ne jamais confondre "pas de retard strict" (retards exclut le mois en
@@ -677,7 +679,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
             <button
               onClick={()=>{ if (echeancierComplet.length>0) setShowEcheancier(true); }}
               disabled={echeancierComplet.length===0}
-              style={{display:"flex",alignItems:"center",gap:10,marginBottom:aJour?0:10,width:"100%",background:"none",border:"none",padding:0,textAlign:"left",fontFamily:"inherit",cursor:echeancierComplet.length>0?"pointer":"default"}}>
+              style={{display:"flex",alignItems:"center",gap:10,marginBottom:aJour?0:10,width:"100%",minWidth:0,boxSizing:"border-box",background:"none",border:"none",padding:0,textAlign:"left",fontFamily:"inherit",cursor:echeancierComplet.length>0?"pointer":"default"}}>
               <div style={{width:40,height:40,borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
                 background:aJour?"#f0fdf4":retards.length>=2?"#fee2e2":"#fff7ed"}}>
                 {aJour
@@ -713,7 +715,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
                   return (
                     <button key={versKey(y,m)} onClick={()=>setShowEcheancier(true)} style={{
                       display:"flex",alignItems:"center",justifyContent:"space-between",
-                      padding:"8px 10px",borderRadius:10,cursor:"pointer",width:"100%",
+                      padding:"8px 10px",borderRadius:10,cursor:"pointer",width:"100%",minWidth:0,boxSizing:"border-box",
                       border:`1px solid ${estCourant?"#fed7aa":"#fecaca"}`,fontFamily:"inherit",textAlign:"left",
                       background:estCourant?"#fff7ed":"#fff1f2",
                     }}>
@@ -743,7 +745,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
                   return (
                   <button key={l.id} onClick={()=>setNoteModal({titre, note:noteComplete, montant:Number(l.montant), date:l.date})} style={{
                     display:"flex",alignItems:"center",justifyContent:"space-between",
-                    padding:"8px 10px",borderRadius:10,cursor:"pointer",width:"100%",
+                    padding:"8px 10px",borderRadius:10,cursor:"pointer",width:"100%",minWidth:0,boxSizing:"border-box",
                     background:"#fff7ed",border:"1px solid #fed7aa",fontFamily:"inherit",textAlign:"left",
                   }}>
                     <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
@@ -1471,7 +1473,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
   const EcheancierModal = () => {
     if (!showEcheancier) return null;
     const moisPayes = echeancierComplet.filter(r=>r.paye);
-    const totalPaye = moisPayes.reduce((s,r)=>s+r.montant,0);
+    const totalPaye = Math.round(moisPayes.reduce((s,r)=>s+r.montant,0) * 100) / 100;
     return (
       <div onClick={()=>setShowEcheancier(false)} style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.6)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:10004,backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",animation:"cv-fadeIn 0.2s ease"}}>
         <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,maxHeight:"88vh",overflowY:"auto",WebkitOverflowScrolling:"touch",boxShadow:"0 -20px 60px rgba(0,0,0,0.25)",paddingBottom:"max(28px,env(safe-area-inset-bottom,28px))",animation:"cv-fadeUp 0.3s ease"}}>
