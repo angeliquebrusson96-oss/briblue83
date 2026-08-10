@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { DS, Ico, RAPPORT_STATUS, SAISONS_META, STATUT_LIV, MOIS, MOIS_L, AC } from "../utils/constants";
 import {
   alerteClient, totalAnnuel, isEntretienType, isControleType, daysUntil,
-  getMoisVal, getPlanningMois, getSaison, calcMensualites, getPH, getCL, getTemp,
+  getMoisVal, getPlanningMois, getSaison, calcMensualites, getNMoisContrat, getPH, getCL, getTemp,
   getResumePassage, getRapportStatus, generateCarnetCode, exportRdvToICS,
   TODAY, MOIS_NOW, YEAR_NOW,
   calculerPassagesPrevusContrat, isPassageDansContrat, isPassageEffectue
@@ -322,7 +322,7 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
   const prevuCeMois = (getMoisVal(client.moisParMois||client.saisons||{},moisNow).entretien||0)+(getMoisVal(client.moisParMois||client.saisons||{},moisNow).controle||0);
   const restantsCeMois = Math.max(0, prevuCeMois - passagesCeMois);
   const pct = total>0?Math.round(eff/total*100):0;
-  const mensualite = (()=>{const {m11}=calcMensualites(client.prix||0);return m11;})();
+  const mensualite = (()=>{const {m11}=calcMensualites(client.prix||0, getNMoisContrat(client));return m11;})();
 
   const TabIcon = ({name, size=16, color="currentColor"}) => {
     const s = {width:size,height:size,viewBox:"0 0 24 24",fill:"none",stroke:color,strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round"};
@@ -1102,8 +1102,11 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
         };
         const statutCfg = STATUTS[ct?.statut] || {label:"📋 Aucun contrat signé", color:"#94a3b8", bg:"#f8fafc", border:"#e2e8f0"};
 
-        // Mensualités
-        const {m1: mensualite1, m11: mensualiteBase} = calcMensualites(client.prix||0);
+        // Mensualités — durée réelle du contrat (12, 6, 3 mois ou autre), pas
+        // toujours 12 : sinon le montant affiché ici diverge de celui du
+        // carnet client / page Gestion / contrat PDF pour tout contrat dont
+        // la durée n'est pas un multiple exact de mois pleins.
+        const {m1: mensualite1, m11: mensualiteBase} = calcMensualites(client.prix||0, getNMoisContrat(client));
         const fmtEur = (v) => v%1===0?`${v}€`:`${v.toFixed(2).replace(".",",")}€`;
         const today = new Date();
         const debut = client.dateDebut ? new Date(client.dateDebut) : null;

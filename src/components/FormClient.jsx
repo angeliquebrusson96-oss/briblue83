@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { DS, MOIS_PAR_MOIS_DEF, MOIS, SAISONS_META } from "../utils/constants";
-import { migrateMois, getMoisVal, getSaison, totalAnnuel, calcMensualites, TODAY } from "../utils/helpers";
+import { migrateMois, getMoisVal, getSaison, totalAnnuel, calcMensualites, getNMoisContrat, TODAY } from "../utils/helpers";
 import { useFormDraft, DraftBanner, Modal, PhotoPicker, FmField, FmSectionTitle, FmHeader, FmSteps } from "./ui";
 import { toastWarn, toastSuccess, toastError } from "../styles";
 import { migrateClientPhotoToStorage } from "../lib/photoStore";
@@ -459,8 +459,9 @@ export function FormClient({ initial, clients, onSave, onClose }) {
                   <span style={{fontSize:26,fontWeight:800,color:"#fff"}}>{prixCalc.toLocaleString("fr")} €</span>
                 </div>
                 {prixCalc>0&&(()=>{
-                  const {m1,m11,estRond}=calcMensualites(prixCalc);
-                  return <div style={{fontSize:12,color:"rgba(255,255,255,0.6)",textAlign:"right",marginTop:4}}>{estRond?`12 × ${m11} €/mois`:`1er mois: ${m1} € · puis 11 × ${m11} €`}</div>;
+                  const nMois = getNMoisContrat({dateDebut:f.dateDebut, dateFin:f.dateFin});
+                  const {m1,m11,estRond}=calcMensualites(prixCalc, nMois);
+                  return <div style={{fontSize:12,color:"rgba(255,255,255,0.6)",textAlign:"right",marginTop:4}}>{estRond?`${nMois} × ${m11} €/mois`:`1er mois: ${m1} € · puis ${nMois-1} × ${m11} €`}</div>;
                 })()}
               </div>
             </div>
