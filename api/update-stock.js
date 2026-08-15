@@ -50,7 +50,14 @@ export default async function handler(req, res) {
       await STOCK_META_DOC.set({ data: { [nom]: patch }, savedAt: now }, { merge: true });
       return res.status(200).json({ success: true });
     }
-    return res.status(400).json({ error: "action doit être 'delete' ou 'patchMeta'" });
+    if (action === "setQty") {
+      const { qty } = req.body || {};
+      if (typeof qty !== "number" || qty < 0) return res.status(400).json({ error: "qty (nombre >= 0) requis" });
+      const now = new Date().toISOString();
+      await STOCK_DOC.set({ data: { [nom]: qty }, savedAt: now }, { merge: true });
+      return res.status(200).json({ success: true });
+    }
+    return res.status(400).json({ error: "action doit être 'delete', 'patchMeta' ou 'setQty'" });
   } catch (err) {
     console.error("[briblue] update-stock error:", err.message);
     return res.status(500).json({ error: err.message });

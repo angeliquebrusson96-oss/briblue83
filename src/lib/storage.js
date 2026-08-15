@@ -273,7 +273,12 @@ async function saveToFirebaseSDK(key, val) {
   const mapping = KEY_MAP[key];
   if (!mapping) return;
   const now = new Date().toISOString();
-  await setDoc(DOCS[mapping.doc], { [mapping.field]: val, savedAt: now }, { merge: true });
+  // ⚠️ {merge:true} ferait un DEEP MERGE du champ (map imbriquée) : une clé
+  // retirée de "val" (ex: produit stock supprimé) ne serait jamais réellement
+  // effacée côté serveur, juste ignorée/conservée — même piège que documenté
+  // dans api/update-stock.js. {mergeFields:[...]} remplace le champ dans son
+  // intégralité (mêmes semantiques que saveViaREST + updateMask.fieldPaths).
+  await setDoc(DOCS[mapping.doc], { [mapping.field]: val, savedAt: now }, { mergeFields: [mapping.field, "savedAt"] });
 }
 
 // ─── FLUSH (iOS background / fermeture de page) ─────────────────────────────
@@ -594,9 +599,12 @@ export async function reconcileOnBoot() {
     }
 
     if (needsPush) {
+      // ⚠️ {merge:true} ferait un DEEP MERGE des champs-map (ex: "data" du stock) :
+      // une clé retirée localement ne serait jamais effacée côté serveur. On
+      // remplace donc chaque champ concerné dans son intégralité via mergeFields.
       await Promise.all(
         Object.entries(toPush).map(([docName, fields]) =>
-          setDoc(DOCS[docName], fields, { merge: true })
+          setDoc(DOCS[docName], fields, { mergeFields: Object.keys(fields) })
         )
       );
       _persistQueue();

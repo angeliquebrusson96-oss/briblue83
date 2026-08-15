@@ -470,57 +470,52 @@ function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta,
                     </div>
                   </div>
 
-                  {/* Nom — renommer si besoin (typo, produit remplacé…). Réservé
-                      aux produits ajoutés par l'admin : un produit "par défaut"
-                      renommé réapparaîtrait quand même sous son nom d'origine
-                      (liste PRODUITS_DEFAUT toujours réinjectée au chargement),
-                      créant un doublon fantôme — même limite que "Supprimer". */}
-                  {!PRODUITS_DEFAUT.includes(nom) && (
-                    <div style={{display:"flex",alignItems:"center",gap:10}}>
-                      <span style={{fontSize:11,color:"#64748b",fontWeight:600,width:64,flexShrink:0}}>Nom</span>
-                      {renamingProd===nom ? (
-                        <div style={{display:"flex",gap:6,flex:1,minWidth:0}}>
-                          <input value={renameDraft} autoFocus
-                            onChange={e=>setRenameDraft(e.target.value)}
-                            onKeyDown={e=>{if(e.key==="Enter")saveRename(nom);if(e.key==="Escape")setRenamingProd(null);}}
-                            style={{flex:1,minWidth:0,padding:"6px 8px",borderRadius:8,border:"1.5px solid #0891b2",
-                              fontSize:12,outline:"none",fontFamily:"inherit",color:"#0f172a",background:"#f0f9ff"}}/>
-                          <button onClick={()=>saveRename(nom)} disabled={!renameDraft.trim()}
-                            style={{padding:"6px 10px",borderRadius:8,border:"none",cursor:"pointer",
-                              background:renameDraft.trim()?"#0891b2":"#e2e8f0",color:renameDraft.trim()?"#fff":"#94a3b8",
-                              fontSize:11,fontWeight:700,fontFamily:"inherit"}}>OK</button>
-                          <button onClick={()=>setRenamingProd(null)}
-                            style={{padding:"6px 10px",borderRadius:8,border:"1.5px solid #e2e8f0",cursor:"pointer",
-                              background:"#fff",color:"#64748b",fontSize:11,fontFamily:"inherit"}}>✕</button>
-                        </div>
-                      ) : (
-                        <button onClick={()=>startRename(nom)}
-                          style={{display:"flex",alignItems:"center",gap:5,padding:"5px 10px",borderRadius:8,
-                            border:"1.5px solid #e2e8f0",background:"#fff",cursor:"pointer",fontSize:11,
-                            color:"#374151",fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>
-                          <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                          Renommer
-                        </button>
-                      )}
-                    </div>
-                  )}
+                  {/* Nom — renommer si besoin (typo, produit remplacé…). Un produit
+                      "par défaut" renommé/supprimé est marqué stockMeta.hidden=true
+                      (voir deleteProduitStock/renameProduitStock) pour ne plus jamais
+                      être réinjecté fantôme au chargement suivant. */}
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <span style={{fontSize:11,color:"#64748b",fontWeight:600,width:64,flexShrink:0}}>Nom</span>
+                    {renamingProd===nom ? (
+                      <div style={{display:"flex",gap:6,flex:1,minWidth:0}}>
+                        <input value={renameDraft} autoFocus
+                          onChange={e=>setRenameDraft(e.target.value)}
+                          onKeyDown={e=>{if(e.key==="Enter")saveRename(nom);if(e.key==="Escape")setRenamingProd(null);}}
+                          style={{flex:1,minWidth:0,padding:"6px 8px",borderRadius:8,border:"1.5px solid #0891b2",
+                            fontSize:12,outline:"none",fontFamily:"inherit",color:"#0f172a",background:"#f0f9ff"}}/>
+                        <button onClick={()=>saveRename(nom)} disabled={!renameDraft.trim()}
+                          style={{padding:"6px 10px",borderRadius:8,border:"none",cursor:"pointer",
+                            background:renameDraft.trim()?"#0891b2":"#e2e8f0",color:renameDraft.trim()?"#fff":"#94a3b8",
+                            fontSize:11,fontWeight:700,fontFamily:"inherit"}}>OK</button>
+                        <button onClick={()=>setRenamingProd(null)}
+                          style={{padding:"6px 10px",borderRadius:8,border:"1.5px solid #e2e8f0",cursor:"pointer",
+                            background:"#fff",color:"#64748b",fontSize:11,fontFamily:"inherit"}}>✕</button>
+                      </div>
+                    ) : (
+                      <button onClick={()=>startRename(nom)}
+                        style={{display:"flex",alignItems:"center",gap:5,padding:"5px 10px",borderRadius:8,
+                          border:"1.5px solid #e2e8f0",background:"#fff",cursor:"pointer",fontSize:11,
+                          color:"#374151",fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>
+                        <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        Renommer
+                      </button>
+                    )}
+                  </div>
 
                   {/* Supprimer */}
-                  {!PRODUITS_DEFAUT.includes(nom) && (
-                    <div style={{display:"flex",justifyContent:"flex-end",paddingTop:4}}>
-                      <button onClick={()=>showConfirm(`Supprimer "${nom}" du stock ?`,()=>onDeleteProduit(nom))}
-                        style={{display:"flex",alignItems:"center",gap:6,padding:"6px 14px",
-                          borderRadius:20,border:"1.5px solid #fca5a5",background:"#fff5f5",
-                          color:"#dc2626",cursor:"pointer",fontSize:11,fontWeight:600,fontFamily:"inherit",
-                          WebkitTapHighlightColor:"transparent"}}>
-                        <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
-                          <path d="M10 11v6M14 11v6"/>
-                        </svg>
-                        Supprimer
-                      </button>
-                    </div>
-                  )}
+                  <div style={{display:"flex",justifyContent:"flex-end",paddingTop:4}}>
+                    <button onClick={()=>showConfirm(`Supprimer "${nom}" du stock ?`,()=>onDeleteProduit(nom))}
+                      style={{display:"flex",alignItems:"center",gap:6,padding:"6px 14px",
+                        borderRadius:20,border:"1.5px solid #fca5a5",background:"#fff5f5",
+                        color:"#dc2626",cursor:"pointer",fontSize:11,fontWeight:600,fontFamily:"inherit",
+                        WebkitTapHighlightColor:"transparent"}}>
+                      <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+                        <path d="M10 11v6M14 11v6"/>
+                      </svg>
+                      Supprimer
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -1267,7 +1262,29 @@ export default function App() {
   const prevTaskCount = useRef(0);
   const clientsRef = useRef(clients); // ref toujours à jour pour les callbacks onSnapshot
   useEffect(() => { clientsRef.current = clients; }, [clients]);
+  const stockMetaRef = useRef({}); // ref toujours à jour, utilisée pour filtrer les défauts masqués dans le callback stock
+  useEffect(() => { stockMetaRef.current = stockMeta; }, [stockMeta]);
+  const stockRef = useRef({}); // ref toujours à jour, utilisée pour la vérification de collision dans renameProduitStock
+  useEffect(() => { stockRef.current = stock; }, [stock]);
   const isMobile = useIsMobile();
+
+  // ── Auto-nettoyage des produits "par défaut" masqués ─────────────────────────
+  // applyLocalData() et le callback realtime "stock" filtrent déjà la réinjection
+  // en se basant sur stockMeta, mais stock/stockMeta arrivent par deux documents
+  // Firestore indépendants (courses possibles selon l'ordre des snapshots). Cet
+  // effet est le filet de sécurité définitif : dès que les deux états sont en
+  // mémoire, il retire tout produit par défaut marqué hidden qui aurait quand
+  // même été réinjecté fantôme, quelle que soit la source de la course.
+  useEffect(() => {
+    const ghosts = PRODUITS_DEFAUT.filter(nom => stockMeta[nom]?.hidden && stock[nom] !== undefined);
+    if (ghosts.length === 0) return;
+    setStock(prev => {
+      const next = { ...prev };
+      let changed = false;
+      for (const nom of ghosts) { if (nom in next) { delete next[nom]; changed = true; } }
+      return changed ? next : prev;
+    });
+  }, [stock, stockMeta]);
 
   useEffect(()=>{
     setupPWA();
@@ -1294,7 +1311,10 @@ export default function App() {
     const versementsData = readLS("bb_versements_v1", {});
     const retardsCarnetData = readLS("bb_retards_carnet_v1", {});
     const notesData     = readLS("bb_notes_v1",     []);
-    const sWithDefaults = {...Object.fromEntries(PRODUITS_DEFAUT.map(nom=>[nom,0])), ...stockData};
+    // Un produit "par défaut" supprimé ou renommé par l'admin est marqué
+    // stockMeta[nom].hidden=true — on ne le réinjecte plus jamais ensuite,
+    // sinon il réapparaîtrait fantôme à chaque chargement.
+    const sWithDefaults = {...Object.fromEntries(PRODUITS_DEFAUT.filter(nom=>!stockMetaData[nom]?.hidden).map(nom=>[nom,0])), ...stockData};
     const cMigrated = clientsData.map(cl => ({...cl, moisParMois: migrateMois(cl.moisParMois||cl.saisons), photoPiscine: cl.photoPiscine||"", prixPassageE: cl.prixPassageE||0, prixPassageC: cl.prixPassageC||0}));
     setClients(cMigrated); setPassages(passagesData); setLivraisons(livraisonsData);
     setRdvs(rdvsData); setStock(sWithDefaults); setStockMeta(stockMetaData); setContrats(contratsData); setVersements(versementsData); setRetardsCarnet(retardsCarnetData);
@@ -1489,7 +1509,8 @@ export default function App() {
       },
       stock:      (data) => {
         if (data && typeof data === "object") {
-          setStock({ ...Object.fromEntries(PRODUITS_DEFAUT.map(n => [n, 0])), ...data });
+          const meta = stockMetaRef.current || {};
+          setStock({ ...Object.fromEntries(PRODUITS_DEFAUT.filter(n=>!meta[n]?.hidden).map(n => [n, 0])), ...data });
         }
       },
       stockMeta: (data) => { if (data && typeof data === "object") setStockMeta(data); },
@@ -1810,15 +1831,23 @@ export default function App() {
   const updateStatutLivraison = useCallback((id,statut)=>{ setLivraisons(prev=>{ const next=prev.map(x=>x.id===id?{...x,statut}:x); saveLivraisonsList(next); return next; }); },[saveLivraisonsList]);
   const updateStock = useCallback((produit, qty) => { setStock(prev=>{ const next={...prev,[produit]:qty}; saveStock(next); return next; }); },[saveStock]);
   const addProduitStock = useCallback((nom) => { setStock(prev=>{ const next={...prev,[nom]:prev[nom]??0}; saveStock(next); return next; }); },[saveStock]);
-  const deleteProduitStock = useCallback((nom) => { setStock(prev=>{ const n={...prev}; delete n[nom]; saveStock(n); return n; }); },[saveStock]);
+  const deleteProduitStock = useCallback((nom) => {
+    setStock(prev=>{ const n={...prev}; delete n[nom]; saveStock(n); return n; });
+    // Un produit "par défaut" doit rester masqué, sinon il est réinjecté à 0
+    // au prochain chargement (voir applyLocalData / callback stock realtime).
+    if (PRODUITS_DEFAUT.includes(nom)) {
+      setStockMeta(prev => { const next={...prev,[nom]:{...(prev[nom]||{}),hidden:true}}; saveStockMeta(next); return next; });
+    }
+  },[saveStock, saveStockMeta]);
   const updateStockMeta = useCallback((nom, meta) => { setStockMeta(prev=>{ const next={...prev,[nom]:meta}; saveStockMeta(next); return next; }); },[saveStockMeta]);
   // Renomme un produit : déplace sa quantité et ses métadonnées (prix, unité…)
   // sous la nouvelle clé. N'affecte pas les livraisons déjà enregistrées sous
   // l'ancien nom (elles restent un instantané de ce qui a été livré à l'époque).
   const renameProduitStock = useCallback((oldNom, newNom) => {
     if (!newNom || newNom === oldNom) return;
+    if (stockRef.current[newNom] !== undefined) { toastError(`"${newNom}" existe déjà.`); return; }
+    const oldWasDefault = PRODUITS_DEFAUT.includes(oldNom);
     setStock(prev => {
-      if (prev[newNom] !== undefined) { toastError(`"${newNom}" existe déjà.`); return prev; }
       const { [oldNom]: qty, ...rest } = prev;
       const next = { ...rest, [newNom]: qty ?? 0 };
       saveStock(next);
@@ -1827,6 +1856,9 @@ export default function App() {
     setStockMeta(prev => {
       const { [oldNom]: meta, ...rest } = prev;
       const next = meta ? { ...rest, [newNom]: meta } : rest;
+      // Un produit "par défaut" renommé doit rester masqué sous son ancien nom,
+      // sinon il est réinjecté à 0 au prochain chargement.
+      if (oldWasDefault) next[oldNom] = { hidden: true };
       saveStockMeta(next);
       return next;
     });
