@@ -4,7 +4,7 @@
 // ou corriger une entrée de stock (produit et/ou ses métadonnées) de façon
 // fiable, sans dépendre de l'auth Firebase client.
 import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 
 if (!getApps().length) {
   const sa = process.env.FIREBASE_SERVICE_ACCOUNT;
@@ -31,15 +31,15 @@ export default async function handler(req, res) {
 
   try {
     if (action === "delete") {
-      await db.runTransaction(async (tx) => {
-        const [stockSnap, metaSnap] = await Promise.all([tx.get(STOCK_DOC), tx.get(STOCK_META_DOC)]);
-        const stockData = { ...(stockSnap.data()?.data || {}) };
-        const metaData = { ...(metaSnap.data()?.data || {}) };
-        delete stockData[nom];
-        delete metaData[nom];
-        tx.set(STOCK_DOC, { data: stockData, savedAt: new Date().toISOString() }, { merge: true });
-        tx.set(STOCK_META_DOC, { data: metaData, savedAt: new Date().toISOString() }, { merge: true });
-      });
+      // ⚠️ set(..., {merge:true}) sur un champ-objet ("data") fait un DEEP
+      // MERGE des clés imbriquées : omettre une clé ne la supprime PAS, elle
+      // est simplement ignorée/conservée. Seul un FieldValue.delete() explicite
+      // sur cette clé imbriquée précise la supprime réellement.
+      const now = new Date().toISOString();
+      await Promise.all([
+        STOCK_DOC.set({ data: { [nom]: FieldValue.delete() }, savedAt: now }, { merge: true }),
+        STOCK_META_DOC.set({ data: { [nom]: FieldValue.delete() }, savedAt: now }, { merge: true }),
+      ]);
       return res.status(200).json({ success: true });
     }
     return res.status(400).json({ error: "action doit être 'delete'" });
