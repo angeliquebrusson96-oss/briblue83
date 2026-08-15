@@ -101,7 +101,7 @@ function buildRapportHTML(passage, client) {
       ${(p.actions || p.travaux || p.resume || p.compteRendu) ? `<div class="section"><h2>Compte-rendu</h2><div class="content">${esc(p.actions || p.travaux || p.resume || p.compteRendu)}</div></div>` : ""}
       ${(p.obs || p.commentaires) ? `<div class="section"><h2>Observations</h2><div class="content">${esc(p.obs || p.commentaires)}</div></div>` : ""}
       ${produitsApportes.length ? `<div class="section"><h2>Produits apportés</h2><div class="content chips">${produitsApportes.map(([k,v])=>`<span class="chip">${esc(k)} : ${esc(v)}</span>`).join("")}</div></div>` : ""}
-      ${produitsLivres.length ? `<div class="section"><h2>Produits livrés au client</h2><div class="content chips">${produitsLivres.map(x=>`<span class="chip green">${esc(x)}</span>`).join("")}</div></div>` : ""}
+      ${produitsLivres.length ? `<div class="section"><h2>Produits livrés au client</h2><div class="content chips">${produitsLivres.map(x=>{const q=p.quantitesLivrees?.[x]||1; return `<span class="chip green">${esc(x)}${q>1?` × ${q}`:""}</span>`;}).join("")}</div></div>` : ""}
       ${photos.length ? `<div class="section"><h2>Photos d'intervention</h2><div class="content"><div class="photo-grid">${photos.map(ph=>`<div class="photo-item"><div class="photo-lbl">${esc(ph.lbl)}</div><img src="${ph.src}"/></div>`).join("")}</div></div></div>` : ""}
       <p class="muted" style="margin-top:28px;font-size:12px">BRIBLUE · La Seyne-sur-Mer · SIRET 84345436400053</p>
       <button class="print-btn" onclick="window.print()">🖨️ Enregistrer en PDF</button>
@@ -1399,7 +1399,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
                   <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                   Produits livrés
                 </div>
-                <div style={{fontSize:13,color:"#065f46",lineHeight:1.6}}>{getProduitsLivres(p).join(", ")}</div>
+                <div style={{fontSize:13,color:"#065f46",lineHeight:1.6}}>{formatProduitsQte(getProduitsLivres(p), p.quantitesLivrees)}</div>
               </div>
             )}
 

@@ -336,6 +336,9 @@ function genererHTMLRapport(passage, client) {
   const d = new Date(passage.date).toLocaleDateString("fr", {day:"2-digit",month:"long",year:"numeric"});
   const val = (v, u="") => (v !== "" && v !== null && v !== undefined) ? `<strong>${v}</strong>${u?" "+u:""}` : `<span class="empty">—</span>`;
   const liste = (arr) => arr?.length ? arr.join(", ") : "—";
+  const listeProduitsQte = (arr, quantites) => arr?.length
+    ? arr.map(p => { const q = quantites?.[p]||1; return q>1 ? `${p} × ${q}` : p; }).join(", ")
+    : "—";
   const ouinon = (v) => v===true?`<span class="badge ok">OUI</span>`:v===false?`<span class="badge no">NON</span>`:"—";
   const etoiles = (n) => n>0 ? `<span class="stars">${"★".repeat(n)}${"☆".repeat(5-n)}</span> <span class="star-num">${n}/5</span>` : "—";
   const sigTech = passage.signatureTech ? `<img src="${passage.signatureTech}" class="sig-img"/>` : `<div class="sig-empty">Non signée</div>`;
@@ -459,7 +462,7 @@ ${(passage.livraisonProduits&&(passage.produitsLivres||[]).length>0)?`
 <div class="section">
   <div class="section-title"><span class="sec-icon">📦</span> Produits livrés</div>
   <div class="section-body">
-    <div class="field" style="grid-column:1/-1"><div class="field-value">${liste(passage.produitsLivres)}${passage.livraisonAutre?" — "+passage.livraisonAutre:""}</div></div>
+    <div class="field" style="grid-column:1/-1"><div class="field-value">${listeProduitsQte(passage.produitsLivres, passage.quantitesLivrees)}${passage.livraisonAutre?" — "+passage.livraisonAutre:""}</div></div>
   </div>
 </div>`:""}
 <div class="section">
@@ -607,6 +610,46 @@ function MultiCheck({ label, options, values, onChange, compact=false }) {
               }
               {o}
             </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Comme MultiCheck, mais avec une quantité par produit sélectionné — le prix
+// (configuré dans Stock) × la quantité alimente le montant suggéré de la
+// livraison auto-créée pour ce passage (voir doSave).
+function ProduitsLivresPicker({ values, quantites, onToggle, onChangeQte, options, stockMeta={} }) {
+  const total = values.reduce((s,p)=>s+(Number(stockMeta[p]?.prix)||0)*(quantites?.[p]||1), 0);
+  return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+        <span style={{fontSize:11,fontWeight:700,color:DS.mid,textTransform:"uppercase",letterSpacing:.5}}>Produit(s) livré(s)</span>
+        {values.length>0 && <span style={{background:DS.blue,color:"#fff",fontSize:11,fontWeight:800,borderRadius:10,padding:"2px 8px"}}>{values.length}{total>0?` · ${Math.round(total*100)/100}€`:""}</span>}
+      </div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+        {options.map(o=>{
+          const sel = values.includes(o);
+          const qte = quantites?.[o] || 1;
+          const prix = Number(stockMeta[o]?.prix)||0;
+          return (
+            <div key={o} style={{display:"inline-flex",alignItems:"center",borderRadius:22,border:`2px solid ${sel?DS.blue:DS.border}`,background:sel?"linear-gradient(135deg,#0891b2,#0ea5e9)":DS.white,overflow:"hidden",WebkitTapHighlightColor:"transparent"}}>
+              <button onClick={()=>onToggle(o)} style={{display:"inline-flex",alignItems:"center",gap:4,padding:"6px 11px",minHeight:34,border:"none",background:"transparent",cursor:"pointer",fontFamily:"inherit",fontWeight:600,fontSize:12,color:sel?"#fff":DS.mid,WebkitTapHighlightColor:"transparent"}}>
+                {sel
+                  ? <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  : <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke={DS.border} strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                }
+                {o}{sel&&prix>0?` · ${Math.round(prix*qte*100)/100}€`:""}
+              </button>
+              {sel && (
+                <div style={{display:"flex",alignItems:"center",gap:4,padding:"0 8px 0 2px",borderLeft:"1px solid rgba(255,255,255,0.35)"}}>
+                  <button onClick={()=>onChangeQte(o,-1)} style={{width:20,height:20,borderRadius:6,border:"none",background:"rgba(255,255,255,0.25)",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,WebkitTapHighlightColor:"transparent"}}>−</button>
+                  <span style={{fontSize:12,fontWeight:800,color:"#fff",minWidth:14,textAlign:"center"}}>{qte}</span>
+                  <button onClick={()=>onChangeQte(o,1)} style={{width:20,height:20,borderRadius:6,border:"none",background:"rgba(255,255,255,0.25)",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,WebkitTapHighlightColor:"transparent"}}>+</button>
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
@@ -825,7 +868,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
     qualiteEau:"", etatFond:[], etatParois:[], etatLocal:[], etatBacTampon:[], etatVoletBac:[],
     corrChlore:"", corrPhosphate:"", corrPH:"", corrSel:"", corrAlgicide:"", corrPeroxyde:"", corrChloreChoc:"", corrAlcafix:"", corrAutre:"",
     devis:null, priseEchantillon:null, commentaires:"",
-    livraisonProduits:null, produitsLivres:[], livraisonAutre:"",
+    livraisonProduits:null, produitsLivres:[], quantitesLivrees:{}, livraisonAutre:"",
     stabilisantHaut:false,
     ressenti:0, presenceClient:null,
     signatureTech:"", signatureClient:"",
@@ -992,6 +1035,21 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
   const STEPS = isSansDonnees ? 1 : isSimplified ? 3 : 5;
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
 
+  // Produits livrés : sélection + quantité par produit (même logique que
+  // FormLivraison.jsx, pour que le montant suggéré tienne compte des quantités).
+  const toggleProduitLivre = (p) => {
+    const selected = f.produitsLivres.includes(p);
+    const arr = selected ? f.produitsLivres.filter(x=>x!==p) : [...f.produitsLivres,p];
+    const qtes = { ...(f.quantitesLivrees||{}) };
+    if (selected) delete qtes[p]; else qtes[p] = qtes[p] || 1;
+    setF(prev => ({ ...prev, produitsLivres: arr, quantitesLivrees: qtes }));
+  };
+  const changeQteLivree = (p, delta) => {
+    const current = f.quantitesLivrees?.[p] || 1;
+    const next = Math.max(1, Math.min(99, current + delta));
+    setF(prev => ({ ...prev, quantitesLivrees: { ...(prev.quantitesLivrees||{}), [p]: next } }));
+  };
+
   const ph=Number(f.tPH)||Number(f.ph);
   const cl=Number(f.tChlore)||Number(f.chloreLibre);
 
@@ -1048,15 +1106,17 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
     if (f.livraisonProduits && (f.produitsLivres?.length > 0 || f.livraisonAutre) && onSaveLivraison) {
       const livId = `auto-${rawPassage.id}`;
       const existingLiv = livraisons.find(l => l.id === livId);
-      // Montant auto-suggéré depuis les prix configurés dans Stock, seulement
-      // si aucun montant n'a déjà été saisi manuellement sur cette livraison.
-      const sommeProduits = (f.produitsLivres || []).reduce((s,p)=>s+(Number(stockMeta[p]?.prix)||0), 0);
+      // Montant auto-suggéré depuis les prix configurés dans Stock × quantité,
+      // seulement si aucun montant n'a déjà été saisi manuellement sur cette livraison.
+      const qtes = f.quantitesLivrees || {};
+      const sommeProduits = (f.produitsLivres || []).reduce((s,p)=>s+(Number(stockMeta[p]?.prix)||0)*(qtes[p]||1), 0);
       const montantSuggere = sommeProduits > 0 ? String(Math.round(sommeProduits*100)/100) : "";
       onSaveLivraison({
         id: livId,
         clientId: f.clientId,
         date: f.date,
         produits: f.produitsLivres || [],
+        quantites: qtes,
         description: f.livraisonAutre || "",
         montant: existingLiv?.montant ?? montantSuggere,
         statut: existingLiv?.statut ?? "aFacturer",
@@ -1689,7 +1749,7 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
               <OuiNon label="Livraison de produits ?" value={f.livraisonProduits} onChange={v=>set("livraisonProduits",v)}/>
               {f.livraisonProduits && (
                 <>
-                  <MultiCheck label="Produit(s) livré(s)" values={f.produitsLivres} onChange={v=>set("produitsLivres",v)} options={produitsStock&&produitsStock.length>0?produitsStock:PRODUITS_DEFAUT} compact/>
+                  <ProduitsLivresPicker values={f.produitsLivres} quantites={f.quantitesLivrees} onToggle={toggleProduitLivre} onChangeQte={changeQteLivree} options={produitsStock&&produitsStock.length>0?produitsStock:PRODUITS_DEFAUT} stockMeta={stockMeta}/>
                   <div>
                     <span style={{fontSize:11,fontWeight:800,color:DS.mid,textTransform:"uppercase",letterSpacing:.7,display:"block",marginBottom:4}}>Autre (quantités, marques…)</span>
                     <textarea value={f.livraisonAutre} onChange={e=>set("livraisonAutre",e.target.value)}
