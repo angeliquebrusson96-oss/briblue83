@@ -183,7 +183,18 @@ export function FormLivraison({ initial, clientId, clients=[], produitsStock=[],
               <FmSectionTitle icon={<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>}>Date & Montant</FmSectionTitle>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                 <FmField label="Date *"><input type="date" value={f.date} onChange={e=>set("date",e.target.value)}/></FmField>
-                <FmField label="Montant (€)"><input type="number" value={f.montant} onChange={e=>{setMontantTouched(true);set("montant",e.target.value);}} placeholder="0.00"/></FmField>
+                <FmField label="Montant (€)"><input type="number" value={f.montant} onChange={e=>{
+                  const v = e.target.value;
+                  set("montant", v);
+                  // Le champ Montant est affiché avant l'étape Produits : un simple
+                  // tap accidentel (ex: saisie puis effacement) ne doit pas bloquer
+                  // définitivement le calcul auto depuis les prix du Stock une fois
+                  // les produits sélectionnés. On ne verrouille que si la valeur est
+                  // réellement personnalisée (non vide et différente du montant auto).
+                  const auto = sommeProduits(f.produits);
+                  const autoStr = auto > 0 ? String(Math.round(auto*100)/100) : "";
+                  setMontantTouched(v !== "" && v !== autoStr);
+                }} placeholder="0.00"/></FmField>
               </div>
               <FmSectionTitle>Statut</FmSectionTitle>
               <div style={{display:"flex",gap:6}}>
