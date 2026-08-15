@@ -1254,6 +1254,8 @@ export default function App() {
   const [editPassage, setEditPassage] = useState(null);
   const [showFormLivraison, setShowFormLivraison] = useState(false);
   const [defaultLivraisonClientId, setDefaultLivraisonClientId] = useState("");
+  const [editLivraison, setEditLivraison] = useState(null);
+  const openEditLivraison = useCallback((l) => { setEditLivraison(l); setShowFormLivraison(true); }, []);
   const [showFormRdv, setShowFormRdv] = useState(false);
   const [editRdv, setEditRdv] = useState(null);
   const [showModalAlertes, setShowModalAlertes] = useState(false);
@@ -1985,7 +1987,7 @@ export default function App() {
           </button>
 
           {/* Livraison */}
-          <button onClick={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} title="Nouvelle livraison"
+          <button onClick={()=>{setDefaultLivraisonClientId("");setEditLivraison(null);setShowFormLivraison(true);}} title="Nouvelle livraison"
             style={{display:"flex",alignItems:"center",gap:5,
               justifyContent:"center",
               padding:isMobile?"0":"0 11px",
@@ -2040,11 +2042,11 @@ export default function App() {
         <>
           {page!=="dashboard"&&(<div style={{padding:"16px 16px 4px"}}><h2 style={{margin:0,fontSize:21,fontWeight:800,color:"#0f172a",letterSpacing:-0.5}}>{PAGE_LABELS[page]}</h2></div>)}
           <div style={{padding:"6px 14px calc(80px + env(safe-area-inset-bottom,0px))",overflowX:"hidden"}}>
-            {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={(opts)=>{setEditPassage(opts?.date||opts?.type?{date:opts?.date,type:opts?.type}:null);setDefaultClientId(opts?.clientId||"");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={(opts)=>{setEditRdv(opts?.date?{date:opts.date}:null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} notes={notes} onNotesChange={n=>{setNotes(n);saveNotes(n);}}/>}
+            {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={(opts)=>{setEditPassage(opts?.date||opts?.type?{date:opts?.date,type:opts?.type}:null);setDefaultClientId(opts?.clientId||"");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setEditLivraison(null);setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={(opts)=>{setEditRdv(opts?.date?{date:opts.date}:null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} notes={notes} onNotesChange={n=>{setNotes(n);saveNotes(n);}}/>}
             {page==="clients"&&<PageClients clients={clients} passages={passages} contrats={contrats} versements={versements} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onToggleVersement={handleToggleVersement} onClientClick={setFicheClient} onAdd={openAddClient}/>}
             {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddClient={openAddClient} onValider={validerPassage} onChangeStatut={updateStatutPassage} onClientClick={setFicheClient}/>}
             {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
-            {page==="gestion"&&<PageGestion clients={clients} versements={versements} onToggleVersement={handleToggleVersement} livraisons={livraisons} onUpdateStatutLivraison={updateStatutLivraison} retardsCarnet={retardsCarnet} onToggleRetardCarnet={handleToggleRetardCarnet} contrats={contrats} onOpenContrat={(client,contrat)=>ouvrirContrat(client,contrat?.signaturePrestataire||"",contrat?.signatureClient||"",contrat)} onClientClick={setFicheClient}/>}
+            {page==="gestion"&&<PageGestion clients={clients} versements={versements} onToggleVersement={handleToggleVersement} livraisons={livraisons} onUpdateStatutLivraison={updateStatutLivraison} retardsCarnet={retardsCarnet} onToggleRetardCarnet={handleToggleRetardCarnet} contrats={contrats} onOpenContrat={(client,contrat)=>ouvrirContrat(client,contrat?.signaturePrestataire||"",contrat?.signatureClient||"",contrat)} onClientClick={setFicheClient} onEditLivraison={openEditLivraison}/>}
             {page==="parametres"&&<PageParametres modeExpert={modeExpert} onToggleExpert={toggleExpert} clients={clients} passages={passages} rdvs={rdvs} onLogout={handleLogout} onOpenImportHTML={()=>setShowImportHTML(true)}/>}
           </div>
         </>
@@ -2078,11 +2080,11 @@ export default function App() {
           <div style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",minWidth:0}}>
             <div style={{padding:"20px 28px 80px",maxWidth:860,margin:"0 auto"}}>
               {page!=="dashboard"&&(<div style={{marginBottom:16}}><h2 style={{margin:0,fontSize:24,fontWeight:800,color:"#0f172a",letterSpacing:-0.5}}>{PAGE_LABELS[page]}</h2></div>)}
-              {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={(opts)=>{setEditRdv(opts?.date?{date:opts.date}:null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} notes={notes} onNotesChange={n=>{setNotes(n);saveNotes(n);}}/>}
+              {page==="dashboard"&&<Dashboard clients={clients} passages={passages} rdvs={rdvs} onClientClick={setFicheClient} onAddPassage={()=>{setDefaultClientId("");setShowFormPassage(true);}} onAddLivraison={()=>{setDefaultLivraisonClientId("");setEditLivraison(null);setShowFormLivraison(true);}} onAddClient={openAddClient} onAddRdv={(opts)=>{setEditRdv(opts?.date?{date:opts.date}:null);setShowFormRdv(true);}} onEditPassage={openEditPassage} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} notes={notes} onNotesChange={n=>{setNotes(n);saveNotes(n);}}/>}
               {page==="clients"&&<PageClients clients={clients} passages={passages} contrats={contrats} versements={versements} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onToggleVersement={handleToggleVersement} onClientClick={setFicheClient} onAdd={openAddClient}/>}
               {(page==="passages"||page==="interventions")&&<PagePassages clients={clients} passages={passages} onAdd={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} onDelete={deletePassage} onEdit={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddClient={openAddClient} onValider={validerPassage} onChangeStatut={updateStatutPassage} onClientClick={setFicheClient}/>}
               {page==="rdv"&&<PageRdv clients={clients} rdvs={rdvs} onAdd={()=>{setEditRdv(null);setShowFormRdv(true);}} onEdit={r=>{setEditRdv(r);setShowFormRdv(true);}} onDelete={deleteRdv}/>}
-              {page==="gestion"&&<PageGestion clients={clients} versements={versements} onToggleVersement={handleToggleVersement} livraisons={livraisons} onUpdateStatutLivraison={updateStatutLivraison} retardsCarnet={retardsCarnet} onToggleRetardCarnet={handleToggleRetardCarnet} contrats={contrats} onOpenContrat={(client,contrat)=>ouvrirContrat(client,contrat?.signaturePrestataire||"",contrat?.signatureClient||"",contrat)} onClientClick={setFicheClient}/>}
+              {page==="gestion"&&<PageGestion clients={clients} versements={versements} onToggleVersement={handleToggleVersement} livraisons={livraisons} onUpdateStatutLivraison={updateStatutLivraison} retardsCarnet={retardsCarnet} onToggleRetardCarnet={handleToggleRetardCarnet} contrats={contrats} onOpenContrat={(client,contrat)=>ouvrirContrat(client,contrat?.signaturePrestataire||"",contrat?.signatureClient||"",contrat)} onClientClick={setFicheClient} onEditLivraison={openEditLivraison}/>}
               {page==="parametres"&&<PageParametres modeExpert={modeExpert} onToggleExpert={toggleExpert} clients={clients} passages={passages} rdvs={rdvs} onLogout={handleLogout} onOpenImportHTML={()=>setShowImportHTML(true)}/>}
             </div>
           </div>
@@ -2126,7 +2128,7 @@ export default function App() {
 
       {showFormClient&&<FormClient initial={editClient} clients={clients} onSave={saveClient} onClose={()=>{setShowFormClient(false);setEditClient(null);}}/>}
       {showFormPassage&&<FormPassage clients={clients} defaultClientId={defaultClientId} initial={editPassage} onSave={p=>savePassage(p)} onSaveLivraison={saveLivraison} livraisons={livraisons} produitsStock={Object.keys(stock)} stockMeta={stockMeta} onClose={()=>{setShowFormPassage(false);setEditPassage(null);}}/>}
-      {showFormLivraison&&<FormLivraison clientId={defaultLivraisonClientId} clients={clients} produitsStock={Object.keys(stock)} stockMeta={stockMeta} onSave={l=>{saveLivraison(l);setShowFormLivraison(false);}} onClose={()=>setShowFormLivraison(false)}/>}
+      {showFormLivraison&&<FormLivraison initial={editLivraison} clientId={editLivraison?.clientId||defaultLivraisonClientId} clients={clients} produitsStock={Object.keys(stock)} stockMeta={stockMeta} onSave={l=>{saveLivraison(l);setShowFormLivraison(false);setEditLivraison(null);}} onClose={()=>{setShowFormLivraison(false);setEditLivraison(null);}}/>}
       {showFormRdv&&<FormRdv initial={editRdv} clients={clients} onSave={saveRdv} onClose={()=>{setShowFormRdv(false);setEditRdv(null);}}/>}
       {showImport&&<ModalImportConnecteam clients={clients} onImport={handleImport} onClose={()=>setShowImport(false)}/>}
       {showImportHTML&&<ModalImportHTML clients={clients} passages={passages} onImport={handleImportHTML} onClose={()=>setShowImportHTML(false)}/>}

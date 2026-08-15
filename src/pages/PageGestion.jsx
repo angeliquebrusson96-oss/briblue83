@@ -181,7 +181,7 @@ const VersementsClient = ({ client, versements, onToggleVersement, retardVisible
 };
 
 // ─── Livraisons d'un client ───────────────────────────────────────────────────
-const LivraisonsClient = ({ client, livraisons, onUpdateStatut, retardVisible, onToggleRetardCarnet }) => {
+const LivraisonsClient = ({ client, livraisons, onUpdateStatut, retardVisible, onToggleRetardCarnet, onEditLivraison }) => {
   const [open, setOpen] = useState(false);
   const clientLivraisons = livraisons
     .filter(l => l.clientId === client.id)
@@ -232,12 +232,12 @@ const LivraisonsClient = ({ client, livraisons, onUpdateStatut, retardVisible, o
           const montant = l.montant || l.prixTotal || l.total || 0;
           const date = l.date ? new Date(l.date).toLocaleDateString("fr", {day:"2-digit",month:"short",year:"numeric"}) : "—";
           const produitsList = l.produits?.length > 0
-            ? l.produits.slice(0, 3).join(", ") + (l.produits.length > 3 ? "…" : "")
+            ? l.produits.slice(0, 3).map(p => { const q = l.quantites?.[p]||1; return q>1 ? `${p} × ${q}` : p; }).join(", ") + (l.produits.length > 3 ? "…" : "")
             : "—";
           return (
-            <div key={l.id} style={{
+            <div key={l.id} onClick={() => onEditLivraison?.(l)} style={{
               display:"flex",alignItems:"center",justifyContent:"space-between",
-              padding:"7px 10px",borderRadius:7,
+              padding:"7px 10px",borderRadius:7,cursor:onEditLivraison?"pointer":"default",
               background:isPaid?"#f0fdf4":isCancelled?"#f8fafc":"#fffbeb",
               border:`1px solid ${isPaid?"#bbf7d0":isCancelled?"#e2e8f0":"#fde68a"}`
             }}>
@@ -255,7 +255,7 @@ const LivraisonsClient = ({ client, livraisons, onUpdateStatut, retardVisible, o
                 </span>
                 {!isCancelled && (
                   <button
-                    onClick={() => onUpdateStatut(l.id, isPaid ? "livree" : "payee")}
+                    onClick={(e) => { e.stopPropagation(); onUpdateStatut(l.id, isPaid ? "livree" : "payee"); }}
                     style={{width:24,height:24,borderRadius:6,border:`1.5px solid ${isPaid?"#16a34a":"#cbd5e1"}`,cursor:"pointer",background:isPaid?"#16a34a":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"}}>
                     {isPaid
                       ? <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
@@ -288,6 +288,7 @@ export function PageGestion({
   contrats = {},
   onOpenContrat,
   onClientClick,
+  onEditLivraison,
 }) {
   const [tab, setTab] = useState("mensualites");
   const [search, setSearch] = useState("");
@@ -498,6 +499,7 @@ export function PageGestion({
                   onUpdateStatut={onUpdateStatutLivraison}
                   retardVisible={!!retardsCarnet[`liv_${c.id}`]}
                   onToggleRetardCarnet={onToggleRetardCarnet}
+                  onEditLivraison={onEditLivraison}
                 />
               </div>
             );
