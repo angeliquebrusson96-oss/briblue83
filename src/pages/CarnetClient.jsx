@@ -638,9 +638,16 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
   })();
 
   // ─── WIDGET VERSEMENT (vue client) ─────────────────────────────────────────
-  // Produits facturés (livraisons statut="facture") mais pas encore payés
-  // → montant ajouté au restant dû affiché au client.
-  const livraisonsDues = (livraisons||[]).filter(l => l.statut === "facture" && Number(l.montant) > 0);
+  // Produits livrés pas encore payés → montant ajouté au restant dû affiché
+  // au client. ⚠️ Deux vocabulaires de statut coexistent sur les livraisons :
+  // FormLivraison.jsx écrit aFacturer/facture/paye, tandis que le bouton
+  // "marquer payé" de PageGestion.jsx réécrit livree/payee/annulee. On exclut
+  // donc explicitement les variantes "payé" et "annulé" plutôt que de exiger
+  // une seule variante "à encaisser" — sinon une livraison en "aFacturer" ou
+  // passée par le toggle "livree" de PageGestion n'apparaissait jamais comme
+  // due, même avec un montant réel renseigné.
+  const STATUTS_PAYES_OU_ANNULES = new Set(["paye","payee","annulee"]);
+  const livraisonsDues = (livraisons||[]).filter(l => !STATUTS_PAYES_OU_ANNULES.has(l.statut) && Number(l.montant) > 0);
   const montantLivraisonsDues = Math.round(livraisonsDues.reduce((s,l)=>s+Number(l.montant), 0) * 100) / 100;
 
   const VersementWidget = () => {

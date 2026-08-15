@@ -670,8 +670,11 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
             id:l.id, date:l.date, kind:"livraison",
             title:"Livraison produits",
             sub:(l.produits||[]).slice(0,3).join(", ")+(l.produits?.length>3?" +"+(l.produits.length-3):""),
-            badge:l.statut==="paye"?"Payé":l.statut==="facture"?"Facturé":"À facturer",
-            badgeColor:l.statut==="paye"?"#059669":"#f59e0b",
+            // ⚠️ Deux vocabulaires coexistent sur le statut d'une livraison :
+            // FormLivraison.jsx écrit paye/facture/aFacturer, alors que le
+            // toggle "marquer payé" de PageGestion.jsx écrit payee/livree.
+            badge:["paye","payee"].includes(l.statut)?"Payé":l.statut==="facture"?"Facturé":"À facturer",
+            badgeColor:["paye","payee"].includes(l.statut)?"#059669":"#f59e0b",
             montant:l.montant, _l:l,
           })),
           ...rdvClient2.map(r=>({
