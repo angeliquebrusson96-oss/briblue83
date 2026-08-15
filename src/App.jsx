@@ -114,7 +114,7 @@ const STOCK_CATS = [
 ];
 const CAT_COLORS = { traitement:"#0891b2", entretien:"#059669", matériel:"#7c3aed" };
 
-function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta, onAddProduit, onDeleteProduit }) {
+function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta, onAddProduit, onDeleteProduit, onRenameProduit }) {
   const isMobile = useIsMobile();
   const [search,      setSearch]      = useState("");
   const [catFilter,   setCatFilter]   = useState("tous");
@@ -125,14 +125,23 @@ function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta,
   const [newUnite,    setNewUnite]    = useState("flacon");
   const [newCat,      setNewCat]      = useState("traitement");
   const [showAddForm, setShowAddForm] = useState(false);
+  const [renamingProd,setRenamingProd]= useState(null);
+  const [renameDraft, setRenameDraft] = useState("");
   const qtyInputRef = useRef(null);
 
   const getMeta = (nom) => ({
-    unite: "unité", seuil: 2, categorie: "traitement",
+    unite: "unité", seuil: 2, categorie: "traitement", prix: 0,
     ...(PRODUITS_META_DEFAUT[nom] || {}),
     ...(stockMeta[nom] || {}),
   });
   const setMeta = (nom, patch) => onUpdateMeta(nom, { ...getMeta(nom), ...patch });
+
+  const startRename = (nom) => { setRenamingProd(nom); setRenameDraft(nom); setExpandedProd(nom); };
+  const saveRename = (oldNom) => {
+    const next = renameDraft.trim();
+    if (next && next !== oldNom && onRenameProduit) onRenameProduit(oldNom, next);
+    setRenamingProd(null);
+  };
 
   const produits = Object.keys(stock);
   const basCount = produits.filter(p => (stock[p]??0) <= getMeta(p).seuil).length;
@@ -333,7 +342,7 @@ function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta,
                       }}/>
                     </div>
                     <span style={{fontSize:9,color:isLow?"#dc2626":"#94a3b8",fontWeight:isLow?700:400}}>
-                      {isLow?"⚠️ stock bas":meta.unite}
+                      {isLow?"⚠️ stock bas":meta.unite}{meta.prix>0?` · ${meta.prix}€`:""}
                     </span>
                   </div>
                 </div>
@@ -444,6 +453,57 @@ function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta,
                       ))}
                     </div>
                   </div>
+
+                  {/* Prix unitaire — utilisé pour suggérer automatiquement le
+                      montant d'une livraison (FormLivraison/FormPassage) et
+                      s'affiche avec le produit dans le carnet client. */}
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <span style={{fontSize:11,color:"#64748b",fontWeight:600,width:64,flexShrink:0}}>Prix</span>
+                    <div style={{position:"relative",width:100}}>
+                      <input type="number" min="0" step="0.01" value={meta.prix||""}
+                        onChange={e=>setMeta(nom,{prix:parseFloat(e.target.value)||0})}
+                        placeholder="0.00"
+                        style={{width:"100%",padding:"6px 24px 6px 8px",borderRadius:8,
+                          border:"1.5px solid #e2e8f0",fontSize:12,outline:"none",
+                          fontFamily:"inherit",color:"#0f172a",background:"#fff",boxSizing:"border-box"}}/>
+                      <span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",fontSize:11,color:"#94a3b8",pointerEvents:"none"}}>€</span>
+                    </div>
+                  </div>
+
+                  {/* Nom — renommer si besoin (typo, produit remplacé…). Réservé
+                      aux produits ajoutés par l'admin : un produit "par défaut"
+                      renommé réapparaîtrait quand même sous son nom d'origine
+                      (liste PRODUITS_DEFAUT toujours réinjectée au chargement),
+                      créant un doublon fantôme — même limite que "Supprimer". */}
+                  {!PRODUITS_DEFAUT.includes(nom) && (
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <span style={{fontSize:11,color:"#64748b",fontWeight:600,width:64,flexShrink:0}}>Nom</span>
+                      {renamingProd===nom ? (
+                        <div style={{display:"flex",gap:6,flex:1,minWidth:0}}>
+                          <input value={renameDraft} autoFocus
+                            onChange={e=>setRenameDraft(e.target.value)}
+                            onKeyDown={e=>{if(e.key==="Enter")saveRename(nom);if(e.key==="Escape")setRenamingProd(null);}}
+                            style={{flex:1,minWidth:0,padding:"6px 8px",borderRadius:8,border:"1.5px solid #0891b2",
+                              fontSize:12,outline:"none",fontFamily:"inherit",color:"#0f172a",background:"#f0f9ff"}}/>
+                          <button onClick={()=>saveRename(nom)} disabled={!renameDraft.trim()}
+                            style={{padding:"6px 10px",borderRadius:8,border:"none",cursor:"pointer",
+                              background:renameDraft.trim()?"#0891b2":"#e2e8f0",color:renameDraft.trim()?"#fff":"#94a3b8",
+                              fontSize:11,fontWeight:700,fontFamily:"inherit"}}>OK</button>
+                          <button onClick={()=>setRenamingProd(null)}
+                            style={{padding:"6px 10px",borderRadius:8,border:"1.5px solid #e2e8f0",cursor:"pointer",
+                              background:"#fff",color:"#64748b",fontSize:11,fontFamily:"inherit"}}>✕</button>
+                        </div>
+                      ) : (
+                        <button onClick={()=>startRename(nom)}
+                          style={{display:"flex",alignItems:"center",gap:5,padding:"5px 10px",borderRadius:8,
+                            border:"1.5px solid #e2e8f0",background:"#fff",cursor:"pointer",fontSize:11,
+                            color:"#374151",fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>
+                          <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                          Renommer
+                        </button>
+                      )}
+                    </div>
+                  )}
 
                   {/* Supprimer */}
                   {!PRODUITS_DEFAUT.includes(nom) && (
@@ -1432,6 +1492,7 @@ export default function App() {
           setStock({ ...Object.fromEntries(PRODUITS_DEFAUT.map(n => [n, 0])), ...data });
         }
       },
+      stockMeta: (data) => { if (data && typeof data === "object") setStockMeta(data); },
       meta: (data) => {
         if (Array.isArray(data.notes))                       setNotes(data.notes);
         if (data.versements && typeof data.versements === "object") setVersements(data.versements);
@@ -1751,6 +1812,25 @@ export default function App() {
   const addProduitStock = useCallback((nom) => { setStock(prev=>{ const next={...prev,[nom]:prev[nom]??0}; saveStock(next); return next; }); },[saveStock]);
   const deleteProduitStock = useCallback((nom) => { setStock(prev=>{ const n={...prev}; delete n[nom]; saveStock(n); return n; }); },[saveStock]);
   const updateStockMeta = useCallback((nom, meta) => { setStockMeta(prev=>{ const next={...prev,[nom]:meta}; saveStockMeta(next); return next; }); },[saveStockMeta]);
+  // Renomme un produit : déplace sa quantité et ses métadonnées (prix, unité…)
+  // sous la nouvelle clé. N'affecte pas les livraisons déjà enregistrées sous
+  // l'ancien nom (elles restent un instantané de ce qui a été livré à l'époque).
+  const renameProduitStock = useCallback((oldNom, newNom) => {
+    if (!newNom || newNom === oldNom) return;
+    setStock(prev => {
+      if (prev[newNom] !== undefined) { toastError(`"${newNom}" existe déjà.`); return prev; }
+      const { [oldNom]: qty, ...rest } = prev;
+      const next = { ...rest, [newNom]: qty ?? 0 };
+      saveStock(next);
+      return next;
+    });
+    setStockMeta(prev => {
+      const { [oldNom]: meta, ...rest } = prev;
+      const next = meta ? { ...rest, [newNom]: meta } : rest;
+      saveStockMeta(next);
+      return next;
+    });
+  }, [saveStock, saveStockMeta]);
   const nbStockBas = useMemo(()=>Object.values(stock).filter(q=>q<=2).length,[stock]);
 
   const handleImportHTML = useCallback((updatedPassages) => {
@@ -2009,16 +2089,16 @@ export default function App() {
       {/* MODALS */}
       {ficheClient&&(()=>{
         const latest=clients.find(c=>c.id===ficheClient.id)||ficheClient;
-        return <FicheClient client={latest} passages={passages} livraisons={livraisons.filter(l=>l.clientId===latest.id)} rdvs={rdvs} produitsStock={Object.keys(stock)} contrats={contrats} versements={versements} onToggleVersement={handleToggleVersement} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onDeleteContrat={()=>deleteContrat(latest.id)} onResetContratSignatures={()=>resetContratSignatures(latest.id)} onUpdateClient={c=>{ setClients(prev=>{ const next=prev.map(x=>x.id===c.id?c:x); saveClients(next); return next; }); setFicheClient(c); }} onSaveLivraison={saveLivraison} onDeleteLivraison={deleteLivraison} onUpdateStatutLivraison={updateStatutLivraison} onClose={()=>setFicheClient(null)} onEdit={()=>{setEditClient(latest);setShowFormClient(true);setFicheClient(null);}} onDelete={()=>deleteClient(latest.id)} onDeletePassage={deletePassage} onAddPassage={()=>openAddPassageFromClient(latest.id)} onEditPassage={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddRdv={()=>{setEditRdv({clientId:latest.id});setShowFormRdv(true);}} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} onDeleteRdv={deleteRdv}/>;
+        return <FicheClient client={latest} passages={passages} livraisons={livraisons.filter(l=>l.clientId===latest.id)} rdvs={rdvs} produitsStock={Object.keys(stock)} stockMeta={stockMeta} contrats={contrats} versements={versements} onToggleVersement={handleToggleVersement} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onDeleteContrat={()=>deleteContrat(latest.id)} onResetContratSignatures={()=>resetContratSignatures(latest.id)} onUpdateClient={c=>{ setClients(prev=>{ const next=prev.map(x=>x.id===c.id?c:x); saveClients(next); return next; }); setFicheClient(c); }} onSaveLivraison={saveLivraison} onDeleteLivraison={deleteLivraison} onUpdateStatutLivraison={updateStatutLivraison} onClose={()=>setFicheClient(null)} onEdit={()=>{setEditClient(latest);setShowFormClient(true);setFicheClient(null);}} onDelete={()=>deleteClient(latest.id)} onDeletePassage={deletePassage} onAddPassage={()=>openAddPassageFromClient(latest.id)} onEditPassage={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddRdv={()=>{setEditRdv({clientId:latest.id});setShowFormRdv(true);}} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} onDeleteRdv={deleteRdv}/>;
       })()}
 
       {showFormClient&&<FormClient initial={editClient} clients={clients} onSave={saveClient} onClose={()=>{setShowFormClient(false);setEditClient(null);}}/>}
-      {showFormPassage&&<FormPassage clients={clients} defaultClientId={defaultClientId} initial={editPassage} onSave={p=>savePassage(p)} onSaveLivraison={saveLivraison} livraisons={livraisons} produitsStock={Object.keys(stock)} onClose={()=>{setShowFormPassage(false);setEditPassage(null);}}/>}
-      {showFormLivraison&&<FormLivraison clientId={defaultLivraisonClientId} clients={clients} produitsStock={Object.keys(stock)} onSave={l=>{saveLivraison(l);setShowFormLivraison(false);}} onClose={()=>setShowFormLivraison(false)}/>}
+      {showFormPassage&&<FormPassage clients={clients} defaultClientId={defaultClientId} initial={editPassage} onSave={p=>savePassage(p)} onSaveLivraison={saveLivraison} livraisons={livraisons} produitsStock={Object.keys(stock)} stockMeta={stockMeta} onClose={()=>{setShowFormPassage(false);setEditPassage(null);}}/>}
+      {showFormLivraison&&<FormLivraison clientId={defaultLivraisonClientId} clients={clients} produitsStock={Object.keys(stock)} stockMeta={stockMeta} onSave={l=>{saveLivraison(l);setShowFormLivraison(false);}} onClose={()=>setShowFormLivraison(false)}/>}
       {showFormRdv&&<FormRdv initial={editRdv} clients={clients} onSave={saveRdv} onClose={()=>{setShowFormRdv(false);setEditRdv(null);}}/>}
       {showImport&&<ModalImportConnecteam clients={clients} onImport={handleImport} onClose={()=>setShowImport(false)}/>}
       {showImportHTML&&<ModalImportHTML clients={clients} passages={passages} onImport={handleImportHTML} onClose={()=>setShowImportHTML(false)}/>}
-      {showStock&&<ModalStock stock={stock} stockMeta={stockMeta} onClose={()=>setShowStock(false)} onUpdateStock={updateStock} onUpdateMeta={updateStockMeta} onAddProduit={addProduitStock} onDeleteProduit={deleteProduitStock}/>}
+      {showStock&&<ModalStock stock={stock} stockMeta={stockMeta} onClose={()=>setShowStock(false)} onUpdateStock={updateStock} onUpdateMeta={updateStockMeta} onAddProduit={addProduitStock} onDeleteProduit={deleteProduitStock} onRenameProduit={renameProduitStock}/>}
 
       {showModalAlertes&&(()=>{
         const alertes = clients.filter(c=>alerteClient(c,passages)!=="ok"&&!dismissedAlertes.includes(c.id));

@@ -1157,13 +1157,14 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
     // Livraisons séparées (bb_livraisons_v1) — créées automatiquement à chaque passage avec produits
     const livsDirectes = (livraisons||[])
       .filter(l => (l.produits||[]).length > 0 || (l.description && String(l.description).trim()))
-      .map(l => ({ id:l.id, date:l.date, produits:l.produits||[], description:l.description||"", source:"livraison" }));
+      .map(l => ({ id:l.id, date:l.date, produits:l.produits||[], description:l.description||"", montant:Number(l.montant)||0, source:"livraison" }));
     // Dates déjà couvertes par une livraison directe (évite les doublons)
     const livraisonDates = new Set(livsDirectes.map(l => String(l.date).slice(0,10)));
     // Produits livrés lors des passages — uniquement si aucune livraison directe ce jour-là
+    // (le montant est repris de la livraison auto-liée au passage, si elle existe)
     const livsPassage = passClient
       .filter(p => getProduitsLivres(p).length > 0 && !livraisonDates.has(String(p.date).slice(0,10)))
-      .map(p => ({ id:p.id, date:p.date, produits:getProduitsLivres(p), source:"passage" }));
+      .map(p => ({ id:p.id, date:p.date, produits:getProduitsLivres(p), montant:Number((livraisons||[]).find(l=>l.id===`auto-${p.id}`)?.montant)||0, source:"passage" }));
     const all = [...livsDirectes, ...livsPassage].sort((a,b)=>b.date.localeCompare(a.date));
 
     return (
@@ -1198,9 +1199,12 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
                       {note&&<div style={{fontSize:12,color:"#475569",marginTop:2,wordBreak:"break-word",lineHeight:1.4}}>{note}</div>}
                       <div style={{fontSize:11,color:"#64748b",marginTop:1}}>{fmtDate(item.date,{day:"2-digit",month:"short",year:"numeric"})}</div>
                     </div>
-                    <div style={{display:"flex",alignItems:"center",gap:4,background:"#f0fdf4",color:"#15803d",borderRadius:8,padding:"4px 9px",fontSize:11,fontWeight:600,flexShrink:0,border:"1px solid #bbf7d0"}}>
-                      <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                      Livré
+                    <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
+                      <div style={{display:"flex",alignItems:"center",gap:4,background:"#f0fdf4",color:"#15803d",borderRadius:8,padding:"4px 9px",fontSize:11,fontWeight:600,border:"1px solid #bbf7d0"}}>
+                        <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        Livré
+                      </div>
+                      {item.montant>0&&<span style={{fontSize:12,fontWeight:700,color:"#0f172a"}}>{item.montant}€</span>}
                     </div>
                   </div>
                 );

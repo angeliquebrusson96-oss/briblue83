@@ -59,7 +59,7 @@ export async function envoyerEmailLivraison(livraison, client) {
   } catch(err) { toastError(`Erreur réseau : ${err.message}`); }
 }
 
-export function FormLivraison({ initial, clientId, clients=[], produitsStock=[], onSave, onClose }) {
+export function FormLivraison({ initial, clientId, clients=[], produitsStock=[], stockMeta={}, onSave, onClose }) {
   const isEdit = !!initial?.id;
   const isMobile = useIsMobile();
   const [step, setStep] = useState(1);
@@ -67,7 +67,18 @@ export function FormLivraison({ initial, clientId, clients=[], produitsStock=[],
   const [f, setF] = useState(()=>initial || { id:uid(), clientId:clientId||"", date:TODAY, produits:[], description:"", montant:"", statut:"aFacturer", photos:[] });
   const set = (k,v) => setF(p=>({...p,[k]:v}));
   const PLIV = produitsStock.length > 0 ? produitsStock : PRODUITS_DEFAUT;
-  const toggleProduit = (p) => { const arr = f.produits.includes(p) ? f.produits.filter(x=>x!==p) : [...f.produits,p]; set("produits",arr); };
+  // Montant suggéré = somme des prix (Stock) des produits sélectionnés. On ne
+  // l'écrase plus dès que l'admin a lui-même modifié le champ à la main.
+  const [montantTouched, setMontantTouched] = useState(!!initial?.montant);
+  const sommeProduits = (produits) => produits.reduce((s,p)=>s+(Number(stockMeta[p]?.prix)||0), 0);
+  const toggleProduit = (p) => {
+    const arr = f.produits.includes(p) ? f.produits.filter(x=>x!==p) : [...f.produits,p];
+    set("produits",arr);
+    if (!montantTouched) {
+      const total = sommeProduits(arr);
+      set("montant", total > 0 ? String(Math.round(total*100)/100) : "");
+    }
+  };
   const selectedClient = clients.find(c=>c.id===f.clientId);
 
   const { hasDraft, restoreDraft, discardDraft, clearDraft } = useFormDraft(
@@ -154,7 +165,7 @@ export function FormLivraison({ initial, clientId, clients=[], produitsStock=[],
               <FmSectionTitle icon={<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>}>Date & Montant</FmSectionTitle>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                 <FmField label="Date *"><input type="date" value={f.date} onChange={e=>set("date",e.target.value)}/></FmField>
-                <FmField label="Montant (€)"><input type="number" value={f.montant} onChange={e=>set("montant",e.target.value)} placeholder="0.00"/></FmField>
+                <FmField label="Montant (€)"><input type="number" value={f.montant} onChange={e=>{setMontantTouched(true);set("montant",e.target.value);}} placeholder="0.00"/></FmField>
               </div>
               <FmSectionTitle>Statut</FmSectionTitle>
               <div style={{display:"flex",gap:6}}>
@@ -171,18 +182,20 @@ export function FormLivraison({ initial, clientId, clients=[], produitsStock=[],
           {step===2&&(
             <div className="fm-in" style={{display:"flex",flexDirection:"column",gap:12}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <FmSectionTitle>{f.produits.length} sélectionné{f.produits.length!==1?"s":""}</FmSectionTitle>
-                {f.produits.length>0&&<button onClick={()=>set("produits",[])} style={{fontSize:11,color:"#ef4444",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:6,padding:"3px 8px",cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>Effacer</button>}
+                <FmSectionTitle>{f.produits.length} sélectionné{f.produits.length!==1?"s":""}{!montantTouched&&sommeProduits(f.produits)>0?` · ≈ ${Math.round(sommeProduits(f.produits)*100)/100}€`:""}</FmSectionTitle>
+                {f.produits.length>0&&<button onClick={()=>{set("produits",[]); if(!montantTouched) set("montant","");}} style={{fontSize:11,color:"#ef4444",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:6,padding:"3px 8px",cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>Effacer</button>}
               </div>
               <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(3,1fr)",gap:6}}>
                 {PLIV.map(p=>{
                   const sel=f.produits.includes(p);
+                  const prix = Number(stockMeta[p]?.prix)||0;
                   return (
                     <button key={p} onClick={()=>toggleProduit(p)} style={{display:"flex",alignItems:"center",gap:7,padding:"10px 10px",borderRadius:10,cursor:"pointer",background:sel?"#f0fdf4":"#fff",border:`1.5px solid ${sel?"#22c55e":"#e2e8f0"}`,fontFamily:"inherit",textAlign:"left",transition:"all .15s"}}>
                       <div style={{width:16,height:16,borderRadius:4,border:`2px solid ${sel?"#22c55e":"#e2e8f0"}`,background:sel?"#22c55e":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                         {sel&&<svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
                       </div>
-                      <span style={{fontSize:12,fontWeight:sel?600:400,color:sel?"#065f46":"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p}</span>
+                      <span style={{flex:1,minWidth:0,fontSize:12,fontWeight:sel?600:400,color:sel?"#065f46":"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p}</span>
+                      {prix>0&&<span style={{fontSize:10,fontWeight:600,color:sel?"#16a34a":"#94a3b8",flexShrink:0}}>{prix}€</span>}
                     </button>
                   );
                 })}

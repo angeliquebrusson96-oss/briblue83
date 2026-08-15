@@ -30,6 +30,7 @@ export const DOCS = {
   contrats:      doc(db, "briblue", "contrats"),      // { data: {...contrats} }
   client_photos: doc(db, "briblue", "client_photos"), // { [clientId]: "data:..." } — fallback photos piscine
   stock:      doc(db, "briblue", "stock"),      // { data: {...stock} }
+  stock_meta: doc(db, "briblue", "stock_meta"), // { data: {...métadonnées par produit : unité, seuil, categorie, prix} }
   meta:       doc(db, "briblue", "meta"),       // { notes, versements, retards }
   // Legacy — conservé pour la migration automatique au 1er démarrage
   app_data:   doc(db, "briblue", "app_data"),
@@ -58,6 +59,11 @@ export const KEY_MAP = {
   "bb_livraisons_v1":        { doc: "livraisons", field: "data" },
   "bb_contrats_v1":          { doc: "contrats",   field: "data" },
   "bb_stock_v1":             { doc: "stock",      field: "data" },
+  // ⚠️ Absente jusqu'ici : les métadonnées produits (prix, unité, seuil,
+  // catégorie) n'ont jamais atteint Firestore, uniquement localStorage —
+  // invisible depuis un autre appareil ou le carnet client. Découvert en
+  // ajoutant le prix produit dans Stock (cf. commit correspondant).
+  "bb_stock_meta_v1":        { doc: "stock_meta", field: "data" },
   "bb_versements_v1":        { doc: "meta",       field: "versements" },
   "bb_retards_carnet_v1":    { doc: "meta",       field: "retards" },
   "bb_notes_v1":             { doc: "meta",       field: "notes" },
@@ -73,6 +79,7 @@ export const REST_URLS = {
   livraisons: _restBase + "livraisons",
   contrats:   _restBase + "contrats",
   stock:      _restBase + "stock",
+  stock_meta: _restBase + "stock_meta",
   meta:       _restBase + "meta",
 };
 

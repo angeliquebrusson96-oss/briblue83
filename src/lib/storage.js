@@ -408,7 +408,7 @@ export async function reconcileOnBoot() {
     const TOMBSTONE_DATA_KEYS = new Set(Object.values(TOMBSTONE_KEY_FOR));
     const KEYS = [...TOMBSTONE_DATA_KEYS,
                   "bb_clients_v2","bb_passages_v2","bb_livraisons_v1","bb_rdvs_v1",
-                  "bb_stock_v1","bb_contrats_v1","bb_versements_v1","bb_retards_carnet_v1","bb_notes_v1"];
+                  "bb_stock_v1","bb_stock_meta_v1","bb_contrats_v1","bb_versements_v1","bb_retards_carnet_v1","bb_notes_v1"];
 
     // ── Lire TOUS les documents Firestore en parallèle ───────────────────────
     const docNames = [...new Set(KEYS.map(k => KEY_MAP[k]?.doc).filter(Boolean))];
@@ -903,6 +903,7 @@ export function subscribeToRealtime(callbacks) {
     livraisons: { keys: ["bb_livraisons_v1"],                       cb: (d) => callbacks.livraisons?.(d["data"]) },
     contrats:   { keys: ["bb_contrats_v1"],                         cb: (d) => callbacks.contrats?.(d["data"]) },
     stock:      { keys: ["bb_stock_v1"],                            cb: (d) => callbacks.stock?.(d["data"]) },
+    stock_meta: { keys: ["bb_stock_meta_v1"],                       cb: (d) => callbacks.stockMeta?.(d["data"]) },
     meta:       { keys: ["bb_versements_v1","bb_retards_carnet_v1","bb_notes_v1"], cb: (d) => callbacks.meta?.(d) },
   };
 

@@ -817,7 +817,7 @@ function MRow({label,unit,value,onChange,ideal,okFn,icon,color="#0891b2",compact
 
 // ─── COMPOSANT PRINCIPAL ─────────────────────────────────────────────────────
 
-export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraison, livraisons=[], produitsStock=[], onClose }) {
+export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveLivraison, livraisons=[], produitsStock=[], stockMeta={}, onClose }) {
   const EMPTY = {
     date:TODAY, clientId:defaultClientId||"", type:"Entretien complet", tech:"Dorian",
     chloreLibre:"", ph:"", alcalinite:"", stabilisant:"",
@@ -1048,13 +1048,17 @@ export function FormPassage({ clients, defaultClientId, initial, onSave, onSaveL
     if (f.livraisonProduits && (f.produitsLivres?.length > 0 || f.livraisonAutre) && onSaveLivraison) {
       const livId = `auto-${rawPassage.id}`;
       const existingLiv = livraisons.find(l => l.id === livId);
+      // Montant auto-suggéré depuis les prix configurés dans Stock, seulement
+      // si aucun montant n'a déjà été saisi manuellement sur cette livraison.
+      const sommeProduits = (f.produitsLivres || []).reduce((s,p)=>s+(Number(stockMeta[p]?.prix)||0), 0);
+      const montantSuggere = sommeProduits > 0 ? String(Math.round(sommeProduits*100)/100) : "";
       onSaveLivraison({
         id: livId,
         clientId: f.clientId,
         date: f.date,
         produits: f.produitsLivres || [],
         description: f.livraisonAutre || "",
-        montant: existingLiv?.montant ?? "",
+        montant: existingLiv?.montant ?? montantSuggere,
         statut: existingLiv?.statut ?? "aFacturer",
       });
     }

@@ -209,7 +209,7 @@ export function PassageDetailModal({ passage, client, onClose }) {
 }
 
 // ─── FICHE CLIENT ─────────────────────────────────────────────────────────────
-export function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[], contrats={}, versements={}, onToggleVersement, onUpdateContrat, onDeleteContrat, onResetContratSignatures, onUpdateClient, onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onDeletePassage, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
+export function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[], stockMeta={}, contrats={}, versements={}, onToggleVersement, onUpdateContrat, onDeleteContrat, onResetContratSignatures, onUpdateClient, onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onDeletePassage, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
   const [tab, setTab] = useState("gestion");
   const [notesPrivees, setNotesPrivees] = useState(client.notesPrivees||"");
   const [notesSaved, setNotesSaved] = useState(false);
@@ -1632,7 +1632,7 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
       )}
 
       {showFormLiv && (
-        <FormLivraison initial={editLiv} clientId={client.id} clients={[client]} produitsStock={produitsStock} onSave={l=>{onSaveLivraison(l);setShowFormLiv(false);setEditLiv(null);}} onClose={()=>{setShowFormLiv(false);setEditLiv(null);}}/>
+        <FormLivraison initial={editLiv} clientId={client.id} clients={[client]} produitsStock={produitsStock} stockMeta={stockMeta} onSave={l=>{onSaveLivraison(l);setShowFormLiv(false);setEditLiv(null);}} onClose={()=>{setShowFormLiv(false);setEditLiv(null);}}/>
       )}
       {detailPassageFiche && <PassageDetailModal passage={detailPassageFiche} client={client} onClose={()=>setDetailPassageFiche(null)}/>}
 
