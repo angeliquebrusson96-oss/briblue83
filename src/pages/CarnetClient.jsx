@@ -11,6 +11,10 @@ import { ToastContainer, toastInfo, toastError } from "../styles";
 
 // Génération autonome du rapport client : évite le bouton PDF cassé si App.jsx n'est pas chargé ici.
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+// Affiche "Produit A × 2, Produit B" quand une quantité > 1 a été saisie
+// dans le formulaire de livraison (FormLivraison.jsx).
+const formatProduitsQte = (produits, quantites) =>
+  (produits||[]).map(p => { const q = quantites?.[p]||1; return q>1 ? `${p} × ${q}` : p; }).join(", ");
 const cleanFileName = (v) => String(v || "rapport").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase();
 const hasProductShape = (v) => v && typeof v === "object" && !Array.isArray(v) && (
   "nom" in v || "produit" in v || "label" in v || "name" in v || "designation" in v ||
@@ -740,7 +744,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
                   <div style={{fontSize:10,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:.5,marginTop:6}}>Produits</div>
                 )}
                 {livraisonsDues.map(l=>{
-                  const titre = (l.produits||[]).join(", ")||l.description||"Produits livrés";
+                  const titre = formatProduitsQte(l.produits, l.quantites)||l.description||"Produits livrés";
                   const noteComplete = (l.produits||[]).length>0 ? l.description : "";
                   return (
                   <button key={l.id} onClick={()=>setNoteModal({titre, note:noteComplete, montant:Number(l.montant), date:l.date})} style={{
@@ -1157,14 +1161,14 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
     // Livraisons séparées (bb_livraisons_v1) — créées automatiquement à chaque passage avec produits
     const livsDirectes = (livraisons||[])
       .filter(l => (l.produits||[]).length > 0 || (l.description && String(l.description).trim()))
-      .map(l => ({ id:l.id, date:l.date, produits:l.produits||[], description:l.description||"", montant:Number(l.montant)||0, source:"livraison" }));
+      .map(l => ({ id:l.id, date:l.date, produits:l.produits||[], quantites:l.quantites||{}, description:l.description||"", montant:Number(l.montant)||0, source:"livraison" }));
     // Dates déjà couvertes par une livraison directe (évite les doublons)
     const livraisonDates = new Set(livsDirectes.map(l => String(l.date).slice(0,10)));
     // Produits livrés lors des passages — uniquement si aucune livraison directe ce jour-là
     // (le montant est repris de la livraison auto-liée au passage, si elle existe)
     const livsPassage = passClient
       .filter(p => getProduitsLivres(p).length > 0 && !livraisonDates.has(String(p.date).slice(0,10)))
-      .map(p => ({ id:p.id, date:p.date, produits:getProduitsLivres(p), montant:Number((livraisons||[]).find(l=>l.id===`auto-${p.id}`)?.montant)||0, source:"passage" }));
+      .map(p => ({ id:p.id, date:p.date, produits:getProduitsLivres(p), quantites:(livraisons||[]).find(l=>l.id===`auto-${p.id}`)?.quantites||{}, montant:Number((livraisons||[]).find(l=>l.id===`auto-${p.id}`)?.montant)||0, source:"passage" }));
     const all = [...livsDirectes, ...livsPassage].sort((a,b)=>b.date.localeCompare(a.date));
 
     return (
@@ -1187,7 +1191,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
                 // La note/quantité (ex: "2 sacs chlore lent, 1 bidon pH+") s'affiche
                 // TOUJOURS en plus quand elle existe — elle ne doit pas disparaître
                 // simplement parce que des produits sont aussi cochés.
-                const label = item.produits.length > 0 ? item.produits.join(", ") : (item.description||"Livraison");
+                const label = item.produits.length > 0 ? formatProduitsQte(item.produits, item.quantites) : (item.description||"Livraison");
                 const note = item.produits.length > 0 ? item.description : "";
                 return (
                   <div key={item.id||i} style={{background:"#fff",borderRadius:14,border:"1px solid #e2e8f0",padding:"12px 14px",display:"flex",alignItems:"center",gap:12,boxShadow:"0 1px 4px rgba(0,0,0,0.04)",minWidth:0}}>

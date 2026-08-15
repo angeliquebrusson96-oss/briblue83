@@ -42,7 +42,15 @@ export default async function handler(req, res) {
       ]);
       return res.status(200).json({ success: true });
     }
-    return res.status(400).json({ error: "action doit être 'delete'" });
+    if (action === "patchMeta") {
+      const { patch } = req.body || {};
+      if (!patch || typeof patch !== "object") return res.status(400).json({ error: "patch requis" });
+      const now = new Date().toISOString();
+      // Merge profond sur la map imbriquée [nom] : ne touche que les clés de "patch".
+      await STOCK_META_DOC.set({ data: { [nom]: patch }, savedAt: now }, { merge: true });
+      return res.status(200).json({ success: true });
+    }
+    return res.status(400).json({ error: "action doit être 'delete' ou 'patchMeta'" });
   } catch (err) {
     console.error("[briblue] update-stock error:", err.message);
     return res.status(500).json({ error: err.message });

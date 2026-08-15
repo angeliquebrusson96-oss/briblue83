@@ -7,8 +7,12 @@ import { toastWarn, toastSuccess, toastError, showConfirm } from "../styles";
 
 export function genererHTMLLivraison(livraison, client) {
   const dateStr = new Date(livraison.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"});
+  const quantites = livraison.quantites || {};
   const produitsList = (livraison.produits||[]).length > 0
-    ? (livraison.produits||[]).map(p=>`<li style="padding:4px 0;border-bottom:1px solid #f0f4f8;font-size:13px;color:#1e293b;">${p}</li>`).join("")
+    ? (livraison.produits||[]).map(p=>{
+        const qte = quantites[p] || 1;
+        return `<li style="padding:4px 0;border-bottom:1px solid #f0f4f8;font-size:13px;color:#1e293b;">${p}${qte>1?` <strong>× ${qte}</strong>`:""}</li>`;
+      }).join("")
     : "<li style='color:#94a3b8;font-size:13px;'>Aucun produit listé</li>";
   return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"/><title>Bon de livraison BRIBLUE</title>
 <style>
@@ -64,20 +68,34 @@ export function FormLivraison({ initial, clientId, clients=[], produitsStock=[],
   const isMobile = useIsMobile();
   const [step, setStep] = useState(1);
   const [clientSearch, setClientSearch] = useState("");
-  const [f, setF] = useState(()=>initial || { id:uid(), clientId:clientId||"", date:TODAY, produits:[], description:"", montant:"", statut:"aFacturer", photos:[] });
+  const [f, setF] = useState(()=>initial || { id:uid(), clientId:clientId||"", date:TODAY, produits:[], quantites:{}, description:"", montant:"", statut:"aFacturer", photos:[] });
   const set = (k,v) => setF(p=>({...p,[k]:v}));
   const PLIV = produitsStock.length > 0 ? produitsStock : PRODUITS_DEFAUT;
-  // Montant suggéré = somme des prix (Stock) des produits sélectionnés. On ne
-  // l'écrase plus dès que l'admin a lui-même modifié le champ à la main.
+  const CAT_ICON = { traitement:"🧪", entretien:"🧹", matériel:"🔧" };
+  // Montant suggéré = somme des (prix × quantité) des produits sélectionnés.
+  // On ne l'écrase plus dès que l'admin a lui-même modifié le champ à la main.
   const [montantTouched, setMontantTouched] = useState(!!initial?.montant);
-  const sommeProduits = (produits) => produits.reduce((s,p)=>s+(Number(stockMeta[p]?.prix)||0), 0);
+  const sommeProduits = (produits, quantites=f.quantites||{}) =>
+    produits.reduce((s,p)=>s+(Number(stockMeta[p]?.prix)||0)*(quantites[p]||1), 0);
+  const applyMontant = (produits, quantites) => {
+    if (montantTouched) return;
+    const total = sommeProduits(produits, quantites);
+    set("montant", total > 0 ? String(Math.round(total*100)/100) : "");
+  };
   const toggleProduit = (p) => {
-    const arr = f.produits.includes(p) ? f.produits.filter(x=>x!==p) : [...f.produits,p];
-    set("produits",arr);
-    if (!montantTouched) {
-      const total = sommeProduits(arr);
-      set("montant", total > 0 ? String(Math.round(total*100)/100) : "");
-    }
+    const selected = f.produits.includes(p);
+    const arr = selected ? f.produits.filter(x=>x!==p) : [...f.produits,p];
+    const qtes = { ...(f.quantites||{}) };
+    if (selected) delete qtes[p]; else qtes[p] = qtes[p] || 1;
+    setF(prev => ({ ...prev, produits: arr, quantites: qtes }));
+    applyMontant(arr, qtes);
+  };
+  const changeQte = (p, delta) => {
+    const current = f.quantites?.[p] || 1;
+    const next = Math.max(1, Math.min(99, current + delta));
+    const qtes = { ...(f.quantites||{}), [p]: next };
+    setF(prev => ({ ...prev, quantites: qtes }));
+    applyMontant(f.produits, qtes);
   };
   const selectedClient = clients.find(c=>c.id===f.clientId);
 
@@ -183,20 +201,41 @@ export function FormLivraison({ initial, clientId, clients=[], produitsStock=[],
             <div className="fm-in" style={{display:"flex",flexDirection:"column",gap:12}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                 <FmSectionTitle>{f.produits.length} sélectionné{f.produits.length!==1?"s":""}{!montantTouched&&sommeProduits(f.produits)>0?` · ≈ ${Math.round(sommeProduits(f.produits)*100)/100}€`:""}</FmSectionTitle>
-                {f.produits.length>0&&<button onClick={()=>{set("produits",[]); if(!montantTouched) set("montant","");}} style={{fontSize:11,color:"#ef4444",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:6,padding:"3px 8px",cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>Effacer</button>}
+                {f.produits.length>0&&<button onClick={()=>{setF(prev=>({...prev,produits:[],quantites:{}})); if(!montantTouched) set("montant","");}} style={{fontSize:11,color:"#ef4444",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:6,padding:"3px 8px",cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>Effacer</button>}
               </div>
-              <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(3,1fr)",gap:6}}>
+              <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(3,1fr)",gap:10}}>
                 {PLIV.map(p=>{
                   const sel=f.produits.includes(p);
                   const prix = Number(stockMeta[p]?.prix)||0;
+                  const qte = f.quantites?.[p] || 1;
+                  const icon = CAT_ICON[stockMeta[p]?.categorie] || "📦";
                   return (
-                    <button key={p} onClick={()=>toggleProduit(p)} style={{display:"flex",alignItems:"center",gap:7,padding:"10px 10px",borderRadius:10,cursor:"pointer",background:sel?"#f0fdf4":"#fff",border:`1.5px solid ${sel?"#22c55e":"#e2e8f0"}`,fontFamily:"inherit",textAlign:"left",transition:"all .15s"}}>
-                      <div style={{width:16,height:16,borderRadius:4,border:`2px solid ${sel?"#22c55e":"#e2e8f0"}`,background:sel?"#22c55e":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                        {sel&&<svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                    <div key={p} onClick={()=>!sel&&toggleProduit(p)}
+                      style={{display:"flex",flexDirection:"column",gap:8,padding:"14px 12px",borderRadius:14,cursor:sel?"default":"pointer",background:sel?"#f0fdf4":"#fff",border:`2px solid ${sel?"#22c55e":"#e2e8f0"}`,fontFamily:"inherit",textAlign:"left",transition:"all .15s"}}>
+                      <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
+                        <div style={{width:34,height:34,borderRadius:10,background:sel?"#dcfce7":"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>{icon}</div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:14,fontWeight:sel?700:600,color:sel?"#065f46":"#1e293b",wordBreak:"break-word",lineHeight:1.3}}>{p}</div>
+                          {prix>0&&<div style={{fontSize:11,fontWeight:600,color:sel?"#16a34a":"#94a3b8",marginTop:2}}>{prix}€ / unité</div>}
+                        </div>
+                        {sel&&(
+                          <button onClick={e=>{e.stopPropagation();toggleProduit(p);}}
+                            style={{width:22,height:22,borderRadius:11,border:"none",background:"#fee2e2",color:"#dc2626",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:13,lineHeight:1}}>✕</button>
+                        )}
                       </div>
-                      <span style={{flex:1,minWidth:0,fontSize:12,fontWeight:sel?600:400,color:sel?"#065f46":"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p}</span>
-                      {prix>0&&<span style={{fontSize:10,fontWeight:600,color:sel?"#16a34a":"#94a3b8",flexShrink:0}}>{prix}€</span>}
-                    </button>
+                      {sel&&(
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,paddingTop:6,borderTop:"1px solid #bbf7d0"}}>
+                          <div style={{display:"flex",alignItems:"center",gap:8}}>
+                            <button onClick={e=>{e.stopPropagation();changeQte(p,-1);}}
+                              style={{width:26,height:26,borderRadius:8,border:"1.5px solid #22c55e",background:"#fff",color:"#16a34a",cursor:"pointer",fontSize:15,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                            <span style={{minWidth:20,textAlign:"center",fontSize:14,fontWeight:800,color:"#065f46"}}>{qte}</span>
+                            <button onClick={e=>{e.stopPropagation();changeQte(p,1);}}
+                              style={{width:26,height:26,borderRadius:8,border:"1.5px solid #22c55e",background:"#fff",color:"#16a34a",cursor:"pointer",fontSize:15,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                          </div>
+                          {prix>0&&<span style={{fontSize:13,fontWeight:800,color:"#065f46"}}>{Math.round(prix*qte*100)/100}€</span>}
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -222,13 +261,28 @@ export function FormLivraison({ initial, clientId, clients=[], produitsStock=[],
             <div className="fm-in" style={{display:"flex",flexDirection:"column",gap:12}}>
               <FmSectionTitle>Récapitulatif</FmSectionTitle>
               <div style={{background:"#f8fafc",borderRadius:14,border:"1px solid #e2e8f0",overflow:"hidden"}}>
-                {[["Client",selectedClient?.nom||"—"],["Date",f.date?new Date(f.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}):"—"],["Produits",f.produits.length+" article"+(f.produits.length!==1?"s":"")],f.montant?["Montant",f.montant+" €"]:null,["Statut",STATUT_LIV[f.statut]?.label||"—"]].filter(Boolean).map(([l,v],i,a)=>(
+                {[["Client",selectedClient?.nom||"—"],["Date",f.date?new Date(f.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}):"—"],f.montant?["Montant",f.montant+" €"]:null,["Statut",STATUT_LIV[f.statut]?.label||"—"]].filter(Boolean).map(([l,v],i,a)=>(
                   <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"10px 14px",borderBottom:i<a.length-1?"1px solid #f1f5f9":"none",fontSize:13}}>
                     <span style={{color:"#64748b"}}>{l}</span>
                     <span style={{fontWeight:600,color:"#0f172a"}}>{v}</span>
                   </div>
                 ))}
               </div>
+              {f.produits.length>0&&(
+                <div style={{background:"#f8fafc",borderRadius:14,border:"1px solid #e2e8f0",overflow:"hidden"}}>
+                  <div style={{padding:"9px 14px",fontSize:11,fontWeight:700,color:"#64748b",textTransform:"uppercase",letterSpacing:.5,borderBottom:"1px solid #f1f5f9"}}>Produits ({f.produits.length})</div>
+                  {f.produits.map((p,i,a)=>{
+                    const qte = f.quantites?.[p]||1;
+                    const prix = Number(stockMeta[p]?.prix)||0;
+                    return (
+                      <div key={p} style={{display:"flex",justifyContent:"space-between",padding:"9px 14px",borderBottom:i<a.length-1?"1px solid #f1f5f9":"none",fontSize:13}}>
+                        <span style={{color:"#0f172a"}}>{p}{qte>1?` × ${qte}`:""}</span>
+                        {prix>0&&<span style={{fontWeight:600,color:"#0f172a"}}>{Math.round(prix*qte*100)/100}€</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
               {selectedClient?.email&&(
                 <button onClick={()=>showConfirm(`Envoyer le bon de livraison à ${selectedClient.email} ?`,()=>envoyerEmailLivraison({...f,id:isEdit?f.id:uid()},selectedClient))} style={{padding:"12px",borderRadius:12,background:"#f0f9ff",border:"1px solid #bae6fd",cursor:"pointer",fontWeight:600,fontSize:13,color:"#0891b2",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
                   {Ico.send(13,"#0891b2")} Envoyer par email à {selectedClient.email}
