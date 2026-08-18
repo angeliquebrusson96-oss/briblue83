@@ -27,7 +27,7 @@ const Toggle = ({ value, onChange, colorOn = "#dc2626", colorOff = "#e2e8f0" }) 
 );
 
 // ─── Mensualités d'un client ──────────────────────────────────────────────────
-const VersementsClient = ({ client, versements, onToggleVersement, retardVisible, onToggleRetardCarnet }) => {
+export const VersementsClient = ({ client, versements, onToggleVersement, retardVisible, onToggleRetardCarnet }) => {
   const [open, setOpen] = useState(false);
   if (!client.prix || !client.dateDebut) return null;
 
@@ -181,7 +181,7 @@ const VersementsClient = ({ client, versements, onToggleVersement, retardVisible
 };
 
 // ─── Livraisons d'un client ───────────────────────────────────────────────────
-const LivraisonsClient = ({ client, livraisons, onUpdateStatut, retardVisible, onToggleRetardCarnet, onEditLivraison }) => {
+export const LivraisonsClient = ({ client, livraisons, onUpdateStatut, retardVisible, onToggleRetardCarnet, onEditLivraison }) => {
   const [open, setOpen] = useState(false);
   const clientLivraisons = livraisons
     .filter(l => l.clientId === client.id)
@@ -189,7 +189,7 @@ const LivraisonsClient = ({ client, livraisons, onUpdateStatut, retardVisible, o
   if (clientLivraisons.length === 0) return null;
 
   const impayees = clientLivraisons.filter(l => l.statut !== "payee" && l.statut !== "annulee");
-  const totalImpaye = impayees.reduce((s, l) => s + (l.montant || l.prixTotal || l.total || 0), 0);
+  const totalImpaye = impayees.reduce((s, l) => s + (Number(l.montant) || Number(l.prixTotal) || Number(l.total) || 0), 0);
 
   return (
     <div>
@@ -320,7 +320,7 @@ export function PageGestion({
     const ids = new Set(livraisons.map(l => l.clientId));
     const impayeMontant = (clientId) => livraisons
       .filter(l => l.clientId === clientId && l.statut !== "payee" && l.statut !== "annulee")
-      .reduce((s, l) => s + (l.montant || l.prixTotal || l.total || 0), 0);
+      .reduce((s, l) => s + (Number(l.montant) || Number(l.prixTotal) || Number(l.total) || 0), 0);
     return clients
       .filter(c => ids.has(c.id))
       .map(c => ({ c, due: impayeMontant(c.id) }))
@@ -480,7 +480,7 @@ export function PageGestion({
             const nb = livraisons.filter(l => l.clientId === c.id).length;
             const due = livraisons
               .filter(l => l.clientId === c.id && l.statut !== "payee" && l.statut !== "annulee")
-              .reduce((s, l) => s + (l.montant || l.prixTotal || l.total || 0), 0);
+              .reduce((s, l) => s + (Number(l.montant) || Number(l.prixTotal) || Number(l.total) || 0), 0);
             return (
               <div key={c.id} style={{background:"#fff",borderRadius:18,border:"1px solid #eef1f5",borderLeft:`4px solid ${due>0?"#ea580c":"#22c55e"}`,padding:"13px 15px",boxShadow:"0 1px 2px rgba(15,23,42,0.03), 0 4px 14px rgba(15,23,42,0.05)"}}>
                 <div

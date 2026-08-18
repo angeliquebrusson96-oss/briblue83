@@ -11,6 +11,7 @@ import {
 import { useIsMobile, Modal, RapportStatusPicker, Avatar, PhotoImg } from "./ui";
 import { showConfirm, toastSuccess } from "../styles";
 import { FormLivraison, envoyerEmailLivraison } from "./FormLivraison";
+import { VersementsClient, LivraisonsClient } from "../pages/PageGestion";
 
 // Forward-declared imports (defined in FormPassage to avoid circular deps)
 // ouvrirRapport, envoyerEmail, ouvrirContrat, envoyerContratSignature
@@ -209,7 +210,7 @@ export function PassageDetailModal({ passage, client, onClose }) {
 }
 
 // ─── FICHE CLIENT ─────────────────────────────────────────────────────────────
-export function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[], stockMeta={}, contrats={}, versements={}, onToggleVersement, onUpdateContrat, onDeleteContrat, onResetContratSignatures, onUpdateClient, onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onDeletePassage, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv }) {
+export function FicheClient({ client, passages, livraisons=[], rdvs=[], produitsStock=[], stockMeta={}, contrats={}, versements={}, onToggleVersement, onUpdateContrat, onDeleteContrat, onResetContratSignatures, onUpdateClient, onSaveLivraison, onDeleteLivraison, onUpdateStatutLivraison, onEdit, onDelete, onDeletePassage, onClose, onAddPassage, onEditPassage, onUpdatePassageStatus, onAddRdv, onEditRdv, onDeleteRdv, retardsCarnet={}, onToggleRetardCarnet, onEditLivraison }) {
   const [tab, setTab] = useState("gestion");
   const [notesPrivees, setNotesPrivees] = useState(client.notesPrivees||"");
   const [notesSaved, setNotesSaved] = useState(false);
@@ -336,6 +337,7 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
       case "carnet":     return <svg {...s}><path d="M4 4.5A2.5 2.5 0 016.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15z"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>;
       case "contrat":    return <svg {...s}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>;
       case "gestion":    return <svg {...s}><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>;
+      case "paiements":  return <svg {...s}><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>;
       default: return null;
     }
   };
@@ -343,6 +345,7 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
     {id:"gestion",    label:"Général",   color:"#0891b2"},   // vue d'ensemble + actions
     {id:"infos",      label:"Infos",     color:"#0284c7"},   // coordonnées client
     {id:"contrat",    label:"Contrat",   color:"#059669"},   // contrat + paiements
+    {id:"paiements",  label:"Gestion",   color:"#0f766e"},   // mensualités + livraisons dues (vue condensée)
     {id:"passages",   label:"Rapports",  color:"#7c3aed"},   // rapports d'intervention
     {id:"saisons",    label:"Planning",  color:"#0891b2"},   // planning mensuel
     {id:"historique", label:"Historique",color:"#64748b"},   // chronologie complète
@@ -453,7 +456,7 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
         <div style={{background:"rgba(255,255,255,0.92)",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",borderBottom:"1px solid rgba(0,0,0,0.06)",overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none",padding:"10px 10px 8px",display:"flex",gap:4}}>
           {TABS.map(({id,label})=>{
             const active=tab===id;
-            const TAB_COLORS = {gestion:"#0891b2",historique:"#64748b",passages:"#7c3aed",saisons:"#0891b2",contrat:"#059669",infos:"#0284c7",rdvs:"#6d28d9",livraisons:"#d97706",carnet:"#be185d"};
+            const TAB_COLORS = {gestion:"#0891b2",historique:"#64748b",passages:"#7c3aed",saisons:"#0891b2",contrat:"#059669",paiements:"#0f766e",infos:"#0284c7",rdvs:"#6d28d9",livraisons:"#d97706",carnet:"#be185d"};
             const tcol = TAB_COLORS[id]||"#64748b";
             return (
               <button key={id} onClick={()=>setTab(id)}
@@ -1584,6 +1587,32 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
           }
         </div>
       )}
+
+      {/* -- GESTION (vue condensée mensualités + livraisons dues, même composants que la page Gestion) -- */}
+      {tab==="paiements" && (()=>{
+        const hasMensualites = !!(client.prix && client.dateDebut);
+        const hasLivraisons = livraisons.length > 0;
+        const cardStyle = {background:"#fff",borderRadius:18,border:"1px solid #eef1f5",padding:"13px 15px",boxShadow:"0 1px 2px rgba(15,23,42,0.03), 0 4px 14px rgba(15,23,42,0.05)"};
+        return (
+          <div className="fade-in" style={{display:"flex",flexDirection:"column",gap:14}}>
+            {!hasMensualites && !hasLivraisons && (
+              <div style={{textAlign:"center",color:DS.mid,padding:24,fontSize:14}}>Rien à gérer pour l'instant — pas de contrat tarifé ni de livraison.</div>
+            )}
+            {hasMensualites && (
+              <div style={cardStyle}>
+                <VersementsClient client={client} versements={versements} onToggleVersement={onToggleVersement}
+                  retardVisible={!!retardsCarnet[client.id]} onToggleRetardCarnet={onToggleRetardCarnet}/>
+              </div>
+            )}
+            {hasLivraisons && (
+              <div style={cardStyle}>
+                <LivraisonsClient client={client} livraisons={livraisons} onUpdateStatut={onUpdateStatutLivraison}
+                  retardVisible={!!retardsCarnet[`liv_${client.id}`]} onToggleRetardCarnet={onToggleRetardCarnet} onEditLivraison={onEditLivraison}/>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {tab==="livraisons" && (
         <div className="fade-in">
