@@ -662,7 +662,12 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
     const aJour = nbDus === 0 && !hasProduitsDue;
     // Arrondi au centime — l'addition flottante (0.1+0.2 style) peut sinon
     // afficher "164.42000000000002€" au client.
-    const totalDu = Math.round((nbDus * (mensualite||0) + montantLivraisonsDues) * 100) / 100;
+    // ⚠️ Sommer le montant RÉEL de chaque mois dû (versementMoisDus[].montant),
+    // pas "nbDus × mensualite" : le 1er mois du contrat (mensualiteSolde/m1)
+    // absorbe l'écart d'arrondi et diffère souvent des mois suivants (m11) —
+    // un flat-rate sous-comptait ou sur-comptait dès que ce mois était dû.
+    const totalMensualitesDues = versementMoisDus.reduce((s,{montant})=>s+(Number(montant)||0), 0);
+    const totalDu = Math.round((totalMensualitesDues + montantLivraisonsDues) * 100) / 100;
     // Libellé : priorité aux mensualités en retard (le cas le plus critique),
     // sinon mensualité du mois en cours, sinon uniquement des produits à régler.
     // Ne jamais confondre "pas de retard strict" (retards exclut le mois en
@@ -721,7 +726,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
                 {nbDus>0 && hasProduitsDue && (
                   <div style={{fontSize:10,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:.5,marginTop:2}}>Mensualités</div>
                 )}
-                {versementMoisDus.map(({year:y,month:m})=>{
+                {versementMoisDus.map(({year:y,month:m,montant:montantMois})=>{
                   const estCourant = y===today.getFullYear() && m===today.getMonth()+1;
                   return (
                     <button key={versKey(y,m)} onClick={()=>setShowEcheancier(true)} style={{
@@ -741,7 +746,7 @@ export function CarnetView({ client, passages, livraisons=[], versements={}, con
                         </div>
                       </div>
                       <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
-                        <span style={{fontSize:14,fontWeight:700,color:estCourant?"#ea580c":"#dc2626"}}>{mensualite}€</span>
+                        <span style={{fontSize:14,fontWeight:700,color:estCourant?"#ea580c":"#dc2626"}}>{montantMois}€</span>
                         <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
                       </div>
                     </button>
