@@ -2114,7 +2114,11 @@ export default function App() {
                 boxShadow:"inset 0 0 0 1px rgba(8,145,178,0.14)",
                 cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
                 flexShrink:0,WebkitTapHighlightColor:"transparent",transition:"transform .12s, background .15s"}}>
-              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+              <svg width={17} height={17} viewBox="0 0 24 24">
+                <path d="M12 2.5a6.5 6.5 0 00-6.5 6.5c0 4.2-1.1 6.06-1.94 7.1-.5.62-.06 1.55.74 1.55h15.4c.8 0 1.24-.93.74-1.55-.84-1.04-1.94-2.9-1.94-7.1A6.5 6.5 0 0012 2.5z" fill="#0891b2" fillOpacity="0.16"/>
+                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M9.5 21a2.5 2.5 0 005 0" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round"/>
+              </svg>
               {unreadCount>0&&<span style={{position:"absolute",top:-4,right:-4,minWidth:14,height:14,borderRadius:7,background:"#ef4444",color:"#fff",fontSize:8,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",boxShadow:"0 0 0 2px #fff"}}>{unreadCount>9?"9+":unreadCount}</span>}
             </button>
 
@@ -2166,7 +2170,12 @@ export default function App() {
               boxShadow:"inset 0 0 0 1px rgba(5,150,105,0.12)",
               cursor:"pointer",flexShrink:0,fontFamily:"inherit",
               WebkitTapHighlightColor:"transparent",transition:"transform .12s"}}>
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8V21H3V8"/><path d="M23 3H1v5h22V3z"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+            <svg width={16} height={16} viewBox="0 0 24 24">
+              <rect x="3" y="8" width="18" height="13" rx="1.5" fill="#059669" fillOpacity="0.14"/>
+              <path d="M21 8V21H3V8" fill="none" stroke="#059669" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M23 3H1v5h22V3z" fill="none" stroke="#059669" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <line x1="9.5" y1="12.2" x2="14.5" y2="12.2" stroke="#059669" strokeWidth="1.8" strokeLinecap="round"/>
+            </svg>
             {!isMobile&&<span style={{fontSize:11,fontWeight:700,color:"#059669"}}>Stock</span>}
             {nbStockBas>0&&<span style={{position:"absolute",top:-4,right:-4,minWidth:14,height:14,borderRadius:7,background:"#ef4444",color:"#fff",fontSize:8,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",boxShadow:"0 0 0 2px #fff"}}>{nbStockBas}</span>}
           </button>
@@ -2182,7 +2191,14 @@ export default function App() {
               boxShadow:"inset 0 0 0 1px rgba(249,115,22,0.14)",
               cursor:"pointer",flexShrink:0,fontFamily:"inherit",
               WebkitTapHighlightColor:"transparent",transition:"transform .12s"}}>
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 4v4h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            <svg width={16} height={16} viewBox="0 0 24 24">
+              <rect x="1" y="3" width="15" height="13" rx="1.5" fill="#f97316" fillOpacity="0.14"/>
+              <path d="M16 8h4l3 4v4h-7V8z" fill="#f97316" fillOpacity="0.14"/>
+              <rect x="1" y="3" width="15" height="13" rx="1" fill="none" stroke="#f97316" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M16 8h4l3 4v4h-7V8z" fill="none" stroke="#f97316" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <circle cx="5.5" cy="18.5" r="2.3" fill="#fff" stroke="#f97316" strokeWidth="1.6"/>
+              <circle cx="18.5" cy="18.5" r="2.3" fill="#fff" stroke="#f97316" strokeWidth="1.6"/>
+            </svg>
             {!isMobile&&<span style={{fontSize:11,fontWeight:700,color:"#f97316"}}>Livraison</span>}
           </button>
 
@@ -2192,7 +2208,14 @@ export default function App() {
               style={{display:"flex",alignItems:"center",gap:5,padding:"0 12px",height:36,borderRadius:11,
                 background:"#f5f3ff",border:"none",boxShadow:"inset 0 0 0 1px rgba(124,58,237,0.14)",
                 cursor:"pointer",flexShrink:0,WebkitTapHighlightColor:"transparent",transition:"transform .12s"}}>
-              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="3" x2="19" y2="9"/><line x1="16" y1="6" x2="22" y2="6"/></svg>
+              <svg width={16} height={16} viewBox="0 0 24 24">
+                <circle cx="11" cy="7" r="4" fill="#7c3aed" fillOpacity="0.16"/>
+                <path d="M19 20v-1.2a4 4 0 00-4-4H7.5a4 4 0 00-4 4V20" fill="#7c3aed" fillOpacity="0.16"/>
+                <path d="M19 20v-1.2a4 4 0 00-4-4H7.5a4 4 0 00-4 4V20" fill="none" stroke="#7c3aed" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                <circle cx="11" cy="7" r="4" fill="none" stroke="#7c3aed" strokeWidth="1.8"/>
+                <line x1="19.5" y1="3.5" x2="19.5" y2="9.5" stroke="#7c3aed" strokeWidth="1.8" strokeLinecap="round"/>
+                <line x1="16.5" y1="6.5" x2="22.5" y2="6.5" stroke="#7c3aed" strokeWidth="1.8" strokeLinecap="round"/>
+              </svg>
               <span style={{fontSize:11,fontWeight:700,color:"#7c3aed"}}>Client</span>
             </button>
           )}
@@ -2208,7 +2231,13 @@ export default function App() {
               cursor:"pointer",flexShrink:0,fontFamily:"inherit",
               WebkitTapHighlightColor:"transparent",
               boxShadow:"0 3px 10px rgba(8,145,178,0.4)",transition:"transform .12s"}}>
-            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+            <svg width={17} height={17} viewBox="0 0 24 24">
+              <rect x="4.5" y="4" width="15" height="18" rx="2.5" fill="rgba(255,255,255,0.18)"/>
+              <rect x="4.5" y="4" width="15" height="18" rx="2.5" fill="none" stroke="#fff" strokeWidth="1.7" strokeLinejoin="round"/>
+              <rect x="8.5" y="2.5" width="7" height="3.5" rx="1.2" fill="#0369a1" stroke="#fff" strokeWidth="1.4"/>
+              <path d="M8.2 12.5l2.2 2.2 4.6-4.8" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <line x1="8.2" y1="17.3" x2="15.8" y2="17.3" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeOpacity="0.85"/>
+            </svg>
             {!isMobile&&<span style={{fontSize:11,fontWeight:800,color:"#fff"}}>Rapport</span>}
           </button>
 
@@ -2218,7 +2247,12 @@ export default function App() {
               background:"#fff1f2",border:"none",boxShadow:"inset 0 0 0 1px rgba(190,18,60,0.14)",
               cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
               flexShrink:0,WebkitTapHighlightColor:"transparent",transition:"transform .12s"}}>
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#be123c" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <svg width={16} height={16} viewBox="0 0 24 24">
+              <rect x="3" y="3" width="6" height="18" rx="1.5" fill="#be123c" fillOpacity="0.14"/>
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" fill="none" stroke="#be123c" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M14.5 7l5 5-5 5" fill="none" stroke="#be123c" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <line x1="19" y1="12" x2="9.5" y2="12" stroke="#be123c" strokeWidth="1.8" strokeLinecap="round"/>
+            </svg>
           </button>
         </div>
       </div>

@@ -1204,16 +1204,8 @@ export function DashboardHero({ clients, passages, rdvs, saisonNow, isMobile, on
         <div style={{position:"absolute",bottom:-70,left:-50,width:200,height:200,borderRadius:"50%",background:"radial-gradient(circle,rgba(255,255,255,0.08),transparent 70%)",pointerEvents:"none"}}/>
 
         <div style={{position:"relative",zIndex:2,padding:"20px 20px 22px"}}>
-          {/* Ligne top: logo + date */}
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18}}>
-            <div style={{display:"flex",alignItems:"center",gap:9}}>
-              <div style={{width:32,height:32,borderRadius:10,overflow:"hidden",flexShrink:0,boxShadow:"0 2px 10px rgba(0,0,0,0.25)"}}>
-                <img src="/icon-192.png" alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-              </div>
-              <span style={{fontSize:12.5,fontWeight:800,color:"rgba(255,255,255,0.92)",letterSpacing:1.2,textTransform:"uppercase"}}>Bri'Blue</span>
-            </div>
-            <div style={{fontSize:11,color:"rgba(255,255,255,0.55)",fontWeight:500,textTransform:"capitalize"}}>{dateStr}</div>
-          </div>
+          {/* Date */}
+          <div style={{fontSize:11,color:"rgba(255,255,255,0.55)",fontWeight:600,textTransform:"capitalize",letterSpacing:.3,marginBottom:10}}>{dateStr}</div>
 
           {/* Salutation */}
           <div style={{marginBottom:16}}>
