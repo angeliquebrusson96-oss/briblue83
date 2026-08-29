@@ -2031,8 +2031,8 @@ export default function App() {
       {/* HEADER */}
       <div style={{background:"#ffffff",paddingTop:isMobile?"max(10px, env(safe-area-inset-top, 0px))":"10px",paddingBottom:"10px",paddingLeft:isMobile?"14px":"28px",paddingRight:isMobile?"14px":"28px",display:"flex",alignItems:"center",gap:isMobile?8:12,position:"sticky",top:4,zIndex:50,borderBottom:"1px solid #e2e8f0",width:"100%",boxSizing:"border-box"}}>
         {/* Logo */}
-        <button onClick={()=>setPage("dashboard")} style={{background:"linear-gradient(135deg,#0891b2,#0369a1)",border:"none",padding:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",width:isMobile?40:38,height:isMobile?40:38,borderRadius:12,flexShrink:0,boxShadow:"0 2px 8px rgba(8,145,178,0.35)"}}>
-          {Ico.wave(isMobile?20:18,"white")}
+        <button onClick={()=>setPage("dashboard")} style={{background:"none",border:"none",padding:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",width:isMobile?40:38,height:isMobile?40:38,borderRadius:12,flexShrink:0,overflow:"hidden",boxShadow:"0 2px 8px rgba(8,20,45,0.3)"}}>
+          <img src="/icon-192.png" alt="Bri'Blue" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
         </button>
         {/* Indicateur online */}
         <div style={{width:8,height:8,borderRadius:"50%",background:online?"#22c55e":"#f87171",boxShadow:online?"0 0 0 2px rgba(34,197,94,0.2)":"0 0 0 2px rgba(248,113,113,0.2)",flexShrink:0}}/>
