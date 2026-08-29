@@ -136,10 +136,15 @@ export function alerteClient(c, passages) {
     const moisStr = `${yearCur}-${String(m).padStart(2,'0')}-01`;
     if (cs && moisStr < cs.slice(0,8)+'01') continue;
     if (ce && moisStr > ce) continue;
-    const done = passContrat.filter(p => {
+    const doneRapports = passContrat.filter(p => {
       const d = new Date(p.date);
       return d.getMonth()+1 === m && d.getFullYear() === yearCur;
     }).length;
+    // Ajoute les déductions manuelles (+/-) faites sur ce mois — sinon un ajustement
+    // du planning n'est jamais reflété tant qu'un rapport n'est pas saisi.
+    const mKey = `${cs?cs.slice(0,4):yearCur}-${String(m).padStart(2,'0')}`;
+    const manuelM = (c.passagesManuel||{})[mKey]||0;
+    const done = doneRapports + manuelM;
     if (done < effPlan) { retard = true; break; }
   }
   if (retard) return "orange";
@@ -150,10 +155,12 @@ export function alerteClient(c, passages) {
     const moisCurStr = `${yearCur}-${String(moisCur).padStart(2,'0')}-01`;
     const inRange = (!cs || moisCurStr >= cs.slice(0,8)+'01') && (!ce || moisCurStr <= ce);
     if (inRange) {
-      const doneCur = passContrat.filter(p => {
+      const doneCurRapports = passContrat.filter(p => {
         const d = new Date(p.date);
         return d.getMonth()+1 === moisCur && d.getFullYear() === yearCur;
       }).length;
+      const mKeyCur = `${cs?cs.slice(0,4):yearCur}-${String(moisCur).padStart(2,'0')}`;
+      const doneCur = doneCurRapports + ((c.passagesManuel||{})[mKeyCur]||0);
       if (doneCur < effCurPlan) return "aFaire";
     }
   }

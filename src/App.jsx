@@ -137,6 +137,7 @@ function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta,
   const [newNom,      setNewNom]      = useState("");
   const [newUnite,    setNewUnite]    = useState("flacon");
   const [newCat,      setNewCat]      = useState("traitement");
+  const [newPrix,     setNewPrix]     = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
   const [renamingProd,setRenamingProd]= useState(null);
   const [renameDraft, setRenameDraft] = useState("");
@@ -187,8 +188,8 @@ function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta,
   const handleAdd = () => {
     if (!newNom.trim()) return;
     onAddProduit(newNom.trim());
-    onUpdateMeta(newNom.trim(), { unite: newUnite, seuil: 2, categorie: newCat });
-    setNewNom(""); setShowAddForm(false);
+    onUpdateMeta(newNom.trim(), { unite: newUnite, seuil: 2, categorie: newCat, prix: parseFloat(newPrix) || 0 });
+    setNewNom(""); setNewPrix(""); setShowAddForm(false);
   };
 
   // ── Contenu partagé desktop + mobile ──────────────────────────────────────
@@ -237,6 +238,15 @@ function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta,
                   fontSize:12,fontFamily:"inherit",background:"#fff",color:"#374151",outline:"none"}}>
                 {STOCK_CATS.filter(c=>c.key!=="tous"&&c.key!=="bas").map(c=><option key={c.key} value={c.key}>{c.label}</option>)}
               </select>
+            </div>
+            <div style={{position:"relative",width:120}}>
+              <input type="number" min="0" step="0.01" value={newPrix}
+                onChange={e=>setNewPrix(e.target.value)}
+                onKeyDown={e=>e.key==="Enter"&&handleAdd()}
+                placeholder="Prix"
+                style={{width:"100%",padding:"8px 24px 8px 10px",borderRadius:9,border:"1.5px solid #e2e8f0",
+                  fontSize:12,outline:"none",fontFamily:"inherit",color:"#0f172a",background:"#fff",boxSizing:"border-box"}}/>
+              <span style={{position:"absolute",right:9,top:"50%",transform:"translateY(-50%)",fontSize:11,color:"#94a3b8",pointerEvents:"none"}}>€</span>
             </div>
             <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
               <button onClick={()=>setShowAddForm(false)}

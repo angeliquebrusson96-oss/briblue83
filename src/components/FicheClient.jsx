@@ -494,10 +494,15 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
                 const mStr = `${yearNow}-${String(m).padStart(2,"0")}-01`;
                 if (cs && mStr < cs.slice(0,8)+"01") continue;
                 if (ce && mStr > ce) continue;
-                const fait = passContrat.filter(p => {
+                const faitRapports = passContrat.filter(p => {
                   const d = new Date(p.date);
                   return d.getMonth()+1===m && d.getFullYear()===yearNow;
                 }).length;
+                // Ajoute les déductions manuelles (+/-) faites sur ce mois passé — sinon
+                // le "en retard" ignore les ajustements du planning et ne compte que les rapports.
+                const mKey = `${cs?cs.slice(0,4):yearNow}-${String(m).padStart(2,"0")}`;
+                const manuelM = (client.passagesManuel||{})[mKey]||0;
+                const fait = faitRapports + manuelM;
                 if (fait < prevuM) moisRetard.push({ m, manquants: prevuM - fait, fait, prevu: prevuM });
               }
               const totalManquants = moisRetard.reduce((s,r)=>s+r.manquants,0);
