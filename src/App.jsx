@@ -1547,19 +1547,21 @@ export default function App() {
                prev[keys.find(k => data[k] === ct)]?.statut !== ct.statut)
             );
           if (newSig) {
-            playNotifSound();
             const cli = clientsRef.current.find(cl => cl.id === newSig.clientId);
             const nomCli = cli?.nom || newSig.clientId;
             const isComplet = newSig.statut === "signe_complet";
-            toastInfo(isComplet
-              ? `✅ Contrat co-signé par ${nomCli} !`
-              : `📝 ${nomCli} a signé son contrat — votre signature est requise.`
-            );
-            sendLocalNotification(
-              isComplet ? "✅ Contrat co-signé !" : "📝 Signature requise",
-              isComplet ? `${nomCli} a co-signé le contrat.` : `${nomCli} a signé — votre tour !`,
-              { tag: "briblue-contrat-" + newSig.clientId, requireInteraction: !isComplet }
-            );
+            if (readLS("notif_enabled", true) && readLS("notif_evt_signature", true)) {
+              playNotifSound();
+              toastInfo(isComplet
+                ? `✅ Contrat co-signé par ${nomCli} !`
+                : `📝 ${nomCli} a signé son contrat — votre signature est requise.`
+              );
+              sendLocalNotification(
+                isComplet ? "✅ Contrat co-signé !" : "📝 Signature requise",
+                isComplet ? `${nomCli} a co-signé le contrat.` : `${nomCli} a signé — votre tour !`,
+                { tag: "briblue-contrat-" + newSig.clientId, requireInteraction: !isComplet }
+              );
+            }
             // ── Envoi automatique du contrat PDF quand les deux parties ont signé ──
             if (isComplet && !newSig.pdfSentAt && cli?.email) {
               const ctKey = keys.find(k => data[k] === newSig);
@@ -1808,6 +1810,8 @@ export default function App() {
   const savePassage = useCallback(async p=>{
     const existing = passages.find(x=>x.id===p.id);
     if(existing?.statut==="validee" && p.statut!=="validee"){ toastError("Cette intervention est validée et ne peut plus être modifiée."); return; }
+    const isNewPassage = !existing;
+    const isNewSignature = !!p.signatureClient && !existing?.signatureClient;
     const raw = passages.find(x=>x.id===p.id) ? passages.map(x=>x.id===p.id?p:x) : [...passages, p];
     // Migrer TOUTES les photos base64 restantes vers IDB avant la sauvegarde.
     // Cela protège aussi les anciens passages qui n'avaient pas encore été migrés.
@@ -1815,6 +1819,18 @@ export default function App() {
     setPassages(next);
     await savePassages(next);
     setShowFormPassage(false);setEditPassage(null);
+    // ── Notifications événements ──
+    if (readLS("notif_enabled", true)) {
+      const nomCli = clientsRef.current.find(c => c.id === p.clientId)?.nom || "";
+      if (isNewPassage && readLS("notif_evt_rapport", true)) {
+        toastInfo(`📋 Rapport saisi${nomCli ? " — " + nomCli : ""}`);
+        sendLocalNotification("📋 Rapport saisi", nomCli ? `Nouveau rapport pour ${nomCli}.` : "Nouveau rapport enregistré.", { tag: "briblue-rapport-" + p.id });
+      }
+      if (isNewSignature && readLS("notif_evt_signature", true)) {
+        toastInfo(`✍️ Signature reçue${nomCli ? " — " + nomCli : ""}`);
+        sendLocalNotification("✍️ Signature client", nomCli ? `${nomCli} a signé le rapport.` : "Signature client reçue.", { tag: "briblue-sig-rapport-" + p.id });
+      }
+    }
     // Arrière-plan : migrer les photos idb: vers Firebase Storage (non-bloquant)
     const saved = next.find(x => x.id === p.id);
     if (saved) {
@@ -1872,6 +1888,11 @@ export default function App() {
     // même livraison (ex: passage réédité) déciderait le stock à chaque fois.
     if (isNew && l.produits?.length > 0) {
       setStock(prev => { const next = {...prev}; l.produits.forEach(p => { if(next[p] !== undefined) next[p] = Math.max(0, (next[p]||0) - 1); }); saveStock(next); return next; });
+    }
+    if (isNew && readLS("notif_enabled", true) && readLS("notif_evt_livraison", true)) {
+      const nomCli = clientsRef.current.find(c => c.id === l.clientId)?.nom || "";
+      toastInfo(`📦 Livraison enregistrée${nomCli ? " — " + nomCli : ""}`);
+      sendLocalNotification("📦 Livraison enregistrée", nomCli ? `Nouvelle livraison pour ${nomCli}.` : "Nouvelle livraison saisie.", { tag: "briblue-livraison-" + l.id });
     }
   },[saveLivraisonsList, saveStock]);
 
