@@ -111,7 +111,10 @@ export function PagePassages({ clients, passages, onAdd, onDelete, onEdit, onUpd
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
                       <div>
-                        <div style={{fontWeight:800,fontSize:13,color:DS.dark}}>{c?.nom||p.clientId}</div>
+                        <div style={{fontWeight:800,fontSize:13,color:DS.dark,display:"flex",alignItems:"center",gap:6}}>
+                          {c?.nom||p.clientId}
+                          {p.createdByRole==="secretaire" && <span title={`Planifié par ${p.createdBy||"la secrétaire"}`} style={{fontSize:9,fontWeight:700,color:"#7c3aed",background:"#f5f3ff",padding:"1px 6px",borderRadius:6,letterSpacing:.2}}>Secrétariat</span>}
+                        </div>
                         <div style={{fontSize:11,color:DS.mid,marginTop:1,display:"flex",alignItems:"center",gap:4}}>
                           {new Date(p.date).toLocaleDateString("fr",{weekday:"short",day:"2-digit",month:"short"})}
                           {p.tech&&<><span>·</span>{Ico.user(10,DS.mid)}<span>{p.tech}</span></>}

@@ -23,6 +23,7 @@ import { CarnetPublic } from "./pages/CarnetClient";
 import { PageDocuments } from "./pages/PageDocuments";
 import { PageGestion } from "./pages/PageGestion";
 import { PageParametres } from "./pages/PageParametres";
+import { PageSecretaire, ModalPlanifierRapport } from "./pages/PageSecretaire";
 
 // Protection module-level contre double-load iOS
 let _BB_BOOT_DONE = false;
@@ -38,20 +39,38 @@ function readLS(key, fallback) {
 // livraison enregistrée, signature client. Alimente le volet cloche du header.
 const EVENTS_LS_KEY = "briblue_events_log_v1";
 const EVENTS_SEEN_KEY = "briblue_events_seen_at";
-function pushEvent(type, label) {
+function pushEvent(type, label, ref) {
   try {
     const raw = localStorage.getItem(EVENTS_LS_KEY);
     const list = raw ? JSON.parse(raw) : [];
-    list.unshift({ id: Date.now() + "_" + Math.random().toString(36).slice(2, 6), type, label, at: new Date().toISOString() });
+    list.unshift({
+      id: Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+      type, label,
+      at: new Date().toISOString(),
+      ...(ref ? { refKind: ref.kind, refId: ref.id } : {}),
+    });
     localStorage.setItem(EVENTS_LS_KEY, JSON.stringify(list.slice(0, 60)));
   } catch { /* noop */ }
 }
 function loadEvents() {
   try { const raw = localStorage.getItem(EVENTS_LS_KEY); return raw ? JSON.parse(raw) : []; } catch { return []; }
 }
+function removeEvent(id) {
+  try {
+    const raw = localStorage.getItem(EVENTS_LS_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    localStorage.setItem(EVENTS_LS_KEY, JSON.stringify(list.filter(e => e.id !== id)));
+  } catch { /* noop */ }
+}
 
 // ─── AUTH ────────────────────────────────────────────────────────────────────
-const AUTH = { email: "briblue83@hotmail.com", code: "2004" };
+// Deux rôles distincts :
+//  - technicien : accès complet (Dorian)
+//  - secretaire : accès restreint centré sur la planification d'interventions
+const ACCOUNTS = [
+  { email: "briblue83@hotmail.com",         code: "2004", role: "technicien", prenom: "Dorian"    },
+  { email: "angelique.brusson96@gmail.com", code: "3007", role: "secretaire", prenom: "Angélique" },
+];
 
 function LoginScreen({ onLogin }) {
   const [email, setEmail] = useState("");
@@ -65,7 +84,8 @@ function LoginScreen({ onLogin }) {
     if (!email.trim() || !code.trim()) { setErr("Veuillez remplir tous les champs."); return; }
     setLoading(true);
     setTimeout(() => {
-      if (email.trim().toLowerCase() === AUTH.email && code === AUTH.code) { onLogin(); }
+      const acc = ACCOUNTS.find(a => a.email === email.trim().toLowerCase() && a.code === code);
+      if (acc) { onLogin(acc); }
       else { setErr("Email ou code incorrect."); setLoading(false); }
     }, 600);
   };
@@ -1301,6 +1321,13 @@ function ModalImportConnecteam({ clients, onImport, onClose }) {
 export default function App() {
   const [carnetCode] = useState(()=>{ try { const p = new URLSearchParams(window.location.search); return p.get("carnet")||""; } catch { return ""; } });
   const [loggedIn, setLoggedIn] = useState(false);
+  const [session, setSession] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem("bb_session");
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  });
+  const isSecretaire = session?.role === "secretaire";
   const { online } = useOnlineStatus();
   const [page, setPage] = useState("dashboard");
   const [modeExpert, setModeExpert] = useState(() => readLS("expert_mode", false));
@@ -1318,11 +1345,14 @@ export default function App() {
   const [showStock, setShowStock] = useState(false);
   const [showImport, setShowImport]     = useState(false);
   const [showImportHTML, setShowImportHTML] = useState(false);
+  const [showPlanRapport, setShowPlanRapport] = useState(false);
+  const [secTab, setSecTab] = useState("planning"); // onglet actif de la vue secrétaire
   const [events, setEvents] = useState(() => loadEvents());
   const [showNotifPanel, setShowNotifPanel] = useState(false);
   const [showNavSheet, setShowNavSheet] = useState(false);
   const [eventsSeenAt, setEventsSeenAt] = useState(() => readLS("events_seen_at", ""));
-  const recordEvent = useCallback((type, label) => { pushEvent(type, label); setEvents(loadEvents()); }, []);
+  const recordEvent = useCallback((type, label, ref) => { pushEvent(type, label, ref); setEvents(loadEvents()); }, []);
+  const deleteEvent = useCallback((id) => { removeEvent(id); setEvents(loadEvents()); }, []);
   const [contrats, setContrats] = useState({});
   const [versements, setVersements] = useState({});
   const [retardsCarnet, setRetardsCarnet] = useState({});
@@ -1346,6 +1376,12 @@ export default function App() {
   const prevTaskCount = useRef(0);
   const clientsRef = useRef(clients); // ref toujours à jour pour les callbacks onSnapshot
   useEffect(() => { clientsRef.current = clients; }, [clients]);
+  const sessionRef  = useRef(null);
+  useEffect(() => { sessionRef.current = session; }, [session]);
+  const passagesRef = useRef([]);
+  useEffect(() => { passagesRef.current = passages; }, [passages]);
+  const rdvsRef     = useRef([]);
+  useEffect(() => { rdvsRef.current = rdvs; }, [rdvs]);
   const stockMetaRef = useRef({}); // ref toujours à jour, utilisée pour filtrer les défauts masqués dans le callback stock
   useEffect(() => { stockMetaRef.current = stockMeta; }, [stockMeta]);
   const stockRef = useRef({}); // ref toujours à jour, utilisée pour la vérification de collision dans renameProduitStock
@@ -1372,7 +1408,15 @@ export default function App() {
 
   useEffect(()=>{
     setupPWA();
-    try { if(sessionStorage.getItem("bb_auth")==="1") setLoggedIn(true); } catch { /* noop */ }
+    try {
+      if(sessionStorage.getItem("bb_auth")==="1") setLoggedIn(true);
+      // Fallback : ancienne session sans role → considérer technicien
+      if (sessionStorage.getItem("bb_auth")==="1" && !sessionStorage.getItem("bb_session")) {
+        const legacy = { email:"briblue83@hotmail.com", role:"technicien", prenom:"Dorian" };
+        sessionStorage.setItem("bb_session", JSON.stringify(legacy));
+        setSession(legacy);
+      }
+    } catch { /* noop */ }
     // S'assurer d'avoir un utilisateur Firebase pour les uploads Storage
     if (!auth.currentUser) signInAnonymously(auth).catch(()=>{});
   },[]);
@@ -1543,8 +1587,48 @@ export default function App() {
           prixPassageC: cl.prixPassageC || 0,
         })));
       },
-      passages:   (data) => { if (Array.isArray(data)) setPassages(data); },
-      rdvs:       (data) => { if (Array.isArray(data)) setRdvs(data); },
+      passages:   (data) => {
+        if (!Array.isArray(data)) return;
+        // Détecter les rapports fraîchement planifiés par la secrétaire pour Dorian
+        // (nouvel ID, marqué createdByRole="secretaire", non déjà connu localement)
+        if (sessionRef.current?.role === "technicien") {
+          const existingIds = new Set((passagesRef.current || []).map(p => p.id));
+          const nouveaux = data.filter(p => p.createdByRole === "secretaire" && p.id && !existingIds.has(p.id));
+          for (const p of nouveaux) {
+            const nomCli = clientsRef.current.find(c => c.id === p.clientId)?.nom || "client ?";
+            const dateStr = p.date ? new Date(p.date).toLocaleDateString("fr", { day:"2-digit", month:"long" }) : "";
+            const label = `${nomCli} — ${dateStr}${p.type ? ` (${p.type})` : ""}`;
+            recordEvent("rapport_planifie_recu", `Angélique a ajouté un rapport · ${label}`, { kind:"passage", id:p.id });
+            toastInfo(`🗓️ Angélique a planifié un rapport — ${label}`);
+            sendLocalNotification(
+              "🗓️ Nouveau rapport planifié",
+              `Angélique a ajouté un rapport pour ${nomCli} le ${dateStr}.`,
+              { tag:"briblue-plan-rapport-"+p.id, requireInteraction:false }
+            );
+          }
+        }
+        setPassages(data);
+      },
+      rdvs: (data) => {
+        if (!Array.isArray(data)) return;
+        if (sessionRef.current?.role === "technicien") {
+          const existingIds = new Set((rdvsRef.current || []).map(r => r.id));
+          const nouveaux = data.filter(r => r.createdByRole === "secretaire" && r.id && !existingIds.has(r.id));
+          for (const r of nouveaux) {
+            const nomCli = clientsRef.current.find(c => c.id === r.clientId)?.nom || "client ?";
+            const dateStr = r.date ? new Date(r.date).toLocaleDateString("fr", { day:"2-digit", month:"long" }) : "";
+            const label = `${nomCli} — ${dateStr}${r.heure ? " "+r.heure : ""}${r.type ? ` (${r.type})` : ""}`;
+            recordEvent("rdv_planifie_recu", `Angélique a ajouté un RDV · ${label}`, { kind:"rdv", id:r.id });
+            toastInfo(`📅 Angélique a planifié un RDV — ${label}`);
+            sendLocalNotification(
+              "📅 Nouveau RDV planifié",
+              `Angélique a ajouté un RDV pour ${nomCli} le ${dateStr}${r.heure ? " à "+r.heure : ""}.`,
+              { tag:"briblue-plan-rdv-"+r.id, requireInteraction:false }
+            );
+          }
+        }
+        setRdvs(data);
+      },
       livraisons: (data) => { if (Array.isArray(data)) setLivraisons(data); },
       contrats: (data) => {
         if (!data || typeof data !== "object") return;
@@ -1710,13 +1794,18 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, rdvs.map(r=>r.id+r.heure+r.date).join(",")]);
 
-  const handleLogin = useCallback(()=>{
-    try{sessionStorage.setItem("bb_auth","1");}catch{ /* noop */ }
+  const handleLogin = useCallback((account)=>{
+    const acc = account || { email:"briblue83@hotmail.com", role:"technicien", prenom:"Dorian" };
+    try{
+      sessionStorage.setItem("bb_auth","1");
+      sessionStorage.setItem("bb_session", JSON.stringify(acc));
+    }catch{ /* noop */ }
+    setSession(acc);
     // Connexion anonyme Firebase pour autoriser les uploads Firebase Storage
     if (!auth.currentUser) signInAnonymously(auth).catch(()=>{});
     setLoggedIn(true);
   },[]);
-  const handleLogout = useCallback(()=>{ try{sessionStorage.removeItem("bb_auth");}catch{ /* noop */ } setLoggedIn(false);setReady(false);setClients([]);setPassages([]);setLivraisons([]);setRdvs([]); },[]);
+  const handleLogout = useCallback(()=>{ try{sessionStorage.removeItem("bb_auth");sessionStorage.removeItem("bb_session");}catch{ /* noop */ } setSession(null);setLoggedIn(false);setReady(false);setClients([]);setPassages([]);setLivraisons([]);setRdvs([]); },[]);
 
   const saveClient = useCallback(async c=>{
     const { envoyerContrat, ...clientDataRaw } = c;
@@ -1836,14 +1925,14 @@ export default function App() {
     {
       const nomCli = clientsRef.current.find(c => c.id === p.clientId)?.nom || "";
       if (isNewPassage) {
-        recordEvent("rapport", nomCli);
+        recordEvent("rapport", nomCli, { kind:"passage", id:p.id });
         if (readLS("notif_enabled", true) && readLS("notif_evt_rapport", true)) {
           toastInfo(`📋 Rapport saisi${nomCli ? " — " + nomCli : ""}`);
           sendLocalNotification("📋 Rapport saisi", nomCli ? `Nouveau rapport pour ${nomCli}.` : "Nouveau rapport enregistré.", { tag: "briblue-rapport-" + p.id });
         }
       }
       if (isNewSignature) {
-        recordEvent("signature", nomCli);
+        recordEvent("signature", nomCli, { kind:"passage", id:p.id });
         if (readLS("notif_enabled", true) && readLS("notif_evt_signature", true)) {
           toastInfo(`✍️ Signature reçue${nomCli ? " — " + nomCli : ""}`);
           sendLocalNotification("✍️ Signature client", nomCli ? `${nomCli} a signé le rapport.` : "Signature client reçue.", { tag: "briblue-sig-rapport-" + p.id });
@@ -1910,7 +1999,7 @@ export default function App() {
     }
     if (isNew) {
       const nomCli = clientsRef.current.find(c => c.id === l.clientId)?.nom || "";
-      recordEvent("livraison", nomCli);
+      recordEvent("livraison", nomCli, { kind:"livraison", id:l.id });
       if (readLS("notif_enabled", true) && readLS("notif_evt_livraison", true)) {
         toastInfo(`📦 Livraison enregistrée${nomCli ? " — " + nomCli : ""}`);
         sendLocalNotification("📦 Livraison enregistrée", nomCli ? `Nouvelle livraison pour ${nomCli}.` : "Nouvelle livraison saisie.", { tag: "briblue-livraison-" + l.id });
@@ -1991,7 +2080,30 @@ export default function App() {
     setShowImport(false);
   }, [saveClients, savePassages]);
 
-  const saveRdv = useCallback(r=>{ setRdvs(prev=>{ const next=prev.find(x=>x.id===r.id)?prev.map(x=>x.id===r.id?r:x):[...prev,r]; saveRdvsList(next); return next; }); setShowFormRdv(false);setEditRdv(null); },[saveRdvsList]);
+  // Planification d'un rapport par la secrétaire — crée un passage à effectuer
+  // (ok:false + statut:"aFaire") que Dorian retrouve dans sa liste de rapports.
+  const planifierRapport = useCallback(async (p) => {
+    const enriched = { ...p, createdByRole: session?.role || "secretaire", createdBy: session?.prenom || "Angélique" };
+    const next = [...passages, enriched];
+    setPassages(next);
+    await savePassages(next);
+    setShowPlanRapport(false);
+    const nomCli = clientsRef.current.find(c => c.id === p.clientId)?.nom || "";
+    recordEvent("rapport_planifie", `${nomCli} — ${p.date}`, { kind:"passage", id:p.id });
+    toastInfo(`✅ Rapport planifié pour ${nomCli}`);
+  }, [passages, savePassages, session, recordEvent]);
+
+  const saveRdv = useCallback(r=>{
+    // Marquer la source pour que le technicien voie d'où vient le RDV
+    const enriched = r.createdByRole ? r : { ...r, createdByRole: session?.role || "technicien", createdBy: session?.prenom || "Dorian" };
+    setRdvs(prev=>{ const next=prev.find(x=>x.id===enriched.id)?prev.map(x=>x.id===enriched.id?enriched:x):[...prev,enriched]; saveRdvsList(next); return next; });
+    // Notification et journal pour le technicien quand la secrétaire planifie
+    if (session?.role === "secretaire") {
+      const nomCli = clientsRef.current.find(c => c.id === r.clientId)?.nom || "";
+      recordEvent("rdv", `${nomCli} — ${r.date}${r.heure?" "+r.heure:""}`, { kind:"rdv", id:r.id });
+    }
+    setShowFormRdv(false);setEditRdv(null);
+  },[saveRdvsList, session, recordEvent]);
   const deleteRdv = useCallback(id=>{ markDeleted("bb_rdvs_v1", id); setRdvs(prev=>{ const next=prev.filter(x=>x.id!==id); saveRdvsList(next); return next; }); },[saveRdvsList]);
   const openAddClient = useCallback(()=>{ setEditClient(null); setShowFormClient(true); },[]);
 
@@ -2052,6 +2164,105 @@ export default function App() {
     </div></>
   );
 
+  // ─── VUE SECRÉTAIRE ────────────────────────────────────────────────────────
+  // Interface simplifiée focalisée sur la planification des interventions.
+  if (isSecretaire) return (
+    <>
+    <GlobalStyles/>
+    <ToastContainer/>
+    <ConfirmModal/>
+    <div style={{minHeight:"100dvh",background:"#f1f5f9",fontFamily:"'Inter', -apple-system, system-ui, sans-serif",maxWidth:isMobile?640:900,margin:"0 auto",display:"flex",flexDirection:"column"}}>
+      <div style={{height:4,background:"linear-gradient(90deg,#7c3aed 0%,#a78bfa 50%,#06b6d4 100%)",flexShrink:0,position:"sticky",top:0,zIndex:51}}/>
+      <div style={{background:"#fff",borderBottom:"1px solid #e2e8f0",position:"sticky",top:4,zIndex:50}}>
+        <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:36,height:36,borderRadius:11,overflow:"hidden",flexShrink:0,boxShadow:"0 2px 8px rgba(8,20,45,0.25)"}}>
+            <img src="/icon-192.png" alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+          </div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,fontWeight:800,color:"#0f172a",lineHeight:1.1}}>BRIBLUE</div>
+            <div style={{fontSize:10,color:"#7c3aed",fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginTop:1}}>Espace secrétariat</div>
+          </div>
+          {/* Stock */}
+          <button onClick={()=>setShowStock(true)} title="Stock produits"
+            style={{position:"relative",width:36,height:36,borderRadius:11,background:"#f0fdf4",border:"none",
+              boxShadow:"inset 0 0 0 1px rgba(5,150,105,0.14)",cursor:"pointer",display:"flex",alignItems:"center",
+              justifyContent:"center",flexShrink:0,WebkitTapHighlightColor:"transparent"}}>
+            <svg width={16} height={16} viewBox="0 0 24 24">
+              <rect x="3" y="8" width="18" height="13" rx="1.5" fill="#059669" fillOpacity="0.14"/>
+              <path d="M21 8V21H3V8" fill="none" stroke="#059669" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M23 3H1v5h22V3z" fill="none" stroke="#059669" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <line x1="9.5" y1="12.2" x2="14.5" y2="12.2" stroke="#059669" strokeWidth="1.8" strokeLinecap="round"/>
+            </svg>
+            {nbStockBas>0&&<span style={{position:"absolute",top:-4,right:-4,minWidth:14,height:14,borderRadius:7,background:"#ef4444",color:"#fff",fontSize:8,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",boxShadow:"0 0 0 2px #fff"}}>{nbStockBas}</span>}
+          </button>
+          <div style={{width:8,height:8,borderRadius:"50%",background:online?"#22c55e":"#f87171",flexShrink:0}}/>
+        </div>
+        {/* Onglets */}
+        <div style={{display:"flex",gap:6,padding:"0 14px 10px"}}>
+          {[
+            {id:"planning", label:"Planning", emoji:"📅"},
+            {id:"gestion",  label:"Gestion",  emoji:"💳"},
+          ].map(t=>{
+            const active = secTab===t.id;
+            return (
+              <button key={t.id} onClick={()=>setSecTab(t.id)}
+                style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+                  padding:"9px 12px",borderRadius:12,fontFamily:"inherit",cursor:"pointer",
+                  fontSize:12.5,fontWeight:active?800:600,
+                  background:active?"linear-gradient(135deg,#7c3aed,#4c1d95)":"#f8fafc",
+                  color:active?"#fff":"#475569",border:"none",
+                  boxShadow:active?"0 3px 12px rgba(124,58,237,0.3)":"inset 0 0 0 1px #eef2f6",
+                  WebkitTapHighlightColor:"transparent",transition:"all .15s"}}>
+                <span>{t.emoji}</span>{t.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{padding:"18px 16px 40px"}}>
+        {secTab==="planning" && (
+          <PageSecretaire
+            clients={clients}
+            rdvs={rdvs}
+            passages={passages}
+            livraisons={livraisons}
+            events={events}
+            session={session}
+            onAddRdv={()=>{setEditRdv(null);setShowFormRdv(true);}}
+            onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}}
+            onEditPassage={p=>{setEditPassage(p);setDefaultClientId(p.clientId);setShowFormPassage(true);}}
+            onAddRapport={()=>setShowPlanRapport(true)}
+            onAddClient={openAddClient}
+            onClientClick={setFicheClient}
+            onAddLivraison={()=>{setDefaultLivraisonClientId("");setEditLivraison(null);setShowFormLivraison(true);}}
+            onEditLivraison={openEditLivraison}
+            onDeleteEvent={deleteEvent}
+            onLogout={handleLogout}
+          />
+        )}
+        {secTab==="gestion" && (
+          <PageGestion clients={clients} versements={versements} onToggleVersement={handleToggleVersement}
+            livraisons={livraisons} onUpdateStatutLivraison={updateStatutLivraison}
+            retardsCarnet={retardsCarnet} onToggleRetardCarnet={handleToggleRetardCarnet}
+            contrats={contrats}
+            onOpenContrat={(client,contrat)=>ouvrirContrat(client,contrat?.signaturePrestataire||"",contrat?.signatureClient||"",contrat)}
+            onClientClick={setFicheClient} onEditLivraison={openEditLivraison}/>
+        )}
+      </div>
+    </div>
+    {ficheClient&&(()=>{
+      const latest=clients.find(c=>c.id===ficheClient.id)||ficheClient;
+      return <FicheClient client={latest} passages={passages} livraisons={livraisons.filter(l=>l.clientId===latest.id)} rdvs={rdvs} produitsStock={Object.keys(stock)} stockMeta={stockMeta} contrats={contrats} versements={versements} onToggleVersement={handleToggleVersement} onUpdateContrat={(contractId,data)=>setContrats(prev=>{ const next={...prev,[contractId]:{...prev[contractId],...data}}; saveContrats(next); return next; })} onDeleteContrat={()=>deleteContrat(latest.id)} onResetContratSignatures={()=>resetContratSignatures(latest.id)} onUpdateClient={c=>{ setClients(prev=>{ const next=prev.map(x=>x.id===c.id?c:x); saveClients(next); return next; }); setFicheClient(c); }} onSaveLivraison={saveLivraison} onDeleteLivraison={deleteLivraison} onUpdateStatutLivraison={updateStatutLivraison} onClose={()=>setFicheClient(null)} onEdit={()=>{setEditClient(latest);setShowFormClient(true);setFicheClient(null);}} onDelete={()=>deleteClient(latest.id)} onDeletePassage={deletePassage} onAddPassage={()=>openAddPassageFromClient(latest.id)} onEditPassage={openEditPassage} onUpdatePassageStatus={updatePassageRapportStatus} onAddRdv={()=>{setEditRdv({clientId:latest.id});setShowFormRdv(true);}} onEditRdv={r=>{setEditRdv(r);setShowFormRdv(true);}} onDeleteRdv={deleteRdv} retardsCarnet={retardsCarnet} onToggleRetardCarnet={handleToggleRetardCarnet} onEditLivraison={openEditLivraison}/>;
+    })()}
+    {showFormRdv&&<FormRdv initial={editRdv} clients={clients} onSave={saveRdv} onClose={()=>{setShowFormRdv(false);setEditRdv(null);}}/>}
+    {showPlanRapport&&<ModalPlanifierRapport clients={clients} onSave={planifierRapport} onClose={()=>setShowPlanRapport(false)}/>}
+    {showFormPassage&&<FormPassage clients={clients} defaultClientId={defaultClientId} initial={editPassage} onSave={p=>savePassage(p)} onSaveLivraison={saveLivraison} livraisons={livraisons} produitsStock={Object.keys(stock)} stockMeta={stockMeta} onClose={()=>{setShowFormPassage(false);setEditPassage(null);}}/>}
+    {showFormClient&&<FormClient initial={editClient} clients={clients} onSave={saveClient} onClose={()=>{setShowFormClient(false);setEditClient(null);}}/>}
+    {showFormLivraison&&<FormLivraison initial={editLivraison} clientId={editLivraison?.clientId||defaultLivraisonClientId} clients={clients} produitsStock={Object.keys(stock)} stockMeta={stockMeta} onSave={l=>{saveLivraison(l);setShowFormLivraison(false);setEditLivraison(null);}} onClose={()=>{setShowFormLivraison(false);setEditLivraison(null);}}/>}
+    {showStock&&<ModalStock stock={stock} stockMeta={stockMeta} onClose={()=>setShowStock(false)} onUpdateStock={updateStock} onUpdateMeta={updateStockMeta} onAddProduit={addProduitStock} onDeleteProduit={deleteProduitStock} onRenameProduit={renameProduitStock}/>}
+    </>
+  );
+
   const NAV = [
     { id:"dashboard",     l:"Accueil",      icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?DS.blue:"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M9 21V14h6v7"/></svg> },
     { id:"clients",       l:"Clients",      icon:(a)=><svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={a?DS.blue:"#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a4 4 0 014-4h8a4 4 0 014 4v2"/></svg> },
@@ -2064,10 +2275,55 @@ export default function App() {
   const PAGE_LABELS = { dashboard:`Bonjour Dorian 👋`, clients:"Clients", passages:"Rapports", interventions:"Rapports", rdv:"Rendez-vous", gestion:"Gestion", parametres:"Paramètres" };
 
   const EVENT_META = {
-    rapport:   { icon:"📋", verbe:"Rapport saisi",        color:"#0891b2" },
-    livraison: { icon:"📦", verbe:"Livraison enregistrée", color:"#f97316" },
-    signature: { icon:"✍️", verbe:"Signature client",      color:"#7c3aed" },
+    rapport:               { icon:"📋", verbe:"Rapport saisi",           color:"#0891b2" },
+    livraison:             { icon:"📦", verbe:"Livraison enregistrée",   color:"#f97316" },
+    signature:             { icon:"✍️", verbe:"Signature client",         color:"#7c3aed" },
+    rdv:                   { icon:"📅", verbe:"RDV planifié",             color:"#6d28d9" },
+    rapport_planifie:      { icon:"🗓️", verbe:"Rapport planifié",         color:"#0891b2" },
+    rdv_planifie_recu:     { icon:"📅", verbe:"RDV ajouté par Angélique", color:"#6d28d9" },
+    rapport_planifie_recu: { icon:"🗓️", verbe:"Rapport ajouté par Angélique", color:"#0891b2" },
   };
+  // Résout l'objet (RDV / rapport / livraison) visé par un événement du journal.
+  // Utilise la référence explicite si présente, sinon retrouve le client par son
+  // nom dans le label (formats historiques variés) et prend l'objet le plus pertinent.
+  const resolveEventTarget = (e) => {
+    if (e.refKind && e.refId) {
+      if (e.refKind === "rdv")       { const o = rdvs.find(r=>r.id===e.refId);       return o ? {kind:"rdv",obj:o} : null; }
+      if (e.refKind === "passage")   { const o = passages.find(p=>p.id===e.refId);   return o ? {kind:"passage",obj:o} : null; }
+      if (e.refKind === "livraison") { const o = livraisons.find(l=>l.id===e.refId); return o ? {kind:"livraison",obj:o} : null; }
+      return null;
+    }
+    if (!e.label) return null;
+    const lower = e.label.toLowerCase();
+    let client = null;
+    for (const c of clients) {
+      const nom = (c.nom||"").trim();
+      if (nom.length > 2 && lower.includes(nom.toLowerCase())) {
+        if (!client || nom.length > (client.nom||"").length) client = c;
+      }
+    }
+    if (!client) return null;
+    const iso = (e.label.match(/(\d{4}-\d{2}-\d{2})/) || [])[1];
+    const pick = (arr) => {
+      const cands = arr.filter(x => x.clientId === client.id);
+      return (iso && cands.find(x => x.date === iso))
+          || [...cands].sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))[0]
+          || null;
+    };
+    if (/rdv/.test(e.type))       { const o = pick(rdvs);       return o ? {kind:"rdv",obj:o} : null; }
+    if (/livraison/.test(e.type)) { const o = pick(livraisons); return o ? {kind:"livraison",obj:o} : null; }
+    const o = pick(passages);
+    return o ? {kind:"passage",obj:o} : null;
+  };
+  const openEventTarget = (e) => {
+    const t = resolveEventTarget(e);
+    if (!t) return;
+    setShowNotifPanel(false);
+    if (t.kind === "rdv")            { setEditRdv(t.obj); setShowFormRdv(true); }
+    else if (t.kind === "passage")   { setEditPassage(t.obj); setDefaultClientId(t.obj.clientId); setShowFormPassage(true); }
+    else if (t.kind === "livraison") { openEditLivraison(t.obj); }
+  };
+
   const unreadCount = events.filter(e => !eventsSeenAt || e.at > eventsSeenAt).length;
   const openNotifPanel = () => {
     setShowNotifPanel(v => !v);
@@ -2133,13 +2389,24 @@ export default function App() {
                       const d = new Date(e.at);
                       const dateStr = d.toLocaleDateString("fr",{day:"2-digit",month:"short"});
                       const heureStr = d.toLocaleTimeString("fr",{hour:"2-digit",minute:"2-digit"});
+                      const clickable = !!resolveEventTarget(e);
                       return (
-                        <div key={e.id} style={{display:"flex",gap:10,padding:"10px 14px",borderBottom:"1px solid #f8fafc",alignItems:"flex-start"}}>
+                        <div key={e.id}
+                          onClick={clickable ? ()=>openEventTarget(e) : undefined}
+                          style={{display:"flex",gap:10,padding:"10px 14px",borderBottom:"1px solid #f8fafc",alignItems:"center",cursor:clickable?"pointer":"default",WebkitTapHighlightColor:"transparent"}}>
                           <div style={{width:30,height:30,borderRadius:9,flexShrink:0,background:"#f8fafc",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>{meta.icon}</div>
                           <div style={{flex:1,minWidth:0}}>
                             <div style={{fontSize:12.5,fontWeight:700,color:"#0f172a"}}>{meta.verbe}{e.label?` — ${e.label}`:""}</div>
-                            <div style={{fontSize:10.5,color:"#94a3b8",marginTop:2}}>{dateStr} · {heureStr}</div>
+                            <div style={{fontSize:10.5,color:"#94a3b8",marginTop:2,display:"flex",alignItems:"center",gap:6}}>
+                              <span>{dateStr} · {heureStr}</span>
+                              {clickable && <span style={{fontSize:9.5,fontWeight:700,color:"#0891b2",background:"#f0f9ff",padding:"1px 6px",borderRadius:6}}>Modifier</span>}
+                            </div>
                           </div>
+                          <button onClick={ev=>{ev.stopPropagation();deleteEvent(e.id);}} title="Retirer de la liste"
+                            style={{width:24,height:24,borderRadius:7,border:"none",background:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,WebkitTapHighlightColor:"transparent"}}>
+                            <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.6" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                          </button>
+                          {clickable && <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2.4" strokeLinecap="round" style={{flexShrink:0}}><polyline points="9 18 15 12 9 6"/></svg>}
                         </div>
                       );
                     })}
