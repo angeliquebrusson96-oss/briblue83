@@ -2120,7 +2120,8 @@ export default function App() {
             {showNotifPanel && (
               <>
                 <div onClick={()=>setShowNotifPanel(false)} style={{position:"fixed",inset:0,zIndex:98,background:"transparent"}}/>
-                <div style={{position:"absolute",top:"calc(100% + 8px)",right:0,width:"min(340px, 88vw)",
+                <div style={{position:"fixed",top:"calc(env(safe-area-inset-top,0px) + 60px)",right:12,
+                  width:"min(340px, calc(100vw - 24px))",
                   background:"#fff",borderRadius:14,border:"1px solid #e2e8f0",
                   boxShadow:"0 12px 32px rgba(15,23,42,0.18)",zIndex:99,overflow:"hidden"}}>
                   <div style={{padding:"12px 14px",borderBottom:"1px solid #f1f5f9",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -2283,12 +2284,9 @@ export default function App() {
             .nav-sheet-backdrop{animation:navSheetFade .2s ease forwards}
           `}</style>
           <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:640,background:"#ffffff",zIndex:50,paddingBottom:"env(safe-area-inset-bottom,0px)",borderTop:"1px solid #e2e8f0"}}>
-            <button onClick={()=>setShowNavSheet(true)} style={{width:"100%",padding:"10px 16px",border:"none",background:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:10,WebkitTapHighlightColor:"transparent",fontFamily:"inherit"}}>
-              <div style={{width:34,height:34,borderRadius:9,background:"#e0f2fe",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                {NAV.find(n=>n.id===page)?.icon(true)}
-              </div>
-              <span style={{flex:1,textAlign:"left",fontSize:13,fontWeight:700,color:"#0f172a"}}>{PAGE_LABELS[page]}</span>
-              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{transform:"rotate(-90deg)"}}><polyline points="6 9 12 15 18 9"/></svg>
+            <button onClick={()=>setShowNavSheet(true)} style={{width:"100%",padding:"12px 16px",border:"none",background:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7,WebkitTapHighlightColor:"transparent",fontFamily:"inherit"}}>
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2.2" strokeLinecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+              <span style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>Menu</span>
             </button>
           </div>
 
