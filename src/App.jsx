@@ -2109,12 +2109,13 @@ export default function App() {
           {/* Cloche notifications */}
           <div style={{position:"relative",flexShrink:0}}>
             <button onClick={openNotifPanel} title="Notifications"
-              style={{position:"relative",width:36,height:36,borderRadius:10,
-                background:showNotifPanel?"#e0f2fe":"#f8fafc",border:"1px solid #e2e8f0",
+              style={{position:"relative",width:36,height:36,borderRadius:11,
+                background:showNotifPanel?"#e0f2fe":"#f0f9ff",border:"none",
+                boxShadow:"inset 0 0 0 1px rgba(8,145,178,0.14)",
                 cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
-                flexShrink:0,WebkitTapHighlightColor:"transparent",transition:"all .15s"}}>
+                flexShrink:0,WebkitTapHighlightColor:"transparent",transition:"transform .12s, background .15s"}}>
               <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
-              {unreadCount>0&&<span style={{position:"absolute",top:-4,right:-4,minWidth:14,height:14,borderRadius:7,background:"#ef4444",color:"#fff",fontSize:8,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px"}}>{unreadCount>9?"9+":unreadCount}</span>}
+              {unreadCount>0&&<span style={{position:"absolute",top:-4,right:-4,minWidth:14,height:14,borderRadius:7,background:"#ef4444",color:"#fff",fontSize:8,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",boxShadow:"0 0 0 2px #fff"}}>{unreadCount>9?"9+":unreadCount}</span>}
             </button>
 
             {showNotifPanel && (
@@ -2158,27 +2159,29 @@ export default function App() {
           <button onClick={()=>setShowStock(true)} title="Stock produits"
             style={{position:"relative",display:"flex",alignItems:"center",gap:5,
               justifyContent:"center",
-              padding:isMobile?"0":"0 11px",
+              padding:isMobile?"0":"0 12px",
               width:isMobile?36:undefined,
-              height:36,borderRadius:10,
-              background:"#f0fdf4",border:"1px solid #bbf7d0",
+              height:36,borderRadius:11,
+              background:"#f0fdf4",border:"none",
+              boxShadow:"inset 0 0 0 1px rgba(5,150,105,0.12)",
               cursor:"pointer",flexShrink:0,fontFamily:"inherit",
-              WebkitTapHighlightColor:"transparent",transition:"all .15s"}}>
+              WebkitTapHighlightColor:"transparent",transition:"transform .12s"}}>
             <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8V21H3V8"/><path d="M23 3H1v5h22V3z"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
             {!isMobile&&<span style={{fontSize:11,fontWeight:700,color:"#059669"}}>Stock</span>}
-            {nbStockBas>0&&<span style={{position:"absolute",top:-4,right:-4,minWidth:14,height:14,borderRadius:7,background:"#ef4444",color:"#fff",fontSize:8,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px"}}>{nbStockBas}</span>}
+            {nbStockBas>0&&<span style={{position:"absolute",top:-4,right:-4,minWidth:14,height:14,borderRadius:7,background:"#ef4444",color:"#fff",fontSize:8,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",boxShadow:"0 0 0 2px #fff"}}>{nbStockBas}</span>}
           </button>
 
           {/* Livraison */}
           <button onClick={()=>{setDefaultLivraisonClientId("");setEditLivraison(null);setShowFormLivraison(true);}} title="Nouvelle livraison"
             style={{display:"flex",alignItems:"center",gap:5,
               justifyContent:"center",
-              padding:isMobile?"0":"0 11px",
+              padding:isMobile?"0":"0 12px",
               width:isMobile?36:undefined,
-              height:36,borderRadius:10,
-              background:"#fff7ed",border:"1px solid #fed7aa",
+              height:36,borderRadius:11,
+              background:"#fff7ed",border:"none",
+              boxShadow:"inset 0 0 0 1px rgba(249,115,22,0.14)",
               cursor:"pointer",flexShrink:0,fontFamily:"inherit",
-              WebkitTapHighlightColor:"transparent",transition:"all .15s"}}>
+              WebkitTapHighlightColor:"transparent",transition:"transform .12s"}}>
             <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 4v4h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
             {!isMobile&&<span style={{fontSize:11,fontWeight:700,color:"#f97316"}}>Livraison</span>}
           </button>
@@ -2186,9 +2189,9 @@ export default function App() {
           {/* Nouveau client — desktop uniquement dans le header */}
           {!isMobile&&(
             <button onClick={openAddClient} title="Nouveau client"
-              style={{display:"flex",alignItems:"center",gap:5,padding:"0 11px",height:36,borderRadius:10,
-                background:"#f5f3ff",border:"1px solid #ddd6fe",
-                cursor:"pointer",flexShrink:0,WebkitTapHighlightColor:"transparent",transition:"all .15s"}}>
+              style={{display:"flex",alignItems:"center",gap:5,padding:"0 12px",height:36,borderRadius:11,
+                background:"#f5f3ff",border:"none",boxShadow:"inset 0 0 0 1px rgba(124,58,237,0.14)",
+                cursor:"pointer",flexShrink:0,WebkitTapHighlightColor:"transparent",transition:"transform .12s"}}>
               <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="3" x2="19" y2="9"/><line x1="16" y1="6" x2="22" y2="6"/></svg>
               <span style={{fontSize:11,fontWeight:700,color:"#7c3aed"}}>Client</span>
             </button>
@@ -2198,23 +2201,23 @@ export default function App() {
           <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} title="Nouveau rapport"
             style={{display:"flex",alignItems:"center",gap:isMobile?0:6,
               justifyContent:"center",
-              padding:isMobile?"0":"0 14px",
+              padding:isMobile?"0":"0 15px",
               width:isMobile?40:undefined,
-              height:36,borderRadius:10,
+              height:36,borderRadius:11,
               background:"linear-gradient(135deg,#0891b2,#0369a1)",border:"none",
               cursor:"pointer",flexShrink:0,fontFamily:"inherit",
               WebkitTapHighlightColor:"transparent",
-              boxShadow:"0 2px 8px rgba(8,145,178,0.35)",transition:"all .15s"}}>
+              boxShadow:"0 3px 10px rgba(8,145,178,0.4)",transition:"transform .12s"}}>
             <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
             {!isMobile&&<span style={{fontSize:11,fontWeight:800,color:"#fff"}}>Rapport</span>}
           </button>
 
           {/* Déconnexion */}
           <button onClick={handleLogout} title="Déconnexion"
-            style={{width:36,height:36,borderRadius:10,
-              background:"#fff1f2",border:"1px solid #fecdd3",
+            style={{width:36,height:36,borderRadius:11,
+              background:"#fff1f2",border:"none",boxShadow:"inset 0 0 0 1px rgba(190,18,60,0.14)",
               cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
-              flexShrink:0,WebkitTapHighlightColor:"transparent",transition:"all .15s"}}>
+              flexShrink:0,WebkitTapHighlightColor:"transparent",transition:"transform .12s"}}>
             <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#be123c" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           </button>
         </div>
