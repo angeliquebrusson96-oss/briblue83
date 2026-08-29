@@ -304,11 +304,12 @@ function CarteClients({ clients, onClientClick, passages = [] }) {
             markerZoomAnimation: true,
           });
 
-          // Tuiles CartoDB Voyager — gratuites, modernes, proches de Google Maps
-          L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+          // Tuiles OpenStreetMap standard — gratuites, sans clé API requise
+          // (CartoDB Voyager exige désormais une clé API sur son offre gratuite)
+          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
             maxZoom: 19,
-            subdomains: "abcd",
-            attribution: "",
+            subdomains: "abc",
+            attribution: "&copy; OpenStreetMap contributors",
           }).addTo(mapInstance.current);
 
           // Contrôles zoom — repositionnés bas droite, grands sur mobile

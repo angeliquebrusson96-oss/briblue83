@@ -305,6 +305,11 @@ export function PageParametres({
   const [notifSon,       setNotifSonRaw]        = useState(() => ls("briblue_notif_son_notif",   "notif"));
   const [notifRepeat,    setNotifRepeatRaw]     = useState(() => ls("briblue_notif_rep_notif",   1));
 
+  // Événements métier — notifier à la saisie
+  const [evtRapportOn,   setEvtRapportOnRaw]    = useState(() => ls("briblue_notif_evt_rapport",   true));
+  const [evtLivraisonOn, setEvtLivraisonOnRaw]  = useState(() => ls("briblue_notif_evt_livraison", true));
+  const [evtSignatureOn, setEvtSignatureOnRaw]  = useState(() => ls("briblue_notif_evt_signature", true));
+
   const setNotifEnabled  = mkSet("briblue_notif_enabled",     setNotifEnabledRaw);
   const setMorningOn     = mkSet("briblue_notif_morning",     setMorningOnRaw);
   const setRdvOn         = mkSet("briblue_notif_rdv",         setRdvOnRaw);
@@ -317,6 +322,9 @@ export function PageParametres({
   const setRdvRepeat     = mkSet("briblue_notif_rep_rdv",     setRdvRepeatRaw);
   const setNotifSon      = mkSet("briblue_notif_son_notif",   setNotifSonRaw);
   const setNotifRepeat   = mkSet("briblue_notif_rep_notif",   setNotifRepeatRaw);
+  const setEvtRapportOn   = mkSet("briblue_notif_evt_rapport",   setEvtRapportOnRaw);
+  const setEvtLivraisonOn = mkSet("briblue_notif_evt_livraison", setEvtLivraisonOnRaw);
+  const setEvtSignatureOn = mkSet("briblue_notif_evt_signature", setEvtSignatureOnRaw);
 
   const testMsgTimerRef = useRef(null);
   const showTest = (msg) => {
@@ -1055,8 +1063,53 @@ export function PageParametres({
             </>)}
           </div>
 
+          {/* ────────────────── ÉVÉNEMENTS MÉTIER ────────────────── */}
+          <div style={{borderTop:"1px solid #f1f5f9"}}>
+            <div style={{padding:"12px 16px 8px",display:"flex",alignItems:"center",gap:13}}>
+              <div style={{width:36,height:36,borderRadius:10,flexShrink:0,
+                background:"#eff6ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>
+                📋
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:14,fontWeight:600,color:"#0f172a"}}>Événements</div>
+                <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>Vous alerter dès qu'une action est enregistrée</div>
+              </div>
+            </div>
+            <Ligne
+              icone={<svg width={16} height={16} viewBox="0 0 24 24" fill="none"
+                stroke={evtRapportOn?"#0891b2":"#94a3b8"} strokeWidth="2" strokeLinecap="round">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="9" y1="11" x2="15" y2="11"/>
+              </svg>}
+              label="Rapport saisi"
+              detail="Notification quand un nouveau rapport de passage est créé"
+              right={<Toggle on={evtRapportOn} onToggle={setEvtRapportOn}/>}
+              onClick={() => setEvtRapportOn(!evtRapportOn)}
+            />
+            <Ligne
+              icone={<svg width={16} height={16} viewBox="0 0 24 24" fill="none"
+                stroke={evtLivraisonOn?"#0891b2":"#94a3b8"} strokeWidth="2" strokeLinecap="round">
+                <path d="M21 8V21H3V8"/><path d="M23 3H1v5h22V3z"/><line x1="10" y1="12" x2="14" y2="12"/>
+              </svg>}
+              label="Livraison enregistrée"
+              detail="Notification quand une nouvelle livraison est saisie"
+              right={<Toggle on={evtLivraisonOn} onToggle={setEvtLivraisonOn}/>}
+              onClick={() => setEvtLivraisonOn(!evtLivraisonOn)}
+            />
+            <Ligne
+              icone={<svg width={16} height={16} viewBox="0 0 24 24" fill="none"
+                stroke={evtSignatureOn?"#0891b2":"#94a3b8"} strokeWidth="2" strokeLinecap="round">
+                <path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/>
+              </svg>}
+              label="Signature client"
+              detail="Notification quand un client signe un contrat ou un rapport"
+              right={<Toggle on={evtSignatureOn} onToggle={setEvtSignatureOn}/>}
+              onClick={() => setEvtSignatureOn(!evtSignatureOn)}
+              sep={false}
+            />
+          </div>
+
           {/* ────────────────── NOTIFICATIONS GÉNÉRALES ────────────────── */}
-          <div>
+          <div style={{borderTop:"1px solid #f1f5f9"}}>
             <div style={{padding:"12px 16px 8px",display:"flex",alignItems:"center",gap:13}}>
               <div style={{width:36,height:36,borderRadius:10,flexShrink:0,
                 background:"#f0fdf4",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>
@@ -1064,7 +1117,7 @@ export function PageParametres({
               </div>
               <div style={{flex:1}}>
                 <div style={{fontSize:14,fontWeight:600,color:"#0f172a"}}>Notifications générales</div>
-                <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>Nouvelles tâches, signatures de contrats…</div>
+                <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>Son et répétitions utilisés par les événements ci-dessus, les nouvelles tâches…</div>
               </div>
             </div>
             <SonSelector

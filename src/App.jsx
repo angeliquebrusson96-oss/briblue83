@@ -33,6 +33,23 @@ function readLS(key, fallback) {
   return fallback;
 }
 
+// ─── JOURNAL D'ÉVÉNEMENTS — pour le volet de notifications ─────────────────
+// Historique local (par appareil) des actions métier : rapport saisi,
+// livraison enregistrée, signature client. Alimente le volet cloche du header.
+const EVENTS_LS_KEY = "briblue_events_log_v1";
+const EVENTS_SEEN_KEY = "briblue_events_seen_at";
+function pushEvent(type, label) {
+  try {
+    const raw = localStorage.getItem(EVENTS_LS_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    list.unshift({ id: Date.now() + "_" + Math.random().toString(36).slice(2, 6), type, label, at: new Date().toISOString() });
+    localStorage.setItem(EVENTS_LS_KEY, JSON.stringify(list.slice(0, 60)));
+  } catch { /* noop */ }
+}
+function loadEvents() {
+  try { const raw = localStorage.getItem(EVENTS_LS_KEY); return raw ? JSON.parse(raw) : []; } catch { return []; }
+}
+
 // ─── AUTH ────────────────────────────────────────────────────────────────────
 const AUTH = { email: "briblue83@hotmail.com", code: "2004" };
 
@@ -1311,6 +1328,11 @@ export default function App() {
   const [showStock, setShowStock] = useState(false);
   const [showImport, setShowImport]     = useState(false);
   const [showImportHTML, setShowImportHTML] = useState(false);
+  const [events, setEvents] = useState(() => loadEvents());
+  const [showNotifPanel, setShowNotifPanel] = useState(false);
+  const [showNavSheet, setShowNavSheet] = useState(false);
+  const [eventsSeenAt, setEventsSeenAt] = useState(() => readLS("events_seen_at", ""));
+  const recordEvent = useCallback((type, label) => { pushEvent(type, label); setEvents(loadEvents()); }, []);
   const [contrats, setContrats] = useState({});
   const [versements, setVersements] = useState({});
   const [retardsCarnet, setRetardsCarnet] = useState({});
@@ -1547,19 +1569,22 @@ export default function App() {
                prev[keys.find(k => data[k] === ct)]?.statut !== ct.statut)
             );
           if (newSig) {
-            playNotifSound();
             const cli = clientsRef.current.find(cl => cl.id === newSig.clientId);
             const nomCli = cli?.nom || newSig.clientId;
             const isComplet = newSig.statut === "signe_complet";
-            toastInfo(isComplet
-              ? `✅ Contrat co-signé par ${nomCli} !`
-              : `📝 ${nomCli} a signé son contrat — votre signature est requise.`
-            );
-            sendLocalNotification(
-              isComplet ? "✅ Contrat co-signé !" : "📝 Signature requise",
-              isComplet ? `${nomCli} a co-signé le contrat.` : `${nomCli} a signé — votre tour !`,
-              { tag: "briblue-contrat-" + newSig.clientId, requireInteraction: !isComplet }
-            );
+            recordEvent("signature", nomCli);
+            if (readLS("notif_enabled", true) && readLS("notif_evt_signature", true)) {
+              playNotifSound();
+              toastInfo(isComplet
+                ? `✅ Contrat co-signé par ${nomCli} !`
+                : `📝 ${nomCli} a signé son contrat — votre signature est requise.`
+              );
+              sendLocalNotification(
+                isComplet ? "✅ Contrat co-signé !" : "📝 Signature requise",
+                isComplet ? `${nomCli} a co-signé le contrat.` : `${nomCli} a signé — votre tour !`,
+                { tag: "briblue-contrat-" + newSig.clientId, requireInteraction: !isComplet }
+              );
+            }
             // ── Envoi automatique du contrat PDF quand les deux parties ont signé ──
             if (isComplet && !newSig.pdfSentAt && cli?.email) {
               const ctKey = keys.find(k => data[k] === newSig);
@@ -1808,6 +1833,8 @@ export default function App() {
   const savePassage = useCallback(async p=>{
     const existing = passages.find(x=>x.id===p.id);
     if(existing?.statut==="validee" && p.statut!=="validee"){ toastError("Cette intervention est validée et ne peut plus être modifiée."); return; }
+    const isNewPassage = !existing;
+    const isNewSignature = !!p.signatureClient && !existing?.signatureClient;
     const raw = passages.find(x=>x.id===p.id) ? passages.map(x=>x.id===p.id?p:x) : [...passages, p];
     // Migrer TOUTES les photos base64 restantes vers IDB avant la sauvegarde.
     // Cela protège aussi les anciens passages qui n'avaient pas encore été migrés.
@@ -1815,6 +1842,24 @@ export default function App() {
     setPassages(next);
     await savePassages(next);
     setShowFormPassage(false);setEditPassage(null);
+    // ── Événements + notifications ──
+    {
+      const nomCli = clientsRef.current.find(c => c.id === p.clientId)?.nom || "";
+      if (isNewPassage) {
+        recordEvent("rapport", nomCli);
+        if (readLS("notif_enabled", true) && readLS("notif_evt_rapport", true)) {
+          toastInfo(`📋 Rapport saisi${nomCli ? " — " + nomCli : ""}`);
+          sendLocalNotification("📋 Rapport saisi", nomCli ? `Nouveau rapport pour ${nomCli}.` : "Nouveau rapport enregistré.", { tag: "briblue-rapport-" + p.id });
+        }
+      }
+      if (isNewSignature) {
+        recordEvent("signature", nomCli);
+        if (readLS("notif_enabled", true) && readLS("notif_evt_signature", true)) {
+          toastInfo(`✍️ Signature reçue${nomCli ? " — " + nomCli : ""}`);
+          sendLocalNotification("✍️ Signature client", nomCli ? `${nomCli} a signé le rapport.` : "Signature client reçue.", { tag: "briblue-sig-rapport-" + p.id });
+        }
+      }
+    }
     // Arrière-plan : migrer les photos idb: vers Firebase Storage (non-bloquant)
     const saved = next.find(x => x.id === p.id);
     if (saved) {
@@ -1827,7 +1872,7 @@ export default function App() {
         });
       }).catch(() => {});
     }
-  },[savePassages, passages]);
+  },[savePassages, passages, recordEvent]);
 
   const updatePassageRapportStatus = useCallback(async (passageMaj) => {
     const next = passages.map(x => x.id === passageMaj.id ? { ...x, ...passageMaj } : x);
@@ -1873,7 +1918,15 @@ export default function App() {
     if (isNew && l.produits?.length > 0) {
       setStock(prev => { const next = {...prev}; l.produits.forEach(p => { if(next[p] !== undefined) next[p] = Math.max(0, (next[p]||0) - 1); }); saveStock(next); return next; });
     }
-  },[saveLivraisonsList, saveStock]);
+    if (isNew) {
+      const nomCli = clientsRef.current.find(c => c.id === l.clientId)?.nom || "";
+      recordEvent("livraison", nomCli);
+      if (readLS("notif_enabled", true) && readLS("notif_evt_livraison", true)) {
+        toastInfo(`📦 Livraison enregistrée${nomCli ? " — " + nomCli : ""}`);
+        sendLocalNotification("📦 Livraison enregistrée", nomCli ? `Nouvelle livraison pour ${nomCli}.` : "Nouvelle livraison saisie.", { tag: "briblue-livraison-" + l.id });
+      }
+    }
+  },[saveLivraisonsList, saveStock, recordEvent]);
 
   // Appel Admin SDK en parallèle de la sauvegarde client habituelle — garantit
   // que la suppression atteint réellement Firestore même si l'auth Firebase
@@ -2020,6 +2073,19 @@ export default function App() {
 
   const PAGE_LABELS = { dashboard:`Bonjour Dorian 👋`, clients:"Clients", passages:"Rapports", interventions:"Rapports", rdv:"Rendez-vous", gestion:"Gestion", parametres:"Paramètres" };
 
+  const EVENT_META = {
+    rapport:   { icon:"📋", verbe:"Rapport saisi",        color:"#0891b2" },
+    livraison: { icon:"📦", verbe:"Livraison enregistrée", color:"#f97316" },
+    signature: { icon:"✍️", verbe:"Signature client",      color:"#7c3aed" },
+  };
+  const unreadCount = events.filter(e => !eventsSeenAt || e.at > eventsSeenAt).length;
+  const openNotifPanel = () => {
+    setShowNotifPanel(v => !v);
+    const now = new Date().toISOString();
+    setEventsSeenAt(now);
+    try { localStorage.setItem("briblue_events_seen_at", JSON.stringify(now)); } catch {}
+  };
+
   return (
     <>
     <GlobalStyles/>
@@ -2039,6 +2105,54 @@ export default function App() {
         <div style={{flex:1}}/>
         {/* ── BOUTONS D'ACTION RAPIDE ── */}
         <div style={{display:"flex",gap:isMobile?4:6,alignItems:"center",flexShrink:0}}>
+
+          {/* Cloche notifications */}
+          <div style={{position:"relative",flexShrink:0}}>
+            <button onClick={openNotifPanel} title="Notifications"
+              style={{position:"relative",width:36,height:36,borderRadius:10,
+                background:showNotifPanel?"#e0f2fe":"#f8fafc",border:"1px solid #e2e8f0",
+                cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
+                flexShrink:0,WebkitTapHighlightColor:"transparent",transition:"all .15s"}}>
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+              {unreadCount>0&&<span style={{position:"absolute",top:-4,right:-4,minWidth:14,height:14,borderRadius:7,background:"#ef4444",color:"#fff",fontSize:8,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px"}}>{unreadCount>9?"9+":unreadCount}</span>}
+            </button>
+
+            {showNotifPanel && (
+              <>
+                <div onClick={()=>setShowNotifPanel(false)} style={{position:"fixed",inset:0,zIndex:98,background:"transparent"}}/>
+                <div style={{position:"fixed",top:"calc(env(safe-area-inset-top,0px) + 60px)",right:12,
+                  width:"min(340px, calc(100vw - 24px))",
+                  background:"#fff",borderRadius:14,border:"1px solid #e2e8f0",
+                  boxShadow:"0 12px 32px rgba(15,23,42,0.18)",zIndex:99,overflow:"hidden"}}>
+                  <div style={{padding:"12px 14px",borderBottom:"1px solid #f1f5f9",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                    <span style={{fontSize:13,fontWeight:800,color:"#0f172a"}}>Notifications</span>
+                    <span style={{fontSize:11,color:"#94a3b8"}}>{events.length} événement{events.length>1?"s":""}</span>
+                  </div>
+                  <div style={{maxHeight:360,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+                    {events.length===0 ? (
+                      <div style={{padding:"28px 14px",textAlign:"center",fontSize:12,color:"#94a3b8"}}>
+                        Aucun événement pour l'instant
+                      </div>
+                    ) : events.map(e => {
+                      const meta = EVENT_META[e.type] || { icon:"🔔", verbe:e.type, color:"#64748b" };
+                      const d = new Date(e.at);
+                      const dateStr = d.toLocaleDateString("fr",{day:"2-digit",month:"short"});
+                      const heureStr = d.toLocaleTimeString("fr",{hour:"2-digit",minute:"2-digit"});
+                      return (
+                        <div key={e.id} style={{display:"flex",gap:10,padding:"10px 14px",borderBottom:"1px solid #f8fafc",alignItems:"flex-start"}}>
+                          <div style={{width:30,height:30,borderRadius:9,flexShrink:0,background:"#f8fafc",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>{meta.icon}</div>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:12.5,fontWeight:700,color:"#0f172a"}}>{meta.verbe}{e.label?` — ${e.label}`:""}</div>
+                            <div style={{fontSize:10.5,color:"#94a3b8",marginTop:2}}>{dateStr} · {heureStr}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Stock */}
           <button onClick={()=>setShowStock(true)} title="Stock produits"
@@ -2160,32 +2274,47 @@ export default function App() {
         </div>
       )}
 
-      {/* NAV BAS mobile */}
+      {/* VOLET DE NAVIGATION mobile — bouton unique qui ouvre une liste défilante */}
       {isMobile && (
         <>
           <style>{`
-            @keyframes navPop { 0%{transform:scale(.7) translateY(8px);opacity:0} 55%{transform:scale(1.15) translateY(-3px);opacity:1} 80%{transform:scale(0.97) translateY(0);opacity:1} 100%{transform:scale(1) translateY(0);opacity:1} }
-            @keyframes navSlideIn { from{opacity:0;transform:translateX(-50%) scaleX(0.4)} to{opacity:1;transform:translateX(-50%) scaleX(1)} }
-            @keyframes navBubble { 0%{transform:translateX(-50%) scale(0.5);opacity:0} 65%{transform:translateX(-50%) scale(1.06);opacity:1} 100%{transform:translateX(-50%) scale(1);opacity:1} }
-            .nav-icon-active{animation:navPop .35s cubic-bezier(.34,1.56,.64,1) forwards}
-            .nav-pill-active{animation:navSlideIn .28s cubic-bezier(.22,1,.36,1) forwards}
-            .nav-bubble{animation:navBubble .32s cubic-bezier(.34,1.56,.64,1) forwards}
+            @keyframes navSheetUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+            @keyframes navSheetFade { from{opacity:0} to{opacity:1} }
+            .nav-sheet{animation:navSheetUp .25s cubic-bezier(.22,1,.36,1) forwards}
+            .nav-sheet-backdrop{animation:navSheetFade .2s ease forwards}
           `}</style>
-          <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:640,background:"#ffffff",display:"flex",alignItems:"flex-end",zIndex:50,paddingBottom:"env(safe-area-inset-bottom,0px)",borderTop:"1px solid #e2e8f0"}}>
-            {NAV.map(n=>{
-              const active = page===n.id;
-              const accentColor = n.id==="rdv" ? "#818cf8" : DS.blue;
-              const gradFrom = n.id==="rdv" ? "#818cf8" : "#06b6d4";
-              const gradTo = n.id==="rdv" ? "#4f46e5" : "#0891b2";
-              return (
-                <button key={n.id} onClick={()=>setPage(n.id)} style={{flex:1,paddingTop:8,paddingBottom:12,border:"none",cursor:"pointer",background:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:2,WebkitTapHighlightColor:"transparent",outline:"none",position:"relative",minWidth:0}}>
-                  {active && <div className="nav-pill-active" style={{position:"absolute",top:0,left:"50%",width:32,height:3,background:`linear-gradient(90deg,${gradFrom},${gradTo})`,borderRadius:"0 0 6px 6px"}}/>}
-                  <div style={{width:40,height:28,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:8,background:active?"#e0f2fe":"transparent",transition:"background .15s"}}>{n.icon(active)}</div>
-                  <span style={{fontSize:10,fontWeight:active?700:400,color:active?accentColor:"#94a3b8",transition:"all .15s",lineHeight:1}}>{n.l}</span>
-                </button>
-              );
-            })}
+          <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:640,background:"#ffffff",zIndex:50,paddingBottom:"env(safe-area-inset-bottom,0px)",borderTop:"1px solid #e2e8f0"}}>
+            <button onClick={()=>setShowNavSheet(true)} style={{width:"100%",padding:"12px 16px",border:"none",background:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7,WebkitTapHighlightColor:"transparent",fontFamily:"inherit"}}>
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2.2" strokeLinecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+              <span style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>Menu</span>
+            </button>
           </div>
+
+          {showNavSheet && (
+            <>
+              <div className="nav-sheet-backdrop" onClick={()=>setShowNavSheet(false)} style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.45)",zIndex:97}}/>
+              <div className="nav-sheet" style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:640,background:"#fff",zIndex:98,borderTopLeftRadius:20,borderTopRightRadius:20,boxShadow:"0 -8px 32px rgba(15,23,42,0.2)",paddingBottom:"env(safe-area-inset-bottom,0px)",maxHeight:"70vh",display:"flex",flexDirection:"column"}}>
+                <div style={{display:"flex",justifyContent:"center",padding:"10px 0 4px"}}>
+                  <div style={{width:36,height:4,borderRadius:2,background:"#e2e8f0"}}/>
+                </div>
+                <div style={{overflowY:"auto",WebkitOverflowScrolling:"touch",padding:"4px 10px 14px"}}>
+                  {NAV.map(n=>{
+                    const active = page===n.id;
+                    return (
+                      <button key={n.id} onClick={()=>{setPage(n.id);setShowNavSheet(false);}}
+                        style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 12px",borderRadius:12,
+                          border:"none",cursor:"pointer",background:active?"#e0f2fe":"transparent",
+                          textAlign:"left",fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>
+                        <div style={{width:34,height:34,borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{n.icon(active)}</div>
+                        <span style={{fontSize:14,fontWeight:active?800:600,color:active?DS.blue:"#334155"}}>{n.l}</span>
+                        {active && <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={DS.blue} strokeWidth="2.5" strokeLinecap="round" style={{marginLeft:"auto"}}><polyline points="20 6 9 17 4 12"/></svg>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
         </>
       )}
 
