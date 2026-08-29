@@ -194,21 +194,11 @@ function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta,
   // ── Contenu partagé desktop + mobile ──────────────────────────────────────
   const inner = (
     <>
-      {/* ── Header ── */}
-      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
-        <div style={{width:40,height:40,borderRadius:12,background:"linear-gradient(135deg,#0891b2,#0e7490)",
-          display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-          <svg width={19} height={19} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
-            <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
-            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
-          </svg>
-        </div>
-        <div style={{flex:1}}>
-          <div style={{fontSize:17,fontWeight:800,color:"#0f172a"}}>Stock produits</div>
-          <div style={{fontSize:11,color:"#64748b",marginTop:1}}>
-            {produits.length} produit{produits.length>1?"s":""}
-            {basCount > 0 && <span style={{marginLeft:8,color:"#dc2626",fontWeight:700}}>· ⚠️ {basCount} en rupture</span>}
-          </div>
+      {/* ── Résumé + action ── */}
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+        <div style={{flex:1,fontSize:12,color:"#64748b"}}>
+          <strong style={{color:"#0f172a"}}>{produits.length}</strong> produit{produits.length>1?"s":""}
+          {basCount > 0 && <span style={{marginLeft:8,color:"#dc2626",fontWeight:700}}>⚠ {basCount} en rupture</span>}
         </div>
         <button onClick={()=>setShowAddForm(s=>!s)}
           style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",
@@ -326,18 +316,17 @@ function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta,
           return (
             <div key={nom} style={{
               borderRadius:14,
-              border:`1.5px solid ${isLow?"#fca5a5":isExp?"#bae6fd":"#e2e8f0"}`,
-              background:isLow?"#fff5f5":isExp?"#f0f9ff":"#fff",
+              border:`1px solid ${isExp?"#bae6fd":"#eef2f6"}`,
+              borderLeft:isLow?"3px solid #ef4444":`1px solid ${isExp?"#bae6fd":"#eef2f6"}`,
+              background:isExp?"#f0f9ff":"#fff",
               overflow:"hidden",
               transition:"border-color .15s",
             }}>
               {/* ── Ligne principale ── */}
-              <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px"}}>
 
                 {/* Dot catégorie */}
-                <div style={{width:10,height:10,borderRadius:"50%",
-                  background:catC,flexShrink:0,
-                  boxShadow:`0 0 0 2px ${catC}33`}}/>
+                <div style={{width:8,height:8,borderRadius:"50%",background:catC,flexShrink:0}}/>
 
                 {/* Nom */}
                 <div style={{flex:1,minWidth:0}}>
@@ -347,64 +336,55 @@ function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta,
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:6,marginTop:3}}>
                     {/* Mini barre stock */}
-                    <div style={{width:44,height:4,background:"#e2e8f0",borderRadius:2,overflow:"hidden",flexShrink:0}}>
+                    <div style={{width:36,height:3,background:"#eef2f6",borderRadius:2,overflow:"hidden",flexShrink:0}}>
                       <div style={{
                         height:"100%",width:`${pct}%`,borderRadius:2,
                         background:isLow?"#ef4444":qty<meta.seuil*2?"#f59e0b":"#22c55e",
                         transition:"width .3s",
                       }}/>
                     </div>
-                    <span style={{fontSize:9,color:isLow?"#dc2626":"#94a3b8",fontWeight:isLow?700:400}}>
-                      {isLow?"⚠️ stock bas":meta.unite}{meta.prix>0?` · ${meta.prix}€`:""}
+                    <span style={{fontSize:10,color:isLow?"#dc2626":"#94a3b8",fontWeight:isLow?700:400}}>
+                      {isLow?"stock bas":meta.unite}{meta.prix>0?` · ${meta.prix}€`:""}
                     </span>
                   </div>
                 </div>
 
-                {/* Stepper quantité */}
-                <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+                {/* Stepper quantité — pilule unifiée */}
+                <div style={{display:"flex",alignItems:"center",borderRadius:10,background:"#f8fafc",flexShrink:0}}>
                   <button onClick={()=>onUpdateStock(nom, Math.max(0, qty-1))}
-                    style={{width:30,height:30,borderRadius:9,border:"1.5px solid #e2e8f0",
-                      background:"#fff",cursor:"pointer",fontSize:18,fontWeight:700,
-                      color:"#64748b",display:"flex",alignItems:"center",justifyContent:"center",
-                      WebkitTapHighlightColor:"transparent"}}>−</button>
+                    style={{width:28,height:28,border:"none",background:"none",cursor:"pointer",
+                      fontSize:16,fontWeight:700,color:"#64748b",display:"flex",alignItems:"center",
+                      justifyContent:"center",WebkitTapHighlightColor:"transparent"}}>−</button>
 
                   {editingQty === nom ? (
                     <input ref={qtyInputRef} value={qtyDraft}
                       onChange={e=>setQtyDraft(e.target.value.replace(/[^0-9]/g,""))}
                       onBlur={()=>saveQty(nom)}
                       onKeyDown={e=>{if(e.key==="Enter")saveQty(nom);if(e.key==="Escape")setEditingQty(null);}}
-                      style={{width:40,textAlign:"center",border:"1.5px solid #0891b2",
-                        borderRadius:8,padding:"4px",fontSize:15,fontWeight:900,
-                        color:"#0891b2",outline:"none",fontFamily:"inherit",background:"#f0f9ff"}}/>
+                      style={{width:34,textAlign:"center",border:"none",
+                        borderRadius:6,padding:"4px 0",fontSize:14,fontWeight:900,
+                        color:"#0891b2",outline:"none",fontFamily:"inherit",background:"#fff"}}/>
                   ) : (
                     <span onClick={()=>startQtyEdit(nom)}
-                      style={{
-                        minWidth:36,textAlign:"center",fontSize:17,fontWeight:900,
-                        color:isLow?"#dc2626":"#0f172a",cursor:"text",
-                        padding:"2px 4px",borderRadius:6,
-                        border:"1.5px solid transparent",
-                        transition:"border-color .15s",
-                      }}
-                      onMouseEnter={e=>e.currentTarget.style.borderColor="#bae6fd"}
-                      onMouseLeave={e=>e.currentTarget.style.borderColor="transparent"}>
+                      style={{minWidth:26,textAlign:"center",fontSize:14,fontWeight:800,
+                        color:isLow?"#dc2626":"#0f172a",cursor:"text"}}>
                       {qty}
                     </span>
                   )}
 
                   <button onClick={()=>onUpdateStock(nom, qty+1)}
-                    style={{width:30,height:30,borderRadius:9,border:"1.5px solid #bae6fd",
-                      background:"#f0f9ff",cursor:"pointer",fontSize:18,fontWeight:700,
-                      color:"#0891b2",display:"flex",alignItems:"center",justifyContent:"center",
-                      WebkitTapHighlightColor:"transparent"}}>+</button>
+                    style={{width:28,height:28,border:"none",background:"none",cursor:"pointer",
+                      fontSize:16,fontWeight:700,color:"#0891b2",display:"flex",alignItems:"center",
+                      justifyContent:"center",WebkitTapHighlightColor:"transparent"}}>+</button>
                 </div>
 
                 {/* Bouton expand */}
                 <button onClick={()=>setExpandedProd(isExp?null:nom)}
-                  style={{width:28,height:28,borderRadius:8,border:"1.5px solid #e2e8f0",
-                    background:"#fafafa",cursor:"pointer",display:"flex",alignItems:"center",
-                    justifyContent:"center",flexShrink:0,WebkitTapHighlightColor:"transparent"}}>
-                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none"
-                    stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round"
+                  style={{width:24,height:24,border:"none",background:"none",cursor:"pointer",
+                    display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
+                    WebkitTapHighlightColor:"transparent"}}>
+                  <svg width={13} height={13} viewBox="0 0 24 24" fill="none"
+                    stroke="#94a3b8" strokeWidth="2.3" strokeLinecap="round"
                     style={{transform:isExp?"rotate(180deg)":"none",transition:"transform .2s"}}>
                     <polyline points="6 9 12 15 18 9"/>
                   </svg>
