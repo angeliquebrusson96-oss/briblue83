@@ -137,6 +137,7 @@ function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta,
   const [newNom,      setNewNom]      = useState("");
   const [newUnite,    setNewUnite]    = useState("flacon");
   const [newCat,      setNewCat]      = useState("traitement");
+  const [newPrix,     setNewPrix]     = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
   const [renamingProd,setRenamingProd]= useState(null);
   const [renameDraft, setRenameDraft] = useState("");
@@ -187,28 +188,18 @@ function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta,
   const handleAdd = () => {
     if (!newNom.trim()) return;
     onAddProduit(newNom.trim());
-    onUpdateMeta(newNom.trim(), { unite: newUnite, seuil: 2, categorie: newCat });
-    setNewNom(""); setShowAddForm(false);
+    onUpdateMeta(newNom.trim(), { unite: newUnite, seuil: 2, categorie: newCat, prix: parseFloat(newPrix) || 0 });
+    setNewNom(""); setNewPrix(""); setShowAddForm(false);
   };
 
   // ── Contenu partagé desktop + mobile ──────────────────────────────────────
   const inner = (
     <>
-      {/* ── Header ── */}
-      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
-        <div style={{width:40,height:40,borderRadius:12,background:"linear-gradient(135deg,#0891b2,#0e7490)",
-          display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-          <svg width={19} height={19} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
-            <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
-            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
-          </svg>
-        </div>
-        <div style={{flex:1}}>
-          <div style={{fontSize:17,fontWeight:800,color:"#0f172a"}}>Stock produits</div>
-          <div style={{fontSize:11,color:"#64748b",marginTop:1}}>
-            {produits.length} produit{produits.length>1?"s":""}
-            {basCount > 0 && <span style={{marginLeft:8,color:"#dc2626",fontWeight:700}}>· ⚠️ {basCount} en rupture</span>}
-          </div>
+      {/* ── Résumé + action ── */}
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+        <div style={{flex:1,fontSize:12,color:"#64748b"}}>
+          <strong style={{color:"#0f172a"}}>{produits.length}</strong> produit{produits.length>1?"s":""}
+          {basCount > 0 && <span style={{marginLeft:8,color:"#dc2626",fontWeight:700}}>⚠ {basCount} en rupture</span>}
         </div>
         <button onClick={()=>setShowAddForm(s=>!s)}
           style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",
@@ -247,6 +238,15 @@ function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta,
                   fontSize:12,fontFamily:"inherit",background:"#fff",color:"#374151",outline:"none"}}>
                 {STOCK_CATS.filter(c=>c.key!=="tous"&&c.key!=="bas").map(c=><option key={c.key} value={c.key}>{c.label}</option>)}
               </select>
+            </div>
+            <div style={{position:"relative",width:120}}>
+              <input type="number" min="0" step="0.01" value={newPrix}
+                onChange={e=>setNewPrix(e.target.value)}
+                onKeyDown={e=>e.key==="Enter"&&handleAdd()}
+                placeholder="Prix"
+                style={{width:"100%",padding:"8px 24px 8px 10px",borderRadius:9,border:"1.5px solid #e2e8f0",
+                  fontSize:12,outline:"none",fontFamily:"inherit",color:"#0f172a",background:"#fff",boxSizing:"border-box"}}/>
+              <span style={{position:"absolute",right:9,top:"50%",transform:"translateY(-50%)",fontSize:11,color:"#94a3b8",pointerEvents:"none"}}>€</span>
             </div>
             <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
               <button onClick={()=>setShowAddForm(false)}
@@ -326,18 +326,17 @@ function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta,
           return (
             <div key={nom} style={{
               borderRadius:14,
-              border:`1.5px solid ${isLow?"#fca5a5":isExp?"#bae6fd":"#e2e8f0"}`,
-              background:isLow?"#fff5f5":isExp?"#f0f9ff":"#fff",
+              border:`1px solid ${isExp?"#bae6fd":"#eef2f6"}`,
+              borderLeft:isLow?"3px solid #ef4444":`1px solid ${isExp?"#bae6fd":"#eef2f6"}`,
+              background:isExp?"#f0f9ff":"#fff",
               overflow:"hidden",
               transition:"border-color .15s",
             }}>
               {/* ── Ligne principale ── */}
-              <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px"}}>
 
                 {/* Dot catégorie */}
-                <div style={{width:10,height:10,borderRadius:"50%",
-                  background:catC,flexShrink:0,
-                  boxShadow:`0 0 0 2px ${catC}33`}}/>
+                <div style={{width:8,height:8,borderRadius:"50%",background:catC,flexShrink:0}}/>
 
                 {/* Nom */}
                 <div style={{flex:1,minWidth:0}}>
@@ -347,64 +346,55 @@ function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta,
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:6,marginTop:3}}>
                     {/* Mini barre stock */}
-                    <div style={{width:44,height:4,background:"#e2e8f0",borderRadius:2,overflow:"hidden",flexShrink:0}}>
+                    <div style={{width:36,height:3,background:"#eef2f6",borderRadius:2,overflow:"hidden",flexShrink:0}}>
                       <div style={{
                         height:"100%",width:`${pct}%`,borderRadius:2,
                         background:isLow?"#ef4444":qty<meta.seuil*2?"#f59e0b":"#22c55e",
                         transition:"width .3s",
                       }}/>
                     </div>
-                    <span style={{fontSize:9,color:isLow?"#dc2626":"#94a3b8",fontWeight:isLow?700:400}}>
-                      {isLow?"⚠️ stock bas":meta.unite}{meta.prix>0?` · ${meta.prix}€`:""}
+                    <span style={{fontSize:10,color:isLow?"#dc2626":"#94a3b8",fontWeight:isLow?700:400}}>
+                      {isLow?"stock bas":meta.unite}{meta.prix>0?` · ${meta.prix}€`:""}
                     </span>
                   </div>
                 </div>
 
-                {/* Stepper quantité */}
-                <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+                {/* Stepper quantité — pilule unifiée */}
+                <div style={{display:"flex",alignItems:"center",borderRadius:10,background:"#f8fafc",flexShrink:0}}>
                   <button onClick={()=>onUpdateStock(nom, Math.max(0, qty-1))}
-                    style={{width:30,height:30,borderRadius:9,border:"1.5px solid #e2e8f0",
-                      background:"#fff",cursor:"pointer",fontSize:18,fontWeight:700,
-                      color:"#64748b",display:"flex",alignItems:"center",justifyContent:"center",
-                      WebkitTapHighlightColor:"transparent"}}>−</button>
+                    style={{width:28,height:28,border:"none",background:"none",cursor:"pointer",
+                      fontSize:16,fontWeight:700,color:"#64748b",display:"flex",alignItems:"center",
+                      justifyContent:"center",WebkitTapHighlightColor:"transparent"}}>−</button>
 
                   {editingQty === nom ? (
                     <input ref={qtyInputRef} value={qtyDraft}
                       onChange={e=>setQtyDraft(e.target.value.replace(/[^0-9]/g,""))}
                       onBlur={()=>saveQty(nom)}
                       onKeyDown={e=>{if(e.key==="Enter")saveQty(nom);if(e.key==="Escape")setEditingQty(null);}}
-                      style={{width:40,textAlign:"center",border:"1.5px solid #0891b2",
-                        borderRadius:8,padding:"4px",fontSize:15,fontWeight:900,
-                        color:"#0891b2",outline:"none",fontFamily:"inherit",background:"#f0f9ff"}}/>
+                      style={{width:34,textAlign:"center",border:"none",
+                        borderRadius:6,padding:"4px 0",fontSize:14,fontWeight:900,
+                        color:"#0891b2",outline:"none",fontFamily:"inherit",background:"#fff"}}/>
                   ) : (
                     <span onClick={()=>startQtyEdit(nom)}
-                      style={{
-                        minWidth:36,textAlign:"center",fontSize:17,fontWeight:900,
-                        color:isLow?"#dc2626":"#0f172a",cursor:"text",
-                        padding:"2px 4px",borderRadius:6,
-                        border:"1.5px solid transparent",
-                        transition:"border-color .15s",
-                      }}
-                      onMouseEnter={e=>e.currentTarget.style.borderColor="#bae6fd"}
-                      onMouseLeave={e=>e.currentTarget.style.borderColor="transparent"}>
+                      style={{minWidth:26,textAlign:"center",fontSize:14,fontWeight:800,
+                        color:isLow?"#dc2626":"#0f172a",cursor:"text"}}>
                       {qty}
                     </span>
                   )}
 
                   <button onClick={()=>onUpdateStock(nom, qty+1)}
-                    style={{width:30,height:30,borderRadius:9,border:"1.5px solid #bae6fd",
-                      background:"#f0f9ff",cursor:"pointer",fontSize:18,fontWeight:700,
-                      color:"#0891b2",display:"flex",alignItems:"center",justifyContent:"center",
-                      WebkitTapHighlightColor:"transparent"}}>+</button>
+                    style={{width:28,height:28,border:"none",background:"none",cursor:"pointer",
+                      fontSize:16,fontWeight:700,color:"#0891b2",display:"flex",alignItems:"center",
+                      justifyContent:"center",WebkitTapHighlightColor:"transparent"}}>+</button>
                 </div>
 
                 {/* Bouton expand */}
                 <button onClick={()=>setExpandedProd(isExp?null:nom)}
-                  style={{width:28,height:28,borderRadius:8,border:"1.5px solid #e2e8f0",
-                    background:"#fafafa",cursor:"pointer",display:"flex",alignItems:"center",
-                    justifyContent:"center",flexShrink:0,WebkitTapHighlightColor:"transparent"}}>
-                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none"
-                    stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round"
+                  style={{width:24,height:24,border:"none",background:"none",cursor:"pointer",
+                    display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
+                    WebkitTapHighlightColor:"transparent"}}>
+                  <svg width={13} height={13} viewBox="0 0 24 24" fill="none"
+                    stroke="#94a3b8" strokeWidth="2.3" strokeLinecap="round"
                     style={{transform:isExp?"rotate(180deg)":"none",transition:"transform .2s"}}>
                     <polyline points="6 9 12 15 18 9"/>
                   </svg>
@@ -2109,12 +2099,17 @@ export default function App() {
           {/* Cloche notifications */}
           <div style={{position:"relative",flexShrink:0}}>
             <button onClick={openNotifPanel} title="Notifications"
-              style={{position:"relative",width:36,height:36,borderRadius:10,
-                background:showNotifPanel?"#e0f2fe":"#f8fafc",border:"1px solid #e2e8f0",
+              style={{position:"relative",width:36,height:36,borderRadius:11,
+                background:showNotifPanel?"#e0f2fe":"#f0f9ff",border:"none",
+                boxShadow:"inset 0 0 0 1px rgba(8,145,178,0.14)",
                 cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
-                flexShrink:0,WebkitTapHighlightColor:"transparent",transition:"all .15s"}}>
-              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
-              {unreadCount>0&&<span style={{position:"absolute",top:-4,right:-4,minWidth:14,height:14,borderRadius:7,background:"#ef4444",color:"#fff",fontSize:8,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px"}}>{unreadCount>9?"9+":unreadCount}</span>}
+                flexShrink:0,WebkitTapHighlightColor:"transparent",transition:"transform .12s, background .15s"}}>
+              <svg width={17} height={17} viewBox="0 0 24 24">
+                <path d="M12 2.5a6.5 6.5 0 00-6.5 6.5c0 4.2-1.1 6.06-1.94 7.1-.5.62-.06 1.55.74 1.55h15.4c.8 0 1.24-.93.74-1.55-.84-1.04-1.94-2.9-1.94-7.1A6.5 6.5 0 0012 2.5z" fill="#0891b2" fillOpacity="0.16"/>
+                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M9.5 21a2.5 2.5 0 005 0" fill="none" stroke="#0891b2" strokeWidth="1.8" strokeLinecap="round"/>
+              </svg>
+              {unreadCount>0&&<span style={{position:"absolute",top:-4,right:-4,minWidth:14,height:14,borderRadius:7,background:"#ef4444",color:"#fff",fontSize:8,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",boxShadow:"0 0 0 2px #fff"}}>{unreadCount>9?"9+":unreadCount}</span>}
             </button>
 
             {showNotifPanel && (
@@ -2158,38 +2153,59 @@ export default function App() {
           <button onClick={()=>setShowStock(true)} title="Stock produits"
             style={{position:"relative",display:"flex",alignItems:"center",gap:5,
               justifyContent:"center",
-              padding:isMobile?"0":"0 11px",
+              padding:isMobile?"0":"0 12px",
               width:isMobile?36:undefined,
-              height:36,borderRadius:10,
-              background:"#f0fdf4",border:"1px solid #bbf7d0",
+              height:36,borderRadius:11,
+              background:"#f0fdf4",border:"none",
+              boxShadow:"inset 0 0 0 1px rgba(5,150,105,0.12)",
               cursor:"pointer",flexShrink:0,fontFamily:"inherit",
-              WebkitTapHighlightColor:"transparent",transition:"all .15s"}}>
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8V21H3V8"/><path d="M23 3H1v5h22V3z"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+              WebkitTapHighlightColor:"transparent",transition:"transform .12s"}}>
+            <svg width={16} height={16} viewBox="0 0 24 24">
+              <rect x="3" y="8" width="18" height="13" rx="1.5" fill="#059669" fillOpacity="0.14"/>
+              <path d="M21 8V21H3V8" fill="none" stroke="#059669" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M23 3H1v5h22V3z" fill="none" stroke="#059669" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <line x1="9.5" y1="12.2" x2="14.5" y2="12.2" stroke="#059669" strokeWidth="1.8" strokeLinecap="round"/>
+            </svg>
             {!isMobile&&<span style={{fontSize:11,fontWeight:700,color:"#059669"}}>Stock</span>}
-            {nbStockBas>0&&<span style={{position:"absolute",top:-4,right:-4,minWidth:14,height:14,borderRadius:7,background:"#ef4444",color:"#fff",fontSize:8,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px"}}>{nbStockBas}</span>}
+            {nbStockBas>0&&<span style={{position:"absolute",top:-4,right:-4,minWidth:14,height:14,borderRadius:7,background:"#ef4444",color:"#fff",fontSize:8,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",boxShadow:"0 0 0 2px #fff"}}>{nbStockBas}</span>}
           </button>
 
           {/* Livraison */}
           <button onClick={()=>{setDefaultLivraisonClientId("");setEditLivraison(null);setShowFormLivraison(true);}} title="Nouvelle livraison"
             style={{display:"flex",alignItems:"center",gap:5,
               justifyContent:"center",
-              padding:isMobile?"0":"0 11px",
+              padding:isMobile?"0":"0 12px",
               width:isMobile?36:undefined,
-              height:36,borderRadius:10,
-              background:"#fff7ed",border:"1px solid #fed7aa",
+              height:36,borderRadius:11,
+              background:"#fff7ed",border:"none",
+              boxShadow:"inset 0 0 0 1px rgba(249,115,22,0.14)",
               cursor:"pointer",flexShrink:0,fontFamily:"inherit",
-              WebkitTapHighlightColor:"transparent",transition:"all .15s"}}>
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 4v4h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+              WebkitTapHighlightColor:"transparent",transition:"transform .12s"}}>
+            <svg width={16} height={16} viewBox="0 0 24 24">
+              <rect x="1" y="3" width="15" height="13" rx="1.5" fill="#f97316" fillOpacity="0.14"/>
+              <path d="M16 8h4l3 4v4h-7V8z" fill="#f97316" fillOpacity="0.14"/>
+              <rect x="1" y="3" width="15" height="13" rx="1" fill="none" stroke="#f97316" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M16 8h4l3 4v4h-7V8z" fill="none" stroke="#f97316" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <circle cx="5.5" cy="18.5" r="2.3" fill="#fff" stroke="#f97316" strokeWidth="1.6"/>
+              <circle cx="18.5" cy="18.5" r="2.3" fill="#fff" stroke="#f97316" strokeWidth="1.6"/>
+            </svg>
             {!isMobile&&<span style={{fontSize:11,fontWeight:700,color:"#f97316"}}>Livraison</span>}
           </button>
 
           {/* Nouveau client — desktop uniquement dans le header */}
           {!isMobile&&(
             <button onClick={openAddClient} title="Nouveau client"
-              style={{display:"flex",alignItems:"center",gap:5,padding:"0 11px",height:36,borderRadius:10,
-                background:"#f5f3ff",border:"1px solid #ddd6fe",
-                cursor:"pointer",flexShrink:0,WebkitTapHighlightColor:"transparent",transition:"all .15s"}}>
-              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="3" x2="19" y2="9"/><line x1="16" y1="6" x2="22" y2="6"/></svg>
+              style={{display:"flex",alignItems:"center",gap:5,padding:"0 12px",height:36,borderRadius:11,
+                background:"#f5f3ff",border:"none",boxShadow:"inset 0 0 0 1px rgba(124,58,237,0.14)",
+                cursor:"pointer",flexShrink:0,WebkitTapHighlightColor:"transparent",transition:"transform .12s"}}>
+              <svg width={16} height={16} viewBox="0 0 24 24">
+                <circle cx="11" cy="7" r="4" fill="#7c3aed" fillOpacity="0.16"/>
+                <path d="M19 20v-1.2a4 4 0 00-4-4H7.5a4 4 0 00-4 4V20" fill="#7c3aed" fillOpacity="0.16"/>
+                <path d="M19 20v-1.2a4 4 0 00-4-4H7.5a4 4 0 00-4 4V20" fill="none" stroke="#7c3aed" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                <circle cx="11" cy="7" r="4" fill="none" stroke="#7c3aed" strokeWidth="1.8"/>
+                <line x1="19.5" y1="3.5" x2="19.5" y2="9.5" stroke="#7c3aed" strokeWidth="1.8" strokeLinecap="round"/>
+                <line x1="16.5" y1="6.5" x2="22.5" y2="6.5" stroke="#7c3aed" strokeWidth="1.8" strokeLinecap="round"/>
+              </svg>
               <span style={{fontSize:11,fontWeight:700,color:"#7c3aed"}}>Client</span>
             </button>
           )}
@@ -2198,24 +2214,35 @@ export default function App() {
           <button onClick={()=>{setEditPassage(null);setDefaultClientId("");setShowFormPassage(true);}} title="Nouveau rapport"
             style={{display:"flex",alignItems:"center",gap:isMobile?0:6,
               justifyContent:"center",
-              padding:isMobile?"0":"0 14px",
+              padding:isMobile?"0":"0 15px",
               width:isMobile?40:undefined,
-              height:36,borderRadius:10,
+              height:36,borderRadius:11,
               background:"linear-gradient(135deg,#0891b2,#0369a1)",border:"none",
               cursor:"pointer",flexShrink:0,fontFamily:"inherit",
               WebkitTapHighlightColor:"transparent",
-              boxShadow:"0 2px 8px rgba(8,145,178,0.35)",transition:"all .15s"}}>
-            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+              boxShadow:"0 3px 10px rgba(8,145,178,0.4)",transition:"transform .12s"}}>
+            <svg width={17} height={17} viewBox="0 0 24 24">
+              <rect x="4.5" y="4" width="15" height="18" rx="2.5" fill="rgba(255,255,255,0.18)"/>
+              <rect x="4.5" y="4" width="15" height="18" rx="2.5" fill="none" stroke="#fff" strokeWidth="1.7" strokeLinejoin="round"/>
+              <rect x="8.5" y="2.5" width="7" height="3.5" rx="1.2" fill="#0369a1" stroke="#fff" strokeWidth="1.4"/>
+              <path d="M8.2 12.5l2.2 2.2 4.6-4.8" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <line x1="8.2" y1="17.3" x2="15.8" y2="17.3" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeOpacity="0.85"/>
+            </svg>
             {!isMobile&&<span style={{fontSize:11,fontWeight:800,color:"#fff"}}>Rapport</span>}
           </button>
 
           {/* Déconnexion */}
           <button onClick={handleLogout} title="Déconnexion"
-            style={{width:36,height:36,borderRadius:10,
-              background:"#fff1f2",border:"1px solid #fecdd3",
+            style={{width:36,height:36,borderRadius:11,
+              background:"#fff1f2",border:"none",boxShadow:"inset 0 0 0 1px rgba(190,18,60,0.14)",
               cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
-              flexShrink:0,WebkitTapHighlightColor:"transparent",transition:"all .15s"}}>
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#be123c" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              flexShrink:0,WebkitTapHighlightColor:"transparent",transition:"transform .12s"}}>
+            <svg width={16} height={16} viewBox="0 0 24 24">
+              <rect x="3" y="3" width="6" height="18" rx="1.5" fill="#be123c" fillOpacity="0.14"/>
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" fill="none" stroke="#be123c" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M14.5 7l5 5-5 5" fill="none" stroke="#be123c" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <line x1="19" y1="12" x2="9.5" y2="12" stroke="#be123c" strokeWidth="1.8" strokeLinecap="round"/>
+            </svg>
           </button>
         </div>
       </div>

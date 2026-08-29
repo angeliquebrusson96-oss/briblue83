@@ -992,7 +992,15 @@ export function subscribeToRealtime(callbacks) {
               const valFiltered = deleted && deleted.size > 0
                 ? val.filter(x => !x?.id || !deleted.has(String(x.id)))
                 : val;
-              if (Array.isArray(localArr) && localArr.length > 0) {
+              if (Array.isArray(localArr) && localArr.length > 0 && offlineQueue.pending[key] !== undefined) {
+                // Une écriture locale pour cette clé est encore en attente/en vol vers
+                // Firebase (debounce 400-800ms) : elle est plus récente que ce snapshot
+                // distant. Garder le local intact — sinon un changement de champ (ex:
+                // statut "payé" d'une livraison) est écrasé par la valeur distante pas
+                // encore à jour, et semble "revenir en arrière" côté utilisateur.
+                val = localArr;
+                patchedData[mapping.field] = localArr;
+              } else if (Array.isArray(localArr) && localArr.length > 0) {
                 const merged = mergeArrayById(valFiltered, localArr, deleted);
                 if (merged.length > valFiltered.length) {
                   console.info(`[briblue] onSnapshot "${key}" : ${merged.length - valFiltered.length} entrée(s) locale(s) absente(s) de Firebase — fusion automatique.`);

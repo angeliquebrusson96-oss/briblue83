@@ -1196,68 +1196,42 @@ export function DashboardHero({ clients, passages, rdvs, saisonNow, isMobile, on
     <div>
 
       {/* ── HERO ── */}
-      <div className="db-s1" style={{borderRadius:18,overflow:"hidden",marginBottom:12,position:"relative",boxShadow:"0 4px 20px rgba(8,145,178,0.2)"}}>
+      <div className="db-s1" style={{borderRadius:24,overflow:"hidden",marginBottom:12,position:"relative",boxShadow:"0 8px 28px rgba(6,20,45,0.28)"}}>
         {/* Fond */}
-        <div style={{position:"absolute",inset:0,background:"linear-gradient(145deg,#075985 0%,#0891b2 50%,#0e7490 100%)"}}/>
-        {/* Vague décorative discrète */}
-        <div style={{position:"absolute",bottom:0,left:0,right:0,height:28,overflow:"hidden",opacity:0.08,pointerEvents:"none"}}>
-          <div style={{display:"flex",width:"200%",height:"100%",animation:"db-wave 10s linear infinite"}}>
-            {[0,1].map(k=>(
-              <svg key={k} viewBox="0 0 400 28" style={{width:"50%",height:"100%"}} preserveAspectRatio="none">
-                <path d="M0 14 C60 2 120 26 180 14 S300 2 360 14 S400 26 400 14 L400 28 L0 28Z" fill="white"/>
-              </svg>
-            ))}
-          </div>
-        </div>
+        <div style={{position:"absolute",inset:0,background:"linear-gradient(160deg,#071427 0%,#0c3a5e 45%,#0891b2 100%)"}}/>
+        {/* Halos décoratifs */}
+        <div style={{position:"absolute",top:-60,right:-40,width:180,height:180,borderRadius:"50%",background:"radial-gradient(circle,rgba(34,211,238,0.25),transparent 70%)",pointerEvents:"none"}}/>
+        <div style={{position:"absolute",bottom:-70,left:-50,width:200,height:200,borderRadius:"50%",background:"radial-gradient(circle,rgba(255,255,255,0.08),transparent 70%)",pointerEvents:"none"}}/>
 
-        <div style={{position:"relative",zIndex:2,padding:"18px 18px 22px"}}>
-          {/* Ligne top: logo + date */}
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <div style={{width:34,height:34,borderRadius:10,background:"rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center",border:"1px solid rgba(255,255,255,0.2)"}}>
-                {/* Triple vague — nouveau logo */}
-                <svg width={18} height={16} viewBox="0 0 32 28" fill="none" stroke="white" strokeLinecap="round">
-                  <path d="M1 22c3.5 4.5 7 4.5 10.5 0S18 17.5 21.5 22 28 26.5 31 22" strokeWidth="3.2"/>
-                  <path d="M3 14c3 3.5 6 3.5 9 0s6-3.5 9 0 5 3.5 8 0" strokeWidth="2.2" strokeOpacity="0.68"/>
-                  <path d="M7 7c2.5 2.5 5 2.5 7.5 0s5-2.5 7.5 0" strokeWidth="1.6" strokeOpacity="0.4"/>
-                </svg>
-              </div>
-              <span style={{fontSize:13,fontWeight:800,color:"rgba(255,255,255,0.95)",letterSpacing:.3}}>BRIBLUE</span>
-            </div>
-            <div style={{textAlign:"right"}}>
-              <div style={{fontSize:11,color:"rgba(255,255,255,0.65)",fontWeight:400,textTransform:"capitalize"}}>{dateStr}</div>
-            </div>
-          </div>
+        <div style={{position:"relative",zIndex:2,padding:"20px 20px 22px"}}>
+          {/* Date */}
+          <div style={{fontSize:11,color:"rgba(255,255,255,0.55)",fontWeight:600,textTransform:"capitalize",letterSpacing:.3,marginBottom:10}}>{dateStr}</div>
 
           {/* Salutation */}
-          <div style={{marginBottom:14}}>
-            <div style={{fontSize:22,fontWeight:800,color:"#fff",lineHeight:1.2,letterSpacing:"-0.4px"}}>
-              {salut} Dorian 👋
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:24,fontWeight:800,color:"#fff",lineHeight:1.15,letterSpacing:"-0.5px"}}>
+              {salut} Dorian <span style={{display:"inline-block"}}>👋</span>
             </div>
-            <div style={{fontSize:12,color:"rgba(255,255,255,0.6)",marginTop:3,fontWeight:400}}>
+            <div style={{fontSize:12.5,color:"rgba(255,255,255,0.62)",marginTop:4,fontWeight:400}}>
               {rdvsToday.length > 0 ? `${rdvsToday.length} rendez-vous aujourd'hui` : "L'application pour reposer son esprit."}
             </div>
           </div>
 
           {/* Citation du jour */}
           <div style={{
-            padding:"10px 14px",
-            borderRadius:12,
-            background:"rgba(255,255,255,0.10)",
-            border:"1px solid rgba(255,255,255,0.15)",
-            backdropFilter:"blur(6px)",
-            WebkitBackdropFilter:"blur(6px)",
+            display:"flex",gap:10,alignItems:"flex-start",
+            padding:"12px 14px",
+            borderRadius:14,
+            background:"rgba(255,255,255,0.08)",
+            border:"1px solid rgba(255,255,255,0.12)",
+            backdropFilter:"blur(10px)",
+            WebkitBackdropFilter:"blur(10px)",
           }}>
-            <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:5}}>
-              <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round">
-                <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
-              </svg>
-              <span style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.45)",textTransform:"uppercase",letterSpacing:1}}>
-                Citation du jour
-              </span>
-            </div>
-            <div style={{fontSize:12.5,color:"rgba(255,255,255,0.88)",fontStyle:"italic",lineHeight:1.55}}>
-              «&nbsp;{CITATION_DU_JOUR}&nbsp;»
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="rgba(34,211,238,0.9)" style={{flexShrink:0,marginTop:1}}>
+              <path d="M7 10c-2.2 0-4 1.8-4 4v6h6v-6H6.2c0-1 .8-1.8 1.8-1.8V10zm10 0c-2.2 0-4 1.8-4 4v6h6v-6h-2.8c0-1 .8-1.8 1.8-1.8V10z"/>
+            </svg>
+            <div style={{fontSize:12.5,color:"rgba(255,255,255,0.9)",fontStyle:"italic",lineHeight:1.55}}>
+              {CITATION_DU_JOUR}
             </div>
           </div>
 
