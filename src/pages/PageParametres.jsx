@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef } from "react";
-import { flushPendingNow, forceRestoreFromFirebase, save } from "../lib/storage";
+import { flushPendingNow, forceRestoreFromFirebase, save, getSyncDiagnostics } from "../lib/storage";
 import { playChimeMorning, playAlertRdv, playNotifSound, playSound, SOUND_TYPES, sendLocalNotification } from "../styles";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -271,6 +271,16 @@ export function PageParametres({
   const [cacheSize,    setCacheSize]    = useState("…");
   const [restoreMsg,   setRestoreMsg]   = useState("");
   const [restoring,    setRestoring]    = useState(false);
+
+  // ── Diagnostics sync temps réel ──
+  const [diag, setDiag] = useState(() => getSyncDiagnostics());
+  useEffect(() => {
+    const t = setInterval(() => setDiag(getSyncDiagnostics()), 4000);
+    const onOnline = () => setDiag(getSyncDiagnostics());
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOnline);
+    return () => { clearInterval(t); window.removeEventListener("online", onOnline); window.removeEventListener("offline", onOnline); };
+  }, []);
 
   // ── Helpers localStorage ──
   const ls    = (k, def) => { try { const v = localStorage.getItem(k); return v === null ? def : JSON.parse(v); } catch { return def; } };
@@ -1055,6 +1065,46 @@ export function PageParametres({
         )}
       </Bloc>
 
+      <Bloc titre="Diagnostics" emoji="🩺">
+        <Ligne
+          icone={<svg width={17} height={17} viewBox="0 0 24 24" fill="none"
+            stroke={diag.online ? "#059669" : "#dc2626"} strokeWidth="2" strokeLinecap="round">
+            <circle cx="12" cy="12" r="10"/>
+          </svg>}
+          label={diag.online ? "En ligne" : "Hors ligne"}
+          detail={
+            diag.pendingKeys.length > 0
+              ? `${diag.pendingKeys.length} donnée${diag.pendingKeys.length > 1 ? "s" : ""} en attente d'envoi`
+              : diag.lastSyncAt
+                ? `Dernière sync réussie il y a ${Math.round((Date.now() - diag.lastSyncAt) / 1000)}s`
+                : "Aucune synchro effectuée depuis l'ouverture"
+          }
+          right={diag.pendingKeys.length > 0
+            ? <span style={{fontSize:11,fontWeight:800,color:"#d97706",background:"#fef3c7",padding:"3px 9px",borderRadius:20}}>⏳ {diag.pendingKeys.length}</span>
+            : <span style={{fontSize:11,fontWeight:800,color:"#059669",background:"#d1fae5",padding:"3px 9px",borderRadius:20}}>✓ à jour</span>}
+        />
+        {diag.lastError && (
+          <Ligne
+            icone={<svg width={17} height={17} viewBox="0 0 24 24" fill="none"
+              stroke="#dc2626" strokeWidth="2" strokeLinecap="round">
+              <path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="10"/>
+            </svg>}
+            label="Dernière erreur de sync"
+            detail={`${diag.lastError} — il y a ${Math.round((Date.now() - diag.lastErrorAt) / 60000)} min`}
+          />
+        )}
+        <Ligne
+          icone={<svg width={17} height={17} viewBox="0 0 24 24" fill="none"
+            stroke="#0891b2" strokeWidth="2" strokeLinecap="round">
+            <rect x="2" y="3" width="20" height="14" rx="2"/>
+            <line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>}
+          label="Appareil"
+          detail={`${diag.isIOS ? "iOS" : "Android / Desktop"} · ${diag.syncCount} synchro${diag.syncCount > 1 ? "s" : ""} réussie${diag.syncCount > 1 ? "s" : ""} cette session`}
+          sep={false}
+        />
+      </Bloc>
+
       <Bloc titre="Données" emoji="💾">
         <Ligne
           icone={<svg width={17} height={17} viewBox="0 0 24 24" fill="none"
@@ -1084,8 +1134,8 @@ export function PageParametres({
             <polyline points="17 8 12 3 7 8"/>
             <line x1="12" y1="3" x2="12" y2="15"/>
           </svg>}
-          label="Import intelligent — Rapports HTML"
-          detail="Rapports manquants • données vides • photos — tout détecté automatiquement"
+          label="Import intelligent — HTML & PDF"
+          detail="Rapports manquants • données vides • photos — PDF scannés lus par OCR"
           onClick={() => onOpenImportHTML?.()}
           sep={modeExpert}
         />

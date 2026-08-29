@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { save, flushPendingNow, IS_IOS, reconcileOnBoot, invalidateDocCache, subscribeToRealtime, markPassageDeleted, markDeleted } from "./lib/storage";
+import { ocrPdfFile, parseOCRText, terminateOcrWorker } from "./lib/ocr";
 import { extractPassagePhotos, migratePassagePhotosToStorage, migrateAllPassagesPhotos, migrateClientPhotoToStorage, retryPendingUploads, _getUploadQueue } from "./lib/photoStore";
 import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import { auth } from "./lib/firebase";
@@ -590,7 +591,10 @@ function ModalImportHTML({ clients, passages, onImport, onClose }) {
   const [selected, setSelected] = useState(() => new Set());
   const [result, setResult]     = useState(null);
   const [dragging, setDragging] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState("");
   const fileRef = useRef(null);
+
+  useEffect(() => () => { terminateOcrWorker(); }, []);
 
   // ── Parser un rapport HTML BRIBLUE ──────────────────────────────────────
   const parseHTML = (html) => {
@@ -742,49 +746,63 @@ function ModalImportHTML({ clients, passages, onImport, onClose }) {
     });
   };
 
+  // Classe un objet "parsed" (issu du HTML ou de l'OCR PDF) en new/enrich/uptodate/no_client
+  const classifyParsed = (parsed, fileName, ocr = false) => {
+    if (!parsed.date || !parsed.clientNom) {
+      return { status:"error", fileName, reason:"Nom client ou date non détecté", ocr, parsed };
+    }
+    const client = matchClient(parsed.clientNom);
+    if (!client) {
+      return { status:"no_client", fileName, clientNom:parsed.clientNom, date:parsed.date, ocr, parsed };
+    }
+    const existing = passages.find(p => p.clientId===client.id && p.date===parsed.date);
+    const photoCount = [parsed.photoArrivee,...(parsed.photos||[]),parsed.photoDepart].filter(Boolean).length;
+
+    if (!existing) {
+      return { status:"new", fileName, client, parsed, photoCount, ocr };
+    }
+    const missingData = DATA_LABELS.filter(([f]) => {
+      const nv = parsed[f]; const ev = existing[f];
+      if (!nv || nv==="" || (Array.isArray(nv)&&!nv.length)) return false;
+      return !ev || ev==="" || (Array.isArray(ev)&&!ev.length);
+    }).map(([,l]) => l);
+
+    const hasPhotoHTML = !!(parsed.photoArrivee||(parsed.photos||[]).length||parsed.photoDepart);
+    const hasPhotoApp  = !!(existing.photoArrivee||(existing.photos||[]).length||existing.photoDepart);
+    const missingPhotos = hasPhotoHTML && !hasPhotoApp;
+    const hasSigHTML = !!parsed.signatureTech;
+    const hasSigApp  = !!existing.signatureTech;
+    const missingSig = hasSigHTML && !hasSigApp;
+
+    if (!missingData.length && !missingPhotos && !missingSig) {
+      return { status:"uptodate", fileName, client, date:parsed.date, ocr };
+    }
+    return { status:"enrich", fileName, client, date:parsed.date,
+      existing, parsed, missingData, missingPhotos, missingSig, photoCount, ocr };
+  };
+
   const analyseFiles = async (files) => {
     setStatus("analyzing");
+    setOcrProgress("");
     const analyzed = [];
     for (const file of Array.from(files)) {
+      const isPDF = /\.pdf$/i.test(file.name);
       try {
-        const html = await file.text();
-        const parsed = parseHTML(html);
-        if (!parsed.date || !parsed.clientNom) {
-          analyzed.push({ status:"error", fileName:file.name, reason:"Nom client ou date non détecté" }); continue;
+        if (isPDF) {
+          setOcrProgress(`${file.name} — préparation…`);
+          const text = await ocrPdfFile(file, (msg) => setOcrProgress(`${file.name} — ${msg}`));
+          const parsed = parseOCRText(text, file.name);
+          analyzed.push(classifyParsed(parsed, file.name, true));
+        } else {
+          const html = await file.text();
+          const parsed = parseHTML(html);
+          analyzed.push(classifyParsed(parsed, file.name, false));
         }
-        const client = matchClient(parsed.clientNom);
-        if (!client) {
-          analyzed.push({ status:"no_client", fileName:file.name, clientNom:parsed.clientNom, date:parsed.date }); continue;
-        }
-        const existing = passages.find(p => p.clientId===client.id && p.date===parsed.date);
-        const photoCount = [parsed.photoArrivee,...(parsed.photos||[]),parsed.photoDepart].filter(Boolean).length;
-
-        if (!existing) {
-          analyzed.push({ status:"new", fileName:file.name, client, parsed, photoCount }); continue;
-        }
-        // Quels champs manquent dans le passage existant ?
-        const missingData = DATA_LABELS.filter(([f]) => {
-          const nv = parsed[f]; const ev = existing[f];
-          if (!nv || nv==="" || (Array.isArray(nv)&&!nv.length)) return false;
-          return !ev || ev==="" || (Array.isArray(ev)&&!ev.length);
-        }).map(([,l]) => l);
-
-        const hasPhotoHTML = !!(parsed.photoArrivee||(parsed.photos||[]).length||parsed.photoDepart);
-        const hasPhotoApp  = !!(existing.photoArrivee||(existing.photos||[]).length||existing.photoDepart);
-        const missingPhotos = hasPhotoHTML && !hasPhotoApp;
-        const hasSigHTML = !!parsed.signatureTech;
-        const hasSigApp  = !!existing.signatureTech;
-        const missingSig = hasSigHTML && !hasSigApp;
-
-        if (!missingData.length && !missingPhotos && !missingSig) {
-          analyzed.push({ status:"uptodate", fileName:file.name, client, date:parsed.date }); continue;
-        }
-        analyzed.push({ status:"enrich", fileName:file.name, client, date:parsed.date,
-          existing, parsed, missingData, missingPhotos, missingSig, photoCount });
       } catch(e) {
         analyzed.push({ status:"error", fileName:file.name, reason:String(e) });
       }
     }
+    setOcrProgress("");
     setItems(analyzed);
     setSelected(new Set(
       analyzed.map((it,i) => ["new","enrich"].includes(it.status) ? i : null).filter(n=>n!==null)
@@ -840,12 +858,29 @@ function ModalImportHTML({ clients, passages, onImport, onClose }) {
   };
 
   const handleFiles = (files) => {
-    const f = Array.from(files||[]).filter(x => /\.html?$/i.test(x.name));
+    const f = Array.from(files||[]).filter(x => /\.(html?|pdf)$/i.test(x.name));
     if (f.length) analyseFiles(f);
   };
   const toggleSel = (i) => setSelected(prev => {
     const s=new Set(prev); s.has(i)?s.delete(i):s.add(i); return s;
   });
+  // Corrige un champ OCR (basse confiance) avant import — appelé depuis les inputs de la preview
+  const updateOcrField = (i, field, value) => setItems(prev =>
+    prev.map((it, idx) => idx === i ? { ...it, parsed: { ...it.parsed, [field]: value } } : it)
+  );
+  // Assigne manuellement un client à un item OCR non reconnu ("no_client")
+  const assignClientToOcrItem = (i, clientId) => {
+    const client = clients.find(c => c.id === clientId);
+    if (!client) return;
+    setItems(prev => {
+      const it = prev[i];
+      const reclassified = classifyParsed({ ...it.parsed, clientNom: client.nom }, it.fileName, true);
+      const next = [...prev];
+      next[i] = reclassified;
+      return next;
+    });
+    setSelected(prev => new Set(prev).add(i));
+  };
   const actionable = items.map((_,i)=>i).filter(i=>["new","enrich"].includes(items[i]?.status));
   const allSel = actionable.length>0 && actionable.every(i=>selected.has(i));
   const selCount = [...selected].filter(i=>["new","enrich"].includes(items[i]?.status)).length;
@@ -858,7 +893,7 @@ function ModalImportHTML({ clients, passages, onImport, onClose }) {
   );
 
   return (
-    <Modal title="📥 Import intelligent — Rapports HTML" onClose={onClose} wide>
+    <Modal title="📥 Import intelligent — Rapports HTML & PDF" onClose={onClose} wide>
 
       {/* IDLE : zone de drop */}
       {status==="idle" && (
@@ -874,17 +909,18 @@ function ModalImportHTML({ clients, passages, onImport, onClose }) {
             <div style={{fontSize:44,marginBottom:12}}>📄</div>
             <div style={{fontWeight:800,fontSize:16,color:"#0f172a",marginBottom:4}}>Glisse tes rapports ici</div>
             <div style={{fontSize:13,color:"#64748b",marginBottom:18}}>
-              ou clique pour sélectionner — <strong>plusieurs .html</strong> simultanément
+              ou clique pour sélectionner — <strong>.html ou .pdf</strong>, plusieurs à la fois
             </div>
             <div style={{display:"inline-flex",alignItems:"center",gap:7,padding:"10px 22px",
               borderRadius:10,background:"linear-gradient(135deg,#0369a1,#0891b2)",color:"#fff",fontWeight:700,fontSize:14}}>
               📂 Choisir les fichiers
             </div>
           </div>
-          <input ref={fileRef} type="file" accept=".html,.htm" multiple style={{display:"none"}}
+          <input ref={fileRef} type="file" accept=".html,.htm,.pdf" multiple style={{display:"none"}}
             onChange={e=>handleFiles(e.target.files)}/>
           <div style={{textAlign:"center",fontSize:12,color:"#94a3b8",lineHeight:1.7}}>
-            Détection automatique : rapports manquants • données vides • photos non importées
+            Détection automatique : rapports manquants • données vides • photos non importées<br/>
+            Les <strong>PDF scannés</strong> sont lus par OCR — vérifiez toujours les valeurs avant de valider.
           </div>
         </div>
       )}
@@ -892,9 +928,18 @@ function ModalImportHTML({ clients, passages, onImport, onClose }) {
       {/* ANALYZING */}
       {status==="analyzing" && (
         <div style={{textAlign:"center",padding:52,display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
-          <div style={{fontSize:44}}>🔍</div>
-          <div style={{fontWeight:800,fontSize:16,color:"#0f172a"}}>Analyse en cours…</div>
-          <div style={{fontSize:13,color:"#64748b"}}>Lecture des sections, mesures, photos…</div>
+          <div style={{fontSize:44}}>{ocrProgress ? "👁️" : "🔍"}</div>
+          <div style={{fontWeight:800,fontSize:16,color:"#0f172a"}}>
+            {ocrProgress ? "Lecture OCR en cours…" : "Analyse en cours…"}
+          </div>
+          <div style={{fontSize:13,color:"#64748b"}}>
+            {ocrProgress || "Lecture des sections, mesures, photos…"}
+          </div>
+          {ocrProgress && (
+            <div style={{fontSize:11,color:"#94a3b8",maxWidth:280}}>
+              Premier import : téléchargement du moteur OCR (peut prendre 20–30 s)
+            </div>
+          )}
         </div>
       )}
 
@@ -932,29 +977,46 @@ function ModalImportHTML({ clients, passages, onImport, onClose }) {
                   <span style={{fontWeight:800,fontSize:12,color:"#065f46"}}>Rapports manquants — à créer</span>
                 </div>
                 {items.map((it,i) => it.status!=="new" ? null : (
-                  <label key={i} onClick={()=>toggleSel(i)}
-                    style={{display:"flex",gap:10,alignItems:"flex-start",padding:"9px 14px",cursor:"pointer",
+                  <div key={i}
+                    style={{display:"flex",flexDirection:"column",gap:8,padding:"9px 14px",
                       background:selected.has(i)?"#f0fdf4":"#fff",borderBottom:"1px solid #f1f5f9",transition:"background .1s"}}>
-                    <input type="checkbox" checked={selected.has(i)} readOnly
-                      style={{accentColor:"#059669",width:15,height:15,flexShrink:0,marginTop:2}}/>
-                    <div style={{flex:1}}>
-                      <div style={{fontWeight:800,fontSize:13,color:"#0f172a"}}>{it.client.nom}</div>
-                      <div style={{fontSize:11,color:"#64748b",marginTop:2}}>
-                        {it.date?new Date(it.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}):"date ?"}
-                        {it.parsed.type&&<> · <span style={{color:"#0369a1"}}>{it.parsed.type}</span></>}
-                        {it.parsed.tech&&<> · {it.parsed.tech}</>}
-                      </div>
-                      {(it.photoCount>0||it.parsed.signatureTech) && (
-                        <div style={{marginTop:5}}>
-                          {it.photoCount>0 && tag(`📸 ${it.photoCount} photo${it.photoCount>1?"s":""}`, "#fef3c7","#92400e")}
-                          {it.parsed.signatureTech && tag("✍️ Signatures","#ede9fe","#6d28d9")}
-                          {Object.entries({ph:it.parsed.ph,chloreLibre:it.parsed.chloreLibre}).filter(([,v])=>v).map(([k,v])=>(
-                            <span key={k} style={{fontSize:10,color:"#64748b",marginRight:6}}>{k==="ph"?"pH":k==="chloreLibre"?"Cl":""}:{v}</span>
-                          ))}
+                    <label style={{display:"flex",gap:10,alignItems:"flex-start",cursor:"pointer"}} onClick={()=>toggleSel(i)}>
+                      <input type="checkbox" checked={selected.has(i)} readOnly
+                        style={{accentColor:"#059669",width:15,height:15,flexShrink:0,marginTop:2}}/>
+                      <div style={{flex:1}}>
+                        <div style={{fontWeight:800,fontSize:13,color:"#0f172a",display:"flex",alignItems:"center",gap:6}}>
+                          {it.client.nom}
+                          {it.ocr && tag("👁️ OCR — à vérifier","#fef3c7","#92400e")}
                         </div>
-                      )}
-                    </div>
-                  </label>
+                        <div style={{fontSize:11,color:"#64748b",marginTop:2}}>
+                          {it.date?new Date(it.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}):"date ?"}
+                          {it.parsed.type&&<> · <span style={{color:"#0369a1"}}>{it.parsed.type}</span></>}
+                          {it.parsed.tech&&<> · {it.parsed.tech}</>}
+                        </div>
+                        {!it.ocr && (it.photoCount>0||it.parsed.signatureTech) && (
+                          <div style={{marginTop:5}}>
+                            {it.photoCount>0 && tag(`📸 ${it.photoCount} photo${it.photoCount>1?"s":""}`, "#fef3c7","#92400e")}
+                            {it.parsed.signatureTech && tag("✍️ Signatures","#ede9fe","#6d28d9")}
+                            {Object.entries({ph:it.parsed.ph,chloreLibre:it.parsed.chloreLibre}).filter(([,v])=>v).map(([k,v])=>(
+                              <span key={k} style={{fontSize:10,color:"#64748b",marginRight:6}}>{k==="ph"?"pH":k==="chloreLibre"?"Cl":""}:{v}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                    {it.ocr && (
+                      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,paddingLeft:25}} onClick={e=>e.stopPropagation()}>
+                        {[["date","Date (AAAA-MM-JJ)"],["ph","pH"],["chloreLibre","Chlore libre"],["commentaires","Commentaires"]].map(([f,lbl])=>(
+                          <div key={f} style={{gridColumn: f==="commentaires" ? "span 3" : "span 1"}}>
+                            <div style={{fontSize:9,fontWeight:700,color:"#92400e",textTransform:"uppercase",marginBottom:2}}>{lbl}</div>
+                            <input value={it.parsed[f]||""} onChange={e=>updateOcrField(i,f,e.target.value)}
+                              style={{width:"100%",padding:"5px 8px",borderRadius:6,border:"1px solid #fde68a",
+                                fontSize:12,fontFamily:"inherit",boxSizing:"border-box"}}/>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             )}
@@ -973,7 +1035,10 @@ function ModalImportHTML({ clients, passages, onImport, onClose }) {
                     <input type="checkbox" checked={selected.has(i)} readOnly
                       style={{accentColor:"#1d4ed8",width:15,height:15,flexShrink:0,marginTop:2}}/>
                     <div style={{flex:1}}>
-                      <div style={{fontWeight:800,fontSize:13,color:"#0f172a"}}>{it.client.nom}</div>
+                      <div style={{fontWeight:800,fontSize:13,color:"#0f172a",display:"flex",alignItems:"center",gap:6}}>
+                        {it.client.nom}
+                        {it.ocr && tag("👁️ OCR — à vérifier","#fef3c7","#92400e")}
+                      </div>
                       <div style={{fontSize:11,color:"#64748b",marginTop:2}}>
                         {it.date?new Date(it.date).toLocaleDateString("fr",{day:"2-digit",month:"long",year:"numeric"}):""}
                       </div>
@@ -998,13 +1063,23 @@ function ModalImportHTML({ clients, passages, onImport, onClose }) {
             )}
 
             {/* Erreurs */}
-            {items.filter(it=>["error","no_client"].includes(it.status)).map((it,i) => (
+            {items.map((it,i) => !["error","no_client"].includes(it.status) ? null : (
               <div key={i} style={{padding:"10px 14px",borderRadius:10,background:"#fef2f2",
-                border:"1px solid #fecaca",fontSize:12,color:"#991b1b"}}>
-                ⚠️ <strong>{it.fileName}</strong> —{" "}
-                {it.status==="no_client"
-                  ? <>Client "<strong>{it.clientNom}</strong>" introuvable dans l'app</>
-                  : it.reason}
+                border:"1px solid #fecaca",fontSize:12,color:"#991b1b",display:"flex",flexDirection:"column",gap:6}}>
+                <div>
+                  ⚠️ <strong>{it.fileName}</strong> —{" "}
+                  {it.status==="no_client"
+                    ? <>Client "<strong>{it.clientNom || "?"}</strong>" introuvable dans l'app</>
+                    : it.reason}
+                  {it.ocr && <span style={{marginLeft:6}}>{tag("👁️ OCR","#fef3c7","#92400e")}</span>}
+                </div>
+                {it.ocr && (
+                  <select onChange={e=>e.target.value && assignClientToOcrItem(i, e.target.value)} defaultValue=""
+                    style={{padding:"6px 8px",borderRadius:6,border:"1px solid #fecaca",fontSize:12,fontFamily:"inherit",background:"#fff"}}>
+                    <option value="">Assigner manuellement un client…</option>
+                    {clients.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+                  </select>
+                )}
               </div>
             ))}
           </div>

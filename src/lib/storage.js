@@ -10,6 +10,19 @@ const FIREBASE_DEBOUNCE_MS = 800;
 const offlineQueue    = { pending: {} };
 const _debounceTimers = {};
 
+// ─── DIAGNOSTICS — état de synchronisation exposé au panneau Paramètres ─────
+const _diag = { lastSyncAt: null, lastError: null, lastErrorAt: null, syncCount: 0 };
+function _diagSyncOk()      { _diag.lastSyncAt = Date.now(); _diag.syncCount++; }
+function _diagError(msg)    { _diag.lastError = msg; _diag.lastErrorAt = Date.now(); }
+export function getSyncDiagnostics() {
+  return {
+    ..._diag,
+    pendingKeys: Object.keys(offlineQueue.pending),
+    online: typeof navigator !== "undefined" ? navigator.onLine : true,
+    isIOS: IS_IOS,
+  };
+}
+
 // ─── SAUVEGARDE IDB (backup critique — survit aux nettoyages iOS localStorage) ─
 // iOS peut purger le localStorage des PWAs après 7 jours sans visite.
 // IndexedDB n'est PAS affecté par cette purge → couche de protection supplémentaire.
@@ -736,8 +749,10 @@ export async function save(key, val) {
       try {
         await saveViaREST({ [key]: latest }, false);
         if (offlineQueue.pending[key] === latest) { delete offlineQueue.pending[key]; _persistQueue(); }
+        _diagSyncOk();
       } catch (e) {
         console.warn(`[briblue] saveViaREST("${key}") échoué:`, e?.message);
+        _diagError(`REST(${key}): ${e?.message || "erreur"}`);
         // Garde dans la queue → sera envoyé au prochain flush
       }
     }, 400);
@@ -752,14 +767,17 @@ export async function save(key, val) {
       try {
         await saveToFirebaseSDK(key, latest);
         if (offlineQueue.pending[key] === latest) { delete offlineQueue.pending[key]; _persistQueue(); }
+        _diagSyncOk();
       } catch (e) {
         console.warn(`[briblue] saveToFirebaseSDK("${key}") échoué:`, e?.message);
         // Fallback REST si le SDK échoue
         try {
           await saveViaREST({ [key]: latest }, false);
           if (offlineQueue.pending[key] === latest) { delete offlineQueue.pending[key]; _persistQueue(); }
+          _diagSyncOk();
         } catch (e2) {
           console.warn(`[briblue] saveViaREST fallback("${key}") échoué:`, e2?.message);
+          _diagError(`SDK+REST(${key}): ${e2?.message || "erreur"}`);
         }
       }
     }, FIREBASE_DEBOUNCE_MS);
