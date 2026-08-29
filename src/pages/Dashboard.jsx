@@ -781,7 +781,7 @@ const PLANNING_ACTIONS = [
 
 const MAX_EVENTS_VISIBLE = 5;
 
-function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEditRdv, onClientClick, isMobile }) {
+function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEditRdv, onEditPassage, onClientClick, isMobile }) {
   const [weekOffset, setWeekOffset] = useState(0);
   const [menuDay, setMenuDay] = useState(null);
   const [menuPos, setMenuPos] = useState(null); // desktop uniquement
@@ -1013,19 +1013,28 @@ function PlanningHebdo({ clients, passages, rdvs, onAddRdv, onAddPassage, onEdit
 
                       const emoji = isPassage ? (isCtrl?"💧":isSav?"🔧":"✓") : "📅";
 
+                      const bySec = ev.createdByRole === "secretaire";
                       return (
                         <button key={ev.id||j}
-                          onClick={()=> isPassage && client ? onClientClick(client) : (!isPassage && onEditRdv && onEditRdv(ev))}
+                          onClick={()=> {
+                            if (isPassage) {
+                              // Rapport planifié → ouvrir la fiche du rapport
+                              if (onEditPassage) onEditPassage(ev);
+                              else if (client) onClientClick(client);
+                            } else if (onEditRdv) onEditRdv(ev);
+                          }}
                           style={{
                             width:"100%",padding:"3px 4px",borderRadius:6,
                             background:bg,border:`1px solid ${bord}`,
+                            borderLeft: bySec ? "3px solid #7c3aed" : `1px solid ${bord}`,
                             cursor:"pointer",fontFamily:"inherit",textAlign:"left",
                             WebkitTapHighlightColor:"transparent",
-                            opacity:isPast&&!isPassage?.6:1,
+                            opacity:isPast&&!isPassage?.6:1, position:"relative",
                           }}>
                           <div style={{fontSize:8,color:"#64748b",marginBottom:1,display:"flex",alignItems:"center",gap:2,lineHeight:1}}>
                             <span>{emoji}</span>
                             {ev.heure&&<span>{ev.heure.slice(0,5)}</span>}
+                            {bySec && <span title="Planifié par la secrétaire" style={{marginLeft:"auto",width:6,height:6,borderRadius:"50%",background:"#7c3aed"}}/>}
                           </div>
                           <div style={{fontSize:10,fontWeight:700,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",lineHeight:1.2}}>{nom}</div>
                           <div style={{fontSize:8,color,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{(ev.type||"RDV").slice(0,13)}</div>
@@ -1814,7 +1823,7 @@ export function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPass
       <DashboardHero clients={clients} passages={passages} rdvs={rdvs} saisonNow={saisonNow} isMobile={isMobile} onAddPassage={onAddPassage} onAddLivraison={onAddLivraison} onAddClient={onAddClient} onAddRdv={onAddRdv} notes={notes} onNotesChange={onNotesChange}/>
 
       {/* ── PLANNING SEMAINE ── */}
-      <PlanningHebdo clients={clients} passages={passages} rdvs={rdvs} onAddRdv={onAddRdv} onAddPassage={onAddPassage} onEditRdv={onEditRdv} onClientClick={onClientClick} isMobile={isMobile}/>
+      <PlanningHebdo clients={clients} passages={passages} rdvs={rdvs} onAddRdv={onAddRdv} onAddPassage={onAddPassage} onEditRdv={onEditRdv} onEditPassage={onEditPassage} onClientClick={onClientClick} isMobile={isMobile}/>
 
       {/* ── PASSAGES DU MOIS ── */}
       <div className="db-s3" style={{marginBottom:14,borderRadius:18,overflow:"hidden",boxShadow:"0 2px 12px rgba(0,0,0,0.06)",border:"1px solid #e2e8f0",background:"#fff"}}>
@@ -1905,15 +1914,22 @@ export function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPass
           </div>
           {rdvsToday.map((r,i)=>{
             const c = clients.find(x=>x.id===r.clientId);
+            const bySec = r.createdByRole === "secretaire";
             return (
-              <div key={r.id} className="db-rdv-row" style={{display:"flex",gap:12,alignItems:"center",padding:"12px 16px",borderBottom:i<rdvsToday.length-1?"1px solid #f8fafc":"none",cursor:"pointer",background:"#fff"}}>
+              <div key={r.id} className="db-rdv-row"
+                onClick={()=>onEditRdv&&onEditRdv(r)}
+                style={{display:"flex",gap:12,alignItems:"center",padding:"12px 16px",borderBottom:i<rdvsToday.length-1?"1px solid #f8fafc":"none",cursor:"pointer",background:"#fff",borderLeft:bySec?"3px solid #7c3aed":"none"}}>
                 <div style={{width:48,textAlign:"center",flexShrink:0}}>
                   <div style={{fontSize:14,fontWeight:800,color:"#0891b2",lineHeight:1}}>{r.heure||"--:--"}</div>
                 </div>
                 <div style={{width:1,height:36,background:"#e2e8f0",flexShrink:0}}/>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontWeight:600,fontSize:13,color:"#0f172a"}}>{r.type}</div>
+                  <div style={{fontWeight:600,fontSize:13,color:"#0f172a",display:"flex",alignItems:"center",gap:6}}>
+                    {r.type}
+                    {bySec && <span style={{fontSize:9,fontWeight:700,color:"#7c3aed",background:"#f5f3ff",padding:"1px 6px",borderRadius:6}}>Secrétariat</span>}
+                  </div>
                   {c&&<div style={{fontSize:11,color:"#64748b",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}{c.adresse?` · ${c.adresse.split(",").pop()?.trim()}`:""}</div>}
+                  {r.description&&<div style={{fontSize:11,color:"#94a3b8",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={r.description}>📝 {r.description}</div>}
                 </div>
                 <span style={{fontSize:11,fontWeight:600,color:"#0891b2",background:"#e0f2fe",padding:"3px 8px",borderRadius:8,flexShrink:0}}>{r.duree||60} min</span>
               </div>
@@ -1935,8 +1951,11 @@ export function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPass
             const c = clients.find(x=>x.id===r.clientId);
             const d = new Date(r.date);
             const isNext = i===0;
+            const bySec = r.createdByRole === "secretaire";
             return (
-              <div key={r.id} className="db-rdv-row" style={{display:"flex",gap:12,alignItems:"center",padding:"12px 16px",borderBottom:i<rdvsProchains.length-1?"1px solid #f8fafc":"none",cursor:"pointer",background:isNext?"#fafeff":"#fff"}}>
+              <div key={r.id} className="db-rdv-row"
+                onClick={()=>onEditRdv&&onEditRdv(r)}
+                style={{display:"flex",gap:12,alignItems:"center",padding:"12px 16px",borderBottom:i<rdvsProchains.length-1?"1px solid #f8fafc":"none",cursor:"pointer",background:isNext?"#fafeff":"#fff",borderLeft:bySec?"3px solid #7c3aed":"none"}}>
                 {/* Date bloc */}
                 <div style={{textAlign:"center",minWidth:46,background:isNext?"#0891b2":"#f0f9ff",borderRadius:12,padding:"7px 4px",flexShrink:0,border:isNext?"none":"1px solid #e0f2fe"}}>
                   <div style={{fontSize:9,fontWeight:700,color:isNext?"rgba(255,255,255,0.8)":"#64748b",textTransform:"uppercase",letterSpacing:.5}}>{d.toLocaleDateString("fr",{weekday:"short"})}</div>
@@ -1944,9 +1963,13 @@ export function Dashboard({ clients, passages, rdvs=[], onClientClick, onAddPass
                   <div style={{fontSize:9,color:isNext?"rgba(255,255,255,0.7)":"#64748b"}}>{d.toLocaleDateString("fr",{month:"short"})}</div>
                 </div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontWeight:600,fontSize:13,color:"#0f172a"}}>{r.heure&&<span style={{color:"#0891b2",marginRight:4}}>{r.heure}</span>}{r.type}</div>
+                  <div style={{fontWeight:600,fontSize:13,color:"#0f172a",display:"flex",alignItems:"center",gap:6}}>
+                    {r.heure&&<span style={{color:"#0891b2"}}>{r.heure}</span>}
+                    {r.type}
+                    {bySec && <span style={{fontSize:9,fontWeight:700,color:"#7c3aed",background:"#f5f3ff",padding:"1px 6px",borderRadius:6}}>Secrétariat</span>}
+                  </div>
                   {c&&<div style={{fontSize:11,color:"#64748b",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nom}</div>}
-                  {r.description&&<div style={{fontSize:11,color:"#94a3b8",marginTop:1}}>{r.description}</div>}
+                  {r.description&&<div style={{fontSize:11,color:"#94a3b8",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={r.description}>📝 {r.description}</div>}
                 </div>
                 <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round" style={{flexShrink:0}}><polyline points="9 18 15 12 9 6"/></svg>
               </div>

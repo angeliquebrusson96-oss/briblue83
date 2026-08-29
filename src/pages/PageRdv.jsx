@@ -43,7 +43,10 @@ export function PageRdv({ clients, rdvs, onAdd, onEdit, onDelete }) {
                   <div style={{flex:1}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                       <div>
-                        <div style={{fontWeight:800,fontSize:14,color:DS.dark}}>{r.type}</div>
+                        <div style={{fontWeight:800,fontSize:14,color:DS.dark,display:"flex",alignItems:"center",gap:6}}>
+                          {r.type}
+                          {r.createdByRole==="secretaire" && <span title={`Planifié par ${r.createdBy||"Angélique"}`} style={{fontSize:9,fontWeight:700,color:"#7c3aed",background:"#f5f3ff",padding:"2px 6px",borderRadius:8,letterSpacing:.2}}>Secrétariat</span>}
+                        </div>
                         <div style={{fontSize:12,color:DS.mid,marginTop:2}}>
                           {r.heure&&<span style={{fontWeight:600}}>{r.heure}</span>}
                           {r.duree&&<span> · {r.duree} min</span>}

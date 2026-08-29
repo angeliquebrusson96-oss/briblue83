@@ -344,10 +344,10 @@ export function FicheClient({ client, passages, livraisons=[], rdvs=[], produits
   const TABS = [
     {id:"gestion",    label:"Général",   color:"#0891b2"},   // vue d'ensemble + actions
     {id:"historique", label:"Historique",color:"#64748b"},   // chronologie complète
+    {id:"passages",   label:"Rapports",  color:"#7c3aed"},   // rapports d'intervention
     {id:"infos",      label:"Infos",     color:"#0284c7"},   // coordonnées client
     {id:"contrat",    label:"Contrat",   color:"#059669"},   // contrat + paiements
     {id:"paiements",  label:"Gestion",   color:"#0f766e"},   // mensualités + livraisons dues (vue condensée)
-    {id:"passages",   label:"Rapports",  color:"#7c3aed"},   // rapports d'intervention
     {id:"saisons",    label:"Planning",  color:"#0891b2"},   // planning mensuel
     {id:"rdvs",       label:"RDV",       color:"#6d28d9"},   // rendez-vous
     {id:"livraisons", label:"Livraisons",color:"#d97706"},   // livraisons produits
