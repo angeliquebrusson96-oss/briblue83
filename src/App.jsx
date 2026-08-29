@@ -58,14 +58,9 @@ function LoginScreen({ onLogin }) {
       {/* Bande couleur top */}
       <div style={{position:"fixed",top:0,left:0,right:0,height:4,background:"linear-gradient(90deg,#0891b2,#06b6d4,#8b5cf6)"}}/>
       <div className="scale-in" style={{marginBottom:28,display:"flex",flexDirection:"column",alignItems:"center",gap:12,position:"relative"}}>
-        {/* Logo principal — carré arrondi avec triple vague */}
-        <div style={{width:84,height:84,borderRadius:24,background:"linear-gradient(145deg,#0891b2,#0369a1)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 8px 32px rgba(8,145,178,0.35)"}}>
-          {Ico.wave(44,"white")}
-        </div>
-        <div style={{textAlign:"center"}}>
-          <div style={{fontWeight:900,fontSize:32,color:"#0f172a",letterSpacing:-1.5}}>BRIBLUE</div>
-          <div style={{color:"#64748b",fontSize:11,marginTop:3,fontWeight:500,letterSpacing:0.2}}>Création · Traitement de l'eau · Installation · Dépannage</div>
-        </div>
+        {/* Logo principal — image officielle Bri'Blue */}
+        <img src="/logo-briblue.png" alt="Bri'Blue" style={{width:220,maxWidth:"80vw",height:"auto",filter:"drop-shadow(0 8px 24px rgba(8,145,178,0.25))"}}/>
+        <div style={{color:"#64748b",fontSize:11,marginTop:3,fontWeight:500,letterSpacing:0.2,textAlign:"center"}}>Création · Traitement de l'eau · Installation · Dépannage</div>
       </div>
       <div className="fade-in" style={{width:"100%",maxWidth:400,borderRadius:18,padding:28,background:"#ffffff",boxShadow:"0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)",border:"1px solid #e2e8f0",position:"relative"}}>
         <div style={{marginBottom:22}}>
@@ -2009,8 +2004,7 @@ export default function App() {
   if(!ready) return (
     <><GlobalStyles/>
     <div style={{height:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"rgba(255,255,255,0.45)",gap:16,fontFamily:"'Inter', -apple-system, system-ui, sans-serif"}}>
-      <div className="scale-in" style={{width:80,height:80,borderRadius:24,background:"#0891b2",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 12px 40px rgba(12,18,34,0.35)"}}>{Ico.wave(42,"white")}</div>
-      <div style={{fontWeight:900,fontSize:24,color:DS.blue,letterSpacing:-0.5}}>BRIBLUE</div>
+      <img src="/logo-briblue.png" alt="Bri'Blue" className="scale-in" style={{width:190,maxWidth:"70vw",height:"auto",filter:"drop-shadow(0 8px 24px rgba(8,145,178,0.25))"}}/>
       <div style={{color:DS.mid,fontSize:13}}>Chargement…</div>
     </div></>
   );

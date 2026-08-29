@@ -650,11 +650,16 @@ export function PageParametres({
     ? Math.round(passages.filter(p => p.ok).length / passages.length * 100)
     : 0;
 
-  return (
-    <div style={{maxWidth:560, margin:"0 auto", padding:"0 0 60px"}}>
+  const [tab, setTab] = useState("general");
+  const TABS = [
+    { id:"general",       label:"Général",       emoji:"⚙️" },
+    { id:"notifications", label:"Notifications", emoji:"🔔" },
+    { id:"donnees",       label:"Données",       emoji:"💾" },
+    { id:"application",   label:"Application",   emoji:"📱" },
+  ];
 
-      {/* ── BLOC RÉCUPÉRATION D'URGENCE ── */}
-      <div style={{
+  const urgenceBlock = (
+    <div style={{
         marginBottom:20,
         borderRadius:18,
         overflow:"hidden",
@@ -728,6 +733,10 @@ export function PageParametres({
           </div>
         </div>
       </div>
+  );
+
+  return (
+    <div style={{maxWidth:560, margin:"0 auto", padding:"0 0 60px"}}>
 
       {/* ── CARTE PROFIL ── */}
       <div style={{
@@ -774,6 +783,30 @@ export function PageParametres({
           </div>
         </div>
       </div>
+
+      {/* ── ONGLETS DE SECTION ── */}
+      <div style={{display:"flex",gap:6,marginBottom:20,overflowX:"auto",WebkitOverflowScrolling:"touch",paddingBottom:2}}>
+        {TABS.map(t => {
+          const active = tab === t.id;
+          return (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              style={{
+                flex:"1 0 auto",display:"flex",alignItems:"center",gap:6,justifyContent:"center",
+                padding:"9px 14px",borderRadius:12,fontFamily:"inherit",cursor:"pointer",
+                fontSize:12.5,fontWeight:active?800:600,whiteSpace:"nowrap",
+                background:active?"linear-gradient(135deg,#0369a1,#0891b2)":"#fff",
+                color:active?"#fff":"#475569",
+                border:`1.5px solid ${active?"#0891b2":"#e2e8f0"}`,
+                boxShadow:active?"0 3px 12px rgba(8,145,178,0.3)":"none",
+                WebkitTapHighlightColor:"transparent",transition:"all .15s",
+              }}>
+              <span>{t.emoji}</span>{t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab==="general" && <>
 
       {/* ── MODE EXPERT ── */}
       <Bloc titre="Mode" emoji="⚡">
@@ -840,6 +873,10 @@ export function PageParametres({
           </div>
         </Bloc>
       )}
+
+      </>}
+
+      {tab==="notifications" && <>
 
       {/* ── NOTIFICATIONS ── */}
       <Bloc titre="Notifications" emoji="🔔">
@@ -1065,6 +1102,12 @@ export function PageParametres({
         )}
       </Bloc>
 
+      </>}
+
+      {tab==="donnees" && <>
+
+      {urgenceBlock}
+
       <Bloc titre="Diagnostics" emoji="🩺">
         <Ligne
           icone={<svg width={17} height={17} viewBox="0 0 24 24" fill="none"
@@ -1155,6 +1198,10 @@ export function PageParametres({
         )}
       </Bloc>
 
+      </>}
+
+      {tab==="application" && <>
+
       {/* ── APPLICATION ── */}
       <Bloc titre="Application" emoji="📱">
         <Ligne
@@ -1222,6 +1269,8 @@ export function PageParametres({
           sep={false}
         />
       </Bloc>
+
+      </>}
 
     </div>
   );
