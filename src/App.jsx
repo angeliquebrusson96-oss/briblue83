@@ -83,11 +83,12 @@ function LoginScreen({ onLogin }) {
     setErr("");
     if (!email.trim() || !code.trim()) { setErr("Veuillez remplir tous les champs."); return; }
     setLoading(true);
+    // Court délai pour laisser l'état "Connexion…" s'afficher, sans ralentir inutilement
     setTimeout(() => {
       const acc = ACCOUNTS.find(a => a.email === email.trim().toLowerCase() && a.code === code);
       if (acc) { onLogin(acc); }
       else { setErr("Email ou code incorrect."); setLoading(false); }
-    }, 600);
+    }, 120);
   };
 
   return (
@@ -139,13 +140,14 @@ function LoginScreen({ onLogin }) {
 // ─────────────────────────────────────────────────────────────────────────────
 const STOCK_UNITES    = ["unité","flacon","sac","carton","L","kg","boîte"];
 const STOCK_CATS = [
-  { key:"tous",       label:"Tous",       color:"#64748b", bg:"#f1f5f9" },
-  { key:"bas",        label:"⚠️ Bas",      color:"#dc2626", bg:"#fee2e2" },
-  { key:"traitement", label:"Traitement", color:"#0891b2", bg:"#e0f2fe" },
-  { key:"entretien",  label:"Entretien",  color:"#059669", bg:"#dcfce7" },
-  { key:"matériel",   label:"Matériel",   color:"#7c3aed", bg:"#ede9fe" },
+  { key:"tous",       label:"Tous",       emoji:"📦", color:"#64748b", bg:"#f1f5f9" },
+  { key:"bas",        label:"Bas",        emoji:"⚠️", color:"#dc2626", bg:"#fee2e2" },
+  { key:"traitement", label:"Traitement", emoji:"💧", color:"#0891b2", bg:"#e0f2fe" },
+  { key:"entretien",  label:"Entretien",  emoji:"🧹", color:"#059669", bg:"#dcfce7" },
+  { key:"matériel",   label:"Matériel",   emoji:"🔧", color:"#7c3aed", bg:"#ede9fe" },
 ];
 const CAT_COLORS = { traitement:"#0891b2", entretien:"#059669", matériel:"#7c3aed" };
+const CAT_EMOJI  = { traitement:"💧", entretien:"🧹", matériel:"🔧" };
 
 function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta, onAddProduit, onDeleteProduit, onRenameProduit }) {
   const isMobile = useIsMobile();
@@ -215,19 +217,35 @@ function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta,
   // ── Contenu partagé desktop + mobile ──────────────────────────────────────
   const inner = (
     <>
-      {/* ── Résumé + action ── */}
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-        <div style={{flex:1,fontSize:12,color:"#64748b"}}>
-          <strong style={{color:"#0f172a"}}>{produits.length}</strong> produit{produits.length>1?"s":""}
-          {basCount > 0 && <span style={{marginLeft:8,color:"#dc2626",fontWeight:700}}>⚠ {basCount} en rupture</span>}
+      {/* ── Résumé (carte dégradée) + action ── */}
+      <div style={{
+        position:"relative",overflow:"hidden",borderRadius:18,marginBottom:16,
+        padding:"16px 16px",display:"flex",alignItems:"center",gap:14,
+        background:"linear-gradient(135deg,#075985 0%,#0891b2 55%,#0e7490 100%)",
+        boxShadow:"0 8px 22px rgba(8,145,178,0.28)",
+      }}>
+        <div style={{position:"absolute",top:-40,right:-30,width:130,height:130,borderRadius:"50%",
+          background:"radial-gradient(circle,rgba(34,211,238,0.25),transparent 70%)",pointerEvents:"none"}}/>
+        <div style={{position:"relative",flex:1,display:"flex",gap:18}}>
+          <div>
+            <div style={{fontSize:24,fontWeight:900,color:"#fff",lineHeight:1}}>{produits.length}</div>
+            <div style={{fontSize:10,color:"rgba(255,255,255,0.7)",fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginTop:3}}>Produits</div>
+          </div>
+          <div style={{width:1,background:"rgba(255,255,255,0.2)"}}/>
+          <div>
+            <div style={{fontSize:24,fontWeight:900,color:basCount>0?"#fef08a":"#fff",lineHeight:1,display:"flex",alignItems:"center",gap:5}}>
+              {basCount>0 && <span style={{fontSize:16}}>⚠️</span>}{basCount}
+            </div>
+            <div style={{fontSize:10,color:"rgba(255,255,255,0.7)",fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginTop:3}}>En rupture</div>
+          </div>
         </div>
         <button onClick={()=>setShowAddForm(s=>!s)}
-          style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",
-            borderRadius:20,background:"linear-gradient(135deg,#0891b2,#0e7490)",
-            border:"none",cursor:"pointer",color:"#fff",fontSize:12,fontWeight:700,
-            fontFamily:"inherit",boxShadow:"0 2px 8px rgba(8,145,178,0.3)",
-            WebkitTapHighlightColor:"transparent"}}>
-          <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round">
+          style={{position:"relative",display:"flex",alignItems:"center",gap:6,padding:"10px 16px",
+            borderRadius:14,background:"rgba(255,255,255,0.16)",
+            border:"1px solid rgba(255,255,255,0.3)",cursor:"pointer",color:"#fff",fontSize:12.5,fontWeight:800,
+            fontFamily:"inherit",backdropFilter:"blur(6px)",WebkitBackdropFilter:"blur(6px)",
+            WebkitTapHighlightColor:"transparent",flexShrink:0}}>
+          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
           Ajouter
@@ -304,7 +322,7 @@ function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta,
       </div>
 
       {/* ── Filtres catégorie ── */}
-      <div style={{display:"flex",gap:6,flexWrap:"nowrap",overflowX:"auto",scrollbarWidth:"none",marginBottom:14,paddingBottom:2}}>
+      <div style={{display:"flex",gap:7,flexWrap:"nowrap",overflowX:"auto",scrollbarWidth:"none",marginBottom:16,paddingBottom:2}}>
         {STOCK_CATS.map(c => {
           const active = catFilter === c.key;
           const count  = c.key==="tous" ? produits.length
@@ -313,16 +331,19 @@ function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta,
           return (
             <button key={c.key} onClick={()=>setCatFilter(c.key)}
               style={{
-                flexShrink:0,padding:"5px 12px",borderRadius:20,
-                border:`1.5px solid ${active?c.color:"#e2e8f0"}`,
-                background:active?c.bg:"#fff",
-                color:active?c.color:"#64748b",
-                fontSize:11,fontWeight:active?700:500,
+                flexShrink:0,display:"flex",alignItems:"center",gap:6,
+                padding:"7px 13px",borderRadius:20,
+                border:"none",
+                background:active?c.color:"#fff",
+                boxShadow:active?`0 3px 10px ${c.color}55`:"inset 0 0 0 1.5px #e2e8f0",
+                color:active?"#fff":"#475569",
+                fontSize:11.5,fontWeight:active?800:600,
                 cursor:"pointer",fontFamily:"inherit",
                 WebkitTapHighlightColor:"transparent",
-                transition:"all .12s",
+                transition:"all .15s",
               }}>
-              {c.label} {count > 0 && <span style={{marginLeft:3,opacity:.7}}>({count})</span>}
+              <span style={{fontSize:12}}>{c.emoji}</span>{c.label}
+              {count > 0 && <span style={{marginLeft:1,opacity:active?.9:.55,fontWeight:700}}>{count}</span>}
             </button>
           );
         })}
@@ -345,45 +366,57 @@ function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta,
 
           return (
             <div key={nom} style={{
-              borderRadius:14,
-              border:`1px solid ${isExp?"#bae6fd":"#eef2f6"}`,
-              borderLeft:isLow?"3px solid #ef4444":`1px solid ${isExp?"#bae6fd":"#eef2f6"}`,
+              borderRadius:16,
+              border:isExp?"1.5px solid #7dd3fc":"1px solid #eef2f6",
               background:isExp?"#f0f9ff":"#fff",
               overflow:"hidden",
+              boxShadow:isLow?"0 1px 3px rgba(239,68,68,0.08)":"0 1px 2px rgba(15,23,42,0.03)",
               transition:"border-color .15s",
             }}>
               {/* ── Ligne principale ── */}
-              <div style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:11,padding:"12px 14px"}}>
 
-                {/* Dot catégorie */}
-                <div style={{width:8,height:8,borderRadius:"50%",background:catC,flexShrink:0}}/>
+                {/* Icône catégorie */}
+                <div style={{width:38,height:38,borderRadius:12,flexShrink:0,
+                  background:isLow?"#fef2f2":`${catC}18`,
+                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,
+                  boxShadow:isLow?"inset 0 0 0 1.5px #fecaca":"none"}}>
+                  {isLow ? "⚠️" : (CAT_EMOJI[meta.categorie] || "📦")}
+                </div>
 
                 {/* Nom */}
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:600,color:"#0f172a",
+                  <div style={{fontSize:13.5,fontWeight:700,color:"#0f172a",
                     overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                     {nom}
                   </div>
-                  <div style={{display:"flex",alignItems:"center",gap:6,marginTop:3}}>
+                  <div style={{display:"flex",alignItems:"center",gap:7,marginTop:4}}>
                     {/* Mini barre stock */}
-                    <div style={{width:36,height:3,background:"#eef2f6",borderRadius:2,overflow:"hidden",flexShrink:0}}>
+                    <div style={{width:40,height:4,background:"#eef2f6",borderRadius:2,overflow:"hidden",flexShrink:0}}>
                       <div style={{
                         height:"100%",width:`${pct}%`,borderRadius:2,
-                        background:isLow?"#ef4444":qty<meta.seuil*2?"#f59e0b":"#22c55e",
+                        background:isLow?"linear-gradient(90deg,#ef4444,#f87171)":qty<meta.seuil*2?"linear-gradient(90deg,#f59e0b,#fbbf24)":"linear-gradient(90deg,#22c55e,#4ade80)",
                         transition:"width .3s",
                       }}/>
                     </div>
-                    <span style={{fontSize:10,color:isLow?"#dc2626":"#94a3b8",fontWeight:isLow?700:400}}>
-                      {isLow?"stock bas":meta.unite}{meta.prix>0?` · ${meta.prix}€`:""}
+                    <span style={{fontSize:10.5,color:isLow?"#dc2626":"#94a3b8",fontWeight:isLow?800:500}}>
+                      {isLow?"stock bas":meta.unite}
                     </span>
+                    {meta.prix>0 && (
+                      <span style={{fontSize:9.5,fontWeight:800,color:"#059669",background:"#f0fdf4",padding:"1px 6px",borderRadius:6}}>
+                        {meta.prix}€
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                {/* Stepper quantité — pilule unifiée */}
-                <div style={{display:"flex",alignItems:"center",borderRadius:10,background:"#f8fafc",flexShrink:0}}>
+                {/* Stepper quantité — pilule colorée */}
+                <div style={{display:"flex",alignItems:"center",borderRadius:12,
+                  background:isLow?"#fef2f2":"#f8fafc",flexShrink:0,
+                  boxShadow:isLow?"inset 0 0 0 1px #fecaca":"none"}}>
                   <button onClick={()=>onUpdateStock(nom, Math.max(0, qty-1))}
-                    style={{width:28,height:28,border:"none",background:"none",cursor:"pointer",
-                      fontSize:16,fontWeight:700,color:"#64748b",display:"flex",alignItems:"center",
+                    style={{width:30,height:32,border:"none",background:"none",cursor:"pointer",
+                      fontSize:17,fontWeight:700,color:"#64748b",display:"flex",alignItems:"center",
                       justifyContent:"center",WebkitTapHighlightColor:"transparent"}}>−</button>
 
                   {editingQty === nom ? (
@@ -392,29 +425,30 @@ function ModalStock({ stock, stockMeta={}, onClose, onUpdateStock, onUpdateMeta,
                       onBlur={()=>saveQty(nom)}
                       onKeyDown={e=>{if(e.key==="Enter")saveQty(nom);if(e.key==="Escape")setEditingQty(null);}}
                       style={{width:34,textAlign:"center",border:"none",
-                        borderRadius:6,padding:"4px 0",fontSize:14,fontWeight:900,
+                        borderRadius:6,padding:"4px 0",fontSize:15,fontWeight:900,
                         color:"#0891b2",outline:"none",fontFamily:"inherit",background:"#fff"}}/>
                   ) : (
                     <span onClick={()=>startQtyEdit(nom)}
-                      style={{minWidth:26,textAlign:"center",fontSize:14,fontWeight:800,
+                      style={{minWidth:28,textAlign:"center",fontSize:15,fontWeight:900,
                         color:isLow?"#dc2626":"#0f172a",cursor:"text"}}>
                       {qty}
                     </span>
                   )}
 
                   <button onClick={()=>onUpdateStock(nom, qty+1)}
-                    style={{width:28,height:28,border:"none",background:"none",cursor:"pointer",
-                      fontSize:16,fontWeight:700,color:"#0891b2",display:"flex",alignItems:"center",
+                    style={{width:30,height:32,border:"none",background:"none",cursor:"pointer",
+                      fontSize:17,fontWeight:700,color:"#0891b2",display:"flex",alignItems:"center",
                       justifyContent:"center",WebkitTapHighlightColor:"transparent"}}>+</button>
                 </div>
 
                 {/* Bouton expand */}
                 <button onClick={()=>setExpandedProd(isExp?null:nom)}
-                  style={{width:24,height:24,border:"none",background:"none",cursor:"pointer",
+                  style={{width:26,height:26,border:"none",background:isExp?"#e0f2fe":"transparent",
+                    borderRadius:8,cursor:"pointer",
                     display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
-                    WebkitTapHighlightColor:"transparent"}}>
+                    WebkitTapHighlightColor:"transparent",transition:"background .15s"}}>
                   <svg width={13} height={13} viewBox="0 0 24 24" fill="none"
-                    stroke="#94a3b8" strokeWidth="2.3" strokeLinecap="round"
+                    stroke={isExp?"#0891b2":"#94a3b8"} strokeWidth="2.3" strokeLinecap="round"
                     style={{transform:isExp?"rotate(180deg)":"none",transition:"transform .2s"}}>
                     <polyline points="6 9 12 15 18 9"/>
                   </svg>
@@ -1349,7 +1383,6 @@ export default function App() {
   const [secTab, setSecTab] = useState("planning"); // onglet actif de la vue secrétaire
   const [events, setEvents] = useState(() => loadEvents());
   const [showNotifPanel, setShowNotifPanel] = useState(false);
-  const [showNavSheet, setShowNavSheet] = useState(false);
   const [eventsSeenAt, setEventsSeenAt] = useState(() => readLS("events_seen_at", ""));
   const recordEvent = useCallback((type, label, ref) => { pushEvent(type, label, ref); setEvents(loadEvents()); }, []);
   const deleteEvent = useCallback((id) => { removeEvent(id); setEvents(loadEvents()); }, []);
@@ -2158,9 +2191,23 @@ export default function App() {
 
   if(!ready) return (
     <><GlobalStyles/>
-    <div style={{height:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"rgba(255,255,255,0.45)",gap:16,fontFamily:"'Inter', -apple-system, system-ui, sans-serif"}}>
-      <img src="/logo-briblue.png" alt="Bri'Blue" className="scale-in" style={{width:190,maxWidth:"70vw",height:"auto",filter:"drop-shadow(0 8px 24px rgba(8,145,178,0.25))"}}/>
-      <div style={{color:DS.mid,fontSize:13}}>Chargement…</div>
+    <style>{`
+      @keyframes bbFloat { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-7px) scale(1.015)} }
+      @keyframes bbSlide { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
+      .bb-load-logo{animation:bbFloat 2.4s ease-in-out infinite}
+      .bb-load-bar{width:160px;height:4px;border-radius:2px;background:#e2e8f0;overflow:hidden;position:relative}
+      .bb-load-bar::after{content:"";position:absolute;inset:0;border-radius:2px;
+        background:linear-gradient(90deg,#0891b2,#22d3ee,#7c3aed);
+        transform:translateX(-100%);animation:bbSlide 1.1s cubic-bezier(.65,0,.35,1) infinite}
+      @media (prefers-reduced-motion: reduce){
+        .bb-load-logo,.bb-load-bar::after{animation:none}
+        .bb-load-bar::after{transform:none}
+      }
+    `}</style>
+    <div style={{height:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"#f1f5f9",gap:22,fontFamily:"'Inter', -apple-system, system-ui, sans-serif"}}>
+      <img src="/logo-briblue.png" alt="Bri'Blue" className="bb-load-logo" style={{width:190,maxWidth:"70vw",height:"auto",filter:"drop-shadow(0 8px 24px rgba(8,145,178,0.25))"}}/>
+      <div className="bb-load-bar"/>
+      <div style={{color:"#94a3b8",fontSize:12,fontWeight:600,letterSpacing:.3}}>Chargement…</div>
     </div></>
   );
 
@@ -2568,47 +2615,30 @@ export default function App() {
         </div>
       )}
 
-      {/* VOLET DE NAVIGATION mobile — bouton unique qui ouvre une liste défilante */}
+      {/* NAV BAS mobile */}
       {isMobile && (
         <>
           <style>{`
-            @keyframes navSheetUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
-            @keyframes navSheetFade { from{opacity:0} to{opacity:1} }
-            .nav-sheet{animation:navSheetUp .25s cubic-bezier(.22,1,.36,1) forwards}
-            .nav-sheet-backdrop{animation:navSheetFade .2s ease forwards}
+            @keyframes navPop { 0%{transform:scale(.7) translateY(8px);opacity:0} 55%{transform:scale(1.15) translateY(-3px);opacity:1} 80%{transform:scale(0.97) translateY(0);opacity:1} 100%{transform:scale(1) translateY(0);opacity:1} }
+            @keyframes navSlideIn { from{opacity:0;transform:translateX(-50%) scaleX(0.4)} to{opacity:1;transform:translateX(-50%) scaleX(1)} }
+            .nav-icon-active{animation:navPop .35s cubic-bezier(.34,1.56,.64,1) forwards}
+            .nav-pill-active{animation:navSlideIn .28s cubic-bezier(.22,1,.36,1) forwards}
           `}</style>
-          <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:640,background:"#ffffff",zIndex:50,paddingBottom:"env(safe-area-inset-bottom,0px)",borderTop:"1px solid #e2e8f0"}}>
-            <button onClick={()=>setShowNavSheet(true)} style={{width:"100%",padding:"12px 16px",border:"none",background:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7,WebkitTapHighlightColor:"transparent",fontFamily:"inherit"}}>
-              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2.2" strokeLinecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
-              <span style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>Menu</span>
-            </button>
+          <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:640,background:"#ffffff",display:"flex",alignItems:"flex-end",zIndex:50,paddingBottom:"env(safe-area-inset-bottom,0px)",borderTop:"1px solid #e2e8f0"}}>
+            {NAV.map(n=>{
+              const active = page===n.id;
+              const accentColor = n.id==="rdv" ? "#818cf8" : DS.blue;
+              const gradFrom = n.id==="rdv" ? "#818cf8" : "#06b6d4";
+              const gradTo = n.id==="rdv" ? "#4f46e5" : "#0891b2";
+              return (
+                <button key={n.id} onClick={()=>setPage(n.id)} style={{flex:1,paddingTop:8,paddingBottom:12,border:"none",cursor:"pointer",background:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:2,WebkitTapHighlightColor:"transparent",outline:"none",position:"relative",minWidth:0}}>
+                  {active && <div className="nav-pill-active" style={{position:"absolute",top:0,left:"50%",width:32,height:3,background:`linear-gradient(90deg,${gradFrom},${gradTo})`,borderRadius:"0 0 6px 6px"}}/>}
+                  <div style={{width:40,height:28,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:8,background:active?"#e0f2fe":"transparent",transition:"background .15s"}}>{n.icon(active)}</div>
+                  <span style={{fontSize:10,fontWeight:active?700:400,color:active?accentColor:"#94a3b8",transition:"all .15s",lineHeight:1}}>{n.l}</span>
+                </button>
+              );
+            })}
           </div>
-
-          {showNavSheet && (
-            <>
-              <div className="nav-sheet-backdrop" onClick={()=>setShowNavSheet(false)} style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.45)",zIndex:97}}/>
-              <div className="nav-sheet" style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:640,background:"#fff",zIndex:98,borderTopLeftRadius:20,borderTopRightRadius:20,boxShadow:"0 -8px 32px rgba(15,23,42,0.2)",paddingBottom:"env(safe-area-inset-bottom,0px)",maxHeight:"70vh",display:"flex",flexDirection:"column"}}>
-                <div style={{display:"flex",justifyContent:"center",padding:"10px 0 4px"}}>
-                  <div style={{width:36,height:4,borderRadius:2,background:"#e2e8f0"}}/>
-                </div>
-                <div style={{overflowY:"auto",WebkitOverflowScrolling:"touch",padding:"4px 10px 14px"}}>
-                  {NAV.map(n=>{
-                    const active = page===n.id;
-                    return (
-                      <button key={n.id} onClick={()=>{setPage(n.id);setShowNavSheet(false);}}
-                        style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 12px",borderRadius:12,
-                          border:"none",cursor:"pointer",background:active?"#e0f2fe":"transparent",
-                          textAlign:"left",fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>
-                        <div style={{width:34,height:34,borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{n.icon(active)}</div>
-                        <span style={{fontSize:14,fontWeight:active?800:600,color:active?DS.blue:"#334155"}}>{n.l}</span>
-                        {active && <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={DS.blue} strokeWidth="2.5" strokeLinecap="round" style={{marginLeft:"auto"}}><polyline points="20 6 9 17 4 12"/></svg>}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </>
-          )}
         </>
       )}
 
