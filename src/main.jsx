@@ -14,3 +14,12 @@ createRoot(document.getElementById('root')).render(
     <App />
   </StrictMode>,
 )
+
+// Retire le splash HTML dès que React a monté (fondu court pour éviter le flash)
+requestAnimationFrame(() => {
+  const splash = document.getElementById('bb-splash');
+  if (!splash) return;
+  splash.style.transition = 'opacity .25s ease';
+  splash.style.opacity = '0';
+  setTimeout(() => splash.remove(), 260);
+});

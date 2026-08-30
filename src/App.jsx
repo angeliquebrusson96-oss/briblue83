@@ -83,11 +83,12 @@ function LoginScreen({ onLogin }) {
     setErr("");
     if (!email.trim() || !code.trim()) { setErr("Veuillez remplir tous les champs."); return; }
     setLoading(true);
+    // Court délai pour laisser l'état "Connexion…" s'afficher, sans ralentir inutilement
     setTimeout(() => {
       const acc = ACCOUNTS.find(a => a.email === email.trim().toLowerCase() && a.code === code);
       if (acc) { onLogin(acc); }
       else { setErr("Email ou code incorrect."); setLoading(false); }
-    }, 600);
+    }, 120);
   };
 
   return (
@@ -1349,7 +1350,6 @@ export default function App() {
   const [secTab, setSecTab] = useState("planning"); // onglet actif de la vue secrétaire
   const [events, setEvents] = useState(() => loadEvents());
   const [showNotifPanel, setShowNotifPanel] = useState(false);
-  const [showNavSheet, setShowNavSheet] = useState(false);
   const [eventsSeenAt, setEventsSeenAt] = useState(() => readLS("events_seen_at", ""));
   const recordEvent = useCallback((type, label, ref) => { pushEvent(type, label, ref); setEvents(loadEvents()); }, []);
   const deleteEvent = useCallback((id) => { removeEvent(id); setEvents(loadEvents()); }, []);
@@ -2158,9 +2158,23 @@ export default function App() {
 
   if(!ready) return (
     <><GlobalStyles/>
-    <div style={{height:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"rgba(255,255,255,0.45)",gap:16,fontFamily:"'Inter', -apple-system, system-ui, sans-serif"}}>
-      <img src="/logo-briblue.png" alt="Bri'Blue" className="scale-in" style={{width:190,maxWidth:"70vw",height:"auto",filter:"drop-shadow(0 8px 24px rgba(8,145,178,0.25))"}}/>
-      <div style={{color:DS.mid,fontSize:13}}>Chargement…</div>
+    <style>{`
+      @keyframes bbFloat { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-7px) scale(1.015)} }
+      @keyframes bbSlide { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
+      .bb-load-logo{animation:bbFloat 2.4s ease-in-out infinite}
+      .bb-load-bar{width:160px;height:4px;border-radius:2px;background:#e2e8f0;overflow:hidden;position:relative}
+      .bb-load-bar::after{content:"";position:absolute;inset:0;border-radius:2px;
+        background:linear-gradient(90deg,#0891b2,#22d3ee,#7c3aed);
+        transform:translateX(-100%);animation:bbSlide 1.1s cubic-bezier(.65,0,.35,1) infinite}
+      @media (prefers-reduced-motion: reduce){
+        .bb-load-logo,.bb-load-bar::after{animation:none}
+        .bb-load-bar::after{transform:none}
+      }
+    `}</style>
+    <div style={{height:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"#f1f5f9",gap:22,fontFamily:"'Inter', -apple-system, system-ui, sans-serif"}}>
+      <img src="/logo-briblue.png" alt="Bri'Blue" className="bb-load-logo" style={{width:190,maxWidth:"70vw",height:"auto",filter:"drop-shadow(0 8px 24px rgba(8,145,178,0.25))"}}/>
+      <div className="bb-load-bar"/>
+      <div style={{color:"#94a3b8",fontSize:12,fontWeight:600,letterSpacing:.3}}>Chargement…</div>
     </div></>
   );
 
@@ -2568,47 +2582,30 @@ export default function App() {
         </div>
       )}
 
-      {/* VOLET DE NAVIGATION mobile — bouton unique qui ouvre une liste défilante */}
+      {/* NAV BAS mobile */}
       {isMobile && (
         <>
           <style>{`
-            @keyframes navSheetUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
-            @keyframes navSheetFade { from{opacity:0} to{opacity:1} }
-            .nav-sheet{animation:navSheetUp .25s cubic-bezier(.22,1,.36,1) forwards}
-            .nav-sheet-backdrop{animation:navSheetFade .2s ease forwards}
+            @keyframes navPop { 0%{transform:scale(.7) translateY(8px);opacity:0} 55%{transform:scale(1.15) translateY(-3px);opacity:1} 80%{transform:scale(0.97) translateY(0);opacity:1} 100%{transform:scale(1) translateY(0);opacity:1} }
+            @keyframes navSlideIn { from{opacity:0;transform:translateX(-50%) scaleX(0.4)} to{opacity:1;transform:translateX(-50%) scaleX(1)} }
+            .nav-icon-active{animation:navPop .35s cubic-bezier(.34,1.56,.64,1) forwards}
+            .nav-pill-active{animation:navSlideIn .28s cubic-bezier(.22,1,.36,1) forwards}
           `}</style>
-          <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:640,background:"#ffffff",zIndex:50,paddingBottom:"env(safe-area-inset-bottom,0px)",borderTop:"1px solid #e2e8f0"}}>
-            <button onClick={()=>setShowNavSheet(true)} style={{width:"100%",padding:"12px 16px",border:"none",background:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7,WebkitTapHighlightColor:"transparent",fontFamily:"inherit"}}>
-              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2.2" strokeLinecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
-              <span style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>Menu</span>
-            </button>
+          <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:640,background:"#ffffff",display:"flex",alignItems:"flex-end",zIndex:50,paddingBottom:"env(safe-area-inset-bottom,0px)",borderTop:"1px solid #e2e8f0"}}>
+            {NAV.map(n=>{
+              const active = page===n.id;
+              const accentColor = n.id==="rdv" ? "#818cf8" : DS.blue;
+              const gradFrom = n.id==="rdv" ? "#818cf8" : "#06b6d4";
+              const gradTo = n.id==="rdv" ? "#4f46e5" : "#0891b2";
+              return (
+                <button key={n.id} onClick={()=>setPage(n.id)} style={{flex:1,paddingTop:8,paddingBottom:12,border:"none",cursor:"pointer",background:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:2,WebkitTapHighlightColor:"transparent",outline:"none",position:"relative",minWidth:0}}>
+                  {active && <div className="nav-pill-active" style={{position:"absolute",top:0,left:"50%",width:32,height:3,background:`linear-gradient(90deg,${gradFrom},${gradTo})`,borderRadius:"0 0 6px 6px"}}/>}
+                  <div style={{width:40,height:28,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:8,background:active?"#e0f2fe":"transparent",transition:"background .15s"}}>{n.icon(active)}</div>
+                  <span style={{fontSize:10,fontWeight:active?700:400,color:active?accentColor:"#94a3b8",transition:"all .15s",lineHeight:1}}>{n.l}</span>
+                </button>
+              );
+            })}
           </div>
-
-          {showNavSheet && (
-            <>
-              <div className="nav-sheet-backdrop" onClick={()=>setShowNavSheet(false)} style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.45)",zIndex:97}}/>
-              <div className="nav-sheet" style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:640,background:"#fff",zIndex:98,borderTopLeftRadius:20,borderTopRightRadius:20,boxShadow:"0 -8px 32px rgba(15,23,42,0.2)",paddingBottom:"env(safe-area-inset-bottom,0px)",maxHeight:"70vh",display:"flex",flexDirection:"column"}}>
-                <div style={{display:"flex",justifyContent:"center",padding:"10px 0 4px"}}>
-                  <div style={{width:36,height:4,borderRadius:2,background:"#e2e8f0"}}/>
-                </div>
-                <div style={{overflowY:"auto",WebkitOverflowScrolling:"touch",padding:"4px 10px 14px"}}>
-                  {NAV.map(n=>{
-                    const active = page===n.id;
-                    return (
-                      <button key={n.id} onClick={()=>{setPage(n.id);setShowNavSheet(false);}}
-                        style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 12px",borderRadius:12,
-                          border:"none",cursor:"pointer",background:active?"#e0f2fe":"transparent",
-                          textAlign:"left",fontFamily:"inherit",WebkitTapHighlightColor:"transparent"}}>
-                        <div style={{width:34,height:34,borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{n.icon(active)}</div>
-                        <span style={{fontSize:14,fontWeight:active?800:600,color:active?DS.blue:"#334155"}}>{n.l}</span>
-                        {active && <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={DS.blue} strokeWidth="2.5" strokeLinecap="round" style={{marginLeft:"auto"}}><polyline points="20 6 9 17 4 12"/></svg>}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </>
-          )}
         </>
       )}
 
