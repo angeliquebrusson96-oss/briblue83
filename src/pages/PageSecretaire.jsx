@@ -498,6 +498,8 @@ export function PageSecretaire({
               signature:             { icon: "✍️", txt: "Signature client",                  color: P.violet },
               rdv:                   { icon: "📅", txt: "RDV planifié",                      color: P.violet },
               rapport_planifie:      { icon: "🗓️", txt: "Rapport planifié",                  color: P.cyan   },
+              versement_paye:        { icon: "💳", txt: "Mensualité marquée payée",           color: "#059669" },
+              livraison_payee:       { icon: "💳", txt: "Livraison marquée payée",             color: "#059669" },
             }[e.type] || { icon: "🔔", txt: e.type, color: P.slate };
             const d = new Date(e.at);
             const target = resolveTarget(e);
