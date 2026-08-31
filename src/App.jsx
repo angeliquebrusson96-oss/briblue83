@@ -1380,6 +1380,7 @@ export default function App() {
   const [showImport, setShowImport]     = useState(false);
   const [showImportHTML, setShowImportHTML] = useState(false);
   const [showPlanRapport, setShowPlanRapport] = useState(false);
+  const [bootStuck, setBootStuck] = useState(false);
   const [secTab, setSecTab] = useState("planning"); // onglet actif de la vue secrétaire
   const [events, setEvents] = useState(() => loadEvents());
   const [showNotifPanel, setShowNotifPanel] = useState(false);
@@ -1415,6 +1416,8 @@ export default function App() {
   useEffect(() => { passagesRef.current = passages; }, [passages]);
   const rdvsRef     = useRef([]);
   useEffect(() => { rdvsRef.current = rdvs; }, [rdvs]);
+  const livraisonsRef = useRef([]);
+  useEffect(() => { livraisonsRef.current = livraisons; }, [livraisons]);
   const stockMetaRef = useRef({}); // ref toujours à jour, utilisée pour filtrer les défauts masqués dans le callback stock
   useEffect(() => { stockMetaRef.current = stockMeta; }, [stockMeta]);
   const stockRef = useRef({}); // ref toujours à jour, utilisée pour la vérification de collision dans renameProduitStock
@@ -1577,6 +1580,15 @@ export default function App() {
       runPhotoMigration().catch(() => {});
     }).catch(() => {});
   },[loggedIn, applyLocalData, runPhotoMigration]);
+
+  // Filet de sécurité : si l'écran "Chargement…" reste affiché anormalement
+  // longtemps (bug non prévu, connexion très lente…), proposer de recharger
+  // plutôt que de laisser l'app bloquée indéfiniment.
+  useEffect(() => {
+    if (!loggedIn || ready) { setBootStuck(false); return; }
+    const t = setTimeout(() => setBootStuck(true), 6000);
+    return () => clearTimeout(t);
+  }, [loggedIn, ready]);
 
   // ─── FIX #5 : re-synchronisation complète au retour en ligne ────────────────
   // reconcileOnBoot est relancé pour récupérer les données Firebase manquantes
@@ -1838,7 +1850,15 @@ export default function App() {
     if (!auth.currentUser) signInAnonymously(auth).catch(()=>{});
     setLoggedIn(true);
   },[]);
-  const handleLogout = useCallback(()=>{ try{sessionStorage.removeItem("bb_auth");sessionStorage.removeItem("bb_session");}catch{ /* noop */ } setSession(null);setLoggedIn(false);setReady(false);setClients([]);setPassages([]);setLivraisons([]);setRdvs([]); },[]);
+  const handleLogout = useCallback(()=>{
+    try{sessionStorage.removeItem("bb_auth");sessionStorage.removeItem("bb_session");}catch{ /* noop */ }
+    // Réarmer le flag de boot module-level : sinon une reconnexion (même
+    // session navigateur, ex: Dorian → Angélique sur le même appareil) saute
+    // silencieusement l'effet d'initialisation et l'app reste bloquée sur
+    // "Chargement…" indéfiniment (ready ne redevient jamais true).
+    _BB_BOOT_DONE = false;
+    setSession(null);setLoggedIn(false);setReady(false);setClients([]);setPassages([]);setLivraisons([]);setRdvs([]);
+  },[]);
 
   const saveClient = useCallback(async c=>{
     const { envoyerContrat, ...clientDataRaw } = c;
@@ -2065,7 +2085,22 @@ export default function App() {
     markDeleted("bb_livraisons_v1", id);
     setLivraisons(prev=>{ const next=prev.filter(x=>x.id!==id); saveLivraisonsList(next); return next; });
   },[saveLivraisonsList, syncLivraisonDeleteServer]);
-  const updateStatutLivraison = useCallback((id,statut)=>{ setLivraisons(prev=>{ const next=prev.map(x=>x.id===id?{...x,statut}:x); saveLivraisonsList(next); return next; }); },[saveLivraisonsList]);
+  const updateStatutLivraison = useCallback((id,statut)=>{
+    setLivraisons(prev=>{
+      const next=prev.map(x=>x.id===id?{...x,statut}:x);
+      saveLivraisonsList(next);
+      return next;
+    });
+    if (statut === "payee") {
+      const l = livraisonsRef.current.find(x => x.id === id);
+      const nomCli = l ? (clientsRef.current.find(c => c.id === l.clientId)?.nom || "") : "";
+      const montant = l ? (Number(l.montant) || Number(l.prixTotal) || Number(l.total) || 0) : 0;
+      const label = `${nomCli}${montant>0?` — ${montant}€`:""}`;
+      recordEvent("livraison_payee", label, l ? { kind:"livraison", id:l.id } : undefined);
+      toastInfo(`💳 Livraison marquée payée${nomCli?` — ${nomCli}`:""}`);
+      sendLocalNotification("💳 Livraison payée", nomCli ? `${nomCli}${montant>0?` — ${montant}€`:""}` : "Une livraison a été marquée payée.", { tag:"briblue-liv-payee-"+id, requireInteraction:false });
+    }
+  },[saveLivraisonsList, recordEvent]);
   const updateStock = useCallback((produit, qty) => { setStock(prev=>{ const next={...prev,[produit]:qty}; saveStock(next); return next; }); },[saveStock]);
   const addProduitStock = useCallback((nom) => { setStock(prev=>{ const next={...prev,[nom]:prev[nom]??0}; saveStock(next); return next; }); },[saveStock]);
   const deleteProduitStock = useCallback((nom) => {
@@ -2177,7 +2212,19 @@ export default function App() {
       saveVersements(next);
       return next;
     });
-  }, [saveVersements, syncVersementServer]);
+    if (paid) {
+      // key = "{clientId}_{annee}_{mois}"
+      const parts = key.split("_");
+      const mois = parts.pop();
+      const annee = parts.pop();
+      const clientId = parts.join("_");
+      const nomCli = clientsRef.current.find(c => c.id === clientId)?.nom || "";
+      const label = `${nomCli} — ${MOIS[parseInt(mois,10)] || mois} ${annee}`;
+      recordEvent("versement_paye", label);
+      toastInfo(`💳 Mensualité marquée payée — ${label}`);
+      sendLocalNotification("💳 Mensualité payée", nomCli ? `${nomCli} — ${MOIS[parseInt(mois,10)] || mois} ${annee}` : "Une mensualité a été marquée payée.", { tag:"briblue-versement-"+key, requireInteraction:false });
+    }
+  }, [saveVersements, syncVersementServer, recordEvent]);
 
   const nbAlertes = useMemo(()=>clients.filter(c=>alerteClient(c,passages)!=="ok"&&!dismissedAlertes.includes(c.id)).length,[clients,passages,dismissedAlertes]);
 
@@ -2208,6 +2255,15 @@ export default function App() {
       <img src="/logo-briblue.png" alt="Bri'Blue" className="bb-load-logo" style={{width:190,maxWidth:"70vw",height:"auto",filter:"drop-shadow(0 8px 24px rgba(8,145,178,0.25))"}}/>
       <div className="bb-load-bar"/>
       <div style={{color:"#94a3b8",fontSize:12,fontWeight:600,letterSpacing:.3}}>Chargement…</div>
+      {bootStuck && (
+        <button onClick={()=>window.location.reload()}
+          style={{marginTop:6,padding:"10px 20px",borderRadius:12,border:"none",
+            background:"linear-gradient(135deg,#0891b2,#0369a1)",color:"#fff",
+            fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",
+            boxShadow:"0 4px 14px rgba(8,145,178,0.35)"}}>
+          Ça prend trop de temps — Recharger
+        </button>
+      )}
     </div></>
   );
 
@@ -2218,10 +2274,10 @@ export default function App() {
     <GlobalStyles/>
     <ToastContainer/>
     <ConfirmModal/>
-    <div style={{minHeight:"100dvh",background:"#f1f5f9",fontFamily:"'Inter', -apple-system, system-ui, sans-serif",maxWidth:isMobile?640:900,margin:"0 auto",display:"flex",flexDirection:"column"}}>
+    <div style={{minHeight:"100dvh",width:"100%",background:"#f1f5f9",fontFamily:"'Inter', -apple-system, system-ui, sans-serif",maxWidth:isMobile?640:900,margin:"0 auto",display:"flex",flexDirection:"column",overflowX:"hidden",boxSizing:"border-box"}}>
       <div style={{height:4,background:"linear-gradient(90deg,#7c3aed 0%,#a78bfa 50%,#06b6d4 100%)",flexShrink:0,position:"sticky",top:0,zIndex:51}}/>
       <div style={{background:"#fff",borderBottom:"1px solid #e2e8f0",position:"sticky",top:4,zIndex:50}}>
-        <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
+        <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10,minWidth:0}}>
           <div style={{width:36,height:36,borderRadius:11,overflow:"hidden",flexShrink:0,boxShadow:"0 2px 8px rgba(8,20,45,0.25)"}}>
             <img src="/icon-192.png" alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
           </div>
@@ -2245,7 +2301,7 @@ export default function App() {
           <div style={{width:8,height:8,borderRadius:"50%",background:online?"#22c55e":"#f87171",flexShrink:0}}/>
         </div>
         {/* Onglets */}
-        <div style={{display:"flex",gap:6,padding:"0 14px 10px"}}>
+        <div style={{display:"flex",gap:6,padding:"0 14px 10px",minWidth:0}}>
           {[
             {id:"planning", label:"Planning", emoji:"📅"},
             {id:"gestion",  label:"Gestion",  emoji:"💳"},
@@ -2253,9 +2309,9 @@ export default function App() {
             const active = secTab===t.id;
             return (
               <button key={t.id} onClick={()=>setSecTab(t.id)}
-                style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,
-                  padding:"9px 12px",borderRadius:12,fontFamily:"inherit",cursor:"pointer",
-                  fontSize:12.5,fontWeight:active?800:600,
+                style={{flex:"1 1 0",minWidth:0,display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+                  padding:"9px 8px",borderRadius:12,fontFamily:"inherit",cursor:"pointer",
+                  fontSize:12.5,fontWeight:active?800:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",
                   background:active?"linear-gradient(135deg,#7c3aed,#4c1d95)":"#f8fafc",
                   color:active?"#fff":"#475569",border:"none",
                   boxShadow:active?"0 3px 12px rgba(124,58,237,0.3)":"inset 0 0 0 1px #eef2f6",
@@ -2266,7 +2322,7 @@ export default function App() {
           })}
         </div>
       </div>
-      <div style={{padding:"18px 16px 40px"}}>
+      <div style={{padding:"18px 16px 40px",minWidth:0,boxSizing:"border-box"}}>
         {secTab==="planning" && (
           <PageSecretaire
             clients={clients}
@@ -2329,6 +2385,8 @@ export default function App() {
     rapport_planifie:      { icon:"🗓️", verbe:"Rapport planifié",         color:"#0891b2" },
     rdv_planifie_recu:     { icon:"📅", verbe:"RDV ajouté par Angélique", color:"#6d28d9" },
     rapport_planifie_recu: { icon:"🗓️", verbe:"Rapport ajouté par Angélique", color:"#0891b2" },
+    versement_paye:        { icon:"💳", verbe:"Mensualité payée",         color:"#059669" },
+    livraison_payee:       { icon:"💳", verbe:"Livraison payée",          color:"#059669" },
   };
   // Résout l'objet (RDV / rapport / livraison) visé par un événement du journal.
   // Utilise la référence explicite si présente, sinon retrouve le client par son
