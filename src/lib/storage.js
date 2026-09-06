@@ -967,6 +967,24 @@ export function subscribeToRealtime(callbacks) {
           let val = data[mapping.field];
           if (val === undefined) continue;
 
+          // ── Garde-fou universel : écriture locale en attente/en vol ─────────
+          // S'applique à TOUTES les clés, pas seulement aux tableaux fusionnés.
+          // Sans ça, un objet comme "versements" (mensualités payées) ou
+          // "retards"/"notes" — qui partagent le document "meta" avec d'autres
+          // champs — peut être écrasé par un ancien snapshot arrivant pendant
+          // le debounce (400-800ms) d'une écriture qu'on vient de faire (ex:
+          // cocher une mensualité payée pour un client puis la voir "revenir
+          // en arrière" quelques centaines de ms plus tard).
+          if (offlineQueue.pending[key] !== undefined) {
+            const localRaw = localStorage.getItem("briblue_" + key);
+            if (localRaw !== null) {
+              try {
+                patchedData[mapping.field] = JSON.parse(localRaw);
+                continue;
+              } catch { /* JSON invalide → laisser le traitement normal reprendre la main */ }
+            }
+          }
+
           // Fusion protectrice pour les clés de type tableau
           if (MERGE_ARRAY_KEYS.has(key) && Array.isArray(val)) {
             try {
@@ -992,15 +1010,9 @@ export function subscribeToRealtime(callbacks) {
               const valFiltered = deleted && deleted.size > 0
                 ? val.filter(x => !x?.id || !deleted.has(String(x.id)))
                 : val;
-              if (Array.isArray(localArr) && localArr.length > 0 && offlineQueue.pending[key] !== undefined) {
-                // Une écriture locale pour cette clé est encore en attente/en vol vers
-                // Firebase (debounce 400-800ms) : elle est plus récente que ce snapshot
-                // distant. Garder le local intact — sinon un changement de champ (ex:
-                // statut "payé" d'une livraison) est écrasé par la valeur distante pas
-                // encore à jour, et semble "revenir en arrière" côté utilisateur.
-                val = localArr;
-                patchedData[mapping.field] = localArr;
-              } else if (Array.isArray(localArr) && localArr.length > 0) {
+              // (le cas "écriture en attente" est déjà traité par le garde-fou
+              // universel plus haut, qui fait `continue` avant d'arriver ici)
+              if (Array.isArray(localArr) && localArr.length > 0) {
                 const merged = mergeArrayById(valFiltered, localArr, deleted);
                 if (merged.length > valFiltered.length) {
                   console.info(`[briblue] onSnapshot "${key}" : ${merged.length - valFiltered.length} entrée(s) locale(s) absente(s) de Firebase — fusion automatique.`);
