@@ -10,6 +10,26 @@ const FIREBASE_DEBOUNCE_MS = 800;
 const offlineQueue    = { pending: {} };
 const _debounceTimers = {};
 
+// ─── TOMBSTONES CONTRATS — mémoriser une suppression/réinitialisation volontaire ─
+// Purement local (jamais synchronisé) : évite qu'un vieux snapshot Firestore, pas
+// encore à jour avec la suppression (appel à /api/update-contract en vol), ne
+// "ressuscite" un contrat qu'on vient de supprimer pour en recréer un nouveau.
+const CONTRATS_TOMB_LS_KEY = "briblue_contrats_tombstones_v1";
+function _readContratTombstones() {
+  try {
+    const raw = localStorage.getItem(CONTRATS_TOMB_LS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+export function markContratDeleted(id) {
+  if (!id) return;
+  try {
+    const tombs = _readContratTombstones();
+    tombs[id] = Date.now();
+    localStorage.setItem(CONTRATS_TOMB_LS_KEY, JSON.stringify(tombs));
+  } catch { /* noop */ }
+}
+
 // ─── DIAGNOSTICS — état de synchronisation exposé au panneau Paramètres ─────
 const _diag = { lastSyncAt: null, lastError: null, lastErrorAt: null, syncCount: 0 };
 function _diagSyncOk()      { _diag.lastSyncAt = Date.now(); _diag.syncCount++; }
@@ -1046,12 +1066,31 @@ export function subscribeToRealtime(callbacks) {
               const RANK = { signe_complet:4, signe_client:3, demande_envoyee:2, cree:1, reset:0 };
               const localRaw = localStorage.getItem("briblue_" + key);
               const localObj = localRaw ? JSON.parse(localRaw) : {};
+              const tombstones = _readContratTombstones();
               if (localObj && typeof localObj === "object") {
                 const mergedConts = { ...val };
+                // Suppression pure (pas de recréation) : l'id n'existe plus en local
+                // mais ce snapshot distant pas encore à jour le propose encore →
+                // ne pas le laisser réapparaître tant que le serveur n'a pas rattrapé
+                // la suppression (/api/update-contract).
+                for (const [id, tombAt] of Object.entries(tombstones)) {
+                  if (tombAt >= remoteTime && !(id in localObj) && id in mergedConts) {
+                    delete mergedConts[id];
+                  }
+                }
                 for (const [id, lct] of Object.entries(localObj)) {
                   if (!lct || typeof lct !== "object") continue;
                   const rct = mergedConts[id];
                   if (!rct || typeof rct !== "object") continue; // absent du serveur → supprimé, on n'y touche pas
+                  const tombAt = tombstones[id];
+                  if (tombAt && tombAt >= remoteTime) {
+                    // Supprimé/réinitialisé localement APRÈS la dernière sauvegarde connue
+                    // du serveur : ce snapshot est encore l'ancienne version (pas encore
+                    // rattrapée par /api/update-contract) → ne pas la laisser l'emporter,
+                    // même si son statut (ex: signé) a un rang plus élevé.
+                    mergedConts[id] = lct;
+                    continue;
+                  }
                   const lr = RANK[lct.statut] ?? -1;
                   const rr = RANK[rct.statut] ?? -1;
                   if (lr > rr) {
