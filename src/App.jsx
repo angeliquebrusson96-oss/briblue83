@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { save, flushPendingNow, IS_IOS, reconcileOnBoot, invalidateDocCache, subscribeToRealtime, markPassageDeleted, markDeleted } from "./lib/storage";
+import { save, flushPendingNow, IS_IOS, reconcileOnBoot, invalidateDocCache, subscribeToRealtime, markPassageDeleted, markDeleted, markContratDeleted } from "./lib/storage";
 import { ocrPdfFile, parseOCRText, terminateOcrWorker } from "./lib/ocr";
 import { extractPassagePhotos, migratePassagePhotosToStorage, migrateAllPassagesPhotos, migrateClientPhotoToStorage, retryPendingUploads, _getUploadQueue } from "./lib/photoStore";
 import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
@@ -1936,7 +1936,10 @@ export default function App() {
       setContrats(prev => {
         const next = {...prev};
         Object.keys(next).forEach(k => {
-          if (k === `CT-${clientId}` || next[k]?.clientId === clientId) delete next[k];
+          if (k === `CT-${clientId}` || next[k]?.clientId === clientId) {
+            markContratDeleted(k);
+            delete next[k];
+          }
         });
         saveContrats(next);
         return next;
@@ -1953,6 +1956,7 @@ export default function App() {
         const next = {...prev};
         Object.keys(next).forEach(k => {
           if (k === `CT-${clientId}` || next[k]?.clientId === clientId) {
+            markContratDeleted(k);
             next[k] = { ...next[k], clientId, statut: "cree", signatureClient: "", signaturePrestataire: "", signedAt: null, signedByPrestaAt: null };
           }
         });
