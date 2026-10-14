@@ -988,14 +988,25 @@ export function subscribeToRealtime(callbacks) {
           if (val === undefined) continue;
 
           // ── Garde-fou universel : écriture locale en attente/en vol ─────────
-          // S'applique à TOUTES les clés, pas seulement aux tableaux fusionnés.
-          // Sans ça, un objet comme "versements" (mensualités payées) ou
-          // "retards"/"notes" — qui partagent le document "meta" avec d'autres
-          // champs — peut être écrasé par un ancien snapshot arrivant pendant
-          // le debounce (400-800ms) d'une écriture qu'on vient de faire (ex:
-          // cocher une mensualité payée pour un client puis la voir "revenir
-          // en arrière" quelques centaines de ms plus tard).
-          if (offlineQueue.pending[key] !== undefined) {
+          // S'applique à TOUTES les clés, SAUF "bb_contrats_v1", pas seulement
+          // aux tableaux fusionnés. Sans ça, un objet comme "versements"
+          // (mensualités payées) ou "retards"/"notes" — qui partagent le
+          // document "meta" avec d'autres champs — peut être écrasé par un
+          // ancien snapshot arrivant pendant le debounce (400-800ms) d'une
+          // écriture qu'on vient de faire (ex: cocher une mensualité payée
+          // pour un client puis la voir "revenir en arrière" quelques
+          // centaines de ms plus tard).
+          // ⚠️ "bb_contrats_v1" est exclu : contrairement aux autres clés, il
+          // a PLUSIEURS écrivains indépendants du navigateur du technicien —
+          // le client (sign.html) et Dorian en co-signature (sign-prestataire.html)
+          // écrivent via /api/sign-contract (Admin SDK), hors de cette app. Si le
+          // technicien a la moindre écriture locale en attente sur "bb_contrats_v1"
+          // (ex: il vient de cliquer "Envoyer pour signature"), ce garde-fou
+          // ignorerait alors AUSSI la vraie signature du client qui vient d'arriver
+          // côté serveur — pire, un retry de la queue locale la réécrirait ensuite
+          // par-dessus. La fusion dédiée "bb_contrats_v1" plus bas (rang de statut +
+          // tombstones) gère déjà correctement la protection sans ce risque.
+          if (key !== "bb_contrats_v1" && offlineQueue.pending[key] !== undefined) {
             const localRaw = localStorage.getItem("briblue_" + key);
             if (localRaw !== null) {
               try {
@@ -1108,6 +1119,14 @@ export function subscribeToRealtime(callbacks) {
                 }
                 val = mergedConts;
                 patchedData[mapping.field] = mergedConts;
+                // Si une écriture locale est encore en attente/en vol pour cette
+                // clé, la remplacer par le résultat fusionné : sinon, quand le
+                // debounce finira par l'envoyer, il écraserait sur le serveur la
+                // signature qu'on vient tout juste de recevoir et d'intégrer ici.
+                if (offlineQueue.pending[key] !== undefined) {
+                  offlineQueue.pending[key] = mergedConts;
+                  _persistQueue();
+                }
               }
             } catch { /* noop */ }
           }
